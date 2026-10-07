@@ -25,11 +25,13 @@ title: "项目搭建与交付"
 **在本机终端里做。**先准备 Node.js。Vite 要求 Node.js 20.19 以上，或 22.12 以上。运行 `node -v` 查看版本。版本太低就去 nodejs.org 安装 LTS 版本。
 
 ```bash title="在本机终端里做：创建并启动项目"
-node -v                                       # 确认版本满足上面的要求
+# 先确认 Node 版本
+node -v
 npm create vite@latest my-app -- --template react-ts
 cd my-app
 npm install
-npm run dev                                   # 打开终端里显示的地址，通常是 http://localhost:5173
+# 启动后，打开终端里显示的地址，通常是 http://localhost:5173
+npm run dev
 ```
 
 `--template react-ts` 是“React + TypeScript”模板。省略它，命令会在终端里问你。Vite 也有一个带 React Compiler 的模板：`react-compiler-ts`。Vite 的模板会随版本变化，例如目前默认附带的检查工具是 Oxlint，加 `--eslint` 才用 ESLint。**以命令运行时的提示和 [vite.dev/guide](https://vite.dev/guide/) 为准。**
