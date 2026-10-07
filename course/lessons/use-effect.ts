@@ -4,7 +4,7 @@ export default {
   id: 'use-effect',
   stage: 1,
   title: 'useEffect 与副作用',
-  mins: 24,
+  mins: 25,
   summary: '让组件与外部世界同步：定时器、网络请求、订阅、修改标题。',
   goals: [
     '能说出 effect 的用途：让组件与外部系统保持同步',

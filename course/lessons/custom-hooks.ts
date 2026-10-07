@@ -4,7 +4,7 @@ export default {
   id: 'custom-hooks',
   stage: 1,
   title: '自定义 Hook：复用逻辑',
-  mins: 19,
+  mins: 20,
   summary: '把组件中的状态逻辑抽取成以 use 开头的函数，在多个组件间复用。',
   goals: [
     '能说出 Hooks 的两条规则，并找出违反规则的代码',

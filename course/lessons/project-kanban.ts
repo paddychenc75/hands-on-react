@@ -4,7 +4,7 @@ export default {
   id: 'project-kanban',
   stage: 1,
   title: '实战三：看板应用',
-  mins: 40,
+  mins: 42,
   summary: '用 useReducer 和 Context 组织一个多组件应用，体会状态架构的价值。',
   goals: [
     '能写出一个纯 reducer：add、move、remove 三种 action，每个分支都返回新对象',
