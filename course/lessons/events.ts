@@ -4,7 +4,7 @@ export default {
   id: 'events',
   stage: 0,
   title: '事件处理',
-  mins: 17,
+  mins: 18,
   summary: '响应点击、输入、键盘等用户操作。',
   goals: [
     '能给元素绑定事件处理函数，包括需要传参的写法',
@@ -34,49 +34,94 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>声明一个布尔 state，初始值为 false。</li><li>在 <code>&lt;p id="status"&gt;</code> 中显示 <b>关</b>（false）或 <b>开</b>（true）。</li><li>点击按钮 <b>切换</b> 时，把 state 取反。</li></ol>',
+    task: '<ol class="task-steps"><li><code>ColorButton</code> 的按钮被点击时，调用 <code>onPick</code>，并把自己的 <code>color</code> 传给它。</li><li>在 <code>App</code> 里给每个 <code>ColorButton</code> 传 <code>onPick</code>，让 <code>&lt;p id="picked"&gt;</code> 显示选中的颜色。</li><li>外层 <code>&lt;div id="outer"&gt;</code> 的 <code>onClick</code> 会把选中清空（显示 <b>无</b>）。点击颜色按钮时不能触发它。点击按钮以外的空白处，才会清空。</li></ol>',
     starter: `import { useState } from 'react';
 
+function ColorButton({ color, onPick }) {
+  return <button>{color}</button>;
+}
+
 function App() {
+  const [picked, setPicked] = useState('无');
   return (
-    <div>
-      <p id="status">关</p>
-      <button>切换</button>
+    <div id="outer" onClick={() => setPicked('无')} style={{ padding: 16 }}>
+      <ColorButton color="红" />
+      <ColorButton color="绿" />
+      <ColorButton color="蓝" />
+      <p id="picked">{picked}</p>
     </div>
   );
 }`,
     solution: `import { useState } from 'react';
 
-function App() {
-  const [on, setOn] = useState(false);
+function ColorButton({ color, onPick }) {
   return (
-    <div>
-      <p id="status">{on ? '开' : '关'}</p>
-      <button onClick={() => setOn(o => !o)}>切换</button>
+    <button
+      onClick={e => {
+        e.stopPropagation();
+        onPick(color);
+      }}
+    >
+      {color}
+    </button>
+  );
+}
+
+function App() {
+  const [picked, setPicked] = useState('无');
+  return (
+    <div id="outer" onClick={() => setPicked('无')} style={{ padding: 16 }}>
+      <ColorButton color="红" onPick={setPicked} />
+      <ColorButton color="绿" onPick={setPicked} />
+      <ColorButton color="蓝" onPick={setPicked} />
+      <p id="picked">{picked}</p>
     </div>
   );
 }`,
-    hint: '用一个布尔类型的 state，<code>setOn(o =&gt; !o)</code> 取反，显示时用三元运算符。',
+    hint: 'onClick 要的是函数，还是函数的返回值？点击按钮后，事件还会传到哪一层？',
     faded: `import { useState } from 'react';
 
-function App() {
-  /* ✏️ 声明一个布尔 state 和它的 set 函数，初始值为 false */
+function ColorButton({ color, onPick }) {
   return (
-    <div>
-      <p id="status">{/* ✏️ true 显示“开”，false 显示“关” */}</p>
-      <button onClick={/* ✏️ 传入一个函数：把 state 取反 */}>切换</button>
+    <button
+      onClick={e => {
+        /* ✏️ 阻止事件冒泡到外层 div */
+        /* ✏️ 调用 onPick，把 color 传给父组件 */
+      }}
+    >
+      {color}
+    </button>
+  );
+}
+
+function App() {
+  const [picked, setPicked] = useState('无');
+  return (
+    <div id="outer" onClick={() => setPicked('无')} style={{ padding: 16 }}>
+      <ColorButton color="红" onPick={/* ✏️ 传入一个能更新 picked 的函数 */} />
+      <ColorButton color="绿" onPick={/* ✏️ 同上 */} />
+      <ColorButton color="蓝" onPick={/* ✏️ 同上 */} />
+      <p id="picked">{picked}</p>
     </div>
   );
 }`,
     test: async t => {
-      const s = () => t.text('#status');
-      t.assert(s() === '关', '初始应显示“关”');
-      const b = t.byText('button', '切换');
-      t.assert(b, '找不到“切换”按钮');
-      await t.click(b);
-      t.assert(s() === '开', '点击一次后应显示“开”');
-      await t.click(b);
-      t.assert(s() === '关', '再点一次应变回“关”');
+      const p = () => t.text('#picked').trim();
+      t.assert(t.q('#picked'), '找不到 id="picked" 的元素');
+      t.assert(p() === '无', '初始应显示“无”');
+      const red = t.byText('button', '红'),
+        blue = t.byText('button', '蓝');
+      t.assert(red && blue, '需要文字为 红、绿、蓝 的三个按钮');
+      await t.click(red);
+      t.assert(
+        p() !== '无',
+        '点击“红”后仍显示“无”。检查两件事：按钮点击时是否调用了 onPick(color)，父组件传入的 onPick 是否更新了 state；点击按钮的事件会冒泡到外层 div，把选中清空，要阻止它',
+      );
+      t.assert(p() === '红', `点击“红”后应显示“红”，实际是“${p()}”。onPick 收到的应该是 color`);
+      await t.click(blue);
+      t.assert(p() === '蓝', `再点“蓝”后应显示“蓝”，实际是“${p()}”`);
+      await t.click(t.q('#outer'));
+      t.assert(p() === '无', '点击外层空白处应清空为“无”。请保留外层 div 的 onClick');
     },
   },
   checkOnly: [
@@ -120,7 +165,7 @@ function App() {
   plays: {
     三种常见写法: {},
     事件对象与冒泡: {
-      note: '按钮 B 的点击先由按钮处理，再冒泡到外层 div，所以新增 2 条。按钮 A 调用了 e.stopPropagation()，事件停在按钮上，只新增 1 条。',
+      note: '按钮 B 的点击先由按钮处理，再冒泡到外层 div，所以新增 2 条。按钮 A 调用了 e.stopPropagation()，事件停在按钮上，只新增 1 条。日志列表用了 <code>.map()</code> 和 <code>key</code>，第 7 课会讲。',
       predict: {
         q: '点击“按钮 B”一次，日志列表会新增几条？',
         options: ['1 条', '2 条', '0 条', '3 条'],

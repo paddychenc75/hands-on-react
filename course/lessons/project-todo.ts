@@ -4,7 +4,7 @@ export default {
   id: 'project-todo',
   stage: 0,
   title: '实战一：完整的待办应用',
-  mins: 40,
+  mins: 41,
   summary: '综合 state、表单、列表、条件渲染和派生数据，从零写一个功能完整的小应用。',
   goals: [
     '能从需求表列出最少需要的 state：todos、text、filter',
@@ -16,7 +16,7 @@ export default {
     '先设计 state，再写界面：只存 todos、输入框文字、当前筛选，其余都能算出来。',
     '“剩余数量”“筛选后的列表”在渲染时用 <code>filter</code> 计算。再存一份，就会出现两个数据源，容易不同步。',
     '修改数组用 <code>map</code>、<code>filter</code>、展开运算符生成新数组。不要 push、splice，也不要直接改某一项的 done。',
-    '最常见的坑：忘了 <code>preventDefault()</code> 导致表单提交刷新页面；忘了清空输入框；空白内容也被添加。',
+    '最常见的坑：忘了 <code>preventDefault()</code> 导致表单提交刷新页面（实验台替你拦住了刷新，所以验收测不出这一点，真实页面里会刷新）；忘了清空输入框；空白内容也被添加。',
   ],
   quiz: [
     {

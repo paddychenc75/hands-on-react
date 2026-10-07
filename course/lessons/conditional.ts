@@ -120,8 +120,8 @@ function App() {
   ],
   plays: {
     '三元运算符与 &&': {},
-    'count 为 0 时的两种写法': {
-      note: '写法 A 显示了一个“0”。0 &amp;&amp; x 的结果是 0，而 React 会渲染数字。',
+    '&& 左边不是布尔值': {
+      note: '写法 A 显示了一个“0”。<code>0 &amp;&amp; x</code> 的结果是 0，而 React 会渲染数字。写法 B 先比较 <code>count &gt; 0</code>，得到布尔值 false，什么都不显示。',
       predict: {
         q: '“写法 A：”这一行后面会显示什么？',
         options: ['什么都不显示', '0', 'false', '有 0 条'],

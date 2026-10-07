@@ -32,9 +32,25 @@ function App() {
 }
 ```
 
+下面的输入框只写了 `value`，没有写 `onChange`。先想一想，再在里面打字。
+
+```jsx play title="只有 value，没有 onChange"
+import { useState } from 'react';
+
+function App() {
+  const [text, setText] = useState('你好');
+  return (
+    <div>
+      <input value={text} />
+      <p>state 里是：{text}</p>
+    </div>
+  );
+}
+```
+
 <CallBox kind="warn" label="常见坑">
 
-如果只写 `value={text}` 却没写 `onChange`，输入框会变成**只读**，怎么打字都没反应。因为每次渲染它都被强制设回 state 的值。
+你可能看到的报错：``Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.``<br />原因：输入框的 `value` 来自 state，却没有 `onChange` 去更新 state。每次渲染它都被强制设回 state 的值。<br />去看：这个输入框。加上 `onChange`；如果确实只读，写 `readOnly`；如果只想要初始值，用 `defaultValue`。
 
 </CallBox>
 
@@ -62,7 +78,7 @@ function App() {
   }
 
   function handleSubmit(e) {
-    e.preventDefault(); // 阻止页面刷新
+    e.preventDefault(); // 阻止页面刷新（实验台替你拦住了刷新，真实页面里不写它会刷新）
     if (!form.name.trim()) return setError('请填写姓名');
     setError('');
     setSubmitted(form);
@@ -85,7 +101,9 @@ function App() {
 }
 ```
 
-注意这里的 `[name]: value` 是 JS 的**计算属性名**：用变量 name 的值作为对象的键。复选框用 `checked` 而不是 `value`。
+注意这里的 `[name]: value` 是 JS 的**计算属性名**：用变量 name 的值作为对象的键。复选框用 `checked` 而不是 `value`：复选框的 `value` 是一个固定的字符串（默认是 "on"），和勾没勾选无关。勾选状态在 `checked` 里。所以要绑定 `checked={…}`，读取 `e.target.checked`。
+
+`<textarea>` 和 `<select>` 也用 `value` + `onChange`，写法和文本框相同。在 HTML 里，它们分别用标签内容和 `selected` 属性。单选框和复选框一样用 `checked`。
 
 <CallBox kind="tip" label="要点">
 

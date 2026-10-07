@@ -4,19 +4,21 @@ export default {
   id: 'components-props',
   stage: 0,
   title: '组件与 Props',
-  mins: 18,
+  mins: 24,
   summary: '把界面拆成组件，用 props 给组件传数据。',
   goals: [
     '能写出一个函数组件，并在 App 里多次使用它',
     '能通过 props 传入数据，并用解构和默认值读取它',
-    '能找出修改 props 的错误写法，说出正确的改法',
-    '能用 children 写一个“包裹”内容的容器组件',
+    '能找出修改 props 的错误写法，说出正确的改法；能说出组件为什么必须是纯函数',
+    '能用 children 写一个“包裹”内容的容器组件，并用 className 和 prop 给组件加样式',
   ],
   keyPoints: [
     '组件是返回 JSX 的函数，名字必须大写开头。React 靠大写区分组件和 HTML 标签。',
     "父组件通过 props 传入数据，就像给函数传参数。子组件常用解构读取：<code>function Card({ name, emoji = '🙂' })</code>。",
     'props 是只读的。子组件不能改它；数据由谁拥有，就由谁修改。',
+    '组件要像纯函数：同样的 props 和 state，得到同样的 JSX。渲染时不要改外部变量。严格模式在开发环境把组件调用两次，用来发现这类问题。',
     '写在组件开闭标签之间的内容，会作为 <code>children</code> 传入。',
+    '样式用 <code>className</code>；让 prop（如 variant）决定类名。内联 style 只用于随数据变化的数值。',
   ],
   quiz: [
     {
@@ -31,7 +33,7 @@ export default {
       options: ['直接 props.count++', '用 Object.assign 修改 props', '不能修改；应由拥有数据的父组件修改并重新传入', '把 props 存到全局变量再改'],
       answer: 2,
       explain:
-        'props 是只读的。数据由谁拥有，就由谁修改。常见做法是父组件再通过 props 传入一个回调函数，子组件调用它。前两项看起来能改，但改的是父组件的数据，React 不知道，界面也不会更新。',
+        'props 是只读的。数据由谁拥有，就由谁修改。常见做法是父组件再通过 props 传入一个回调函数，子组件调用它。前两项改不成功：开发环境中 React 会冻结 props 对象，在真实项目（ES 模块）里这行代码直接抛出 TypeError，在本站实验台里则静默失败。就算改成功了，React 也不知道，界面不会更新。',
     },
     {
       q: 'Panel 写成 <code>function Panel({ title }) { return &lt;section&gt;&lt;h3&gt;{title}&lt;/h3&gt;&lt;/section&gt;; }</code>。使用时写 <code>&lt;Panel title="公告"&gt;&lt;p&gt;周五开会&lt;/p&gt;&lt;/Panel&gt;</code>。页面上会显示什么？',
@@ -39,6 +41,13 @@ export default {
       answer: 1,
       explain:
         '标签之间的 &lt;p&gt; 会作为 children 传入，但 Panel 没有读取也没有渲染 children，所以它被丢掉了。最容易误选的是第一项：children 不会自动出现，要在 JSX 里写 {children}。',
+    },
+    {
+      q: '组件 <code>function Cup() { guest = guest + 1; return &lt;p&gt;{guest}&lt;/p&gt;; }</code> 里的 guest 是模块变量，初始为 0。在严格模式下渲染一个 <code>&lt;Cup /&gt;</code>，开发环境中页面显示几？',
+      options: ['2', '1', '0', '报错'],
+      answer: 0,
+      explain:
+        '严格模式在开发环境把组件函数调用两次，第二次的结果被采用，所以 guest 加了两次，显示 2。最容易误选的是 1：那是生产环境的结果。同一个组件在两个环境里表现不同，正说明它不是纯函数。',
     },
   ],
   exercise: {
@@ -116,5 +125,18 @@ function App() {
       note: '王五没有传 emoji，所以用了默认值 🙂。',
     },
     'children 让组件可以“包裹”任意内容': {},
+    渲染时修改外部变量: {
+      note: '三个杯子显示 2、4、6 号。严格模式把每个 Cup 调用了两次，每次都给 guest 加 1，页面用的是第二次的结果。组件在渲染时修改了外部变量，所以多调用一次就多一次影响。把编号改成从 props 传入（<code>&lt;Cup no={1} /&gt;</code>），调用几次结果都一样。',
+      predict: {
+        q: '三个杯子分别显示几号？',
+        options: ['1、2、3 号', '2、4、6 号', '1、1、1 号', '3、3、3 号'],
+        answer: 1,
+        explain: '严格模式在开发环境里把每个组件函数调用两次。Cup 每次调用都改 guest，所以三个杯子是 2、4、6。纯函数调用几次结果都一样。',
+      },
+      pkey: 'components-props|渲染时修改外部变量',
+    },
+    '用 className 和 variant 加样式': {
+      note: '同一个 Button，variant 不同就对应不同的类名，外观随之变化。disabled 为 true 时才加上 btn-disabled。',
+    },
   },
 } satisfies Lesson;

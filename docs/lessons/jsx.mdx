@@ -56,6 +56,18 @@ function App() {
 }
 ```
 
+不是所有值都会显示出来。下面把几个不同的值放进方括号里，看看方括号之间留下了什么。
+
+```jsx play title="哪些值会显示"
+function App() {
+  return (
+    <p>
+      [{0}] [{false}] [{null}] [{[1, 2]}] [{NaN}]
+    </p>
+  );
+}
+```
+
 <CallBox kind="warn" label="常见坑">
 
 花括号里只能放**表达式**，不能放**语句**。`{if (x) ...}`、`{for (...)}` 都是错的。需要判断时用三元运算符 `{x ? a : b}` 或 `&&`，需要循环时用 `.map()`，后面会专门讲。
@@ -71,6 +83,8 @@ function App() {
 | class 要写成 className | `class="box"` | `className="box"` |
 | 属性用驼峰命名（例外：`aria-*` 和 `data-*` 保留短横线） | `onclick`、`tabindex` | `onClick`、`tabIndex` |
 | style 接收对象 | `style="color:red"` | `style={{ color: 'red' }}` |
+
+JSX 里的注释要写成 `{/* 注释 */}`：花括号进入 JS，里面是普通的块注释。直接写 `// 注释` 会被当成文字显示出来。
 
 为什么 `style` 有两层花括号？外层 `{}` 表示“这里是 JS”，内层 `{}` 是一个 JS 对象字面量。CSS 属性名也要改成驼峰：`font-size` → `fontSize`。
 
