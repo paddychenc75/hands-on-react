@@ -4,11 +4,11 @@ export default {
   id: 'router',
   stage: 4,
   title: '路由：React Router',
-  mins: 28,
+  mins: 30,
   summary: '让单页应用拥有多个“页面”：路由表、动态参数、嵌套布局与跳转。',
   goals: [
     '能解释客户端路由的三步：URL 变化、路由库读 URL、渲染匹配的组件',
-    '能写出路由表：静态路径、动态参数 <code>:id</code>、兜底 <code>*</code>，并排对顺序',
+    '能写出路由表：静态路径、动态参数 <code>:id</code>、兜底 <code>*</code>，并能说出 React Router 怎样在多条匹配里选一条',
     '能用 Link、useParams、useNavigate 完成“列表 → 详情 → 返回”的流程',
     '能判断哪些状态该放进 URL 的查询参数，以及什么时候用 <code>{ replace: true }</code>',
   ],
@@ -21,16 +21,16 @@ export default {
   ],
   quiz: [
     {
-      q: '同事在导航栏里写了 <code>&lt;a href="/cart"&gt;购物车&lt;/a&gt;</code>。用户在首页填了一半表单，点这个链接再点“后退”。表单里的内容会怎样？',
+      q: '同事在导航栏里写了 <code>&lt;a href="/cart"&gt;购物车&lt;/a&gt;</code>。用户在首页把 3 件商品加入了购物车（数量存在 Context 的 state 里），然后点这个链接。购物车页显示几件？',
       options: [
-        '还在：React Router 会把每个页面的 state 自动保存在历史记录里',
-        '没了：a 标签让浏览器整页刷新，所有 state 都被丢弃',
-        '还在，因为 URL 变回了首页',
-        '没了，但只是因为没有用 useNavigate',
+        '3 件：Context 在整个应用里共享',
+        '0 件：a 标签让浏览器重新加载整个页面，应用从头启动，state 回到初始值',
+        '3 件，因为 URL 变了但组件没有卸载',
+        '0 件，但只是因为没有用 useNavigate',
       ],
       answer: 1,
       explain:
-        '普通 a 标签会让浏览器重新加载整个页面，React 应用从头启动，state 全部丢失。&lt;Link&gt; 拦截点击，只改 URL 并重新渲染。“URL 变回了首页”有迷惑性：URL 相同不代表 state 还在，state 只存在于这一次页面加载的内存里。',
+        '普通 a 标签会让浏览器重新加载整个页面，React 应用从头启动，state 全部回到初始值。&lt;Link&gt; 拦截点击，只改 URL 并重新渲染，所以 state 还在。“Context 在整个应用里共享”有迷惑性：Context 只在同一次页面加载的内存里共享，页面重新加载后它也从头开始。',
     },
     {
       q: '路由是 <code>users/:id</code>，当前 URL 是 <code>/users/2</code>。组件里写 <code>const { id } = useParams(); const user = USERS.find(u =&gt; u.id === id);</code>，USERS 里的 id 是数字。结果是？',
@@ -156,7 +156,7 @@ function App() {
       </nav>
       <Routes routes={[
         { path: '/', element: <Home /> },
-        // 步骤 6：在这里加 /users、/users/:id 和 * 三条路由。注意顺序。
+        // 步骤 6：在这里加 /users、/users/:id 和 * 三条路由。注意顺序：迷你版按顺序匹配（真的 React Router 会自动排名，不需要）。
       ]} />
     </Router>
   );
@@ -334,11 +334,11 @@ function App() {
         t.assert(/useParams\s*\(\s*\)/.test(t.source), '详情页要用 useParams() 读出 id（步骤 3）');
         t.assert(/useNavigate\s*\(\s*\)/.test(t.source), '返回按钮要用 useNavigate() 得到的函数跳转（步骤 4）');
         t.assert(path() === '/' && t.q('#home'), '一开始应在首页 /，并显示 #home');
-        t.assert(!t.q('#not-found'), '在首页时不应显示 #not-found。检查 * 路由是不是放在了最前面（步骤 6）');
+        t.assert(!t.q('#not-found'), '在首页时不应显示 #not-found。检查 * 路由是不是放在了最前面（步骤 6；迷你路由按顺序匹配）');
 
         await go('/users');
         t.assert(path() === '/users', '点“用户”后地址应是 /users');
-        t.assert(!t.q('#not-found'), '/users 页不应显示 #not-found。* 路由应放在最后（步骤 6）');
+        t.assert(!t.q('#not-found'), '/users 页不应显示 #not-found。* 路由应放在最后（步骤 6；迷你路由按顺序匹配）');
         const items = t.qa('li.user');
         t.assert(items.length === 3, '用户列表应有 3 个 li.user，实际有 ' + items.length + ' 个（步骤 2）');
         t.assert(items.map(li => li.textContent.trim()).join() === '张三,李四,王五', '列表应按顺序显示 张三、李四、王五');
@@ -419,12 +419,30 @@ const page = params.get('page') ?? 1;
       options: ['/users/2/edit', '/users/edit', '/edit', '/users/2edit'],
       answer: 0,
       explain:
-        '不以 <code>/</code> 开头的路径是相对路径。React Router 把它解析为相对于<b>当前路由</b>的路径，这里是 /users/2，所以得到 /users/2/edit。想去根路径，写 <code>to="/edit"</code>；想去上一级，写 <code>to=".."</code>。“/users/edit”是按浏览器解析 <code>&lt;a href="edit"&gt;</code> 的规则推出来的：浏览器会替换最后一段，React Router 不会。',
+        '不以 <code>/</code> 开头的路径是相对路径。React Router 把它解析为相对于<b>当前路由</b>的路径，这里是 /users/2，所以得到 /users/2/edit。想去根路径，写 <code>to="/edit"</code>。<code>to=".."</code> 回到<b>父路由</b>：它去掉的是当前路由的整段 path。这里路由是单层的 <code>/users/:id</code>，所以 <code>..</code> 去的是 <code>/</code>。只有把 <code>:id</code> 写成 <code>/users</code> 的子路由，<code>..</code> 才是 <code>/users</code>。想按 URL 去掉最后一段，写 <code>&lt;Link to=".." relative="path"&gt;</code>。“/users/edit”是按浏览器解析 <code>&lt;a href="edit"&gt;</code> 的规则推出来的：浏览器会替换最后一段，React Router 不会。',
+    },
+    {
+      q: `路由表这样写，<code>*</code> 在最前面。用 React Router（不是本课的迷你版）访问 <code>/users/2</code>，渲染哪个组件？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;Routes&gt;
+  &lt;Route path="*" element={&lt;NotFound /&gt;} /&gt;
+  &lt;Route path="/users/:id" element={&lt;UserDetail /&gt;} /&gt;
+&lt;/Routes&gt;</code></pre></div>`,
+      options: ['NotFound：* 在最前面，先匹配', 'UserDetail', '两个都渲染', '报错：* 必须放在最后'],
+      answer: 1,
+      explain:
+        'React Router 按“谁更具体”给路由排名：静态段优先于动态段，动态段优先于 <code>*</code>，和书写顺序无关。所以 /users/2 渲染 UserDetail。“* 先匹配”是迷你路由的行为（它按数组顺序取第一个），不是真库的行为。',
     },
   ],
   plays: {
     '迷你路由（Link 和 Hook 的用法与 React Router 一致）': {
-      note: '点“关于”看 404 兜底。<br>这是原理演示。真实项目从 <code>react-router</code> 导入，写法见上面的代码块。迷你版和真库有三点不同：1. 路由表用数组传入，不是 <code>&lt;Route&gt;</code> 子元素；2. 不支持嵌套路由和 <code>&lt;Outlet /&gt;</code>；3. 不同步浏览器地址栏，也不支持前进后退。',
+      pkey: 'router|迷你路由（Link 和 Hook 的用法与 React Router 一致）',
+      predict: {
+        q: '路由表里有 /、/users、/users/:id 三条，没有 /about。运行后点导航里的“关于”，页面显示什么？',
+        options: ['回到首页', '空白，什么都不渲染', '404：没有页面匹配 /about', '控制台报错，页面崩溃'],
+        answer: 2,
+        explain:
+          '迷你 Routes 逐条匹配，一条都没匹配上时走最后的 return，显示“404：没有页面匹配 /about”。“空白”有迷惑性：练习里的 Routes 才是没匹配就返回 null，这里的写法多了一行兜底文字。',
+      },
+      note: '这是原理演示。真实项目从 <code>react-router</code> 导入，写法见上面的代码块。迷你版和真库有四点不同：1. 路由表用数组传入，不是 <code>&lt;Route&gt;</code> 子元素；2. 不支持嵌套路由和 <code>&lt;Outlet /&gt;</code>；3. 不同步浏览器地址栏，也不支持前进后退；4. 迷你版按数组顺序取第一个匹配，所以 <code>*</code> 必须放最后。真库按“谁更具体”排名（静态段 &gt; 动态段 &gt; <code>*</code>），和书写顺序无关。',
     },
   },
 } satisfies Lesson;

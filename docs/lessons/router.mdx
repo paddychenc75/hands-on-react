@@ -64,7 +64,7 @@ function UserDetail() {
 
 ## 自己动手：一个 40 行的迷你路由
 
-本页的沙箱不能加载 React Router。所以我们用学过的 Context 和 state 写一个**迷你版**。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。路由表用数组传入，写法类似 `createBrowserRouter`，也不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
+本页的沙箱不能加载 React Router。所以我们用学过的 Context 和 state 写一个**迷你版**。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。它和真库有两点不同：路由表用数组传入（写法类似 `createBrowserRouter`）；不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
 
 ```jsx play title="迷你路由（Link 和 Hook 的用法与 React Router 一致）"
 import { createContext, useContext, useState } from 'react';
@@ -177,6 +177,30 @@ function ProductList() {
 
 </CallBox>
 
+## 数据模式：让路由来加载数据
+
+`createBrowserRouter` 让你把 `loader` 写在路由表里。`loader` 是进入页面前运行的函数，返回的数据用 `useLoaderData()` 读取。下面的代码只能阅读。
+
+```jsx
+import { createBrowserRouter, RouterProvider, useLoaderData } from 'react-router';
+
+const router = createBrowserRouter([
+  {
+    path: '/users/:id',
+    loader: ({ params }) => fetch(`/api/users/${params.id}`).then(r => r.json()),
+    element: <UserDetail />,
+  },
+]);
+
+function UserDetail() {
+  const user = useLoaderData();         // 进入页面时数据已经取好
+  return <h3>{user.name}</h3>;
+}
+// 浏览器里：<RouterProvider router={router} />，从 'react-router/dom' 导入
+```
+
+这样组件里不用 `useEffect` 取数据，页面也不会先闪一下空白。它和第 34 课的 TanStack Query 分工不同：`loader` 解决“进入页面前取到数据”，Query 解决“缓存、过期和后台刷新”。两者也可以一起用。
+
 ## 选哪种模式？
 
 | 情况 | 模式 |
@@ -185,7 +209,7 @@ function ProductList() {
 | 要在进入页面前取数据，或要显示待定状态 | 数据模式（`createBrowserRouter`） |
 | 新项目，需要服务端渲染 | 框架模式（react.dev 推荐从框架开始） |
 
-版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。
+版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2 以上，并且只提供 ESM。还在用 React 18 的项目请用 v7，导入写法相同。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
 
 ## 上线前必遇的三件事
 
@@ -210,7 +234,7 @@ const UserDetail = lazy(() => import('./UserDetail'));
 
 <CallBox kind="deep" label="深入一点">
 
-React Router 的数据模式（`createBrowserRouter`）和框架模式还提供两个功能。`loader` 在进入页面前加载数据。路由 `action` 处理表单提交。本课用的 `<BrowserRouter>` 属于声明式模式，不支持这两个功能。这和第 29 课的 Server Components、Server Functions 思路相同。**数据跟着路由加载**，不在组件里用 effect 请求。
+React Router 的数据模式（`createBrowserRouter`）和框架模式还提供两个功能。`loader` 在进入页面前加载数据。路由 `action` 处理表单提交。本课用的 `<BrowserRouter>` 属于声明式模式，不支持这两个功能。`loader` 和路由 `action` 的思路，与第 29 课的 Server Components、Server Functions 相同：**数据跟着路由加载**，不在组件里用 effect 请求。
 
 </CallBox>
 

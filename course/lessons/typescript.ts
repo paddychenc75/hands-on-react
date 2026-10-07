@@ -4,12 +4,12 @@ export default {
   id: 'typescript',
   stage: 4,
   title: 'TypeScript + React',
-  mins: 22,
+  mins: 30,
   summary: '给组件、状态、事件和 Hook 加上类型，让编辑器替你找 bug。',
   goals: [
     '能写出 props 的类型：必填、可选（?）和字面量联合类型',
     '能判断 useState 什么时候要手写类型（例如 User | null），并给事件和 ref 标注类型',
-    '能读懂并写出一个泛型列表组件',
+    '能读懂并写出泛型列表组件，并给 reducer、Context 和自定义 Hook 写类型',
     '能指出 any 和“联合类型里混进 string”为什么让检查失效',
   ],
   keyPoints: [
@@ -25,14 +25,14 @@ export default {
       options: ['useState<any>(null)', 'useState<User | null>(null)', 'useState<User>(null)', '不用写，TypeScript 会从后面的 setUser 调用推断'],
       answer: 1,
       explain:
-        'TypeScript 只看初始值。初始值 null 推断不出以后会存 User，所以要写出联合类型 User | null。最有迷惑性的是 <code>useState&lt;User&gt;(null)</code>：严格模式下 null 不能赋给 User，会报错；它也隐瞒了“可能还没有用户”这件事。any 能通过编译，但关掉了检查。',
+        'TypeScript 只看初始值。初始值 null 推断不出以后会存 User，所以要写出联合类型 User | null。最有迷惑性的是 <code>useState&lt;User&gt;(null)</code>：开启 <code>strict</code>（TypeScript 的严格检查）后，null 不能赋给 User，会报错；它也隐瞒了“可能还没有用户”这件事。any 能通过编译，但关掉了检查。',
     },
     {
       q: 'Card 的 children 有时是一段文字，有时是 <code>&lt;img&gt;</code>，有时是 null。children 的类型写哪个？',
-      options: ['string', 'JSX.Element', 'React.ReactNode', 'React.ReactElement[]'],
+      options: ['string', 'React.JSX.Element', 'React.ReactNode', 'React.ReactElement[]'],
       answer: 2,
       explain:
-        'ReactNode 包括元素、字符串、数字、数组、null 等所有可渲染的内容。最常见的误解是 JSX.Element：它只表示一个 JSX 元素，传入文字或 null 都会报错。string 不接受元素，ReactElement[] 不接受单个元素和文字。',
+        'ReactNode 包括元素、字符串、数字、数组、null 等所有可渲染的内容。最常见的误解是 React.JSX.Element：它只表示一个 JSX 元素，传入文字或 null 都会报错（React 19 的类型里要写 <code>React.JSX.Element</code>，旧教程写 <code>JSX.Element</code>）。string 不接受元素，ReactElement[] 不接受单个元素和文字。',
     },
     {
       q: "类型是 <code>variant?: 'primary' | 'ghost'</code>。下面哪个用法会被编辑器标红？",
@@ -45,6 +45,13 @@ export default {
       answer: 2,
       explain:
         '联合类型只允许列出的值，"danger" 不在其中。? 表示可选，所以不传、或传 undefined 都可以。很多人以为“可选”就是“随便传什么都行”，其实可选只放宽了“传不传”，没有放宽“传什么”。',
+    },
+    {
+      q: `<code>createContext&lt;Theme | null&gt;(null)</code> 创建了 ThemeContext。组件里直接 <code>const theme = useContext(ThemeContext); theme.mode</code> 会怎样？`,
+      options: ['没有问题：Context 一定有值', '开启 strict 后 TypeScript 报错：theme 可能是 null', '运行时报错，但编译通过', '报错：createContext 不能写泛型'],
+      answer: 1,
+      explain:
+        'useContext 返回的类型是 Theme | null。开启 strict 后，读 theme.mode 前必须先排除 null。常见做法是写一个 useTheme()：里面判断 null 并抛错，返回已收窄的 Theme，所有使用方就不用再判断。“运行时才报错”是没开 strict 时的情况：编译能过，但 Provider 漏写时会读到 null。',
     },
   ],
   exercise: {
@@ -227,6 +234,22 @@ function View({ s }: { s: State }) {
       answer: 1,
       explain:
         'TypeScript 先从 items 推断出 T 是 number，再用 T 给 render 的参数定类型。所以 u 是 number，读 <code>u.name</code> 报错。这正是泛型组件的价值：同一个组件能适配任何数据，但数据和回调的类型必须一致。“u 是 any”不对：u 的类型由上下文推断出来，不是 any。泛型参数也不需要手写，能推断时可以省略。',
+    },
+    {
+      q: `这个自定义 Hook 返回一个数组。使用方写 <code>const [on, toggle] = useToggle();</code> 然后 <code>toggle()</code>，TypeScript 会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function useToggle() {
+  const [on, setOn] = useState(false);
+  const toggle = () =&gt; setOn(v =&gt; !v);
+  return [on, toggle];
+}</code></pre></div>`,
+      options: [
+        '没有问题：on 是 boolean，toggle 是函数',
+        '报错：返回值被推断为 (boolean | (() => void))[]，toggle 可能是 boolean，不能调用',
+        '报错：Hook 不能返回数组',
+        '运行时报错，编译通过',
+      ],
+      answer: 1,
+      explain:
+        '不加 as const 时，数组字面量被推断成元素类型的联合数组，每一项都可能是 boolean 或函数。写 <code>return [on, toggle] as const;</code> 才得到元组 readonly [boolean, () => void]，位置和类型一一对应。',
     },
   ],
   plays: {

@@ -4,7 +4,7 @@ export default {
   id: 'tanstack-query',
   stage: 4,
   title: '数据请求：TanStack Query',
-  mins: 26,
+  mins: 28,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
     '能列出 useEffect 手写请求没有解决的三个问题：重复请求、没有缓存、数据过期',
@@ -64,7 +64,7 @@ export default {
     starter: `import { useSyncExternalStore, useEffect, useState } from 'react';
 
 // ===== 迷你 Query 缓存（不要修改） =====
-// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致。
+// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致（真库失败会先重试，见课文“常见坑”）。
 const cache = new Map();      // key -> { data, updatedAt, fetching, promise, error }
 const listeners = new Set();
 const notify = () => listeners.forEach(l => l());
@@ -136,7 +136,7 @@ function App() {
     solution: `import { useSyncExternalStore, useEffect, useState } from 'react';
 
 // ===== 迷你 Query 缓存（不要修改） =====
-// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致。
+// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致（真库失败会先重试，见课文“常见坑”）。
 const cache = new Map();      // key -> { data, updatedAt, fetching, promise, error }
 const listeners = new Set();
 const notify = () => listeners.forEach(l => l());
@@ -295,6 +295,26 @@ const { data: posts } = useQuery({
       answer: 2,
       explain:
         'TanStack Query 按 queryKey 管理缓存。相同 key 的查询共享同一份数据和同一个请求。第一个组件发出请求后，第二个组件发现请求正在进行，就等这同一个结果。数据回来后，两个组件都会更新。所以在多个组件里直接调用同一个查询是推荐做法，不需要把数据层层传下去。“2 次”是用 useEffect 自己请求时的行为。',
+    },
+    {
+      q: `用“界面式”乐观更新：不动缓存，只在列表末尾多渲染一行临时项。提交请求后、服务器还没响应时，这一行会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const { mutate, variables, isPending } = useMutation({
+  mutationFn: addTodo,
+  onSettled: () =&gt; queryClient.invalidateQueries({ queryKey: ['todos'] }),
+});
+
+&lt;ul&gt;
+  {todos.map(t =&gt; &lt;li key={t.id}&gt;{t.title}&lt;/li&gt;)}
+  {isPending &amp;&amp; &lt;li style={{ opacity: 0.5 }}&gt;{variables}&lt;/li&gt;}
+&lt;/ul&gt;</code></pre></div>`,
+      options: [
+        '不显示：缓存里还没有这条数据',
+        '半透明地显示：isPending 为 true，variables 是 mutate 的参数',
+        '显示成正式的一行，并且已经写进了缓存',
+        '报错：variables 在 isPending 时是 undefined',
+      ],
+      answer: 1,
+      explain:
+        'mutation 在等待响应时 isPending 是 true，variables 是传给 mutate 的参数，所以临时项会半透明地显示。它只存在于这次渲染里，没有写进缓存，所以失败时不需要回滚。请求结束后 invalidateQueries 取回真数据，临时项随 isPending 变为 false 而消失。“已经写进缓存”是缓存写法（setQueryData）的行为，不是这里的。',
     },
   ],
   plays: {

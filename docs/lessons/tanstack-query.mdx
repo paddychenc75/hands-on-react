@@ -64,7 +64,7 @@ function Todos() {
 
 本页的沙箱不能加载 TanStack Query。下面用 `useSyncExternalStore` 实现一个带缓存的迷你 useQuery。这是原理演示，真实项目的写法见上面的代码块。
 
-注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：只有 queryKey 变化才重新请求。
+注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：queryFn 每次渲染换成新函数，不会触发重新请求；它只认 queryKey。
 
 ```jsx play title="迷你 useQuery"
 import { useSyncExternalStore, useEffect, useState } from 'react';
@@ -133,6 +133,13 @@ function App() {
 }
 ```
 
+迷你版和真库的差别：
+
+1. 真库失败后默认重试 3 次（约 7 秒）才报错，迷你版立刻报错。
+2. 真库在窗口重新获得焦点、网络恢复时，会刷新过期的数据。
+3. 真库在没有组件使用一份缓存 5 分钟后删除它（`gcTime`）。
+4. 迷你版没有 `invalidateQueries` 和 `useMutation`。
+
 ## useMutation：修改数据
 
 ```jsx title="修改后让相关缓存失效，是最简单可靠的同步方式"
@@ -168,7 +175,9 @@ function AddTodo() {
 
 ## 乐观更新：先改界面，失败再回滚
 
-步骤如下：
+简单情况不用动缓存：`const { variables, isPending } = useMutation(…)`，在列表末尾加一行 `{isPending && <li style={{ opacity: 0.5 }}>{variables}</li>}`。`variables` 是你传给 `mutate` 的参数。请求结束后，`invalidateQueries` 换成真数据。只有多个组件都要看到这条临时数据时，才用下面的缓存写法。
+
+缓存写法的步骤如下：
 
 1. 在 `onMutate` 中取消进行中的请求，保存旧数据，再用 `setQueryData` 写入新数据。
 2. `onMutate` 返回旧数据。
@@ -182,7 +191,7 @@ useMutation({
     await queryClient.cancelQueries({ queryKey: ['todos'] });
     const prev = queryClient.getQueryData(['todos']);
     queryClient.setQueryData(['todos'], old => [...(old ?? []), { id: 'temp', title }]);
-    return { prev };                                 // 会作为 onError 的第 3 个参数
+    return { prev };                                 // 会作为 onError 的第 3 个参数（v5 后期末尾还多一个 context 参数，三参数写法仍可用）
   },
   onError: (err, title, result) => queryClient.setQueryData(['todos'], result?.prev),
   onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
@@ -194,7 +203,7 @@ useMutation({
 | 现象或需求 | 做法 |
 |---|---|
 | 接口失败后，约 7 秒才显示错误 | 默认会重试 3 次，间隔 1、2、4 秒。测试里要设 `retry: false` |
-| key 到处手写，容易拼错 | 用 key 工厂集中定义：`userKeys = { all: ['users'], detail: id => ['users', id] }`。`invalidateQueries({ queryKey: userKeys.all })` 能一次让所有用户缓存失效 |
+| key 到处手写，容易拼错 | 用 key 工厂集中定义：`userKeys = { all: ['users'], detail: id => ['users', id] }`。`invalidateQueries({ queryKey: userKeys.all })` 能一次让所有用户缓存失效。v5 也可以用 `queryOptions({ queryKey, queryFn })` 把两者绑在一起 |
 | 翻页或搜索时，界面闪回“加载中” | `placeholderData: keepPreviousData`：换 key 时先显示上一页数据 |
 | 要等前一个数据到了再请求 | `enabled: !!userId` |
 | 只请求一次、不需要缓存；或数据已在服务端组件、loader 里取好 | 不必引入 Query |

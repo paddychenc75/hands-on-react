@@ -54,19 +54,19 @@ export default {
   id: 'nextjs',
   stage: 4,
   title: 'Next.js App Router',
-  mins: 25,
-  summary: '用文件夹定义路由，在服务端取数据，用 Server Actions 处理表单。',
+  mins: 28,
+  summary: '用文件夹定义路由，在服务端取数据，用 Server Function 处理表单。',
   goals: [
     '能根据 app/ 目录说出一个 URL 对应哪个 page.tsx、套着哪几层 layout.tsx、params 是什么',
     '能判断数据该在服务端组件、Server Function、Route Handler 还是 TanStack Query 里获取',
-    '能解释 Server Action 为什么必须自己校验登录和输入',
+    '能解释 Server Function 为什么必须自己校验登录和输入',
     "能找出“整页标成 'use client'”这类错误，只把交互部件拆成客户端组件",
   ],
   keyPoints: [
     '文件夹就是路由：<code>app/blog/[slug]/page.tsx</code> 对应 <code>/blog/任意一段</code>，值在 params.slug 里。静态文件夹优先于动态文件夹。',
     '<code>layout.tsx</code> 从外到内一层套一层；<code>loading.tsx</code> 和 <code>error.tsx</code> 就是框架自动加的 Suspense 和错误边界。',
     '页面默认是服务端组件，可以直接 <code>await</code> 查库，不需要 useEffect 和 loading state。',
-    'Server Action 本质上是一个公开的 HTTP 接口。每次都要在函数里检查登录，并校验 formData。',
+    'Server Function 本质上是一个公开的 HTTP 接口。每次都要在函数里检查登录，并校验 formData。',
     "最常见的坑：把整个页面标成 <code>'use client'</code>，等于退回传统 SPA。只把按钮、表单这类交互部件拆出去。",
   ],
   quiz: [
@@ -90,16 +90,16 @@ export default {
         'loading.tsx 会被自动用作这一段路由的 Suspense fallback。page.tsx 默认是服务端组件，不能用 useState。改成客户端组件加 useEffect 虽然能做到，但放弃了服务端取数据，也就是本课讲的最常见错误。error.tsx 是出错时的界面，不是加载界面。',
     },
     {
-      q: 'Server Action 里为什么必须做权限校验？',
+      q: 'Server Function 里为什么必须做权限校验？',
       options: [
         '只有页面里的 &lt;form&gt; 能调用它，所以只需在页面里校验',
         '它其实是公开的 HTTP 接口，谁都能直接调用',
-        '中间件已经拦截了所有未登录的请求，函数里不用再查一遍',
+        'proxy.ts（旧名 middleware）已经拦截了所有未登录的请求，函数里不用再查一遍',
         '只有用了 revalidatePath 时才需要校验',
       ],
       answer: 1,
       explain:
-        "'use server' 函数会暴露为可被网络请求调用的端点。别人不用打开你的页面，也能直接发请求调用它。“中间件已经拦截”最有迷惑性：中间件的匹配规则可能漏掉某些路径，而且它只看请求，不知道这个用户有没有权限改这条数据。权限要在函数里检查。",
+        "'use server' 函数会暴露为可被网络请求调用的端点。别人不用打开你的页面，也能直接发请求调用它。“Proxy 已经拦截”最有迷惑性：Server Function 是发到所在页面路由的 POST 请求。Proxy 的 matcher 漏掉这条路径，或者函数后来被别的页面使用，拦截就悄悄失效。而且 Proxy 只看请求，不知道这个用户能不能改这条数据。权限要在函数里检查。（Next.js 16 起 middleware 改名为 proxy。）",
     },
   ],
   exercise: {
@@ -176,7 +176,7 @@ export function resolveRoute(url, files) {
   const path = url.split(/[?#]/)[0];
   const parts = path.split('/').filter(Boolean);
 
-  // 2. 逐个试 page.tsx。静态段更多的匹配优先
+  // 2. 逐个试 page.tsx。这里用“静态段更多的优先”做简化（Next.js 的真实规则是从左到右逐段比较，每一段都是静态文件夹优先）
   let best = null;
   for (const file of files) {
     if (!file.endsWith('/page.tsx')) continue;
@@ -235,7 +235,7 @@ function App() {
   /* ✏️ path：url 在第一个 ? 或 # 之前的部分 */
   const parts = path.split('/').filter(Boolean);
 
-  // 2. 逐个试 page.tsx。静态段更多的匹配优先
+  // 2. 逐个试 page.tsx。这里用“静态段更多的优先”做简化（Next.js 的真实规则是从左到右逐段比较，每一段都是静态文件夹优先）
   let best = null;
   for (const file of files) {
     if (!file.endsWith('/page.tsx')) continue;
@@ -262,7 +262,7 @@ function App() {
   }
   return { page: best.page, layouts, params: best.params };
 }`,
-    hint: "把 <code>'app/blog/[slug]/page.tsx'</code> 变成段数组 <code>['blog', '[slug]']</code>，和 URL 的段数组逐段比较。段数必须相同。多个文件都匹配时，比较谁的静态段更多。",
+    hint: "把 <code>'app/blog/[slug]/page.tsx'</code> 变成段数组 <code>['blog', '[slug]']</code>，和 URL 的段数组逐段比较。段数必须相同。多个文件都匹配时，比较谁的静态段更多（这是简化；Next.js 的真实规则是从左到右逐段比较，每一段都是静态文件夹优先）。",
     test: async t => {
       const fn = t.exports.resolveRoute;
       t.assert(typeof fn === 'function', '找不到函数 resolveRoute。不要改它的名字');
@@ -327,6 +327,22 @@ export default function Page() {
       answer: 0,
       explain:
         '在共用同一个 layout 的页面之间导航，layout 不会重新挂载，只有 children 部分被替换。所以 SearchBox 的 state 保留。用 <code>&lt;a&gt;</code> 会让整页刷新，state 反而全部丢失。需要每次导航都重置时，改用 <code>template.tsx</code>：它在每次导航时都创建新实例。',
+    },
+    {
+      q: `Next.js 16.4 新建的项目默认开启 Cache Components。下面的页面在开发时会报 blocking-route 错误。怎样改最合适？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">// app/dashboard/page.tsx（没有 loading.tsx）
+export default async function Page() {
+  const user = (await cookies()).get('uid')?.value;
+  return &lt;h1&gt;你好，{user}&lt;/h1&gt;;
+}</code></pre></div>`,
+      options: [
+        "把页面改成 'use client'，在 useEffect 里读 cookie",
+        '把读取 cookie 的部分拆成组件，包在 <Suspense> 里；或者在 app/dashboard/ 下加 loading.tsx',
+        '在页面顶部加 export const dynamic = "force-static"',
+        "给 cookies() 的结果加 'use cache'",
+      ],
+      answer: 1,
+      explain:
+        "新模型里，没缓存的数据和运行时数据（cookies、headers、searchParams）必须放在 Suspense 里，请求时流式返回；loading.tsx 就是一层 Suspense。cookie 因人而异，不能用 'use cache' 缓存给所有人。“改成客户端组件”会放弃服务端取数据，是本课讲的最常见错误。具体报错和选项以所用版本的官方文档为准。",
     },
   ],
   plays: {},
