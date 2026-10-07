@@ -57,7 +57,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `course/registry.ts` | `LESSONS`（按顺序）、`lessonNo(id)`、`lessonById(id)`、`LESSON_ORDER` | — |
 | `course/stages.ts`、`glossary.ts`、`site.ts` | 6 个阶段、术语表、站点常量（base、链接工具） | — |
 | `course/card-keys.snapshot.json` | 复习卡片键快照，**提交进仓库**，由脚本更新（见「卡片键快照」） | 手改 |
-| `course/engine/logic/` | **纯函数**：不碰 DOM、localStorage，不读 `Date.now()`（时间由参数传入）。有单元测试，`tests/unit/purity.test.ts` 会挡住副作用 | DOM、存储、`window` |
+| `course/engine/logic/` | **纯函数**：不碰 DOM、localStorage，不读 `Date.now()`（时间由参数传入）。有单元测试，`tests/unit/purity.test.ts` 会挡住副作用；`tests/unit/cycles.test.ts` 检查全仓库没有循环依赖 | DOM、存储、`window` |
 | `course/engine/*.ts` | 会碰 DOM / 存储的引擎模块，模块清单见下面「引擎模块」 | 业务规则（放进 `logic/` 并写测试） |
 | `plugins/remark-play.mjs` | 把 ```` ```jsx play ```` 代码块变成 `<Playground>` | — |
 | `theme/` | React 薄包装组件（`components/`，在 `rspress.config.ts` 的 `globalComponents` 里注册，MDX 里不用 import）、`lib/` 钩子、`index.tsx`（顶栏加总进度）、`style.css`（全部样式，浅色 `:root`、深色 `html.dark`） | 学习机制的逻辑 |
