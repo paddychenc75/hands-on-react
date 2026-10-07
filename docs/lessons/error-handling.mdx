@@ -91,7 +91,7 @@ export default function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>开发版本会多报一次。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误。生产版本不会这样。测试全局上报时，用生产版本确认数量。
+<strong>开发版本会多报。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误（通常是两次：第一次渲染和同步重试各一次，jsdom 下验证）。生产版本不会这样。React 19 取消了这个做法。测试全局上报时，用生产版本确认数量。
 
 </CallBox>
 
@@ -121,7 +121,7 @@ function Weather({ city }) {
 
 <CallBox kind="deep" label="深入一点">
 
-React 有时会在 set 函数被调用时，提前执行一次更新函数，用来判断新旧 state 是否相同（eager state）。源码在这里包了 try/catch，注释写着“错误会在渲染时再抛一次”。所以这个写法在 18.3.1 中可靠。React 19 的 `startTransition` 里抛出的错误，以及 `use()` 读取的失败 Promise，都会直接交给边界，不需要这个技巧。
+React 有时会在 set 函数被调用时，提前执行一次更新函数，用来判断新旧 state 是否相同（eager state）。源码在这里包了 try/catch，注释写着“错误会在渲染时再抛一次”。所以这个写法在 18.3.1 中可靠。React 19 中，`useTransition` 返回的 startTransition 里抛出的错误（包括 async 函数里的），以及 `use()` 读取的失败 Promise，都会直接交给边界，不需要这个技巧。从 react 直接导入的 startTransition 不行，它不属于任何组件。
 
 </CallBox>
 
@@ -140,6 +140,8 @@ React 有时会在 set 函数被调用时，提前执行一次更新函数，用
 - `fallbackRender({ error, reset })`：备用界面由调用者决定。它拿到错误和一个 reset 函数，可以显示“重试”按钮。
 - `resetKeys`：一个数组。数组中的某个值变化时，边界自动重置。例如 `[productId]`。
 - `onError(error, info)`：在 componentDidCatch 中调用，用来上报。`info.componentStack` 是组件栈：出错组件到根组件的路径。
+
+库里 fallbackRender 收到的函数叫 `resetErrorBoundary`，本课简写成 reset。库也提供了第二节那个技巧的现成版本：`const { showBoundary } = useErrorBoundary()`。
 
 下面的边界实现了 resetKeys，但有一个缺陷。商品 3 的数据是坏的。先预测，再运行。
 
@@ -339,7 +341,7 @@ const root = createRoot(container, {
   onUncaughtError(error, info) {
     capture(error, { level: 'fatal', componentStack: info.componentStack });
   },
-  // 被某个边界接住。info.errorBoundary 是那个边界的实例
+  // 被某个边界接住。info.errorBoundary 是那个边界的实例（源码和类型定义里有，react.dev 的文档没有列出）
   onCaughtError(error, info) {
     capture(error, { level: 'error', componentStack: info.componentStack });
   },
@@ -349,6 +351,8 @@ const root = createRoot(container, {
   },
 });
 ```
+
+React 19 还改了默认行为。渲染错误不再被重新抛出：没被接住的错误默认交给 `window.reportError`，所以全局的 error 事件仍然能收到；被边界接住的错误默认只用 `console.error` 打印。你传了 onUncaughtError 或 onCaughtError，就**替换**了对应的默认行为：React 不再调用 reportError，也不再打印。另外，同一个被接住的错误会先后到达边界的 onError 和根的 onCaughtError。上报只放在一处，或者像上面的 capture 那样去重。
 
 在 React 18 中，没有这两个新回调。被边界接住的错误，靠边界的 onError 上报；没被接住的错误，React 会卸载整棵树，再把错误抛到 window，由全局的 error 事件接住。所以 React 18 项目需要**根边界 + 全局事件 + onRecoverableError** 三处配合。
 

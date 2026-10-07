@@ -86,6 +86,12 @@ function App() {
 
 </CallBox>
 
+<CallBox kind="tip" label="TS 写法">
+
+用 TypeScript 写 `useControllableState` 时，值的类型做成泛型：`function useControllableState<T>({ value, defaultValue, onChange }: { value?: T; defaultValue?: T; onChange?: (next: T) => void }): [T | undefined, (next: T) => void]`。调用方传 `useControllableState<string | null>(…)`，`null` 才能作为“受控，但没有选中”的合法值。
+
+</CallBox>
+
 ## 二、Headless Hook 与 prop getters
 
 Hook 管状态，但键盘事件、`aria-*` 属性、id 都必须落到使用者渲染的元素上。Hook 看不到这些元素，所以它返回一组函数，由使用者展开到元素上。这种函数叫 **prop getter**：调用它，得到一组应该放在某个元素上的 props。
@@ -305,7 +311,9 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-Listbox 有两种选择方式。“选择跟随焦点”：方向键移到哪项就选中哪项，适合选项少、选中没有副作用的情况（例如标签页）。“显式选择”：方向键只移动高亮，按 Enter 或空格才选中，适合选中会触发请求或跳转的情况。本课练习用后者，所以 Hook 里要区分“高亮的项”（activeIndex）和“选中的值”（value）。
+Listbox 有两种选择方式。“选择跟随焦点”：方向键移到哪项就选中哪项。这是 APG 给单选 Listbox 的写法，适合选中没有副作用的情况。“显式选择”：方向键只移动高亮，按键确认后才选中，适合选中会触发请求或跳转的情况。
+
+APG 的 Listbox 模式里，确认键是空格（用于多选）。Enter 是 Combobox 弹出列表的确认键。本课练习做一个可以用在弹出层里的列表，所以 Enter 和空格都选中高亮的项。本课练习用显式选择，所以 Hook 里要区分“高亮的项”（activeIndex）和“选中的值”（value）。APG 还建议支持按字符跳转（type-ahead），本课省略。
 
 </CallBox>
 
@@ -339,7 +347,7 @@ Listbox 有两种选择方式。“选择跟随焦点”：方向键移到哪项
 
 使用者常常想“行为是按钮，元素是链接”。有两种 API。下面的代码只能阅读：TypeScript 类型在本页的运行环境里不检查。
 
-```jsx title="多态组件的两种写法"
+```tsx title="多态组件的两种写法"
 // 方案一：as prop。类型要从 as 推导出可用的 props
 type ButtonProps<C extends React.ElementType> = {
   as?: C;

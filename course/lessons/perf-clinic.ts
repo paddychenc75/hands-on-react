@@ -4,7 +4,7 @@ export default {
   id: 'perf-clinic',
   stage: 5,
   title: '性能诊断实战',
-  mins: 40,
+  mins: 42,
   summary: '拿到一份不是你写的、很卡的代码。按“复现、测量、假设、修改、再测量”的流程找出病因，用数字证明修好了，并且功能不变。',
   goals: [
     '能按“复现、测量、假设、修改、再测量”的流程诊断陌生代码，并把每个假设写成可以验证的预测',
@@ -623,7 +623,7 @@ function App() {
         "第一次提交时 first 已更新，但 fullName 还是旧值。提交后 effect 执行，调用 setFullName，引起第二次渲染和提交。fullName 能由 first 和 last 算出，就不该存成 state：直接写 <code>const fullName = first + ' ' + last</code>，每次按键只有 1 次提交，而且永远不会显示旧值。",
     },
     {
-      q: `组件挂载、卸载 5 次之后，window 上还剩几个 resize 监听？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useEffect(() =&gt; {
+      q: `（生产版本，或没有开启 StrictMode）组件挂载、卸载 5 次之后，window 上还剩几个 resize 监听？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useEffect(() =&gt; {
   window.addEventListener('resize', () =&gt; setW(innerWidth));
   return () =&gt; {
     window.removeEventListener('resize', () =&gt; setW(innerWidth));
@@ -632,7 +632,7 @@ function App() {
       options: ['0 个', '1 个', '5 个', '10 个'],
       answer: 2,
       explain:
-        '清理函数里的箭头函数是新创建的，和添加时的不是同一个引用。removeEventListener 找不到它，什么也没移除。每次挂载留下一个监听，5 次就是 5 个。而且它们都会调用已卸载组件的 setW。修法：把函数存进一个变量 <code>const onResize = …</code>，添加和移除都用它。',
+        '清理函数里的箭头函数是新创建的，和添加时的不是同一个引用。removeEventListener 找不到它，什么也没移除。每次挂载留下一个监听，5 次就是 5 个。开发环境开了 StrictMode 时，每次挂载 effect 执行两次，会留下 10 个。而且它们都会调用已卸载组件的 setW。修法：把函数存进一个变量 <code>const onResize = …</code>，添加和移除都用它。',
     },
     {
       q: `在第一行的备注框里写了“加急”，然后在上方的搜索框里打一个字。第一行仍在结果中。备注框会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Table({ rows }) {
