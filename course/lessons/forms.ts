@@ -4,7 +4,7 @@ export default {
   id: 'forms',
   stage: 0,
   title: '表单与受控组件',
-  mins: 17,
+  mins: 19,
   summary: '让 React state 成为表单数据的唯一数据源。',
   goals: [
     '能把输入框写成受控组件：value 来自 state，onChange 更新 state',
@@ -15,7 +15,7 @@ export default {
   keyPoints: [
     '受控组件：<code>value</code> 来自 state，<code>onChange</code> 更新 state。state 是唯一数据源。',
     '只写 <code>value</code> 不写 <code>onChange</code>，输入框会变成只读。',
-    '复选框读写的是 <code>checked</code>，不是 <code>value</code>。',
+    '复选框读写的是 <code>checked</code>，不是 <code>value</code>：它的 value 是固定字符串，和勾没勾选无关。<code>&lt;textarea&gt;</code>、<code>&lt;select&gt;</code> 和文本框一样用 value + onChange。',
     '字段多时，用一个对象 state，再用 <code>[name]: value</code> 写一个通用的 handleChange。',
     '提交时调用 <code>e.preventDefault()</code> 阻止刷新。校验直接根据 state 计算。',
   ],
@@ -112,6 +112,16 @@ function App() {
   plays: {
     最基本的受控输入框: {
       note: '“清空”按钮能起作用，正是因为输入框的值由 state 控制。',
+    },
+    '只有 value，没有 onChange': {
+      note: '输入框打不进字，下方的警告说明了原因。输入框每次渲染都被设回 state 里的“你好”，而没有 onChange 去更新 state。',
+      predict: {
+        q: '点进输入框，按几个键盘字符。输入框里会怎样？',
+        options: ['输入的字显示出来，下面的 state 也跟着变', '输入的字显示出来，下面的 state 不变', '什么都打不进去，保持“你好”', '页面报错并停止渲染'],
+        answer: 2,
+        explain: 'value 被 state 锁定。没有 onChange 去更新 state，每次渲染都被设回“你好”，所以打不进字。React 只在控制台警告，不会崩溃。',
+      },
+      pkey: 'forms|只有 value，没有 onChange',
     },
     一个完整的表单: {},
   },

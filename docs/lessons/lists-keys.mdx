@@ -91,6 +91,7 @@ function App() {
 - 优先使用数据自带的 id（数据库 id、uuid 等）
 - 只有当列表**永远不会重排、插入、删除**时，用 index 才是安全的
 - key 要写在 map 直接返回的那个元素上，而不是它的子元素上
+- 一项数据要渲染多个并列元素时，用 `<Fragment key={item.id}>…</Fragment>` 把它们包起来（先 `import { Fragment } from 'react'`）。简写 `<>…</>` 不能写 key
 
 <CallBox kind="tip" label="要点">
 
@@ -100,15 +101,50 @@ key 不会作为 prop 传给组件。如果子组件也需要这个 id，要另�
 
 <CallBox kind="warn" label="常见坑">
 
-你可能看到的报错：`Warning: Each child in a list should have a unique "key" prop.`<br />原因：map 返回的元素没有 key，或者 key 重复了。<br />去看：`.map()` 回调返回的最外层元素。在它上面写 `key={item.id}`。如果它是一个组件，就写在组件上：`<TodoItem key={t.id} … />`。
+你可能看到的报错：`Warning: Each child in a list should have a unique "key" prop.`<br />原因：map 返回的元素没有 key。<br />去看：`.map()` 回调返回的最外层元素。在它上面写 `key={item.id}`。如果它是一个组件，就写在组件上：`<TodoItem key={t.id} … />`。<br />如果看到的是 `Encountered two children with the same key`：有两项的 key 相同。去检查 id 是怎么生成的。
 
 </CallBox>
 
-<CallBox kind="deep" label="深入一点">
+## key 的另一个用法
 
-key 还有一个高级用法：**改变 key 可以强制重置组件**。当 key 变化时，React 会卸载旧组件、创建一个全新的组件（状态全部清空）。例如 `<Profile key={userId} />` 在切换用户时自动清空表单。
+key 不只用在列表里。下面左右两个 `Profile` 完全一样，只有右边多了一个 key。操作步骤如下。
 
-</CallBox>
+1. 在两个备注框里各输入一些文字。
+2. 点“切换用户”。
+
+```jsx play title="切换用户时的备注框"
+import { useState } from 'react';
+
+function Profile({ userId }) {
+  const [note, setNote] = useState('');
+  return (
+    <div>
+      <b>用户 {userId}</b>
+      <br />
+      <input value={note} onChange={e => setNote(e.target.value)} placeholder="备注" size="10" />
+    </div>
+  );
+}
+
+function App() {
+  const [userId, setUserId] = useState(1);
+  return (
+    <div style={{ display: 'flex', gap: 24 }}>
+      <div>
+        <p>左：没有 key</p>
+        <Profile userId={userId} />
+      </div>
+      <div>
+        <p>右：key={userId}</p>
+        <Profile key={userId} userId={userId} />
+      </div>
+      <button onClick={() => setUserId(userId === 1 ? 2 : 1)}>切换用户</button>
+    </div>
+  );
+}
+```
+
+实际项目里，切换用户、切换表单时常用这个办法清空 state。
 
 </LessonProse>
 

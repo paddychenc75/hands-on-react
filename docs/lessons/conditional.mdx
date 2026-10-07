@@ -16,7 +16,7 @@ title: "条件渲染"
 
 ## 方式一：if 提前返回
 
-适合整个组件根据条件输出完全不同的内容。提前 return 要放在所有 useState 之后。
+适合整个组件根据条件输出完全不同的内容。
 
 ```jsx
 function Greeting({ isLoggedIn }) {
@@ -55,7 +55,7 @@ function App() {
 
 `&&` 左边不一定是布尔值。下面两种写法只差一点：写法 A 直接用 count，写法 B 先比较 `count > 0`。
 
-```jsx play title="count 为 0 时的两种写法"
+```jsx play title="&& 左边不是布尔值"
 function App() {
   const count = 0;
   return (
@@ -66,12 +66,6 @@ function App() {
   );
 }
 ```
-
-<CallBox kind="warn" label="常见坑">
-
-`{count && <p>...</p>}` 当 count 为 **0** 时，页面上会显示一个“0”！因为 `0 && x` 的结果是 0，而 React 会渲染数字。正确写法：`{count > 0 && ...}` 或 `{!!count && ...}`。
-
-</CallBox>
 
 ## 不渲染任何东西：return null
 
@@ -84,6 +78,12 @@ function App() {
 <CallBox kind="tip" label="要点">
 
 条件很多时，可以把判断提取到变量或一个小函数里，让 JSX 保持干净。也可以用对象映射：`const icons = { success: '✅', error: '❌' }; {icons[status]}`。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+`{count && <p>...</p>}` 当 count 为 **0** 时，页面上会显示一个“0”！因为 `0 && x` 的结果是 0，而 React 会渲染数字。正确写法：`{count > 0 && ...}` 或 `{!!count && ...}`。
 
 </CallBox>
 

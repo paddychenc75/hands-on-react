@@ -5,7 +5,7 @@ export default {
   id: 'lists-keys',
   stage: 0,
   title: '列表渲染与 key',
-  mins: 18,
+  mins: 21,
   summary: '用 map 渲染列表，理解 key 为什么重要。',
   goals: [
     '能用 map 把数组渲染成元素列表，并先用 filter 筛选',
@@ -205,6 +205,16 @@ export default {
   ],
   plays: {
     'map + filter': {},
+    切换用户时的备注框: {
+      note: '左边的备注还在，右边被清空了。key 变了，React 就认为右边是另一个组件：旧的被卸载，新的从初始 state 开始。左边没有 key，位置和类型没变，React 复用了原来的组件，state 保留。这个机制和列表里用 key 对上号是同一个。',
+      predict: {
+        q: '点“切换用户”后，左右两个备注框里原来的文字会怎样？',
+        options: ['左边还在，右边被清空', '两个都还在', '两个都被清空', '左边被清空，右边还在'],
+        answer: 0,
+        explain: '右边的 key 从 1 变成 2，React 卸载旧的 Profile、新建一个，state 回到初始值。左边没有 key，同一位置的同类型组件被复用，state 保留。',
+      },
+      pkey: 'lists-keys|切换用户时的备注框',
+    },
     '两列只差 key': {
       note: '左边的输入内容会“错位”到别的字母后面，右边则跟着字母走。',
       predict: {

@@ -4,10 +4,10 @@ export default {
   id: 'state',
   stage: 0,
   title: 'State：让组件“记住”东西',
-  mins: 22,
+  mins: 25,
   summary: '用 useState 保存会变化的数据，理解为什么普通变量不行。',
   goals: [
-    '能用 useState 声明 state，并在事件处理函数里调用 set 函数更新它',
+    '能用 useState 声明 state，并在事件处理函数里调用 set 函数更新它，并说出同一组件的两个实例各有自己的 state',
     '能解释为什么修改普通变量不会更新界面',
     '能预测连续调用 set 函数后的结果，并在需要时改用函数式更新',
     '能写出对象和数组的不可变更新',
@@ -15,8 +15,9 @@ export default {
   keyPoints: [
     '普通变量不行：修改它不会通知 React；而且每次渲染时，它都会被重新初始化。',
     '<code>const [count, setCount] = useState(0)</code>：React 替你保存值。调用 set 函数，React 就会重新渲染。',
+    '每个组件实例有自己的 state：同一个组件渲染两次，就有两份互相独立的 state。state 属于界面上的这一个实例，不属于函数。',
     '一次渲染 = 一张快照：调用 set 函数后，本次渲染里的 count 不会变，新值在下一次渲染才看到。',
-    '新值依赖旧值时，用函数式更新 <code>setCount(c =&gt; c + 1)</code>。React 会按队列依次用最新值计算。',
+    '同一事件里连续更新、新值依赖旧值时，用函数式更新 <code>setCount(c =&gt; c + 1)</code>。React 会按队列依次用最新值计算。',
     '对象和数组要换成新的（<code>{ ...user, age: 19 }</code>、<code>[...tags, x]</code>）。直接修改原来的，引用没变，界面不会更新。',
   ],
   quiz: [
@@ -51,9 +52,16 @@ export default {
       explain:
         '组件函数每次渲染都重新执行，局部变量会重置。修改它也不会通知 React。最容易误选的是第二项：那描述的是 state 的“快照”行为，而普通变量根本不会触发渲染。',
     },
+    {
+      q: '一个 <code>Counter</code> 组件内部有 <code>useState(0)</code>。App 里写了 <code>&lt;Counter /&gt;&lt;Counter /&gt;</code>，点第一个的 +1 三次。第二个显示几？',
+      options: ['0', '3', '1', '报错：同一个组件不能渲染两次'],
+      answer: 0,
+      explain:
+        'state 属于界面上的这一个组件实例。两个 Counter 各有自己的 state，互不影响，所以第二个仍是 0。最容易误选的是 3：那等于把 state 当成组件函数里共用的变量。想共用一个数，要把 state 放到父组件里。',
+    },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>声明一个 state <code>count</code>，初始值为 0。</li><li>在 <code>&lt;span id="count"&gt;</code> 中显示 count。</li><li>点击按钮 <b>+1</b> 时，count 加 1。</li><li>点击按钮 <b>-1</b> 时，count 减 1。</li><li>点击按钮 <b>+3</b> 时，count 加 3。快速连点时结果也要正确。</li><li>建议这样写 +3：在处理函数里调用三次 <code>setCount</code>，每次加 1。想一想：哪种写法能让三次调用都生效？</li></ol>',
+    task: '<ol class="task-steps"><li>声明一个 state <code>count</code>，初始值为 0。</li><li>在 <code>&lt;span id="count"&gt;</code> 中显示 count。</li><li>点击按钮 <b>+1</b> 时，count 加 1。</li><li>点击按钮 <b>-1</b> 时，count 减 1。</li><li>点击按钮 <b>+3</b> 时，count 加 3。</li><li>建议这样写 +3：在处理函数里调用三次 <code>setCount</code>，每次加 1。想一想：哪种写法能让三次调用都生效？</li></ol>',
     starter: `import { useState } from 'react';
 
 function App() {
@@ -121,14 +129,6 @@ function App() {
         c() === '5',
         `点 +3 后应从 2 变成 5，实际是 ${c()}。连续调用三次 setCount(count + 1) 时，三次读到的是同一个 count。请用函数式更新 setCount(c => c + 1)`,
       );
-      // 同一轮里连点两次：第二次点击时 React 还没重新渲染。只有基于最新值的更新才能得到 11
-      plus3.click();
-      plus3.click();
-      await t.wait(60);
-      t.assert(
-        c() === '11',
-        `快速连点两次 +3，应从 5 变成 11，实际是 ${c()}。第二次点击时，处理函数读到的还是旧的 count。每次加 1 都要基于最新值：setCount(c => c + 1)`,
-      );
     },
   },
   checkOnly: [
@@ -160,8 +160,8 @@ function handle() {
     },
   ],
   plays: {
-    失败的计数器: {
-      note: '点几下按钮，看看下方控制台：变量确实增加了，但界面没变。',
+    用普通变量计数: {
+      note: '点几下按钮，看看下方控制台：变量确实增加了，但界面没变。原因有两个：修改普通变量不会通知 React 重新渲染；就算重新渲染了，函数重新执行时 <code>let count = 0</code> 又会把它重置为 0。',
       predict: {
         q: '连续点击按钮 3 次后，按钮上显示的数字是多少？',
         options: ['3', '0', '1', '报错'],
@@ -171,8 +171,18 @@ function handle() {
       pkey: 'state|失败的计数器',
     },
     正确的计数器: {},
-    '快照 vs 函数式更新': {
-      note: '写法 A 只加了 1。这次渲染里 count 是 0，三次调用都在请求“设为 1”。控制台也打印 0：调用 set 函数后，本次渲染里的 count 没有变。写法 B 传入的是函数，React 按队列依次计算：0 → 1 → 2 → 3。',
+    渲染两个计数器: {
+      note: '第二个计数器仍是 0。state 属于界面上的这一个组件实例，不属于 Counter 函数。两个 Counter 各有自己的 state，父组件看不到也改不了它们。',
+      predict: {
+        q: '点“计数器 A”的 +1 三次后，“计数器 B”显示几？',
+        options: ['3', '0', '1', '报错'],
+        answer: 1,
+        explain: '每个 &lt;Counter /&gt; 是独立的组件实例，各有一份 state。点 A 只改 A 的 state，B 不受影响。',
+      },
+      pkey: 'state|渲染两个计数器',
+    },
+    '连续调用三次 set 函数': {
+      note: '写法 A 只加了 1。<b>调用 set 函数不会立刻改变本次渲染中的 count</b>：一次渲染中，state 的值是固定的，就像一张照片。这次渲染里 count 是 0，三次调用读到的都是它，都在请求“设为 1”。控制台也打印 0：调用 set 函数后，本次渲染里的 count 没有变。写法 B 传入的是函数，React 按队列依次计算：0 → 1 → 2 → 3。',
       predict: {
         q: '点一次“+3（写法 A）”后，count 会变成几？',
         options: ['3', '1', '0', '6'],

@@ -14,9 +14,9 @@ title: "State：让组件“记住”东西"
 
 组件经常需要“记住”一些会变的信息：输入框里的文字、购物车数量、弹窗是否打开。这种数据叫 **state（状态）**。
 
-## 为什么普通变量不行？
+## 先试试用普通变量计数
 
-```jsx play title="失败的计数器"
+```jsx play title="用普通变量计数"
 function App() {
   let count = 0; // 普通变量
 
@@ -29,12 +29,12 @@ function App() {
 }
 ```
 
-有两个原因：
+## useState 登场
+
+普通变量有两个问题：
 
 1. 修改普通变量**不会通知 React** 重新渲染。
 2. 就算重新渲染了，函数重新执行时 `let count = 0` 又会把它重置为 0。
-
-## useState 登场
 
 `useState` 解决这两个问题。第一，React 替你**保存**这个值，重新渲染后值还在。第二，你得到一个 **set 函数**。调用 set 函数，React 就会重新渲染。
 
@@ -61,11 +61,40 @@ state 像组件的“记忆”。每次调用 setCount，就像对 React 说：�
 
 </CallBox>
 
+## 每个组件有自己的 state
+
+把计数器抽成一个 `Counter` 组件，在 `App` 里渲染两次。每个 `<Counter />` 是一个独立的**组件实例**。
+
+```jsx play title="渲染两个计数器"
+import { useState } from 'react';
+
+function Counter({ label }) {
+  const [count, setCount] = useState(0);
+  return (
+    <p>
+      {label}：{count}
+      <button onClick={() => setCount(count + 1)}>+1</button>
+    </p>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Counter label="计数器 A" />
+      <Counter label="计数器 B" />
+    </div>
+  );
+}
+```
+
+想让两个计数器共用一个数，要把 state 放到它们共同的父组件里。第 10 课《状态提升》会讲。
+
 ## 一次渲染 = 一张快照
 
 新手最容易在这里困惑。下面有两个“+3”按钮。写法 A 连续调用三次 `setCount(count + 1)`；写法 B 连续调用三次 `setCount(c => c + 1)`。
 
-```jsx play title="快照 vs 函数式更新"
+```jsx play title="连续调用三次 set 函数"
 import { useState } from 'react';
 
 function App() {
@@ -96,11 +125,9 @@ function App() {
 }
 ```
 
-原因：**调用 set 函数不会立刻改变本次渲染中的 count**。在一次渲染中，state 的值是固定的，就像一张照片。写法 A 的三次调用读到的都是同一个 count。
-
 <CallBox kind="tip" label="要点">
 
-当新状态依赖旧状态时，优先使用**函数式更新** `setX(prev => ...)`。React 会把这些函数排成队列，依次用最新值计算。
+同一个事件处理函数里要基于上一次的结果连续更新时，用**函数式更新** `setX(prev => ...)`：React 会把这些函数排成队列，依次用最新值计算。只更新一次时，`setX(x + 1)` 也是对的：React 保证下一次点击前 state 已经更新。习惯上总写函数式更新也没有坏处。
 
 </CallBox>
 
@@ -136,7 +163,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-`useState` 要写在组件函数的最上面。不要放在 if 或循环里。也不要放在提前 return 之后。原因在第 15 课讲。
+`useState` 要在组件函数的**顶层**调用：不要放在 if、循环或嵌套函数里，也不要放在提前 return 之后。原因在第 15 课讲。
 
 </CallBox>
 

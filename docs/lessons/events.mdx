@@ -53,7 +53,10 @@ let nextId = 0; // 放在组件外：每条日志一个稳定的 id
 
 function App() {
   const [log, setLog] = useState([]);
-  const add = (msg) => setLog(l => [{ id: nextId++, msg }, ...l].slice(0, 5));
+  const add = (msg) => {
+    const id = nextId++; // 在事件处理函数里取 id，更新函数要保持纯
+    setLog(l => [{ id, msg }, ...l].slice(0, 5));
+  };
 
   return (
     <div onClick={() => add('外层 div 收到点击')} style={{ padding: 12, background: '#eef6fa' }}>

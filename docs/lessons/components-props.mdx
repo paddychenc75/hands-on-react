@@ -69,9 +69,46 @@ function App() {
 
 组件**绝对不能修改自己的 props**。`props.name = '新名字'` 这样的代码是错误的。props 属于父组件，子组件只能读取。想要“可变化的数据”，要用下一课的 **state**。
 
+开发环境中，React 会冻结 props 对象。在真实项目（ES 模块，严格模式）里，改 props 的那行代码会直接抛出 TypeError。在本站实验台里，它会静默失败，什么都不发生。
+
 </CallBox>
 
-组件要像**纯函数**。同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。第 14 课会讲剩下的情况。
+## 组件必须是纯函数
+
+组件要像**纯函数**：同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。第 14 课会讲剩下的情况。
+
+React 怎么帮你发现违反这条规则的代码？开发环境里的**严格模式**（`<StrictMode>`）会把每个组件函数调用两次。纯函数调用两次，结果和调用一次相同。不纯的函数就会露馅。生产环境没有这个检查。
+
+下面的 `Cup` 在渲染时修改了模块变量 `guest`，并包在 `<StrictMode>` 里。
+
+```jsx play title="渲染时修改外部变量"
+import { StrictMode } from 'react';
+
+let guest = 0;
+
+function Cup() {
+  guest = guest + 1;
+  return <p>{guest} 号杯子</p>;
+}
+
+function App() {
+  return (
+    <StrictMode>
+      <Cup />
+      <Cup />
+      <Cup />
+    </StrictMode>
+  );
+}
+```
+
+修复办法是不在渲染时改外部变量，让编号从 props 来：`<Cup no={1} />`，组件里写 `<p>{no} 号杯子</p>`。
+
+<CallBox kind="warn" label="常见坑">
+
+在组件函数里 `guest++`、`list.push(x)`、`document.title = …`，在严格模式下都会出现“多做一次”的现象。把这类代码移进事件处理函数或 effect。
+
+</CallBox>
 
 ## 特殊的 prop：children
 
@@ -100,6 +137,39 @@ function App() {
   );
 }
 ```
+
+## 给组件加样式
+
+用 `className` 指定 CSS 类名，样式写在 CSS 文件里。`className` 接收一个字符串。常见做法是让组件的 prop 决定类名：
+
+- `variant` 这样的 prop 对应一个类名，例如 `className={'btn btn-' + variant}`。
+- 条件类名：用模板字符串，或者把类名放进数组再 `filter(Boolean).join(' ')`。
+- 内联 `style` 只用于随数据变化的数值，例如进度条的宽度。固定样式放进 CSS。
+
+```jsx play title="用 className 和 variant 加样式"
+function Button({ variant = 'primary', disabled, children }) {
+  const cls = ['btn', 'btn-' + variant, disabled && 'btn-disabled'].filter(Boolean).join(' ');
+  return <button className={cls} disabled={disabled}>{children}</button>;
+}
+
+function App() {
+  return (
+    <div>
+      <style>{`
+        .btn { padding: 6px 14px; margin: 4px; border: 0; border-radius: 6px; color: white; }
+        .btn-primary { background: #087ea4; }
+        .btn-danger { background: crimson; }
+        .btn-disabled { opacity: 0.4; }
+      `}</style>
+      <Button>保存</Button>
+      <Button variant="danger">删除</Button>
+      <Button disabled>不可用</Button>
+    </div>
+  );
+}
+```
+
+真实项目里，样式写在 `.css` 文件中，用 `import './app.css'` 引入。本站实验台没有文件，所以这里把 CSS 放进 `<style>` 标签。
 
 <CallBox kind="tip" label="要点">
 
