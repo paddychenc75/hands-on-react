@@ -1,4 +1,3 @@
-// 由 scripts/convert.mjs 从旧版 src/*.js 生成。
 // 术语表：课文里第一次出现的术语会自动加注（引擎 markTerms）。
 export const GLOSSARY = [
   {

@@ -1,4 +1,3 @@
-// 由 scripts/convert.mjs 从旧版 src/*.js 生成。
 import { stripComments } from '../engine/exec.js';
 
 // 检查程序自己的三个版本：和起始代码里的写法一样，但不依赖学习者的代码

@@ -263,7 +263,7 @@ for (const id of LESSONS) {
 {
   await openLesson('lists-keys');
   ok(await page.locator('.stage-cta').count() === 0, 'm. 不是阶段最后一课，没有阶段测验入口');
-  const { LESSON_ORDER } = await import('../course/order.js');
+  const { LESSON_ORDER } = await import('../course/registry.js');
   const lastOf = (si) => null;
   await openLesson('project-todo');
   const cta = page.locator('.stage-cta');

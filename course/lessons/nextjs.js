@@ -1,4 +1,3 @@
-// 由 scripts/convert.mjs 从旧版 src/*.js 生成。
 
 // 检查用的文件列表：和起始代码不同，而且故意把动态段放在静态段前面
 const FILES2 = [

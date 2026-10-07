@@ -1,6 +1,6 @@
-// 由 scripts/convert.mjs 从旧版 src/*.js 生成。
-// 汇总全部已转换的课。引擎的热身、复习、阶段测验要跨课取题，都从这里拿。
-import { LESSON_ORDER } from './order.js';
+// 课程注册表：全部课程，按课程顺序排列。课号 = 在这个数组里的位置（从 1 开始）。
+// 加一课：新建 docs/lessons/<id>.mdx 和 course/lessons/<id>.js，然后在下面加一行 import，并把它放进 LESSONS 的正确位置。
+// 引擎的热身、复习、阶段测验要跨课取题，侧栏和首页的课程地图也从这里生成。
 import l_what_is_react from './lessons/what-is-react.js';
 import l_jsx from './lessons/jsx.js';
 import l_components_props from './lessons/components-props.js';
@@ -47,9 +47,54 @@ import l_error_handling from './lessons/error-handling.js';
 import l_perf_clinic from './lessons/perf-clinic.js';
 import l_portfolio from './lessons/portfolio.js';
 
-const ALL = [l_what_is_react, l_jsx, l_components_props, l_state, l_events, l_conditional, l_lists_keys, l_forms, l_project_todo, l_lifting_state, l_use_reducer, l_context, l_use_ref, l_use_effect, l_custom_hooks, l_escape_hatches, l_project_search, l_project_kanban, l_rendering, l_performance, l_closures, l_suspense, l_concurrent, l_profiling, l_patterns, l_accessibility, l_state_architecture, l_react_19, l_server_components, l_mini_react, l_engineering, l_typescript, l_router, l_tanstack_query, l_testing, l_nextjs, l_scheduler, l_suspense_data, l_streaming_ssr, l_state_at_scale, l_headless_components, l_form_architecture, l_error_handling, l_perf_clinic, l_portfolio];
-// 按课程顺序排列。课号 = 在 LESSON_ORDER 里的位置（不是在 LESSONS 里的位置：未转换的课不在这里）
-export const LESSONS = ALL.sort((a, b) => LESSON_ORDER.indexOf(a.id) - LESSON_ORDER.indexOf(b.id));
+export const LESSONS = [
+  l_what_is_react,
+  l_jsx,
+  l_components_props,
+  l_state,
+  l_events,
+  l_conditional,
+  l_lists_keys,
+  l_forms,
+  l_project_todo,
+  l_lifting_state,
+  l_use_reducer,
+  l_context,
+  l_use_ref,
+  l_use_effect,
+  l_custom_hooks,
+  l_escape_hatches,
+  l_project_search,
+  l_project_kanban,
+  l_rendering,
+  l_performance,
+  l_closures,
+  l_suspense,
+  l_concurrent,
+  l_profiling,
+  l_patterns,
+  l_accessibility,
+  l_state_architecture,
+  l_react_19,
+  l_server_components,
+  l_mini_react,
+  l_engineering,
+  l_typescript,
+  l_router,
+  l_tanstack_query,
+  l_testing,
+  l_nextjs,
+  l_scheduler,
+  l_suspense_data,
+  l_streaming_ssr,
+  l_state_at_scale,
+  l_headless_components,
+  l_form_architecture,
+  l_error_handling,
+  l_perf_clinic,
+  l_portfolio,
+];
+export const LESSON_ORDER = LESSONS.map((l) => l.id);
 export const lessonNo = (id) => LESSON_ORDER.indexOf(id) + 1;
-export const TOTAL_LESSONS = LESSON_ORDER.length;
+export const TOTAL_LESSONS = LESSONS.length;
 export const lessonById = (id) => LESSONS.find((l) => l.id === id);

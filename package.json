@@ -2,32 +2,24 @@
   "name": "hands-on-react",
   "private": true,
   "type": "module",
-  "description": "中文交互式 React 课程“动手学 React”：单文件网页，45 课 6 阶段",
+  "description": "动手学 React：中文交互式 React 课程，45 课 6 阶段，基于 Rspress 2（MDX + React），可运行示例、预测题、自动判分练习、间隔复习和阶段测验",
   "scripts": {
-    "build": "python3 src/build.py",
-    "test": "npm run build && node tests/lessons.mjs && node tests/mechanics.mjs",
-    "test:lessons": "node tests/lessons.mjs",
-    "test:mechanics": "node tests/mechanics.mjs",
-    "check": "for f in src/*.js; do node --check \"$f\" || exit 1; done",
-    "docs:convert": "node scripts/convert.mjs",
-    "docs:dev": "rspress dev",
-    "docs:build": "rspress build",
-    "docs:preview": "rspress preview",
-    "test:site": "node tests-site/smoke.mjs"
+    "dev": "rspress dev",
+    "build": "rspress build",
+    "preview": "rspress preview",
+    "test": "rspress build && node tests/lessons.mjs && node tests/mechanics.mjs && node tests/smoke.mjs",
+    "screenshots": "node tests/screenshots.mjs"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "devDependencies": {
-    "@mdx-js/mdx": "^3.1.1",
     "@rspress/core": "^2.0.23",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
-    "mdast-util-to-string": "^4.0.0",
     "playwright": "^1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "remark-gfm": "^4.0.1",
-    "remark-mdx": "^3.1.1",
-    "remark-parse": "^11.0.0",
-    "typescript": "^7.0.2",
-    "unified": "^11.0.5"
+    "typescript": "^7.0.2"
   }
 }

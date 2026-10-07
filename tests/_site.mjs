@@ -13,7 +13,7 @@ export const BASE = '/hands-on-react/';
 export const KEY = 'hands-on-react-v1';
 export const launch = () => chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
 export const lessonData = async (id) => (await import(pathToFileURL(path.join(ROOT, 'course/lessons', id + '.js')).href)).default;
-export const lessonOrder = async () => (await import(pathToFileURL(path.join(ROOT, 'course/order.js')).href)).LESSON_ORDER;
+export const lessonOrder = async () => (await import(pathToFileURL(path.join(ROOT, 'course/registry.js')).href)).LESSON_ORDER;
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.txt': 'text/plain', '.woff2': 'font/woff2' };
 function serve(dir) {
