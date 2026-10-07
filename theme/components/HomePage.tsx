@@ -1,7 +1,7 @@
 import { Link } from '@rspress/core/theme';
-import { buildHeroTree, doneCount, dueCount, progress, isDone } from '../../course/engine/index.js';
-import { LESSONS } from '../../course/registry.js';
-import { STAGES } from '../../course/stages.js';
+import { buildHeroTree, doneCount, dueCount, progress, isDone } from '../../course/engine/index.ts';
+import { LESSONS } from '../../course/registry.ts';
+import { STAGES } from '../../course/stages.ts';
 import { useProgress } from '../lib/useProgress';
 import { useDomSlot } from '../lib/useDomSlot';
 

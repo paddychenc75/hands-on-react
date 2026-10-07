@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { progress, PROGRESS_EVENT } from '../../course/engine/index.js';
+import { progress, PROGRESS_EVENT } from '../../course/engine/index.ts';
 import { useLesson } from '../lib/useLesson';
 
 const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') as ScrollBehavior;

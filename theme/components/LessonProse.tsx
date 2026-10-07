@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { markTerms, toast } from '../../course/engine/index.js';
+import { markTerms, toast } from '../../course/engine/index.ts';
 
 /** 正文容器：挂载后给术语表里的术语第一次出现的位置加虚线和释义（引擎 markTerms）。 */
 export default function LessonProse({ children }: { children?: ReactNode }) {

@@ -1,4 +1,4 @@
-import { makePlayground, disposePlayground } from '../../course/engine/index.js';
+import { makePlayground, disposePlayground } from '../../course/engine/index.ts';
 import { useSlot } from '../lib/useSlot';
 
 /** 由 remark 插件从 ```jsx play 代码块生成。说明和预测题按示例标题（或 playKey）到本课数据文件的 plays 里查。 */

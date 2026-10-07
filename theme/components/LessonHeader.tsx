@@ -1,5 +1,5 @@
-import { STAGES } from '../../course/stages.js';
-import { lessonNo, TOTAL_LESSONS } from '../../course/registry.js';
+import { STAGES } from '../../course/stages.ts';
+import { lessonNo, TOTAL_LESSONS } from '../../course/registry.ts';
 import { useLesson } from '../lib/useLesson';
 
 /** 面包屑（阶段、第几课、时长）+ 一句话摘要。标题 h1 由 MDX 里的 # 提供。 */

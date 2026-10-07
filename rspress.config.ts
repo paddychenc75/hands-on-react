@@ -1,20 +1,21 @@
 import * as path from 'node:path';
 import { defineConfig } from '@rspress/core';
 import remarkPlay from './plugins/remark-play.mjs';
-import { BASE, SITE_TITLE } from './course/site.js';
-import { LESSONS, lessonNo } from './course/registry.js';
-import { STAGES } from './course/stages.js';
+import { BASE, SITE_TITLE } from './course/site.ts';
+import { LESSONS, lessonNo } from './course/registry.ts';
+import { STAGES } from './course/stages.ts';
 
 const here = import.meta.dirname;
 const component = (name: string) => path.join(here, 'theme/components', name + '.tsx');
 
 // 侧栏：全站一份（课程页、复习页、术语表、阶段测验页都显示同一个目录），按阶段分组。
+// 课的顺序来自 course/order.ts，阶段来自每课数据文件的 stage：加课不用改这里。
 const lessonSidebar = [
   { text: '今日复习', link: '/review' },
   { text: '术语表', link: '/glossary' },
-  ...STAGES.flatMap((s: any, si: number) => [
+  ...STAGES.flatMap((s, si) => [
     { sectionHeaderText: `${s.no} ${s.name}` },
-    ...LESSONS.filter((l: any) => l.stage === si).map((l: any) => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),
+    ...LESSONS.filter((l) => l.stage === si).map((l) => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),
     { text: '阶段测验', link: '/check/' + si },
   ]),
 ];

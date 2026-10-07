@@ -1,7 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler", "jsx": "react-jsx",
-    "allowJs": true, "checkJs": false, "strict": false, "skipLibCheck": true, "noEmit": true, "esModuleInterop": true
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "allowUmdGlobalAccess": true,
+    "strict": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false
   },
-  "include": ["rspress.config.ts", "theme", "course", "plugins"]
+  "include": ["rspress.config.ts", "vitest.config.ts", "theme", "course", "tests/unit"]
 }

@@ -1,5 +1,5 @@
-import { makeCheck } from '../../course/engine/index.js';
-import { STAGES } from '../../course/stages.js';
+import { makeCheck } from '../../course/engine/index.ts';
+import { STAGES } from '../../course/stages.ts';
 import { useDomSlot } from '../lib/useDomSlot';
 
 /** 阶段测验页：标题由 MDX 提供，这里是面包屑、说明和题目区（引擎 makeCheck） */

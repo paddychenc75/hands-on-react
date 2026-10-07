@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLinkNavigate } from '@rspress/core/theme';
-import { BASE } from '../../course/site.js';
-import { smooth } from '../../course/engine/util.js';
+import { BASE } from '../../course/site.ts';
+import { smooth } from '../../course/engine/util.ts';
 
 /** 全局点击处理：
  *  1. 引擎生成的站内 <a>（回看这一课、翻页、阶段测验入口等）原本是整页跳转，这里改走 Rspress 的客户端路由（href 已带 base）。

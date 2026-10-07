@@ -1,4 +1,4 @@
-import { makeSelfExplain } from '../../course/engine/index.js';
+import { makeSelfExplain } from '../../course/engine/index.ts';
 import { useSlot } from '../lib/useSlot';
 
 export default function SelfExplain() {

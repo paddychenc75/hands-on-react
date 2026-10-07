@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { Link } from '@rspress/core/theme';
-import { paintFinish } from '../../course/engine/index.js';
-import { LESSONS } from '../../course/registry.js';
-import { STAGES } from '../../course/stages.js';
+import { paintFinish } from '../../course/engine/index.ts';
+import { LESSONS } from '../../course/registry.ts';
+import { STAGES } from '../../course/stages.ts';
 import { useLesson } from '../lib/useLesson';
 
 /** 掌握标准 + 上一课 / 下一课（只保留这一套，Rspress 自带的上下页已隐藏）+ 阶段测验入口 */

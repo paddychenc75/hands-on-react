@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /** 和 useSlot 类似，但不依赖某一课：浏览器里调用 build()，把返回的 DOM 挂进占位元素。 */
-export function useDomSlot(build: () => HTMLElement | null, deps: any[] = []) {
+export function useDomSlot(build: () => Element | null, deps: unknown[] = []) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const host = ref.current;

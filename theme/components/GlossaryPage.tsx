@@ -1,4 +1,4 @@
-import { GLOSSARY } from '../../course/glossary.js';
+import { GLOSSARY } from '../../course/glossary.ts';
 
 /** 术语表：静态数据，直接渲染成表格（服务端也输出，站内搜索能搜到） */
 export default function GlossaryPage() {

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { isDone, progress, stageCount, dueCount, PROGRESS_EVENT } from '../../course/engine/index.js';
-import { STAGES } from '../../course/stages.js';
+import { isDone, progress, stageCount, dueCount, PROGRESS_EVENT } from '../../course/engine/index.ts';
+import { STAGES } from '../../course/stages.ts';
 
 const SIDEBAR = '.rp-doc-layout__sidebar';
 const setAttr = (el: Element, name: string, value: string | null) => {

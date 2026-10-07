@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from '@rspress/core/runtime';
 import { useLinkNavigate } from '@rspress/core/theme';
-import { offerResume, savePos } from '../../course/engine/index.js';
-import { LESSONS } from '../../course/registry.js';
-import { lessonHref } from '../../course/site.js';
+import { offerResume, savePos } from '../../course/engine/index.ts';
+import { LESSONS } from '../../course/registry.ts';
+import { lessonHref } from '../../course/site.ts';
 
 const lessonIdOf = (pathname: string) => {
   const m = decodeURIComponent(pathname).replace(/\.html$/, '').replace(/\/+$/, '').match(/\/lessons\/([^/]+)$/);

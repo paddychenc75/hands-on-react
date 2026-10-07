@@ -1,5 +1,5 @@
-import { doneCount } from '../../course/engine/index.js';
-import { TOTAL_LESSONS } from '../../course/registry.js';
+import { doneCount } from '../../course/engine/index.ts';
+import { TOTAL_LESSONS } from '../../course/registry.ts';
 import { useProgress } from '../lib/useProgress';
 
 /** 顶栏右侧的总进度：已完成 n/45（旧版 #prog-text / #prog-bar） */

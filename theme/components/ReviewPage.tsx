@@ -1,4 +1,4 @@
-import { makeReview } from '../../course/engine/index.js';
+import { makeReview } from '../../course/engine/index.ts';
 import { useDomSlot } from '../lib/useDomSlot';
 
 /** 今日复习：标题由 MDX 提供，这里是面包屑、说明和题目区（引擎 makeReview） */
