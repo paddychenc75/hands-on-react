@@ -590,6 +590,21 @@ expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.com' });</code></pre></div>`
       explain:
         '要避免的是断言组件内部的东西：自己的 state 值、内部函数或 set 函数被调用了几次。作为 props 传进来的回调是组件和外界的约定，断言它收到了什么参数，检查的是组件对外的行为。“算实现细节”有迷惑性：它只对组件内部的函数成立。',
     },
+    {
+      q: `LoginForm 提交后，要等一个 500 ms 的请求返回，才显示“登录成功”。这个测试会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">render(&lt;LoginForm /&gt;);
+await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+await user.click(screen.getByRole('button', { name: '登录' }));
+expect(screen.getByText('登录成功')).toBeInTheDocument();</code></pre></div>`,
+      options: [
+        '通过：await user.click 会一直等到请求完成、界面更新',
+        '失败：文字还没出现，应改用 await findByText',
+        '失败：getByLabelText 只能找 id，找不到输入框',
+        '通过，但会打印“没有用 act 包裹”的警告',
+      ],
+      answer: 1,
+      explain:
+        'user.click 只等点击事件处理完，不会等请求返回。getBy… 立刻查找，找不到就抛错。findBy… 会反复查找，默认最多等 1 秒，适合异步出现的内容。getByLabelText 按 &lt;label&gt; 的文字查找，不需要 id。',
+    },
   ],
   plays: {
     在浏览器里跑测试: {
