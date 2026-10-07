@@ -49,7 +49,7 @@ function App() {
   const [show, setShow] = useState(false);
   return (
     <div>
-      <button onClick={() => setShow(true)}>显示图表</button>
+      <button onClick={() => setShow(s => !s)}>显示/隐藏图表</button>
       {show && (
         <Suspense fallback={<p>⏳ 正在加载图表代码…</p>}>
           <HeavyChart />
@@ -72,9 +72,93 @@ Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js�
 
 </CallBox>
 
+## 边界包在哪一层
+
+Suspense 边界的位置，决定了页面怎样分批出现。两条规则：
+
+1. **同一个 Suspense 里的内容一起出现**，等最慢的那个。
+2. 组件挂起时，**只有离它最近的 Suspense 显示 fallback**，外层不受影响。
+
+下面的示例有两个组件，分别要 1 秒和 3 秒加载。勾选后，它们各包一个 Suspense：
+
+```jsx play title="一个边界还是两个边界"
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react';
+
+// 用延迟模拟网络加载一个组件文件
+function makeLazy(name, ms) {
+  return lazy(() => new Promise(resolve => {
+    setTimeout(() => resolve({ default: () => <p>✅ {name} 已就绪</p> }), ms);
+  }));
+}
+
+function App() {
+  const [run, setRun] = useState(0);
+  const [split, setSplit] = useState(false);
+  const [sec, setSec] = useState('0.0');
+  const [Fast, Slow] = useMemo(() => [makeLazy('文章（1 秒）', 1000), makeLazy('评论（3 秒）', 3000)], [run]);
+
+  useEffect(() => {
+    const t0 = Date.now();
+    setSec('0.0');
+    const id = setInterval(() => {
+      const s = (Date.now() - t0) / 1000;
+      setSec(s.toFixed(1));
+      if (s >= 4) clearInterval(id);
+    }, 100);
+    return () => clearInterval(id);
+  }, [run]);
+
+  return (
+    <div>
+      <label><input type="checkbox" checked={split} onChange={e => setSplit(e.target.checked)} /> 各包一个 Suspense</label>
+      <button onClick={() => setRun(run + 1)}>重新加载</button>
+      <p>已过去 {sec} 秒</p>
+      <div key={run}>
+        {split ? (
+          <>
+            <Suspense fallback={<p>⏳ 文章加载中…</p>}><Fast /></Suspense>
+            <Suspense fallback={<p>⏳ 评论加载中…</p>}><Slow /></Suspense>
+          </>
+        ) : (
+          <Suspense fallback={<p>⏳ 加载中…</p>}>
+            <Fast />
+            <Slow />
+          </Suspense>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+怎样选边界：
+
+- 应该一起出现的内容（标题和正文）放在同一个边界。
+- 可以晚到的内容（评论、推荐）单独包一层。
+- 错误边界同理：一个模块坏了，不该影响的部分，就不要和它放在同一个边界里。
+
+两个版本的细节略有不同。React 18 会先把同一边界里的兄弟组件都渲染一遍，再显示 fallback。React 19 先显示 fallback，再回头渲染兄弟组件，提前发起它们的加载。两者的加载都是同时开始的，所以共用一个边界时都是等 3 秒，不是 4 秒。
+
 ## 错误边界：防止一个组件崩溃拖垮整个页面
 
 如果某个组件在渲染时抛出错误，默认情况下**整个应用都会白屏**。错误边界可以捕获子树中的渲染错误，显示一个备用界面。目前错误边界**只能用 class 组件**编写。你也可以使用 react-error-boundary 库。
+
+<CallBox kind="deep" label="五分钟读懂 class 组件">
+
+新代码不写 class。错误边界是唯一的例外，所以先看懂它的语法。class 组件和函数组件对照如下：
+
+| class 组件 | 函数组件里的对应 |
+|---|---|
+| `this.props` | 函数的参数 `props` |
+| `state = { … }` 和 `this.state` | `useState` 的值 |
+| `this.setState({ … })` | set 函数 |
+| `render()` 的返回值 | 函数体的返回值 |
+| `componentDidMount`、`componentDidUpdate`、`componentWillUnmount` | effect 的开始、更新和清理 |
+| `static getDerivedStateFromError(error)` | 没有对应的 Hook：只有 class 能写 |
+
+`static` 方法属于类本身，不属于实例，所以它读不到 `this.props` 和 `this.state`。React 在子树抛出错误时调用它，用它返回的对象更新 state。
+
+</CallBox>
 
 ```jsx play title="错误边界隔离故障"
 import { Component, useState } from 'react';
@@ -128,7 +212,7 @@ function App() {
 3. 服务端渲染中的错误。
 4. 错误边界自身的错误。
 
-它捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：`startTransition` 里抛出的错误，以及 `use()` 读取的被拒绝的 Promise，也会被错误边界捕获。
+它捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：传给 `useTransition` 返回的 `startTransition` 的函数抛出的错误（包括它返回的 Promise 被拒绝），以及 `use()` 读取的被拒绝的 Promise，会被错误边界捕获。从 react 直接导入的 `startTransition` 没有这个行为。
 
 </CallBox>
 

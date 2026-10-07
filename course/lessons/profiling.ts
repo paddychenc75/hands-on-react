@@ -4,7 +4,7 @@ export default {
   id: 'profiling',
   stage: 2,
   title: '性能测量：先找到慢在哪里',
-  mins: 30,
+  mins: 36,
   summary: '用 React DevTools、Profiler 组件和浏览器 Performance 面板找到真正的瓶颈，再选择正确的优化方法。',
   goals: [
     '能用 React DevTools Profiler 录制一次操作，找出最慢的组件和它的渲染原因',
@@ -212,7 +212,7 @@ function App() {
       pkey: 'profiling|读懂 actualDuration 和 baseDuration',
     },
     虚拟列表前后对比: {
-      note: '分别点两个按钮，比较 mount 的耗时和 DOM 行数。然后在虚拟列表中滚动：每次 update 只要很短的时间。',
+      note: '运行后先看控制台里 full 的 mount 耗时，再点“虚拟列表”比较，同时看 DOM 行数。然后在虚拟列表中滚动：每次 update 只要很短的时间。这里的毫秒数只是 React 渲染的时间。浏览器为 5000 行计算样式和布局的时间不在里面，要用 Performance 面板才看得到，真实差距更大。',
     },
   },
 } satisfies Lesson;

@@ -77,11 +77,46 @@ effect 只在挂载时运行一次。所以 interval 回调中的 `count` 永远
 2. 把函数移到 effect 内部。
 3. 把不依赖 props 和 state 的对象移到组件外部。
 
+真实项目里，ESLint 的 `react-hooks/exhaustive-deps` 规则会指出漏写的依赖。看到它的警告时，按上面三个方法改代码，不要用注释关掉它。
+
 </CallBox>
 
-## 用 ref 读取最新值
+## 把事件逻辑从 effect 中分开：useEffectEvent
 
-有时，长期存在的回调需要读取最新的值。但你不想让这个值触发 effect 重新执行。这时可以用 ref 保存最新值：
+有时，effect 里有一段逻辑，需要读最新的值，但这个值变化时不该让 effect 重新运行。例如聊天室：切换房间要重新连接，切换主题不该重新连接。可是“连接成功”后的提示要用当前主题。
+
+如果把 `theme` 写进依赖，切换主题就会断开再重连。如果不写，就是过期闭包。
+
+**Effect Event** 解决这个问题。React 19.2 起，`useEffectEvent` 把这段逻辑提取出来。它总能读到最新的 props 和 state，而且不是 effect 的依赖。下面的代码用到了 React 19 才有的 API，**只能阅读**，实验台运行不了：
+
+```jsx title="只读：React 19.2 的 useEffectEvent"
+import { useEffect, useEffectEvent } from 'react';
+
+function ChatRoom({ roomId, theme }) {
+  // 读最新的 theme，但它自己不是依赖
+  const onConnected = useEffectEvent(() => {
+    showToast('已连接 ' + roomId, theme);
+  });
+
+  useEffect(() => {
+    const conn = createConnection(roomId);
+    conn.on('connected', () => onConnected());
+    conn.connect();
+    return () => conn.disconnect();
+  }, [roomId]); // 只有 roomId 变化才重连
+}
+```
+
+它有两条限制：
+
+1. 只能在 effect 内部（或另一个 Effect Event 里）调用，不要在渲染时调用。
+2. 不要把它传给别的组件，也不要放进依赖数组。
+
+它不是“绕过依赖检查”的工具。只有逻辑本来就属于“事件”（发生了某件事，要做点什么），而且你不希望它的值引起重新同步，才用它。如果 `roomId` 变了就该重连，它就必须留在依赖里。
+
+## React 18 中的写法：用 ref 读取最新值
+
+实验台运行的是 React 18.3.1，没有 `useEffectEvent`。在 React 18，以及 19.2 之前的版本，用 ref 保存最新值。它就是 `useEffectEvent` 的手写版：
 
 ```jsx
 const latestCount = useRef(count);
@@ -95,16 +130,41 @@ useEffect(() => {
 }, []); // 依赖为空，但能读到最新值
 ```
 
-<CallBox kind="deep" label="深入一点">
+用同样的办法改写上面的聊天室。切换房间会重连，切换主题不会重连，但每秒的消息总是用当前主题：
 
-React 19.2 起提供 `useEffectEvent`。它从 effect 中提取不应成为依赖的逻辑，总能读到最新的 props 和 state。限制有两条：
+```jsx play title="聊天室：读到最新主题"
+import { useState, useEffect, useRef } from 'react';
 
-1. 只能在 effect 内部调用。
-2. 不要把它放进依赖数组。
+function ChatRoom({ roomId, theme }) {
+  const latestTheme = useRef(theme);
+  useEffect(() => { latestTheme.current = theme; }); // 每次渲染后同步
 
-在 19.2 及以上版本中，它可以代替上面的 ref 方案。
+  useEffect(() => {
+    console.log('连接 ' + roomId);
+    const id = setInterval(() => {
+      console.log('[' + roomId + '] 当前主题：' + latestTheme.current);
+    }, 1000);
+    return () => {
+      clearInterval(id);
+      console.log('断开 ' + roomId);
+    };
+  }, [roomId]);
 
-</CallBox>
+  return <p>房间：{roomId}，主题：{theme}</p>;
+}
+
+function App() {
+  const [roomId, setRoomId] = useState('综合');
+  const [theme, setTheme] = useState('浅色');
+  return (
+    <div>
+      <button onClick={() => setTheme(theme === '浅色' ? '深色' : '浅色')}>切换主题</button>
+      <button onClick={() => setRoomId(roomId === '综合' ? '旅行' : '综合')}>切换房间</button>
+      <ChatRoom roomId={roomId} theme={theme} />
+    </div>
+  );
+}
+```
 
 ## 对象和函数作为依赖
 

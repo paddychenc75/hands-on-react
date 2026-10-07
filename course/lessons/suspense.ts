@@ -4,7 +4,7 @@ export default {
   id: 'suspense',
   stage: 2,
   title: 'Suspense、懒加载与错误边界',
-  mins: 20,
+  mins: 26,
   summary: '优雅地处理“还没准备好”和“出错了”这两种状态。',
   goals: ['能用 lazy 和 Suspense 按需加载一个组件', '能写出一个错误边界组件', '能判断一个错误会不会被错误边界捕获', '能决定 Suspense 和错误边界包在哪一层'],
   keyPoints: [
@@ -20,7 +20,7 @@ export default {
       options: ['空白，代码加载完成后再显示 Chart', 'Spinner，加载完替换为 Chart', '报错：组件还没有加载', 'Spinner 和 Chart 同时出现'],
       answer: 1,
       explain:
-        'Chart 的代码还没到时，它会“挂起”，最近的 Suspense 显示 fallback。代码加载完成后，React 用 Chart 替换 fallback。不会是空白：只有没有任何 Suspense 包着时，才会出错。',
+        'Chart 的代码还没到时，它会“挂起”，最近的 Suspense 显示 fallback。代码加载完成后，React 用 Chart 替换 fallback。有 Suspense 包着，所以等待期间显示的是 fallback，不是空白。如果没有任何 Suspense：首次挂载时页面会一直空白到代码加载完；在 React 18 中，由点击这类同步更新引起的挂起还会直接报错并清空界面（React 19 改为保留旧界面）。所以懒加载组件外面总要包一个 Suspense。',
     },
     {
       q: '错误边界能捕获以下哪种错误？',
@@ -152,10 +152,33 @@ function App() {
       explain:
         '组件挂起时，只有离它最近的 Suspense 显示 fallback。Comments 被内层边界接住，不影响外层。外层只等 Header 和 Article，1 秒后就显示内容，Comments 的位置显示内层 fallback。所以嵌套 Suspense 可以让页面分批出现。“要等所有内容”是只有一个边界时的行为。',
     },
+    {
+      q: `React 19。按钮点击后调用 start，里面抛出错误。哪种写法的错误会被 ErrorBoundary 捕获？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">// A：Hook 返回的
+const [isPending, start] = useTransition();
+start(() =&gt; { throw new Error('boom'); });
+
+// B：从 react 直接导入的
+import { startTransition } from 'react';
+startTransition(() =&gt; { throw new Error('boom'); });</code></pre></div>`,
+      options: ['两种都会', '只有 A 会：B 没有和组件关联，错误成为未捕获错误', '只有 B 会', '两种都不会，错误边界不处理事件里的错误'],
+      answer: 1,
+      explain:
+        '在 React 19 中，useTransition 返回的 startTransition 和组件关联，它里面抛出的错误会交给错误边界。直接导入的 startTransition 没有关联的组件，错误成为全局的未捕获错误。最后一项在 React 18 是对的：React 18 中两种写法的错误都会抛回事件处理函数。',
+    },
   ],
   plays: {
     懒加载组件: {
-      note: '只有第一次加载需要等待，之后会使用缓存。点“运行”可重置。',
+      note: '第一次显示要等 1.5 秒。隐藏后再显示，立刻出现：lazy 只加载一次。点“运行”可重置。',
+    },
+    一个边界还是两个边界: {
+      note: '共用一个边界时，文章和评论一起在 3 秒时出现，等的是最慢的评论。勾选后各包一个 Suspense，文章 1 秒就出现，评论的位置显示自己的 fallback，直到 3 秒。每次切换后点“重新加载”重新计时。',
+      predict: {
+        q: '先不勾选“各包一个 Suspense”，点“重新加载”。文章（1 秒）什么时候出现？',
+        options: ['1 秒', '3 秒，和评论一起', '4 秒', '不会出现'],
+        answer: 1,
+        explain: '同一个 Suspense 里的内容作为整体显示，要等最慢的评论就绪。两个组件同时开始加载，所以是 3 秒，不是 1 + 3 = 4 秒。',
+      },
+      pkey: 'suspense|一个边界还是两个边界',
     },
     错误边界隔离故障: {
       note: '每个计数器都有自己的错误边界。一个崩溃，只有它的边界显示备用界面，另一个不受影响。点“重试”会清空边界的 error，重新渲染计数器。',

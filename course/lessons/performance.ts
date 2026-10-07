@@ -4,20 +4,20 @@ export default {
   id: 'performance',
   stage: 2,
   title: '性能优化：memo、useMemo、useCallback',
-  mins: 24,
+  mins: 28,
   summary: '跳过不必要的渲染和计算，以及为什么不该到处使用它们。',
   goals: [
     '能用 memo 让 props 没变的子组件跳过渲染',
     '能找出让 memo 失效的 props（内联函数、对象、JSX）',
     '能用 useCallback 和 useMemo 固定引用，并写对依赖',
-    '能判断一次优化值不值得做',
+    '能判断一次优化值不值得做，并说出启用 React Compiler 后哪些手写记忆化可以省掉',
   ],
   keyPoints: [
     '<code>memo</code> 在渲染前浅比较新旧 props。每个 prop 都用 <code>Object.is</code> 判定相等时，跳过这次渲染。',
     '组件每次渲染都会新建函数、对象和 JSX。把它们传给 memo 组件，浅比较判定“变了”，memo 失效。',
     '<code>useCallback</code> 固定函数，<code>useMemo</code> 固定计算结果。它们只在配合 memo 或作为依赖时才有用。',
-    '常见坑：<code>useCallback(() =&gt; setX(x + 1), [])</code> 会读到旧的 x。用函数式更新，或把 x 写进依赖。',
-    '先用 Profiler 测量，再优化。把 state 下移、把内容作为 children 传入，往往比 memo 更简单。',
+    '常见坑：<code>useCallback(() =&gt; setX(x + 1), [])</code> 会读到旧的 x。依赖数组为空，函数就永远读第一次渲染的值。用函数式更新，或把 x 写进依赖。',
+    '先用 Profiler 测量，再优化。启用 React Compiler 的项目默认交给它做记忆化，只在 effect 依赖或编译器没覆盖处手写。把 state 下移、把内容作为 children 传入，往往比 memo 更简单。',
   ],
   quiz: [
     {
@@ -30,7 +30,7 @@ export default {
       q: 'Child 没有用 memo。父组件用 useCallback 包好 onClick，再传给 Child。父组件渲染时，Child 会怎样？',
       options: ['跳过渲染', '照样重新渲染', '只在 onClick 变化时渲染', '报错'],
       answer: 1,
-      explain: '没有 memo，子组件总会随父组件渲染。很多人以为 useCallback 能阻止渲染，其实它只让引用稳定，跳过渲染要靠 memo。',
+      explain: '在没有启用 React Compiler 时，没有 memo 的子组件总会随父组件渲染。很多人以为 useCallback 能阻止渲染，其实它只让引用稳定，跳过渲染要靠 memo。',
     },
     {
       q: 'App 有 state count，渲染 &lt;Layout&gt;&lt;BigTable /&gt;&lt;/Layout&gt;。Layout 用 {children} 渲染 BigTable，BigTable 没有用 memo。点 App 里的“count +1”时，BigTable 会重新渲染吗？',
@@ -42,7 +42,7 @@ export default {
       ],
       answer: 1,
       explain:
-        '&lt;BigTable /&gt; 这个元素是 App 创建的。App 重新渲染，就会创建一个新元素，BigTable 跟着渲染。“作为 children 传入”只在 Layout 自己的 state 变化时有用：那时 children 还是同一个对象。最有迷惑性的是“类型和位置没变”：这只决定 state 能不能保留，组件函数照样要调用。没有 memo 时，React 也根本不比较 props。',
+        '&lt;BigTable /&gt; 这个元素是 App 创建的。App 重新渲染，就会创建一个新元素，BigTable 跟着渲染。“作为 children 传入”只在 Layout 自己的 state 变化时有用：那时 children 还是同一个对象。最有迷惑性的是“类型和位置没变”：这只决定 state 能不能保留，组件函数照样要调用。在没有 memo 且没有启用 React Compiler 时，React 也根本不比较 props。',
     },
   ],
   exercise: {
@@ -222,6 +222,18 @@ const visible = useMemo(
       explain:
         '依赖用 Object.is 比较。<code>{ type: tab }</code> 每次渲染都创建一个新对象，和上一次不相等，所以每次都重新计算，useMemo 白写了。修复：依赖写原始值 <code>[items, tab]</code>，在计算函数里再创建对象。“useMemo 会深比较”是常见误解：React 的所有依赖数组都只做浅比较。',
     },
+    {
+      q: `项目已经启用了 React Compiler。组件里有一批以前手写的 useMemo 和 useCallback。同事说：“编译器会自动处理，今天把它们全删掉。”哪种做法最合适？`,
+      options: [
+        '全部删除：启用编译器后，手写记忆化一定没用',
+        '先别顺手删：删除会改变编译结果。要删就逐处测过再删，作为 effect 依赖的那些尤其要保留',
+        '全部保留，并且新代码也继续到处手写 useMemo',
+        '把 useMemo 换成 useRef，让编译器不处理它们',
+      ],
+      answer: 1,
+      explain:
+        '官方建议：已有的手写记忆化保留，或测过再删，因为删除会改变编译输出；新代码默认依靠编译器。最迷惑的是第一项：用作 effect 依赖的值需要稳定的引用，删掉可能让 effect 多次运行。第三项忽略了编译器的作用；第四项没有依据：ref 不是记忆化的替代品，渲染时读写 ref 还违反 React 的规则。',
+    },
   ],
   plays: {
     '哪个 memo 生效了？': {
@@ -235,6 +247,15 @@ const visible = useMemo(
       },
       pkey: 'performance|哪个 memo 生效了？',
     },
-    'useMemo 跳过重复计算': {},
+    'useMemo 跳过重复计算': {
+      note: '取消勾选“使用 useMemo 的结果”后，每次渲染都会重新计算，切换主题也一样，控制台会打印耗时。勾选时，切换主题只在 count 变化时才算。',
+      predict: {
+        q: '取消勾选“使用 useMemo 的结果”，然后点“切换主题”。控制台会打印“计算耗时”吗？',
+        options: ['不会：count 没变', '会：每次渲染都重新计算', '只在第一次点击时打印', '报错'],
+        answer: 1,
+        explain: '取消勾选后，primes 直接调用 slowPrimes(count)，没有任何缓存，每次渲染都执行。useMemo 的作用是在 count 不变时跳过这次计算。',
+      },
+      pkey: 'performance|useMemo 跳过重复计算',
+    },
   },
 } satisfies Lesson;

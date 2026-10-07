@@ -147,6 +147,30 @@ function App() {
 
 </CallBox>
 
+<CallBox kind="deep" label="React 19 的变化（只能阅读）">
+
+本课的两个 Hook 在 React 19 里都有变化。实验台运行 React 18.3.1，下面的代码只能阅读。
+
+1. `startTransition` 可以接收 async 函数。`isPending` 在整个异步过程中都是 true。React 18 只能传同步函数。
+2. `await` 之后的 set 函数调用不再属于这次过渡。要再包一层 `startTransition`。这是最常见的坑。
+3. `useDeferredValue` 多了第二个参数，用于首次渲染。
+4. 配合 Suspense 时：新值的内容挂起，用户看到的是旧内容，而不是 fallback。
+
+```jsx
+// React 19：startTransition 可以接收 async 函数。isPending 在整个过程中为 true
+startTransition(async () => {
+  const saved = await save(draft);
+  startTransition(() => setItem(saved)); // await 之后的更新要再包一层
+});
+
+// React 19：第二个参数是首次渲染时用的值
+const deferredQuery = useDeferredValue(query, '');
+```
+
+async 的 `startTransition` 就是[第 28 课](/lessons/react-19)讲的 Action。
+
+</CallBox>
+
 <CallBox kind="deep" label="深入一点">
 
 并发特性和防抖（debounce）不同，它没有固定的延迟。设备快，更新几乎立刻发生。设备慢，更新自动推迟。后台渲染还可以被中断，不浪费计算。注意：并发特性不会减少计算量，它只让慢的渲染可以被打断。要真正减少计算，仍要靠 memo、虚拟列表，或减少渲染的内容。

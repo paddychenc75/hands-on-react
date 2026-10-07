@@ -4,7 +4,7 @@ export default {
   id: 'concurrent',
   stage: 2,
   title: '并发特性：useTransition 与 useDeferredValue',
-  mins: 25,
+  mins: 26,
   summary: '区分紧急和不紧急的更新，让界面在繁重新渲染时依然流畅。',
   goals: [
     '能判断一个更新是紧急更新还是过渡更新',
@@ -279,7 +279,8 @@ const [isPending, startTransition] = useTransition();
         q: '保持勾选“使用 startTransition”。点“文章（很慢）”，再立刻点“联系”。会怎样？',
         options: ['界面卡住约半秒，然后显示文章', '立即切到“联系”，文章的渲染被丢弃', '同时显示文章和联系', '报错'],
         answer: 1,
-        explain: '过渡更新可以被打断。新的点击更紧急，React 丢弃还没完成的文章渲染。取消勾选后，渲染必须一次做完，界面会卡住。',
+        explain:
+          '过渡更新可以被打断。第二次点击到来时，React 先停下文章的渲染去处理点击。两次过渡更新会合并：tab 的最终值是“联系”，所以没渲染完的文章被丢弃。取消勾选后，渲染必须一次做完，界面会卡住。',
       },
       pkey: 'concurrent|用 useTransition 切换标签页',
     },
