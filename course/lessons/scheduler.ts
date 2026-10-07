@@ -7,7 +7,7 @@ export default {
   mins: 40,
   summary: '看清 React 怎样把渲染切成小片、给更新排优先级、打断再重来，以及外部 store 为什么会在并发渲染中“撕裂”。',
   goals: [
-    '能解释调度器为什么用 MessageChannel 每约 5ms 让出一次主线程，而不用微任务',
+    '能解释调度器为什么用 MessageChannel 每约 5ms 让出一次主线程，而不用微任务（选读：偏原理）',
     '能判断一个更新属于哪一档优先级，并预测它在 React 18 中会不会被切片',
     '能诊断“过渡更新被打断后从头重来”带来的重复计算和渲染期副作用',
     '能写出一个带两档优先级、可打断并重新开始的迷你调度器，并用 useSyncExternalStore 消除撕裂',
@@ -15,7 +15,7 @@ export default {
   keyPoints: [
     '时间切片：渲染拆成很多小片，每片约 5ms。片与片之间，调度器用 MessageChannel 预约一个宏任务，浏览器趁机处理输入和绘制。微任务不会让出主线程。',
     '每个更新带一个 lane（优先级）。档位从高到低：同步/离散事件 → 连续事件 → 默认 → 过渡 → 空闲。React 18 只切片过渡、重试和空闲这几档，其余同步完成。',
-    '高优先级更新到来时，React 丢弃过渡渲染的进度，先提交紧急更新，再从根开始重新渲染过渡更新。所以渲染函数可能执行多次而只提交一次。',
+    '同步档或连续事件档的更新到来时，React 丢弃过渡渲染的进度，先提交紧急更新，再从根开始重新渲染过渡更新。默认档更新不打断过渡渲染。所以渲染函数可能执行多次而只提交一次。',
     '提交阶段一口气完成，不能被打断。否则用户会看到一半新、一半旧的 DOM。',
     '撕裂：同一次提交里，界面不同部分显示了同一数据源的不同版本。useSyncExternalStore 在提交前再读一次快照，不一致就同步重新渲染，代价是这部分更新失去并发能力。',
   ],
@@ -71,7 +71,7 @@ export default {
     {
       q: '筛选条件存在外部 store 里，组件用 useSyncExternalStore 读取。你写了 <code>startTransition(() =&gt; store.setFilter(v))</code>，希望慢列表不阻塞输入。结果输入仍然卡顿。为什么？怎么改？',
       options: [
-        'startTransition 只对 useState 的 set 函数有效；外部 store 的更新总是同步渲染。把读到的 filter 交给 useDeferredValue，再传给 memo 包裹的慢列表',
+        'startTransition 只影响 React 自己的 state 更新（useState、useReducer）；外部 store 的更新总是同步渲染。把读到的 filter 交给 useDeferredValue，再传给 memo 包裹的慢列表',
         'startTransition 需要 isPending 才能生效，要改用 useTransition',
         'store.setFilter 是异步的，要在外面加 await',
         '要在 getSnapshot 里返回新对象，React 才知道值变了',

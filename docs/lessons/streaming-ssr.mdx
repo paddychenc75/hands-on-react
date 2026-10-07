@@ -28,8 +28,10 @@ title: "流式 SSR、选择性水合与 RSC 缓存"
 |---|---|---|
 | 返回什么 | 一个完整的字符串 | 一个流，可以分多次写给浏览器 |
 | 遇到数据还没准备好的组件 | 不等待。该 Suspense 边界输出 fallback，由浏览器再渲染内容 | 先发 fallback，数据好了再把内容发出去，并附一段替换脚本 |
-| 首字节时间 | 取决于最慢的那部分 | 取决于外壳 |
+| 首字节时间 | 取决于最慢的数据（渲染前要先自己取齐数据） | 取决于外壳 |
 | 适合 | 旧项目、无数据依赖的页面 | 有慢数据的页面；框架（Next.js、Remix）内部都用它 |
+
+React 19 另有 `react-dom/static` 的 `prerender`：它等所有数据就绪再输出完整 HTML，用于构建时的静态生成，也可以用来给爬虫输出。只能阅读。
 
 **外壳**（shell）指所有 Suspense 边界之外的部分。外壳渲染完，`onShellReady` 就会被调用，服务器开始发送。
 
@@ -279,6 +281,8 @@ function useOnline() {
 
 `suppressHydrationWarning` 只作用于一个元素的文字和属性，不作用于子元素。它适合“一个时间戳”这类无法避免的差异。把它加在外层容器上，下面的不匹配照样报错。用它掩盖结构差异，等于把问题留到生产环境。
 
+React 19 中它只是不报错，不会把文字换成客户端的值。要显示客户端的值，仍然要在水合后用 effect 更新。
+
 </CallBox>
 
 ## 五、RSC 的序列化边界与组合
@@ -318,11 +322,15 @@ export default function Page() {
 | 层 | 范围 | 怎样失效 |
 |---|---|---|
 | React `cache(fn)` | 一次请求内。同一请求里多个组件调用同一个函数，只执行一次 | 请求结束即丢弃 |
-| Next.js 数据缓存（fetch / 'use cache'） | 跨请求、跨用户，部署后仍可能保留 | 按时间（revalidate）或按标签、路径手动失效 |
+| Next.js fetch 数据缓存 | 跨请求、跨用户，部署后仍可能保留 | 按时间（revalidate）或按标签、路径手动失效 |
+| `'use cache'`（Next.js 16） | 跨请求、跨用户；默认存在服务器内存里，新部署后清空 | `cacheLife` 设时长，`cacheTag` 配合 `updateTag` / `revalidateTag` 失效 |
 | Next.js 整页缓存 | 静态生成的 HTML 和 RSC Payload | 页面用到的数据失效时重新生成 |
 | 浏览器端路由缓存 | 一个用户的一个标签页 | 刷新页面、router.refresh()、Server Action 里重新验证 |
 
-Next.js 的默认值在几个大版本之间变过。读文章和旧代码时，先看版本：
+Next.js 的默认值在几个大版本之间变过。读文章和旧代码时，先看版本。下表可以先跳过，遇到旧代码再回来查：
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>Next.js 13 到 16 的默认值对照<small>可以先跳过，需要时再展开</small></summary>
 
 | 版本 | fetch 默认 | 常用写法 |
 |---|---|---|
@@ -330,17 +338,23 @@ Next.js 的默认值在几个大版本之间变过。读文章和旧代码时，
 | 15 | 默认不缓存 | 需要缓存时写 `cache: 'force-cache'` 或 revalidate |
 | 16（开启 cacheComponents） | 默认按请求动态渲染 | 在函数或组件里写 `'use cache'`，用 `cacheLife()` 设时长，`cacheTag()` 打标签 |
 
-```jsx title="只能阅读：API 名称以 Next.js 16 官方文档为准。13–15 用 fetch 的 next.tags 和 revalidateTag(tag)"
-// Next.js 16：缓存一个数据函数，并打上标签
-async function getProduct(id) {
+</details>
+
+```jsx title="只能阅读：Next.js 16 的写法。13–15 用 fetch 的 next.tags 和 revalidateTag(tag)"
+// lib/data.js：缓存一个数据函数，并打上标签
+import { cacheTag, cacheLife } from 'next/cache';
+
+export async function getProduct(id) {
   'use cache';
   cacheTag('product-' + id);
   cacheLife('hours');
   return db.product.find(id);
 }
 
-// Server Action：改价格后让带这个标签的缓存失效
+// app/actions.js：Server Action，改价格后让带这个标签的缓存失效
 'use server';
+import { updateTag, revalidateTag } from 'next/cache';
+
 export async function updatePrice(id, price) {
   await checkAdmin();                 // 先检查权限
   await db.product.update(id, { price });
@@ -351,7 +365,7 @@ export async function updatePrice(id, price) {
 
 - **按时间重新验证是“先给旧的，后台更新”**：revalidate 为 60，第 61 秒的第一个请求仍拿到旧数据，同时触发后台重新生成。下一个请求才拿到新数据。
 - **按路径还是按标签**：`revalidatePath('/product/7')` 只管这一条路由。同一个商品还出现在首页、搜索页时，给数据打标签，用标签失效。
-- **个人数据不要放进跨用户的缓存**：读 cookies 或用户信息的函数，不要加 'use cache'。否则 A 用户的数据可能被 B 用户看到。
+- **个人数据要进缓存键**：`'use cache'` 的函数里不能读 cookies 和 headers，Next.js 16 会直接报错。在外面读出用户 id，作为参数传进去，参数是缓存键的一部分。函数不带用户参数却返回了某个用户的数据，A 的数据才会被 B 看到。
 
 <details className="optional">
 <summary><span className="opt-tag">选读</span>七、迁移评估：什么时候不该用 SSR 或 RSC<small>可以先跳过，需要时再展开</small></summary>

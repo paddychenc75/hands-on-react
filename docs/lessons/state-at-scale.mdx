@@ -89,7 +89,7 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-**什么时候不规范化**：数据只读、只在一个页面展示、实体之间没有共享时，嵌套结构更简单。另外，TanStack Query 按查询键缓存，不做规范化。同一个商品在列表查询和详情查询里是两份数据，修改后要让两个查询都失效（第 34 课）。Apollo、Relay、RTK Query 的实体适配器提供规范化缓存，代价是更多的配置。
+**什么时候不规范化**：数据只读、只在一个页面展示、实体之间没有共享时，嵌套结构更简单。另外，TanStack Query 按查询键缓存，不做规范化。同一个商品在列表查询和详情查询里是两份数据，修改后要让两个查询都失效（第 34 课）。Apollo Client 和 Relay 提供按实体 id 规范化的缓存，代价是更多的配置。RTK Query 和 TanStack Query 一样，按查询缓存，不做规范化。自己管理的客户端 state 需要规范化时，Redux Toolkit 的 `createEntityAdapter` 会替你生成 `{ ids, entities }` 结构和增删改的 reducer，它做的就是本节手写的这件事。
 
 </CallBox>
 
@@ -100,7 +100,7 @@ function App() {
 1. 计算很贵，例如在 5000 条评论里筛选和排序。
 2. 每次计算都返回**新数组**。即使内容相同，memo 组件和 effect 依赖也会认为“变了”。第 27 课说过，作为 useSyncExternalStore 的快照，它还会导致无限渲染。
 
-**记忆化选择器**把计算分成两步。**输入选择器**从 state 里选出几块原始数据。**结果函数**用这几块数据计算。输入都没变（用 Object.is 比较），就直接返回上一次的结果。Reselect 和 Redux Toolkit 的 `createSelector` 都是这个思路。
+**记忆化选择器**把计算分成两步。**输入选择器**从 state 里选出几块原始数据。**结果函数**用这几块数据计算。输入都没变（用 Object.is 比较），就直接返回上一次的结果。Reselect 和 Redux Toolkit 的 `createSelector` 是同一个思路（它们用 `===` 比较输入）。
 
 ```jsx play title="普通函数 vs 记忆化选择器"
 import { useState, useReducer, memo } from 'react';
@@ -182,7 +182,7 @@ function App() {
 
 - **输入选择器返回新对象**：例如 `s => s.ids.map(…)`。输入每次都“变了”，记忆化永远不命中。输入选择器只做取值，计算放进结果函数。
 - **输入选得太粗**：例如直接选整个 `state`。任何无关字段变化，都会让它重新计算。
-- **多个组件共用一个选择器，参数不同**：缓存只有一格，A 用“热门”、B 用“全部”，两边轮流把缓存挤掉。为每个组件实例创建自己的选择器：`const select = useMemo(() => makeSelectByFilter(), [])`。
+- **多个组件共用一个选择器，参数不同**：缓存只有一格，A 用“热门”、B 用“全部”，两边轮流把缓存挤掉。为每个组件实例创建自己的选择器：`const select = useMemo(() => makeSelectByFilter(), [])`。这是只有一格缓存的实现（本课手写的版本、Reselect 4 及以前）才有的问题。Reselect 5 和 Redux Toolkit 2 的默认实现按参数分别缓存，直接共用一个选择器即可。
 
 <CallBox kind="warn" label="常见坑">
 
@@ -192,7 +192,7 @@ function App() {
 
 ## 三、乐观更新的并发问题
 
-第 34 课讲了乐观更新的四步：取消请求、保存快照、先改界面、失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
+第 34 课的乐观更新是：先保存快照并改界面，失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
 
 ```jsx play title="两个请求并发时的回滚"
 import { useState, useRef } from 'react';
@@ -260,7 +260,7 @@ B 的做法可以推广：`显示的 state = 待定操作.reduce(reducer, 已确
 
 快照做法的历史结构是 `{ past: [], present, future: [] }`。用一个高阶 reducer 包住原来的 reducer：它接收 reducer，返回一个管理历史的新 reducer。
 
-```jsx title="骨架。练习里你要补全它，并处理下面的三条规则"
+```jsx title="骨架。练习里你要补全它，并处理下面的前三条规则"
 function undoable(reducer) {
   return (history, action) => {
     const { past, present, future } = history;

@@ -346,7 +346,7 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-React 18 还有一个节流：一个 fallback 显示后，后续“内容就绪”的提交至少间隔约 500ms，避免界面连续跳动。所以有时数据 400ms 就到了，内容却在 500ms 左右才出现。这是内部实现，版本之间可能不同。
+React 还会给 fallback 的出现节流，避免加载提示连续跳动。React 18 中：外层内容就绪、但里面还有一个边界在挂起时，“外层内容 + 内层 fallback”这次提交会被推迟到上一个 fallback 出现约 500ms 之后；内容完全就绪时不推迟。React 19 中，fallback 显示后的内容提交都会被节流，间隔约 300ms。所以嵌套边界里，数据 100ms 就到了，内容可能 500ms 才出现。这是内部实现，版本之间不同。
 
 </CallBox>
 
@@ -392,7 +392,7 @@ class ErrorBoundary extends Component {
 
 <CallBox kind="warn" label="常见坑">
 
-错误边界只能接住渲染期间抛出的错误。在 effect 或事件处理函数里 `await fetch()` 失败，错误边界接不到。这也是“在渲染中读取缓存”这个模式的好处：失败和加载一样，都能用声明式的边界处理。
+错误边界接不住异步代码里的错误。在 effect 或事件处理函数里 `await fetch()` 失败，错误发生在 React 的渲染和提交之外，错误边界接不到。这也是“在渲染中读取缓存”这个模式的好处：失败和加载一样，都能用声明式的边界处理。
 
 </CallBox>
 

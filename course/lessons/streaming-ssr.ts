@@ -9,8 +9,8 @@ export default {
   goals: [
     '能解释 renderToString 与 renderToPipeableStream 的区别，并说出 Suspense 边界怎样决定首批 HTML 包含什么',
     '能预测选择性水合的顺序：用户点击的区块先水合，其他区块的未完成工作被丢弃后重做',
-    '能诊断水合不匹配的四类原因，并用 effect 或 getServerSnapshot 写出首次渲染与服务端一致的组件',
-    '能判断一份数据该用哪种缓存与重新验证方式，并说出 Next.js 14、15、16 的默认行为差异',
+    '能诊断水合不匹配的常见原因，并用 effect 或 getServerSnapshot 写出首次渲染与服务端一致的组件',
+    '能判断一份数据该用哪种缓存与重新验证方式',
   ],
   keyPoints: [
     'renderToString 一次性返回整页 HTML，不能流式发送。renderToPipeableStream 先发“外壳”（Suspense 边界之外的部分），每个边界的内容准备好后再单独发送。',
@@ -440,7 +440,7 @@ return &lt;span&gt;{online ? '在线' : '离线'}&lt;/span&gt;;</code></pre></di
         ],
         answer: 1,
         explain:
-          '文字不一致时，React 18 不会就地修补文字，而是丢弃最近的 Suspense 边界里的服务端 HTML，在客户端重新渲染这一块。边界外的库存段落不受影响。“整个根”是乙的情况：错误发生在边界外。“只改文字”是最常见的误解：只有用了 suppressHydrationWarning 的那一层才会这样处理。',
+          '文字不一致时，React 18 不会就地修补文字，而是丢弃最近的 Suspense 边界里的服务端 HTML，在客户端重新渲染这一块。边界外的库存段落不受影响。“整个根”是乙的情况：错误发生在边界外。“只改文字”是最常见的误解：React 18 中，只有加了 suppressHydrationWarning 的那一层会这样处理；React 19 连这一层也不改，保留服务端的文字。',
       },
       pkey: 'streaming-ssr|同一段 HTML，三种客户端数据',
     },
