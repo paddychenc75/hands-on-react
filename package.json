@@ -1,0 +1,16 @@
+{
+  "name": "react-zero-to-expert",
+  "private": true,
+  "type": "module",
+  "description": "中文交互式 React 课程“React 从零到专家”：单文件网页，45 课 6 阶段",
+  "scripts": {
+    "build": "python3 src/build.py",
+    "test": "npm run build && node tests/lessons.mjs && node tests/mechanics.mjs",
+    "test:lessons": "node tests/lessons.mjs",
+    "test:mechanics": "node tests/mechanics.mjs",
+    "check": "for f in src/*.js; do node --check \"$f\" || exit 1; done"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
