@@ -171,6 +171,9 @@ const afterLine = `  '${values.after}',\n`;
 if (!orderSrc.includes(afterLine)) die(`在 course/order.ts 里找不到 '${values.after}' 这一行；请手动加 '${id}',`);
 fs.writeFileSync(orderPath, orderSrc.replace(afterLine, `${afterLine}  '${id}',\n`));
 
+// 生成的数据文件按 Biome 的格式写好，npm run check 里的 lint 才不会因为格式报错
+spawnSync(path.join(ROOT, 'node_modules/.bin/biome'), ['format', '--write', dataPath], { stdio: 'ignore' });
+
 const run = (script, ...a) =>
   spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(ROOT, 'scripts', script), ...a], { stdio: 'inherit' }).status;
 run('gen-registry.mjs');
