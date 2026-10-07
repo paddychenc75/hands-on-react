@@ -16,7 +16,7 @@ export default {
     '先设计 state，再写界面：只存 todos、输入框文字、当前筛选，其余都能算出来。',
     '“剩余数量”“筛选后的列表”在渲染时用 <code>filter</code> 计算。再存一份，就会出现两个数据源，容易不同步。',
     '修改数组用 <code>map</code>、<code>filter</code>、展开运算符生成新数组。不要 push、splice，也不要直接改某一项的 done。',
-    '最常见的坑：忘了 <code>preventDefault()</code> 导致表单提交刷新页面（实验台替你拦住了刷新，所以验收测不出这一点，真实页面里会刷新）；忘了清空输入框；空白内容也被添加。',
+    '最常见的坑：忘了 <code>preventDefault()</code> 导致表单提交刷新页面（实验台会替你拦住刷新，并在控制台警告；验收也会检查这一点，真实页面里会整页刷新）；忘了清空输入框；空白内容也被添加。',
   ],
   quiz: [
     {
@@ -181,6 +181,10 @@ function App() {
       await add('写周报');
       await add('跑步');
       t.assert(items().length === 3, `添加 3 条后应有 3 个 li.todo，实际 ${items().length} 个`);
+      t.assert(
+        t.unpreventedSubmits() === 0,
+        '提交表单时没有调用 e.preventDefault()：真实页面里浏览器会提交表单并刷新整个页面（实验台替你拦住了，所以界面看起来正常）。在 onSubmit 处理函数的第一行调用 e.preventDefault()。',
+      );
       t.assert(t.q('#new-todo').value === '', '添加后输入框应被清空');
       await add('   ');
       t.assert(items().length === 3, '空白内容不应被添加（需求 2）');

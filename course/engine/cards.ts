@@ -3,13 +3,21 @@ import { LESSONS, lessonNo } from '../registry.ts';
 import { lessonHref } from '../site.ts';
 import type { SrsCard } from '../types.ts';
 import { esc } from './logic/text.ts';
-import { type Card, dueKeys, nextCard } from './logic/srs.ts';
+import { type Card, dueKeys, gatedNextCard, nextCard } from './logic/srs.ts';
 import { progress, save } from './store.ts';
 
 export const srsAll = (): Record<string, SrsCard> => (progress.__srs = progress.__srs || {});
 export function srsRecord(key: string, ok: boolean): void {
   const s = srsAll();
   s[key] = nextCard(s[key], ok, Date.now());
+  save();
+}
+/** 带门槛的记录：答对没到期的卡片不改复习间隔（热身、混合练习、阶段测验用）；答错照样重置 */
+export function srsRecordGated(key: string, ok: boolean): void {
+  const s = srsAll();
+  const next = gatedNextCard(s[key], ok, Date.now());
+  if (next === s[key]) return;
+  s[key] = next;
   save();
 }
 export function cardOf(key: string): Card | null {

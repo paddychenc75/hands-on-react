@@ -37,6 +37,8 @@ export interface Tester {
   rawSource: string;
   /** 按练习的 exports 字段导出的顶层名字 */
   exports: Record<string, any>;
+  /** 本次运行里表单被提交、但学习者的处理函数没有调用 preventDefault 的次数。实验台会替学习者拦住刷新，所以只有这个计数能看出漏写 */
+  unpreventedSubmits: () => number;
   /** 返回元素；约定是"找得到"，找不到时返回 null。查询结果按 any 使用，因为练习要读 value、checked 等各种元素的属性 */
   q: (selector: string) => any;
   qa: (selector: string) => any[];

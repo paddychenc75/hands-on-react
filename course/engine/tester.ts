@@ -5,7 +5,7 @@ import { sleep } from './util.ts';
 
 export class TestFail extends Error {}
 
-export function makeTester(root: HTMLElement, rawSource: string, exports?: Record<string, any>): Tester {
+export function makeTester(root: HTMLElement, rawSource: string, exports?: Record<string, any>, unpreventedSubmits: () => number = () => 0): Tester {
   const source = stripComments(rawSource);
   const q = (s: string) => root.querySelector(s);
   const qa = (s: string) => Array.from(root.querySelectorAll(s));
@@ -19,6 +19,7 @@ export function makeTester(root: HTMLElement, rawSource: string, exports?: Recor
     source,
     rawSource,
     exports: exports || {},
+    unpreventedSubmits,
     q,
     qa,
     text: s => {

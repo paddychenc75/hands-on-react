@@ -49,6 +49,8 @@ export class Runner {
   root: any;
   timers: Set<any>;
   gen: number;
+  /** 本次运行中，学习者的处理函数没有调用 preventDefault 就提交了表单的次数（供练习检查读取） */
+  unpreventedSubmits = 0;
   constructor(mount: HTMLElement, consoleEl: HTMLElement) {
     this.mount = mount;
     this.consoleEl = consoleEl;
@@ -60,7 +62,15 @@ export class Runner {
     };
     mount.addEventListener('pointerdown', touch, true);
     mount.addEventListener('focusin', touch, true);
-    mount.addEventListener('submit', e => e.preventDefault()); // 没写 onSubmit 的表单也不会刷新页面
+    // 兜底：没写 onSubmit 或没调用 preventDefault 的表单也不会刷新页面。
+    // 监听放在 mount 的父元素上（冒泡阶段），晚于 React 挂在 mount 上的处理函数，所以能看到学习者有没有调用 preventDefault
+    (mount.parentElement || mount).addEventListener('submit', e => {
+      if (!e.defaultPrevented) {
+        this.unpreventedSubmits++;
+        e.preventDefault();
+        this.log('warn', ['表单提交时没有调用 e.preventDefault()：在真实页面里浏览器会提交表单并刷新整个页面（实验台替你拦住了）。']);
+      }
+    });
   }
   log(kind: string, args: any[]) {
     const line = el('div', { class: kind === 'error' ? 'err' : kind === 'warn' ? 'warn' : '' });
@@ -90,6 +100,7 @@ export class Runner {
   run(source: string, exportNames?: string[]): { error?: any; App?: any; exports?: Record<string, any> } {
     this.unmount();
     this.consoleEl.innerHTML = '';
+    this.unpreventedSubmits = 0;
     const gen = this.gen;
     const self = this;
     const fakeConsole = {

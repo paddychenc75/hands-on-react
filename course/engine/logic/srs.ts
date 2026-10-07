@@ -3,7 +3,7 @@
 import type { Lesson, QuizItem, SrsCard } from '../../types.ts';
 
 export const DAY = 864e5;
-/** 盒子 0..5 对应的复习间隔（天） */
+/** 盒子 0..5 对应的复习间隔（天）。盒子 0 的 0 只是占位，没有参与计算：答错固定"明天再出"（见 nextCard），否则答错的题当天又会到期 */
 export const SRS_DAYS = [0, 1, 3, 7, 16, 35];
 /** 刚答过（12 小时内）的题不拿来热身，否则只是在考短期记忆 */
 export const WARMUP_COOLDOWN = 12 * 36e5;
@@ -42,8 +42,11 @@ export const nextDueAfter = (srs: Record<string, SrsCard>, now: number): number 
     .filter(d => d > now)
     .sort((a, b) => a - b)[0];
 
-/** 热身答题是否要更新复习安排：答错照样重置；答对只有"到期的题"才拉长间隔 */
-export const shouldRecordWarmup = (ok: boolean, card: SrsCard, now: number): boolean => !ok || card.due <= now;
+/** 答题是否要更新复习安排：答错照样重置；答对只有"到期的题"才拉长间隔；还没有记录的新卡总是记录。热身、混合练习和阶段测验共用 */
+export const shouldRecord = (ok: boolean, card: SrsCard | undefined, now: number): boolean => !ok || !card || card.due <= now;
+
+/** 带"到期才升级"门槛的 nextCard：不该记录时原样返回旧卡片 */
+export const gatedNextCard = (card: SrsCard | undefined, ok: boolean, now: number): SrsCard => (shouldRecord(ok, card, now) ? nextCard(card, ok, now) : card);
 
 /** 热身题库：只考已经学过（答过题）的内容，并去掉刚答过的 */
 export function warmupPool(pool: Card[], srs: Record<string, SrsCard>, now: number): Card[] {

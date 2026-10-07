@@ -137,6 +137,12 @@ describe('交卷后的记录（以最近一次为准）', () => {
     expect(rec.failedAt).toBeUndefined();
     expect(rec.pending).toBeUndefined();
   });
+  it('通过：清掉之前未通过留下的 weak；没通过时仍然写入新的 weak', () => {
+    const passed = settleResult({ passed: false, failedAt: NOW - MIN, weak: ['state', 'events'] }, 92, ['jsx'], NOW);
+    expect(passed.weak).toBeUndefined();
+    const failed = settleResult({ weak: ['state'] }, 40, ['jsx'], NOW);
+    expect(failed.weak).toEqual(['jsx']);
+  });
   it('没通过：记 failedAt 和需要加强的课，开始冷却', () => {
     const rec = settleResult({}, 58, ['state', 'events'], NOW);
     expect(rec).toMatchObject({ passed: false, failedAt: NOW, weak: ['state', 'events'], best: 58, last: 58 });

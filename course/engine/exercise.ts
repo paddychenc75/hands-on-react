@@ -72,7 +72,7 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
       await sleep(80);
       const err = pg._mount.querySelector(':scope > .pv-err');
       if (err) throw new TestFail(err.textContent);
-      await ex.test(makeTester(pg._mount, pg._editor.value, res.exports));
+      await ex.test(makeTester(pg._mount, pg._editor.value, res.exports, () => pg._runner.unpreventedSubmits));
       if (p.sawSol && !p.ex) p.exHelp = p.rewrite ? 'rewrite' : 'solution';
       p.ex = true;
       save();

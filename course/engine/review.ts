@@ -1,7 +1,7 @@
 /* 复习页：到期的卡片，或没有到期时的混合练习。 */
 import { LESSONS } from '../registry.ts';
 import { HOME_HREF, lessonHref } from '../site.ts';
-import { dueCards, learnedCards, srcLine, srsAll, srsRecord } from './cards.ts';
+import { dueCards, learnedCards, srcLine, srsAll, srsRecordGated } from './cards.ts';
 import { DAY, nextDueAfter, type Card } from './logic/srs.ts';
 import { shuffled } from './logic/random.ts';
 import { makeQuestion } from './question.ts';
@@ -48,7 +48,7 @@ export function makeReview(): HTMLDivElement {
           footer: srcLine(c),
           onAnswer: (_oi, ok) => {
             if (ok) right++;
-            srsRecord(c.key, ok);
+            srsRecordGated(c.key, ok);
             nextBtn.hidden = false;
             nextBtn.focus();
           },
@@ -78,7 +78,7 @@ export function makeReview(): HTMLDivElement {
     const box = el(
       'div',
       { class: 'done-card' },
-      `<b>今天该复习的都复习完了 🎉</b><span>你已学过 ${learned.length} 道题。想多练一会儿，可以做一组从所有学过的课里随机抽取的混合题，结果同样会影响复习安排。</span>`,
+      `<b>今天该复习的都复习完了 🎉</b><span>你已学过 ${learned.length} 道题。想多练一会儿，可以做一组从所有学过的课里随机抽取的混合题，答错的题会重新安排；还没到期的题答对不改变复习间隔。</span>`,
     );
     const extra = el('button', { class: 'btn primary', type: 'button' }, '来 10 道混合练习');
     extra.addEventListener('click', () =>

@@ -8,7 +8,8 @@ import {
   nextCard,
   nextDueAfter,
   pickWarmup,
-  shouldRecordWarmup,
+  shouldRecord,
+  gatedNextCard,
   warmupPool,
 } from '../../course/engine/logic/srs.ts';
 import type { SrsCard } from '../../course/types.ts';
@@ -78,16 +79,41 @@ describe('到期判断', () => {
   });
 });
 
-describe('热身：只有到期的卡片才提升复习间隔', () => {
+describe('只有到期的卡片才提升复习间隔（热身、混合练习、阶段测验共用）', () => {
   it('答对且没到期：不更新复习安排', () => {
-    expect(shouldRecordWarmup(true, srsCard({ due: NOW + DAY }), NOW)).toBe(false);
+    expect(shouldRecord(true, srsCard({ due: NOW + DAY }), NOW)).toBe(false);
   });
   it('答对且已到期（含刚好到期）：更新', () => {
-    expect(shouldRecordWarmup(true, srsCard({ due: NOW }), NOW)).toBe(true);
-    expect(shouldRecordWarmup(true, srsCard({ due: NOW - DAY }), NOW)).toBe(true);
+    expect(shouldRecord(true, srsCard({ due: NOW }), NOW)).toBe(true);
+    expect(shouldRecord(true, srsCard({ due: NOW - DAY }), NOW)).toBe(true);
   });
   it('答错：不管到没到期都更新（照样重置）', () => {
-    expect(shouldRecordWarmup(false, srsCard({ due: NOW + 30 * DAY }), NOW)).toBe(true);
+    expect(shouldRecord(false, srsCard({ due: NOW + 30 * DAY }), NOW)).toBe(true);
+  });
+  it('没有记录的新卡：总是记录', () => {
+    expect(shouldRecord(true, undefined, NOW)).toBe(true);
+    expect(shouldRecord(false, undefined, NOW)).toBe(true);
+  });
+
+  it('gatedNextCard：到期的卡答对 -> 升一级', () => {
+    const c = srsCard({ box: 1, n: 2, due: NOW - DAY });
+    const r = gatedNextCard(c, true, NOW);
+    expect(r.box).toBe(2);
+    expect(r.due).toBe(NOW + 3 * DAY);
+    expect(r.n).toBe(3);
+  });
+  it('gatedNextCard：未到期的卡答对 -> 盒子、到期时间、次数都不变', () => {
+    const c = srsCard({ box: 2, n: 4, due: NOW + 2 * DAY, last: NOW - DAY });
+    expect(gatedNextCard(c, true, NOW)).toEqual(c);
+  });
+  it('gatedNextCard：答错和 nextCard 一致（回盒子 0、明天再出），即使没到期', () => {
+    const c = srsCard({ box: 3, n: 4, due: NOW + 5 * DAY });
+    expect(gatedNextCard(c, false, NOW)).toEqual(nextCard(c, false, NOW));
+    expect(gatedNextCard(c, false, NOW).box).toBe(0);
+    expect(gatedNextCard(c, false, NOW).due).toBe(NOW + DAY);
+  });
+  it('gatedNextCard：新卡答对 -> 进盒子 1', () => {
+    expect(gatedNextCard(undefined, true, NOW).box).toBe(1);
   });
 });
 

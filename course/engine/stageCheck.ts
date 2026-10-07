@@ -4,7 +4,7 @@ import { LESSONS } from '../registry.ts';
 import { checkHref, lessonHref, reviewHref } from '../site.ts';
 import { STAGES } from '../stages.ts';
 import type { Lesson, StageRecord } from '../types.ts';
-import { cardOf, srcLine, srsAll, srsRecord } from './cards.ts';
+import { cardOf, srcLine, srsAll, srsRecordGated } from './cards.ts';
 import { DAY, type Card } from './logic/srs.ts';
 import { cooldownLeft, isPass, needsRetest, percent, pickStageQuestions, settlePending, settleResult } from './logic/stageCheck.ts';
 import { esc } from './logic/text.ts';
@@ -88,7 +88,7 @@ export function makeCheck(si: number): HTMLDivElement {
             wrong.add(c.l);
             wrongQ.push(i);
           }
-          srsRecord(c.key, ok);
+          srsRecordGated(c.key, ok);
           if (answered === picks.length) {
             finish();
             return;

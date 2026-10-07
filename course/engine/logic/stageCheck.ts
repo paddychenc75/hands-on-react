@@ -62,6 +62,7 @@ export function settleResult(rec: StageRecord, pct: number, weak: string[], now:
     next.passed = true;
     next.passedAt = now;
     delete next.failedAt;
+    delete next.weak;
   } else {
     next.passed = false;
     next.failedAt = now;

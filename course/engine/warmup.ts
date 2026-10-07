@@ -1,8 +1,8 @@
 /* 课前热身：从前面学过的课里挑 2 道题做提取练习，优先挑到期该复习的。 */
 import { LESSONS } from '../registry.ts';
 import type { Lesson } from '../types.ts';
-import { srcLine, srsAll, srsRecord } from './cards.ts';
-import { type Card, pickWarmup, shouldRecordWarmup, warmupPool } from './logic/srs.ts';
+import { srcLine, srsAll, srsRecordGated } from './cards.ts';
+import { type Card, pickWarmup, warmupPool } from './logic/srs.ts';
 import { seeded } from './logic/random.ts';
 import { makeQuestion } from './question.ts';
 import { el } from './util.ts';
@@ -26,7 +26,7 @@ export function makeWarmup(lesson: Lesson): HTMLElement | null {
       makeQuestion(c.item, '回忆 ' + (i + 1), {
         shuffle: true,
         onAnswer: (_oi, ok) => {
-          if (shouldRecordWarmup(ok, srs[c.key], Date.now())) srsRecord(c.key, ok);
+          srsRecordGated(c.key, ok);
         },
         footer: srcLine(c),
       }),
