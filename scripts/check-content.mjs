@@ -332,6 +332,10 @@ for (const { file, lines } of sources) {
 }
 // 说明：Rspress 构建（markdown.link.checkDeadLinks）也会查 MDX 里的死链接；这里补查了数据文件和 <Raw html> 里构建查不到的链接。
 
+// ---------- 占位提示（不算错误） ----------
+const TODO = '【待写】';
+const todos = LESSON_ORDER.map((id) => [id, (textOf[id].match(new RegExp(TODO, 'g')) || []).length]).filter(([, n]) => n);
+
 // ---------- 输出 ----------
 if (VERBOSE) {
   console.log(`\n"第 N 课"引用共 ${refCount} 处，下面 ${refNotes.length} 处没法自动核对课号，请人工看一眼：`);
@@ -343,4 +347,5 @@ if (errors.length) {
   for (const e of errors) console.error('✗ ' + e + '\n');
   process.exit(1);
 }
+if (todos.length) console.log(`提示：这些课还有【待写】占位，发布前要换成真内容：${todos.map(([id, n]) => `${id}（${n} 处）`).join('、')}`);
 if (!UPDATE) console.log(`check:content 通过：${LESSON_ORDER.length} 课、${Object.keys(currentCards).length} 个复习卡片键、${refCount} 处"第 N 课"引用${VERBOSE ? '' : '（--verbose 可列出没法自动核对的引用）'}`);

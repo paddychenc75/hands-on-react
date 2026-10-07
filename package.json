@@ -14,7 +14,8 @@
     "test:e2e": "node tests/e2e/run.mjs",
     "screenshots": "node tests/e2e/screenshots.mjs",
     "test:unit": "vitest run",
-    "check:content": "node --disable-warning=ExperimentalWarning scripts/check-content.mjs"
+    "check:content": "node --disable-warning=ExperimentalWarning scripts/check-content.mjs",
+    "new-lesson": "node --disable-warning=ExperimentalWarning scripts/new-lesson.mjs"
   },
   "engines": {
     "node": ">=24"
