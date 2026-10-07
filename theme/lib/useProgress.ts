@@ -8,7 +8,7 @@ export function useProgress(): boolean {
   const [, setTick] = useState(0);
   useEffect(() => {
     setMounted(true);
-    const f = () => setTick((n) => n + 1);
+    const f = () => setTick(n => n + 1);
     window.addEventListener(PROGRESS_EVENT, f);
     return () => window.removeEventListener(PROGRESS_EVENT, f);
   }, []);

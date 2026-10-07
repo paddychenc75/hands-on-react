@@ -14,14 +14,14 @@ export default {
   ],
   keyPoints: [
     '问题：服务端数据需要缓存、去重、过期刷新和重试。用 useEffect 手写，每个组件都要重复这些代码。',
-    '<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>[\'user\', id]</code>。',
+    "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
     '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后先显示缓存，再在后台刷新。',
     '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
   ],
   quiz: [
     {
-      q: 'useQuery({ queryKey: [\'user\'], queryFn: () => getUser(id) }) 有什么问题？',
+      q: "useQuery({ queryKey: ['user'], queryFn: () => getUser(id) }) 有什么问题？",
       options: [
         '没有问题：id 变了 queryFn 也会跟着变，自动请求新用户',
         'key 里没有 id，切换后读到上一个用户的缓存',
@@ -29,7 +29,8 @@ export default {
         '读取数据应该用 useMutation',
       ],
       answer: 1,
-      explain: '缓存按 queryKey 存取。key 一直是 [\'user\']，切到新 id 时，Query 认为“这份数据已经有了”，直接返回上一个用户。最有迷惑性的是“queryFn 也会跟着变”：queryFn 确实是新函数，但 Query 只看 key 决定是否重新请求。要写成 [\'user\', id]。',
+      explain:
+        "缓存按 queryKey 存取。key 一直是 ['user']，切到新 id 时，Query 认为“这份数据已经有了”，直接返回上一个用户。最有迷惑性的是“queryFn 也会跟着变”：queryFn 确实是新函数，但 Query 只看 key 决定是否重新请求。要写成 ['user', id]。",
     },
     {
       q: '添加一条待办后，想让列表自动更新，最常用的做法是？',
@@ -40,19 +41,22 @@ export default {
         '在 onSuccess 中再调用一次 useQuery',
       ],
       answer: 1,
-      explain: '让缓存失效后，所有使用这份数据的组件会自动重新获取。staleTime 改为 0 不会立刻触发请求，要等组件下次挂载或窗口获得焦点。另存一份列表会出现两个数据源，容易不同步。useQuery 是 Hook，不能在回调里调用。',
+      explain:
+        '让缓存失效后，所有使用这份数据的组件会自动重新获取。staleTime 改为 0 不会立刻触发请求，要等组件下次挂载或窗口获得焦点。另存一份列表会出现两个数据源，容易不同步。useQuery 是 Hook，不能在回调里调用。',
     },
     {
       q: 'useQuery 没有设置 staleTime（默认为 0）。用户 1 的数据已在缓存中。从别的页面切回用户 1 时，会怎样？',
       options: ['直接显示缓存，不发请求', '先显示缓存，同时在后台重新请求', '显示加载中，等新数据回来以后再显示列表', '缓存已经过期被删除，重新请求'],
       answer: 1,
-      explain: 'staleTime 为 0 表示数据一到手就算“过期”。过期不等于没有：Query 先显示缓存，再在后台刷新。“显示加载中”混淆了“过期”和“没有缓存”。“被删除”混淆了 staleTime 和 gcTime：没人使用的缓存默认 5 分钟后才删除。',
+      explain:
+        'staleTime 为 0 表示数据一到手就算“过期”。过期不等于没有：Query 先显示缓存，再在后台刷新。“显示加载中”混淆了“过期”和“没有缓存”。“被删除”混淆了 staleTime 和 gcTime：没人使用的缓存默认 5 分钟后才删除。',
     },
     {
       q: 'staleTime 是 60 秒。用户 30 秒后切回这个页面，会怎样？',
       options: ['直接显示缓存，不发请求', '先显示缓存，再在后台请求', '显示加载中，并重新请求', '缓存已被删除，重新请求'],
       answer: 0,
-      explain: '30 秒时数据还新鲜，所以不请求。“先显示缓存，再在后台请求”是过期之后（60 秒以后）的行为。staleTime 决定何时“过期”；gcTime 决定没人使用的缓存何时被删除（默认 5 分钟）。',
+      explain:
+        '30 秒时数据还新鲜，所以不请求。“先显示缓存，再在后台请求”是过期之后（60 秒以后）的行为。staleTime 决定何时“过期”；gcTime 决定没人使用的缓存何时被删除（默认 5 分钟）。',
     },
   ],
   exercise: {
@@ -217,11 +221,11 @@ function UserCard({ id }) {
 }`,
     hint: '课文里的 <code>User</code> 组件就是这样用 <code>useQuery</code> 的。想一想：如果 key 里没有 <code>id</code>，所有用户会共用哪一条缓存？',
     exports: ['stats'],
-    test: async (t) => {
+    test: async t => {
       const stats = t.exports.stats;
       t.assert(stats && typeof stats.calls === 'number', '找不到 stats。不要修改模拟后端');
       t.assert(/useQuery\s*\(/.test(t.source.replace(/function\s+useQuery\s*\(/, '')), '要在 UserCard 中调用 useQuery（步骤 2）');
-      const btn = (n) => t.q('button[data-id="' + n + '"]');
+      const btn = n => t.q('button[data-id="' + n + '"]');
       const shows = () => ({ loading: !!t.q('#loading'), error: t.text('#error'), user: t.text('#user') });
       await t.wait(60);
       t.assert(shows().loading && !shows().user, '首次加载用户 1 时应显示 #loading，不显示 #user（步骤 4）');
@@ -229,26 +233,33 @@ function UserCard({ id }) {
       t.assert(shows().user === '张三' && !shows().loading, '用户 1 加载完成后，#user 应显示“张三”，实际是“' + shows().user + '”（步骤 4）');
       t.assert(stats.calls === 1, '加载用户 1 应只请求 1 次，实际 ' + stats.calls + ' 次');
 
-      await t.click(btn(2)); await t.wait(30);
+      await t.click(btn(2));
+      await t.wait(30);
       t.assert(shows().user !== '张三', '切到用户 2 后还显示“张三”。queryKey 要包含 id，否则不同用户共用一条缓存（步骤 2）');
       t.assert(shows().loading, '用户 2 第一次加载时应显示 #loading');
       await t.wait(450);
       t.assert(shows().user === '李四', '用户 2 加载完成后，#user 应显示“李四”，实际是“' + shows().user + '”');
       t.assert(stats.calls === 2, '此时应共请求 2 次，实际 ' + stats.calls + ' 次');
 
-      await t.click(btn(1)); await t.wait(30);
+      await t.click(btn(1));
+      await t.wait(30);
       t.assert(shows().user === '张三' && !shows().loading, '切回用户 1 时应立刻显示缓存里的“张三”，不显示 #loading。数据要来自 useQuery 的缓存');
       await t.wait(450);
       t.assert(stats.calls === 2, '切回用户 1 不应再发请求，但请求次数变成了 ' + stats.calls + '。设置 staleTime（步骤 3）');
       t.assert(shows().user === '张三', '切回用户 1 后应一直显示“张三”');
 
-      await t.click(btn(4)); await t.wait(30);
+      await t.click(btn(4));
+      await t.wait(30);
       t.assert(shows().loading, '用户 4 第一次加载时应显示 #loading');
       await t.wait(450);
-      t.assert(shows().error.includes('用户 4 不存在'), '用户 4 请求失败，#error 应显示 error.message（“用户 4 不存在”），实际是“' + shows().error + '”（步骤 4）');
+      t.assert(
+        shows().error.includes('用户 4 不存在'),
+        '用户 4 请求失败，#error 应显示 error.message（“用户 4 不存在”），实际是“' + shows().error + '”（步骤 4）',
+      );
       t.assert(!shows().user && !shows().loading, '出错时不应显示 #user 或 #loading');
 
-      await t.click(btn(3)); await t.wait(450);
+      await t.click(btn(3));
+      await t.wait(450);
       t.assert(shows().user === '王五' && !shows().error, '切到用户 3 后应显示“王五”，且不再显示 #error');
       t.assert(stats.calls === 4, '最后应共请求 4 次（用户 1、2、4、3 各一次），实际 ' + stats.calls + ' 次');
     },
@@ -263,25 +274,17 @@ const { data: posts } = useQuery({
   queryKey: ['posts', user.id],
   queryFn: () =&gt; getPosts(user.id),
 });</code></pre></div>`,
-      options: [
-        '等 user 到了，自动再查 posts',
-        '报错：第一次渲染时 user 是 undefined，读 user.id 失败',
-        '两个请求同时发出，都成功',
-        'posts 用 user 的缓存',
-      ],
+      options: ['等 user 到了，自动再查 posts', '报错：第一次渲染时 user 是 undefined，读 user.id 失败', '两个请求同时发出，都成功', 'posts 用 user 的缓存'],
       answer: 1,
-      explain: '第一次渲染时数据还没回来，data 是 undefined。读取 user.id 会抛出 TypeError。依赖查询的写法：<code>queryKey: [\'posts\', user?.id]</code>，并加上 <code>enabled: !!user</code>，等 user 有值后再请求。',
+      explain:
+        "第一次渲染时数据还没回来，data 是 undefined。读取 user.id 会抛出 TypeError。依赖查询的写法：<code>queryKey: ['posts', user?.id]</code>，并加上 <code>enabled: !!user</code>，等 user 有值后再请求。",
     },
     {
-      q: '缓存里有 <code>[\'todos\', \'list\', 1]</code>、<code>[\'todos\', \'list\', 2]</code>、<code>[\'todos\', \'detail\', 5]</code> 和 <code>[\'user\']</code>。执行下面的代码，哪些查询会失效？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">queryClient.invalidateQueries({ queryKey: [\'todos\'] });</code></pre></div>',
-      options: [
-        '一个都不会：没有查询的 key 正好等于 [\'todos\']',
-        '所有以 \'todos\' 开头的三个查询',
-        '只有 [\'todos\', \'list\', 1]',
-        '全部四个',
-      ],
+      q: "缓存里有 <code>['todos', 'list', 1]</code>、<code>['todos', 'list', 2]</code>、<code>['todos', 'detail', 5]</code> 和 <code>['user']</code>。执行下面的代码，哪些查询会失效？<div class=\"codeblock faded\"><pre style=\"white-space:pre-wrap\"><code style=\"background:none;color:inherit;padding:0;font-size:inherit\">queryClient.invalidateQueries({ queryKey: ['todos'] });</code></pre></div>",
+      options: ["一个都不会：没有查询的 key 正好等于 ['todos']", "所有以 'todos' 开头的三个查询", "只有 ['todos', 'list', 1]", '全部四个'],
       answer: 1,
-      explain: 'invalidateQueries 默认按<b>前缀</b>匹配。所有 key 以 \'todos\' 开头的查询都会失效，正在显示的会在后台重新请求。<code>[\'user\']</code> 不受影响。只想匹配完全相同的 key，可以加 <code>exact: true</code>。',
+      explain:
+        "invalidateQueries 默认按<b>前缀</b>匹配。所有 key 以 'todos' 开头的查询都会失效，正在显示的会在后台重新请求。<code>['user']</code> 不受影响。只想匹配完全相同的 key，可以加 <code>exact: true</code>。",
     },
     {
       q: `Header 和 Sidebar 同时挂载，都调用下面的代码。会发出几次 getTodos 请求？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const { data } = useQuery({
@@ -290,7 +293,8 @@ const { data: posts } = useQuery({
 });</code></pre></div>`,
       options: ['2 次：每个组件各发一次', '1 次，但第二个组件拿到的是 undefined，不会更新', '1 次', '报错：同一个 queryKey 不能用两次'],
       answer: 2,
-      explain: 'TanStack Query 按 queryKey 管理缓存。相同 key 的查询共享同一份数据和同一个请求。第一个组件发出请求后，第二个组件发现请求正在进行，就等这同一个结果。数据回来后，两个组件都会更新。所以在多个组件里直接调用同一个查询是推荐做法，不需要把数据层层传下去。“2 次”是用 useEffect 自己请求时的行为。',
+      explain:
+        'TanStack Query 按 queryKey 管理缓存。相同 key 的查询共享同一份数据和同一个请求。第一个组件发出请求后，第二个组件发现请求正在进行，就等这同一个结果。数据回来后，两个组件都会更新。所以在多个组件里直接调用同一个查询是推荐做法，不需要把数据层层传下去。“2 次”是用 useEffect 自己请求时的行为。',
     },
   ],
   plays: {

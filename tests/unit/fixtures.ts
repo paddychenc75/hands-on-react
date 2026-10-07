@@ -12,4 +12,7 @@ export const lesson = (id: string): Lesson => ({ id, stage: 0, title: id, mins: 
 export const card = (l: Lesson, qi: number, prefix = ''): Card => ({ key: `${l.id}#${prefix}${qi}`, l, qi, item: item(`${l.id}-${qi}`) });
 export const srsCard = (over: Partial<SrsCard> = {}): SrsCard => ({ box: 1, n: 1, due: NOW + DAY, last: NOW - DAY, ...over });
 /** 固定的随机数序列，循环使用 */
-export const seq = (...v: number[]) => { let i = 0; return () => v[i++ % v.length]; };
+export const seq = (...v: number[]) => {
+  let i = 0;
+  return () => v[i++ % v.length];
+};

@@ -6,7 +6,10 @@ import { LESSONS } from '../../course/registry.ts';
 import { lessonHref } from '../../course/site.ts';
 
 const lessonIdOf = (pathname: string) => {
-  const m = decodeURIComponent(pathname).replace(/\.html$/, '').replace(/\/+$/, '').match(/\/lessons\/([^/]+)$/);
+  const m = decodeURIComponent(pathname)
+    .replace(/\.html$/, '')
+    .replace(/\/+$/, '')
+    .match(/\/lessons\/([^/]+)$/);
   return m ? m[1] : '';
 };
 
@@ -36,7 +39,11 @@ export default function ReadingAids() {
     window.addEventListener('scroll', onScroll, { passive: true });
     // 实验台是异步加载的，页面高度稳定后再提示“继续上次位置”
     const resume = setTimeout(() => offerResume(id), 1200);
-    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(timer); clearTimeout(resume); };
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+      clearTimeout(resume);
+    };
   }, [id]);
 
   useEffect(() => {

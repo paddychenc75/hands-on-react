@@ -10,8 +10,12 @@ export default function LessonHeader() {
   return (
     <div className="hoc">
       <div className="crumb">
-        <span className="tag">{stage.no} · {stage.name}</span>
-        <span>第 {lessonNo(lesson.id)} / {TOTAL_LESSONS} 课</span>
+        <span className="tag">
+          {stage.no} · {stage.name}
+        </span>
+        <span>
+          第 {lessonNo(lesson.id)} / {TOTAL_LESSONS} 课
+        </span>
         <span>·</span>
         <span>约 {lesson.mins} 分钟</span>
       </div>

@@ -16,12 +16,17 @@ export interface QuestionOptions {
 /** makeQuestion 返回的元素；交卷模式下 _reveal 统一显示对错和解析 */
 export type QuestionElement = HTMLDivElement & { _reveal: () => void };
 
-export function makeQuestion(item: QuizItem, label: string, { chosen, shuffle, onAnswer, onRetry, footer, hideAnswer, defer }: QuestionOptions = {}): QuestionElement {
+export function makeQuestion(
+  item: QuizItem,
+  label: string,
+  { chosen, shuffle, onAnswer, onRetry, footer, hideAnswer, defer }: QuestionOptions = {},
+): QuestionElement {
   const q = el('div', { class: 'q' }) as QuestionElement;
   q.appendChild(el('div', { class: 'q-text' }, `<span class="qn">${label}</span><span>${item.q}</span>`));
   const opts = el('div', { class: 'opts' });
   const order = shuffle ? shuffled(item.options.length) : [...item.options.keys()];
-  const explain = el('div', { class: 'explain' }); explain.hidden = true;
+  const explain = el('div', { class: 'explain' });
+  explain.hidden = true;
   const btns = new Map<number, HTMLButtonElement>();
   order.forEach((oi, pos) => {
     const b = el('button', { class: 'opt', type: 'button' }, `<span class="ol">${'ABCD'[pos]}</span><span>${fmtOpt(item.options[oi])}</span>`);
@@ -29,11 +34,16 @@ export function makeQuestion(item: QuizItem, label: string, { chosen, shuffle, o
       if (chosen !== undefined) return;
       chosen = oi;
       // 交卷模式：只记下选择，全部答完再统一显示对错和解析
-      if (defer) btns.forEach((x, k) => { x.disabled = true; x.classList.toggle('picked', k === oi); });
+      if (defer)
+        btns.forEach((x, k) => {
+          x.disabled = true;
+          x.classList.toggle('picked', k === oi);
+        });
       else paint();
       onAnswer && onAnswer(oi, oi === item.answer);
     });
-    btns.set(oi, b); opts.appendChild(b);
+    btns.set(oi, b);
+    opts.appendChild(b);
   });
   function paint() {
     if (chosen === undefined) return;
@@ -58,7 +68,10 @@ export function makeQuestion(item: QuizItem, label: string, { chosen, shuffle, o
     explain.hidden = false;
   }
   if (!defer) paint();
-  q._reveal = () => { btns.forEach(x => x.classList.remove('picked')); paint(); };
+  q._reveal = () => {
+    btns.forEach(x => x.classList.remove('picked'));
+    paint();
+  };
   q.append(opts, explain);
   return q;
 }

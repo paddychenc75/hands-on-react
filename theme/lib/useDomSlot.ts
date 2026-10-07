@@ -8,7 +8,9 @@ export function useDomSlot(build: () => Element | null, deps: unknown[] = []) {
     if (!host) return;
     const node = build();
     if (node) host.appendChild(node);
-    return () => { node?.remove(); };
+    return () => {
+      node?.remove();
+    };
     // biome-ignore lint/correctness/useExhaustiveDependencies: deps 由调用方决定何时重建 DOM；build 每次渲染都是新函数，不能放进依赖
   }, deps);
   return ref;

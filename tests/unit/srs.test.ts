@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DAY, SRS_DAYS, WARMUP_COOLDOWN, dueKeys, isDue, nextCard, nextDueAfter, pickWarmup, shouldRecordWarmup, warmupPool } from '../../course/engine/logic/srs.ts';
+import {
+  DAY,
+  SRS_DAYS,
+  WARMUP_COOLDOWN,
+  dueKeys,
+  isDue,
+  nextCard,
+  nextDueAfter,
+  pickWarmup,
+  shouldRecordWarmup,
+  warmupPool,
+} from '../../course/engine/logic/srs.ts';
 import type { SrsCard } from '../../course/types.ts';
 import { HOUR, NOW, card, lesson, seq, srsCard } from './fixtures.ts';
 
@@ -82,10 +93,10 @@ describe('热身：只有到期的卡片才提升复习间隔', () => {
 
 describe('热身题库：12 小时内答过的不再出，没答过的课不出', () => {
   const l = lesson('l1');
-  const [c0, c1, c2, c3] = [0, 1, 2, 3].map((i) => card(l, i));
+  const [c0, c1, c2, c3] = [0, 1, 2, 3].map(i => card(l, i));
   const srs = {
     [c0.key]: srsCard({ last: NOW - 12 * HOUR + 1 }), // 差 1 毫秒满 12 小时：不出
-    [c1.key]: srsCard({ last: NOW - 12 * HOUR }),     // 刚好 12 小时：可以出
+    [c1.key]: srsCard({ last: NOW - 12 * HOUR }), // 刚好 12 小时：可以出
     [c2.key]: srsCard({ last: NOW - 30 * HOUR }),
     // c3 没有记录：没答过
   };
@@ -111,7 +122,7 @@ describe('pickWarmup：选 2 题，先到期的、再上一课的', () => {
   const rnd = seq(0.1, 0.9, 0.5, 0.3);
 
   it('没有到期的题：从上一课挑 1 道，再从更早的课补 1 道', () => {
-    const srs = Object.fromEntries(cards.map((c) => [c.key, srsCard({ due: NOW + DAY })]));
+    const srs = Object.fromEntries(cards.map(c => [c.key, srsCard({ due: NOW + DAY })]));
     const picks = pickWarmup(cards, srs, b, rnd, NOW);
     expect(picks).toHaveLength(2);
     expect(picks[0].l).toBe(b);
@@ -119,7 +130,7 @@ describe('pickWarmup：选 2 题，先到期的、再上一课的', () => {
   });
 
   it('有到期的题：到期的排第一，其次才是上一课的', () => {
-    const srs = Object.fromEntries(cards.map((c) => [c.key, srsCard({ due: NOW + DAY })]));
+    const srs = Object.fromEntries(cards.map(c => [c.key, srsCard({ due: NOW + DAY })]));
     srs[cards[0].key] = srsCard({ due: NOW - 1 });
     const picks = pickWarmup(cards, srs, b, rnd, NOW);
     expect(picks[0]).toBe(cards[0]);
@@ -133,7 +144,7 @@ describe('pickWarmup：选 2 题，先到期的、再上一课的', () => {
   });
 
   it('相同的随机数序列得到相同的结果', () => {
-    const srs = Object.fromEntries(cards.map((c) => [c.key, srsCard({ due: NOW + DAY })]));
+    const srs = Object.fromEntries(cards.map(c => [c.key, srsCard({ due: NOW + DAY })]));
     expect(pickWarmup(cards, srs, b, seq(0.2, 0.7), NOW)).toEqual(pickWarmup(cards, srs, b, seq(0.2, 0.7), NOW));
   });
 });

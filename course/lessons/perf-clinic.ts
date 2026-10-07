@@ -29,7 +29,8 @@ export default {
         '把 30 个 UserCard 改成虚拟列表',
       ],
       answer: 0,
-      explain: '好的验证实验只改假设指向的那一处，并预先说出数字会怎样变化。固定 value 后渲染次数降到 0，假设成立。给子组件加 memo 是最迷惑的选项：Context 的变化绕过 memo，它不会改变 UserCard 的渲染次数，也就验证不了任何东西。生产版本和虚拟列表都会让数字变小，但说明不了病因。',
+      explain:
+        '好的验证实验只改假设指向的那一处，并预先说出数字会怎样变化。固定 value 后渲染次数降到 0，假设成立。给子组件加 memo 是最迷惑的选项：Context 的变化绕过 memo，它不会改变 UserCard 的渲染次数，也就验证不了任何东西。生产版本和虚拟列表都会让数字变小，但说明不了病因。',
     },
     {
       q: '一次点击产生 3 次提交，每次约 8ms。同事说：“每次都低于 16ms，一帧就能完成，不用管。”哪个判断最准确？',
@@ -40,7 +41,8 @@ export default {
         '3 次提交在同一次交互里，总耗时约 24ms；中间提交还可能显示不一致的界面。应把派生值改成在渲染时计算',
       ],
       answer: 3,
-      explain: '用户感受到的是整次交互的耗时，3 次提交加起来超过了一帧。effect 连锁还会让中间状态出现在 DOM 中，例如分类已变、列表还是旧的。根治的方法是消除多余的提交：在渲染时计算派生值，或者在事件处理函数里一次更新所有 state。memo 和 startTransition 都没有减少提交次数。',
+      explain:
+        '用户感受到的是整次交互的耗时，3 次提交加起来超过了一帧。effect 连锁还会让中间状态出现在 DOM 中，例如分类已变、列表还是旧的。根治的方法是消除多余的提交：在渲染时计算派生值，或者在事件处理函数里一次更新所有 state。memo 和 startTransition 都没有减少提交次数。',
     },
     {
       q: '团队想在 CI 中加一条性能检查，防止搜索框再次变卡。哪条最可靠？',
@@ -51,7 +53,8 @@ export default {
         '每次 PR 都人工用 Profiler 录一次',
       ],
       answer: 1,
-      explain: '计数在任何机器上都一样，所以适合作为 CI 中的预算。毫秒阈值是最迷惑的选项：CI 机器有时快有时慢，16ms 的断言会随机失败，团队很快就会忽略它。毫秒数更适合放在线上监控中看趋势。',
+      explain:
+        '计数在任何机器上都一样，所以适合作为 CI 中的预算。毫秒阈值是最迷惑的选项：CI 机器有时快有时慢，16ms 的断言会随机失败，团队很快就会忽略它。毫秒数更适合放在线上监控中看趋势。',
     },
     {
       q: '用户反馈：弹窗打开、关闭十几次后，按一次 Esc 页面会卡一下。你在控制台运行 <code>getEventListeners(document)<wbr>.keydown<wbr>.length</code>，结果是 14。最可能的原因是？',
@@ -62,7 +65,8 @@ export default {
         '开发版本会把每个监听器添加两次',
       ],
       answer: 2,
-      explain: '每打开一次弹窗就多一个监听器，而关闭时没有移除。常见写法是 <code>return () =&gt; document.removeEventListener(\'keydown\', () =&gt; …)</code>：这里的箭头函数是新创建的，和添加时的不是同一个引用，所以什么也没移除。渲染次数和这个数量无关。冒泡不会增加监听器的数量。',
+      explain:
+        "每打开一次弹窗就多一个监听器，而关闭时没有移除。常见写法是 <code>return () =&gt; document.removeEventListener('keydown', () =&gt; …)</code>：这里的箭头函数是新创建的，和添加时的不是同一个引用，所以什么也没移除。渲染次数和这个数量无关。冒泡不会增加监听器的数量。",
     },
     {
       q: '一个 380KB 的图表库只在“报表”页使用。首页的 LCP 是 4.1 秒，构建分析显示这个库被打进了首页的包。最合适的做法是？',
@@ -73,7 +77,8 @@ export default {
         '用 useMemo 缓存图表的配置对象',
       ],
       answer: 0,
-      explain: '这是加载阶段的问题：首页要下载并执行一个用不到的库。代码分割直接把它移出首屏的包。memo 和 useMemo 只影响渲染，对下载和解析的成本毫无帮助。换成 CDN 加载，浏览器照样要下载和执行它，只是不计入你的构建产物，问题并没有消失。',
+      explain:
+        '这是加载阶段的问题：首页要下载并执行一个用不到的库。代码分割直接把它移出首屏的包。memo 和 useMemo 只影响渲染，对下载和解析的成本毫无帮助。换成 CDN 加载，浏览器照样要下载和执行它，只是不计入你的构建产物，问题并没有消失。',
     },
   ],
   exercise: {
@@ -461,7 +466,7 @@ function App() {
     </Profiler>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       const h = React.createElement;
       const { App, probe, feed, ORDERS } = t.exports;
       t.assert(typeof App === 'function', '请保留名为 App 的组件');
@@ -476,8 +481,8 @@ function App() {
       const root = ReactDOM.createRoot(box);
       const commits = [];
       const onRender = (id, phase, d) => commits.push({ phase, d });
-      const q = (s) => box.querySelector(s);
-      const qa = (s) => Array.from(box.querySelectorAll(s));
+      const q = s => box.querySelector(s);
+      const qa = s => Array.from(box.querySelectorAll(s));
       let mounted = true;
       try {
         const nav0 = probe.navRenders;
@@ -487,7 +492,10 @@ function App() {
         t.assert(navMount >= 12, '挂载时 NavItem 应渲染 12 次，probe.navRenders 只增加了 ' + navMount + ' 次。不要删除 NavItem 里的计数');
         t.assert(probe.statsCalls >= 1, 'computeStats 一次都没被调用。统计数字要由它算出');
         const total = ORDERS.reduce((s, o) => s + o.amount, 0);
-        t.assert(q('#stats') && q('#stats').textContent.includes(String(total)) && q('#stats').textContent.includes(String(Math.round(total / 120))), '统计数字不对：应显示总额 ¥' + total + ' 和平均 ¥' + Math.round(total / 120));
+        t.assert(
+          q('#stats') && q('#stats').textContent.includes(String(total)) && q('#stats').textContent.includes(String(Math.round(total / 120))),
+          '统计数字不对：应显示总额 ¥' + total + ' 和平均 ¥' + Math.round(total / 120),
+        );
         t.assert(feed.listeners.size === base + 1, '挂载一个仪表盘后，feed 上应多 1 个监听器，实际多了 ' + (feed.listeners.size - base) + ' 个');
         t.assert(q('#count') && q('#count').textContent.includes('120') && qa('.order-row').length === 120, '一开始应显示全部 120 条订单');
         const search = q('#search');
@@ -497,31 +505,50 @@ function App() {
         const steps = [];
         for (const v of ['张', '张伟', '张']) {
           commits.length = 0;
-          const n0 = probe.navRenders, s0 = probe.statsCalls;
+          const n0 = probe.navRenders,
+            s0 = probe.statsCalls;
           await t.type(search, v);
           await t.wait(60);
           steps.push({ commits: commits.length, nav: probe.navRenders - n0, stats: probe.statsCalls - s0, listeners: feed.listeners.size - base });
         }
-        const max = (k) => Math.max(...steps.map(s => s[k]));
+        const max = k => Math.max(...steps.map(s => s[k]));
         const problems = [];
-        if (max('commits') > 1) problems.push('每次按键产生了 ' + max('commits') + ' 次提交（预算 1 次）。哪个 effect 在提交后又调用了 set 函数？能在渲染时算出的值，不要放进 state');
-        if (max('nav') > 0) problems.push('打字时 NavItem 渲染了 ' + max('nav') + ' 次（预算 0 次）。它的 props 没变，memo 却没挡住：检查它读取的 Context，value 是不是每次都是新对象');
+        if (max('commits') > 1)
+          problems.push('每次按键产生了 ' + max('commits') + ' 次提交（预算 1 次）。哪个 effect 在提交后又调用了 set 函数？能在渲染时算出的值，不要放进 state');
+        if (max('nav') > 0)
+          problems.push(
+            '打字时 NavItem 渲染了 ' + max('nav') + ' 次（预算 0 次）。它的 props 没变，memo 却没挡住：检查它读取的 Context，value 是不是每次都是新对象',
+          );
         if (max('stats') > 0) problems.push('打字时 computeStats 被调用了 ' + max('stats') + ' 次（预算 0 次）。ORDERS 没变，统计结果也不会变');
-        if (steps[steps.length - 1].listeners !== 1) problems.push('输入 3 次后，这个仪表盘在 feed 上有 ' + steps[steps.length - 1].listeners + ' 个监听器（预算 1 个）。effect 重新执行前，旧的订阅要被取消');
+        if (steps[steps.length - 1].listeners !== 1)
+          problems.push(
+            '输入 3 次后，这个仪表盘在 feed 上有 ' + steps[steps.length - 1].listeners + ' 个监听器（预算 1 个）。effect 重新执行前，旧的订阅要被取消',
+          );
         t.assert(!problems.length, '还有 ' + problems.length + ' 项超出预算：' + problems.map((m, i) => '（' + (i + 1) + '）' + m).join('；'));
 
         // ---- 功能不变 ----
         const expected = ORDERS.filter(o => o.customer.includes('张'));
-        t.assert(q('#count').textContent.includes(String(expected.length)) && qa('.order-row').length === expected.length,
-          '搜索“张”后应显示 ' + expected.length + ' 条订单，实际 #count 是“' + q('#count').textContent + '”，表格有 ' + qa('.order-row').length + ' 行');
-        t.assert(qa('.order-row').every(r => r.textContent.includes('张')), '搜索“张”后，每一行的客户名都应包含“张”');
+        t.assert(
+          q('#count').textContent.includes(String(expected.length)) && qa('.order-row').length === expected.length,
+          '搜索“张”后应显示 ' + expected.length + ' 条订单，实际 #count 是“' + q('#count').textContent + '”，表格有 ' + qa('.order-row').length + ' 行',
+        );
+        t.assert(
+          qa('.order-row').every(r => r.textContent.includes('张')),
+          '搜索“张”后，每一行的客户名都应包含“张”',
+        );
 
-        const ticker = () => { const m = (q('#ticker') ? q('#ticker').textContent : '').match(/(\d+)\s*$/); return m ? Number(m[1]) : NaN; };
+        const ticker = () => {
+          const m = (q('#ticker') ? q('#ticker').textContent : '').match(/(\d+)\s*$/);
+          return m ? Number(m[1]) : NaN;
+        };
         const c0 = ticker();
         t.assert(!isNaN(c0), '找不到 #ticker 中的计数');
         feed.emit({ id: 9001, customer: '王芳', amount: 1 });
         await t.wait(60);
-        t.assert(ticker() === c0, '搜索词是“张”时，推送一条“王芳”的订单，计数从 ' + c0 + ' 变成了 ' + ticker() + '，不应该变。还有用旧搜索词（例如空字符串）判断的订阅在计数');
+        t.assert(
+          ticker() === c0,
+          '搜索词是“张”时，推送一条“王芳”的订单，计数从 ' + c0 + ' 变成了 ' + ticker() + '，不应该变。还有用旧搜索词（例如空字符串）判断的订阅在计数',
+        );
         feed.emit({ id: 9002, customer: '张伟', amount: 1 });
         await t.wait(60);
         t.assert(ticker() === c0 + 1, '推送一条“张伟”的订单，计数应加 1，实际加了 ' + (ticker() - c0) + '。订阅要使用当前的搜索词，而且只能有一个订阅在计数');
@@ -530,14 +557,23 @@ function App() {
         t.assert(themeBtn, '找不到 #theme 按钮');
         themeBtn.click();
         await t.wait(60);
-        t.assert(qa('.nav-item').length === 12 && qa('.nav-item').every(li => li.classList.contains('dark')), '点“主题”按钮后，所有 NavItem 都应变成深色（class 中有 dark）。固定 Context 的 value 时，依赖里要有 theme');
+        t.assert(
+          qa('.nav-item').length === 12 && qa('.nav-item').every(li => li.classList.contains('dark')),
+          '点“主题”按钮后，所有 NavItem 都应变成深色（class 中有 dark）。固定 Context 的 value 时，依赖里要有 theme',
+        );
         themeBtn.click();
         await t.wait(60);
-        t.assert(qa('.nav-item').every(li => li.classList.contains('light')), '再点一次“主题”，NavItem 应变回浅色');
+        t.assert(
+          qa('.nav-item').every(li => li.classList.contains('light')),
+          '再点一次“主题”，NavItem 应变回浅色',
+        );
 
         root.unmount();
         mounted = false;
-        t.assert(feed.listeners.size === base, '仪表盘卸载后，feed 上还多出 ' + (feed.listeners.size - base) + ' 个监听器（预算 0 个）。effect 要返回取消订阅的函数');
+        t.assert(
+          feed.listeners.size === base,
+          '仪表盘卸载后，feed 上还多出 ' + (feed.listeners.size - base) + ' 个监听器（预算 0 个）。effect 要返回取消订阅的函数',
+        );
       } finally {
         if (mounted) root.unmount();
         box.remove();
@@ -560,14 +596,10 @@ function App() {
     &lt;/AuthContext.Provider&gt;
   );
 }</code></pre></div>`,
-      options: [
-        '从不：user 没变，memo 让它跳过',
-        '只在挂载时渲染一次',
-        '每秒两次：Header 和 Provider 各触发一次',
-        '每秒一次：value 每次都是新对象',
-      ],
+      options: ['从不：user 没变，memo 让它跳过', '只在挂载时渲染一次', '每秒两次：Header 和 Provider 各触发一次', '每秒一次：value 每次都是新对象'],
       answer: 3,
-      explain: 'now 每秒变化，App 每秒重新渲染。<code>{ user, logout }</code> 每次都是新对象，logout 也是新函数，所以 Provider 的 value 每秒都“变了”。读取这个 Context 的 Avatar 每秒渲染一次，memo 挡不住。修法：用 useMemo 固定 value，并用 useCallback 固定 logout；或者把时钟的 state 移到 Header 里。',
+      explain:
+        'now 每秒变化，App 每秒重新渲染。<code>{ user, logout }</code> 每次都是新对象，logout 也是新函数，所以 Provider 的 value 每秒都“变了”。读取这个 Context 的 Avatar 每秒渲染一次，memo 挡不住。修法：用 useMemo 固定 value，并用 useCallback 固定 logout；或者把时钟的 state 移到 Header 里。',
     },
     {
       q: `在“名”输入框里打一个字，会产生几次提交？第一次提交时，屏幕上的全名是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function NameForm() {
@@ -587,7 +619,8 @@ function App() {
 }</code></pre></div>`,
       options: ['1 次，全名立刻是新的', '2 次；第一次提交时全名还是旧的', '2 次；两次提交时全名都是新的', '3 次：每个 state 一次'],
       answer: 1,
-      explain: '第一次提交时 first 已更新，但 fullName 还是旧值。提交后 effect 执行，调用 setFullName，引起第二次渲染和提交。fullName 能由 first 和 last 算出，就不该存成 state：直接写 <code>const fullName = first + \' \' + last</code>，每次按键只有 1 次提交，而且永远不会显示旧值。',
+      explain:
+        "第一次提交时 first 已更新，但 fullName 还是旧值。提交后 effect 执行，调用 setFullName，引起第二次渲染和提交。fullName 能由 first 和 last 算出，就不该存成 state：直接写 <code>const fullName = first + ' ' + last</code>，每次按键只有 1 次提交，而且永远不会显示旧值。",
     },
     {
       q: `组件挂载、卸载 5 次之后，window 上还剩几个 resize 监听？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useEffect(() =&gt; {
@@ -598,7 +631,8 @@ function App() {
 }, []);</code></pre></div>`,
       options: ['0 个', '1 个', '5 个', '10 个'],
       answer: 2,
-      explain: '清理函数里的箭头函数是新创建的，和添加时的不是同一个引用。removeEventListener 找不到它，什么也没移除。每次挂载留下一个监听，5 次就是 5 个。而且它们都会调用已卸载组件的 setW。修法：把函数存进一个变量 <code>const onResize = …</code>，添加和移除都用它。',
+      explain:
+        '清理函数里的箭头函数是新创建的，和添加时的不是同一个引用。removeEventListener 找不到它，什么也没移除。每次挂载留下一个监听，5 次就是 5 个。而且它们都会调用已卸载组件的 setW。修法：把函数存进一个变量 <code>const onResize = …</code>，添加和移除都用它。',
     },
     {
       q: `在第一行的备注框里写了“加急”，然后在上方的搜索框里打一个字。第一行仍在结果中。备注框会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Table({ rows }) {
@@ -622,7 +656,8 @@ function App() {
         '被清空：每次渲染 Row 都是一个新的组件类型，所有行被卸载再重新挂载',
       ],
       answer: 3,
-      explain: 'Row 定义在 Table 里面。Table 每次渲染都创建一个新的 Row 函数。React 比较元素类型时发现“不是同一个组件”，就卸载旧的行，挂载新的行。key 只在同一类型之间起作用，所以帮不上忙。note 丢失，Profiler 里这些行每次都显示为 “mount”。修法：把 Row 移到 Table 外面定义。',
+      explain:
+        'Row 定义在 Table 里面。Table 每次渲染都创建一个新的 Row 函数。React 比较元素类型时发现“不是同一个组件”，就卸载旧的行，挂载新的行。key 只在同一类型之间起作用，所以帮不上忙。note 丢失，Profiler 里这些行每次都显示为 “mount”。修法：把 Row 移到 Table 外面定义。',
     },
   ],
   plays: {
@@ -632,7 +667,8 @@ function App() {
         q: '不勾选复选框。在输入框里打一个字。Item 都用 memo 包着，label 没变。控制台会显示这次提交里 Item 渲染了几次？',
         options: ['0 次：memo 让它们全部跳过', '1 次：只有第一个 Item 渲染', '20 次：每个 Item 都重新渲染', '40 次：每个 Item 渲染两次'],
         answer: 2,
-        explain: 'App 重新渲染时，<code>{ theme, setTheme }</code> 是一个新对象。Provider 的 value 变了，React 通知所有读取这个 Context 的组件重新渲染。memo 只能挡住“props 没变”的渲染，挡不住 Context 的变化。所以 20 个 Item 全部渲染。',
+        explain:
+          'App 重新渲染时，<code>{ theme, setTheme }</code> 是一个新对象。Provider 的 value 变了，React 通知所有读取这个 Context 的组件重新渲染。memo 只能挡住“props 没变”的渲染，挡不住 Context 的变化。所以 20 个 Item 全部渲染。',
       },
       pkey: 'perf-clinic|memo 挡得住 Context 吗？',
     },

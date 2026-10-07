@@ -30,13 +30,15 @@ export default {
         '给列表项加一个 HTML id 属性，方便查找',
       ],
       answer: 0,
-      explain: 'key 是列表项的身份标识，React 用它匹配新旧元素和它们的 state。最迷惑的是第二项：key 不会作为 prop 传给组件，子组件需要 id 时要另外传。第三项是 memo 的作用，不是 key 的。',
+      explain:
+        'key 是列表项的身份标识，React 用它匹配新旧元素和它们的 state。最迷惑的是第二项：key 不会作为 prop 传给组件，子组件需要 id 时要另外传。第三项是 memo 的作用，不是 key 的。',
     },
     {
       q: '一个可以拖动排序的列表，下列哪个最适合作为 key？',
       options: ['Math.random()', '数组下标 index', '数据自带的唯一 id', 'item.name（名字可能重复）'],
       answer: 2,
-      explain: '稳定且唯一的 id 最好。最容易误选的是 index：排序后同一个下标对应的是另一项数据，state 会错位。随机数每次渲染都变，组件会反复重建。名字可能重复，key 就不唯一。',
+      explain:
+        '稳定且唯一的 id 最好。最容易误选的是 index：排序后同一个下标对应的是另一项数据，state 会错位。随机数每次渲染都变，组件会反复重建。名字可能重复，key 就不唯一。',
     },
     {
       q: '<code>&lt;Profile key={userId} /&gt;</code>。userId 从 1 变成 2 时，Profile 会怎样？',
@@ -47,7 +49,8 @@ export default {
         '什么都不发生：key 只在列表里起作用',
       ],
       answer: 1,
-      explain: 'key 变了，React 认为这是另一个组件，于是卸载旧的、挂载新的。最迷惑的是第一项：没有 key、或 key 不变时，同位置同类型的组件才会保留 state。key 在列表外也起作用。',
+      explain:
+        'key 变了，React 认为这是另一个组件，于是卸载旧的、挂载新的。最迷惑的是第一项：没有 key、或 key 不变时，同位置同类型的组件才会保留 state。key 在列表外也起作用。',
     },
   ],
   exercise: {
@@ -94,16 +97,30 @@ export default {
     </ul>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       const lis = t.qa('li');
       const li = lis.map(x => x.textContent.trim());
       t.assert(li.length === 2, `应渲染 2 个未完成事项，实际 ${li.length} 个。先用 filter 留下 done 为 false 的事项`);
       t.assert(li.includes('学习 State') && li.includes('学习列表'), `渲染的事项不对：${li.join('、')}。应只显示“学习 State”和“学习列表”`);
       // 读 React 记录的 key。从 <li> 往上找，直到某一层也包含了别的列表项：
       // 这之前最高的那一层，就是 map 为这一项返回的元素（<li>、组件、<Fragment> 或 <>）
-      const fiberOf = (node) => { const k = Object.keys(node).find(k => k.startsWith('__reactFiber$')); return k && node[k]; };
-      const hosts = (f) => { const out = []; const walk = (c) => { for (; c; c = c.sibling) { if (c.tag === 5) out.push(c.stateNode); walk(c.child); } }; if (f.tag === 5) out.push(f.stateNode); walk(f.child); return out; };
-      const keyInfo = (node) => {
+      const fiberOf = node => {
+        const k = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
+        return k && node[k];
+      };
+      const hosts = f => {
+        const out = [];
+        const walk = c => {
+          for (; c; c = c.sibling) {
+            if (c.tag === 5) out.push(c.stateNode);
+            walk(c.child);
+          }
+        };
+        if (f.tag === 5) out.push(f.stateNode);
+        walk(f.child);
+        return out;
+      };
+      const keyInfo = node => {
         const path = [];
         for (let f = fiberOf(node); f; f = f.return) {
           if (f.stateNode && f.stateNode.tagName === 'UL') break;
@@ -113,19 +130,25 @@ export default {
         const top = path[path.length - 1];
         return { top: top ? top.key : null, inner: path.slice(0, -1).some(f => f.key != null) };
       };
-      const ids = { '学习 State': '2', '学习列表': '3' };
+      const ids = { '学习 State': '2', 学习列表: '3' };
       const seen = [];
       lis.forEach(x => {
         const { top, inner } = keyInfo(x);
         const title = x.textContent.trim();
-        t.assert(top != null || !inner, 'key 写在了里层元素上。key 要写在 map 直接返回的那个元素上。用 <></> 包住 <li> 时，<></> 不能写 key，请改成 <Fragment key={t.id}>，或直接返回 <li key={t.id}>');
+        t.assert(
+          top != null || !inner,
+          'key 写在了里层元素上。key 要写在 map 直接返回的那个元素上。用 <></> 包住 <li> 时，<></> 不能写 key，请改成 <Fragment key={t.id}>，或直接返回 <li key={t.id}>',
+        );
         t.assert(top != null, 'map 返回的元素没有 key。请用每项的 id 作为 key，例如 key={t.id}');
         const hasId = new RegExp('(^|\\D)' + ids[title] + '(\\D|$)').test(top);
         if (!hasId || top === title) {
           const byIndex = /key=\{\s*(i|idx|index)\s*\}/.test(t.source) || /^\d+$/.test(top);
-          t.assert(false, byIndex && top !== ids[title]
-            ? `“${title}”的 key 是 ${top}，看起来是数组下标。列表插入、删除或重排时，下标会对应到别的数据，state 会错位。请用每项自带的 id：key={t.id}`
-            : `“${title}”的 key 是“${top}”，里面没有它的 id（${ids[title]}）。${top === title ? '标题可能重复，也可能被修改。' : ''}key 要能区分每一项，而且一直不变。请用 key={t.id}`);
+          t.assert(
+            false,
+            byIndex && top !== ids[title]
+              ? `“${title}”的 key 是 ${top}，看起来是数组下标。列表插入、删除或重排时，下标会对应到别的数据，state 会错位。请用每项自带的 id：key={t.id}`
+              : `“${title}”的 key 是“${top}”，里面没有它的 id（${ids[title]}）。${top === title ? '标题可能重复，也可能被修改。' : ''}key 要能区分每一项，而且一直不变。请用 key={t.id}`,
+          );
         }
         t.assert(!seen.includes(top), `两个列表项的 key 都是“${top}”。key 在同一个列表里必须各不相同`);
         seen.push(top);
@@ -135,15 +158,22 @@ export default {
       t.assert(changed !== t.rawSource, '请保留起始代码里的 todos 数据（包括“喝水”那一项）。检查程序会改动它，看列表会不会跟着变');
       if (typeof prepare === 'function' && typeof compile === 'function') {
         let App2: any;
-        try { App2 = compile(['React', 'ReactDOM'], prepare(changed, []))(React, ReactDOM).App; } catch (e) {}
+        try {
+          App2 = compile(['React', 'ReactDOM'], prepare(changed, []))(React, ReactDOM).App;
+        } catch (e) {}
         if (typeof App2 === 'function') {
           const box = document.createElement('div');
           const root = ReactDOM.createRoot(box);
           try {
             ReactDOM.flushSync(() => root.render(React.createElement(App2)));
             const li2 = [...box.querySelectorAll('li')].map(x => x.textContent.trim());
-            t.assert(li2.length === 3 && li2.includes('喝水'), `把“喝水”改成未完成后，列表应变成 3 项，实际是 ${li2.length} 项（${li2.join('、')}）。列表要从 todos 数据算出来：todos.filter(…).map(…)，不要手写 <li>`);
-          } finally { root.unmount(); }
+            t.assert(
+              li2.length === 3 && li2.includes('喝水'),
+              `把“喝水”改成未完成后，列表应变成 3 项，实际是 ${li2.length} 项（${li2.join('、')}）。列表要从 todos 数据算出来：todos.filter(…).map(…)，不要手写 <li>`,
+            );
+          } finally {
+            root.unmount();
+          }
         }
       }
     },
@@ -156,14 +186,10 @@ export default {
     &lt;li&gt;{t.due}&lt;/li&gt;
   &lt;/&gt;
 ))}</code></pre></div>`,
-      options: [
-        '写在第一个 <li> 上：<li key={t.id}>',
-        '两个 <li> 都写 key={t.id}',
-        '改用 <Fragment key={t.id}> 包住两个 <li>',
-        '不需要：片段会自动生成 key',
-      ],
+      options: ['写在第一个 <li> 上：<li key={t.id}>', '两个 <li> 都写 key={t.id}', '改用 <Fragment key={t.id}> 包住两个 <li>', '不需要：片段会自动生成 key'],
       answer: 2,
-      explain: 'key 必须写在 map 直接返回的那个元素上。这里返回的是片段。简写 <code>&lt;&gt;&lt;/&gt;</code> 不能写属性，所以要改成 <code>&lt;Fragment key={t.id}&gt;</code>。两个 li 都写同一个 key 也不对：它们在同一个片段里，不是 map 的直接返回值。',
+      explain:
+        'key 必须写在 map 直接返回的那个元素上。这里返回的是片段。简写 <code>&lt;&gt;&lt;/&gt;</code> 不能写属性，所以要改成 <code>&lt;Fragment key={t.id}&gt;</code>。两个 li 都写同一个 key 也不对：它们在同一个片段里，不是 map 的直接返回值。',
     },
     {
       q: `在第一项的备注框里输入“急”，然后删除第一项。“急”会出现在哪里？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">{todos.map((t, i) =&gt; (
@@ -173,7 +199,8 @@ export default {
 ))}</code></pre></div>`,
       options: ['随第一项一起消失', '在原第二项的备注框里', '所有备注框都被清空', '出现在最后一项的备注框里'],
       answer: 1,
-      explain: 'key 是下标。删除后，原来的第二项下标变成 0，React 认为“key 为 0 的那一项还在”，只更新了它的文字。输入框是同一个 DOM 节点，里面的“急”留了下来。结果备注挂到了错的待办上。改成 <code>key={t.id}</code> 即可。“随第一项消失”是用 id 做 key 时的行为；用下标时，React 删掉的是 key 最大的最后一项。',
+      explain:
+        'key 是下标。删除后，原来的第二项下标变成 0，React 认为“key 为 0 的那一项还在”，只更新了它的文字。输入框是同一个 DOM 节点，里面的“急”留了下来。结果备注挂到了错的待办上。改成 <code>key={t.id}</code> 即可。“随第一项消失”是用 id 做 key 时的行为；用下标时，React 删掉的是 key 最大的最后一项。',
     },
   ],
   plays: {

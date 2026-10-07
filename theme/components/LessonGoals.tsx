@@ -33,14 +33,26 @@ export default function LessonGoals() {
     <div className="hoc">
       <div className="goals">
         <b>学完这一课，你应该</b>
-        <ul>{lesson.goals.map((g: string, i: number) => <li key={i} dangerouslySetInnerHTML={{ __html: g }} />)}</ul>
+        <ul>
+          {lesson.goals.map((g: string, i: number) => (
+            <li key={i} dangerouslySetInnerHTML={{ __html: g }} />
+          ))}
+        </ul>
       </div>
       <nav className="jumps" aria-label="本课内容">
         <span>本课：</span>
         {jumps.map(([id, t]) => (
-          <a key={id} href={'#' + id} className={ok[id] ? 'ok' : ''}
-            onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: smooth() }); }}>
-            {ok[id] ? '✓ ' : ''}{t}
+          <a
+            key={id}
+            href={'#' + id}
+            className={ok[id] ? 'ok' : ''}
+            onClick={e => {
+              e.preventDefault();
+              document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: smooth() });
+            }}
+          >
+            {ok[id] ? '✓ ' : ''}
+            {t}
           </a>
         ))}
       </nav>

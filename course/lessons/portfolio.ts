@@ -29,7 +29,8 @@ export default {
         'Lighthouse 性能得分达到 100',
       ],
       answer: 1,
-      explain: '验收要看用户看到的结果。try/catch 只说明错误被捕获了，不说明用户看到了提示，也不说明能重试。控制台没有报错，可能只是因为错误被悄悄吞掉了。Lighthouse 性能分和出错处理无关。',
+      explain:
+        '验收要看用户看到的结果。try/catch 只说明错误被捕获了，不说明用户看到了提示，也不说明能重试。控制台没有报错，可能只是因为错误被悄悄吞掉了。Lighthouse 性能分和出错处理无关。',
     },
     {
       q: '你写了测试“添加‘午饭 25 元’后，列表里出现‘午饭’”。你故意把合计改成少加一项，测试仍然全绿。说明什么？',
@@ -40,7 +41,8 @@ export default {
         '应该改用 getByTestId 找元素',
       ],
       answer: 1,
-      explain: '测试只断言了“午饭出现了”，合计错了它也看不见。要断言用户看到的确切结果，例如“本月支出：¥25.00”。断言内部 state 是最常见的误解：它测的是实现细节，重构时会误报。改用 getByTestId 只改变了找元素的方式，没有改变断言了什么。',
+      explain:
+        '测试只断言了“午饭出现了”，合计错了它也看不见。要断言用户看到的确切结果，例如“本月支出：¥25.00”。断言内部 state 是最常见的误解：它测的是实现细节，重构时会误报。改用 getByTestId 只改变了找元素的方式，没有改变断言了什么。',
     },
     {
       q: 'TMDB 密钥写在 VITE_TMDB_KEY 里，安全吗？',
@@ -51,7 +53,8 @@ export default {
         '只要把 GitHub 仓库设为私有，就是安全的',
       ],
       answer: 1,
-      explain: 'VITE_ 开头的变量会在构建时直接写进 JS 文件，任何人打开开发者工具都能看到。最有迷惑性的是 .gitignore：它只保证密钥不进仓库，但构建出的前端代码里照样有它。需要保密的密钥要放到服务端代理或 serverless 函数里。',
+      explain:
+        'VITE_ 开头的变量会在构建时直接写进 JS 文件，任何人打开开发者工具都能看到。最有迷惑性的是 .gitignore：它只保证密钥不进仓库，但构建出的前端代码里照样有它。需要保密的密钥要放到服务端代理或 serverless 函数里。',
     },
   ],
   checkOnly: [
@@ -66,7 +69,8 @@ export default {
         '没有问题',
       ],
       answer: 1,
-      explain: 'useState 的参数只在第一次渲染时使用，但表达式每次渲染都会执行。数据多时会浪费时间。传入函数 <code>useState(() =&gt; …)</code>，React 只在第一次调用它。另外，<code>JSON.parse(null)</code> 返回 null，不会报错，所以 <code>?? []</code> 能正常兜底。',
+      explain:
+        'useState 的参数只在第一次渲染时使用，但表达式每次渲染都会执行。数据多时会浪费时间。传入函数 <code>useState(() =&gt; …)</code>，React 只在第一次调用它。另外，<code>JSON.parse(null)</code> 返回 null，不会报错，所以 <code>?? []</code> 能正常兜底。',
     },
     {
       q: `记账本（Vite + TypeScript）里，item 的类型是 <code>Item</code>，id 是 number。这行删除代码会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;button onClick={() =&gt;
@@ -74,7 +78,8 @@ export default {
 }&gt;删除&lt;/button&gt;</code></pre></div>`,
       options: ['正常删除这一项', 'TypeScript 编译报错', '把所有记录都删掉', '编译通过，运行时什么都没删，也没有提示'],
       answer: 1,
-      explain: '<code>i</code> 是 Item 对象，<code>item.id</code> 是数字，两者永远不相等，filter 会保留所有记录。TypeScript 能发现这种比较：类型完全没有重叠时，它报错“This comparison appears to be unintentional”。正确写法：<code>i.id !== item.id</code>。“运行时什么都没删”是纯 JavaScript 项目里会发生的事；用了 TypeScript，这个 bug 在编译时就被拦下了。',
+      explain:
+        '<code>i</code> 是 Item 对象，<code>item.id</code> 是数字，两者永远不相等，filter 会保留所有记录。TypeScript 能发现这种比较：类型完全没有重叠时，它报错“This comparison appears to be unintentional”。正确写法：<code>i.id !== item.id</code>。“运行时什么都没删”是纯 JavaScript 项目里会发生的事；用了 TypeScript，这个 bug 在编译时就被拦下了。',
     },
   ],
   plays: {},

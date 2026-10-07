@@ -137,7 +137,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: 'action',
     en: 'action',
-    def: 'reducer 中描述“发生了什么”的对象，例如 { type: \'added\' }。路由和表单里处理提交的函数另称“路由 action”和“Server Function”。',
+    def: "reducer 中描述“发生了什么”的对象，例如 { type: 'added' }。路由和表单里处理提交的函数另称“路由 action”和“Server Function”。",
     avoid: '',
   },
   {
@@ -197,7 +197,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: '客户端组件',
     en: 'Client Component',
-    def: '位于 \'use client\' 边界内的组件（在该文件定义或被它导入）。代码会发送到浏览器，首次加载时通常也在服务器预渲染成 HTML。',
+    def: "位于 'use client' 边界内的组件（在该文件定义或被它导入）。代码会发送到浏览器，首次加载时通常也在服务器预渲染成 HTML。",
     avoid: '',
   },
   {

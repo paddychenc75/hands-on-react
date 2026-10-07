@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { DAY } from '../../course/engine/logic/srs.ts';
 import {
-  COOLDOWN, PASS_PERCENT, RETEST_AFTER, STAGE_FRESH, STAGE_QUESTIONS,
-  cooldownLeft, isPass, needsRetest, percent, pickStageQuestions, settlePending, settleResult,
+  COOLDOWN,
+  PASS_PERCENT,
+  RETEST_AFTER,
+  STAGE_FRESH,
+  STAGE_QUESTIONS,
+  cooldownLeft,
+  isPass,
+  needsRetest,
+  percent,
+  pickStageQuestions,
+  settlePending,
+  settleResult,
 } from '../../course/engine/logic/stageCheck.ts';
 import { MIN, NOW, srsCard } from './fixtures.ts';
 
@@ -14,29 +24,31 @@ describe('抽题：12 题 = 8 新 + 4 常规', () => {
   });
 
   it('题够多时：共 12 题，其中 8 道是新题（checkOnly），4 道是课内见过的常规题', () => {
-    const pool = cards('q', 30), fresh = cards('c', 20);
+    const pool = cards('q', 30),
+      fresh = cards('c', 20);
     const picks = pickStageQuestions(pool, fresh, {});
     expect(picks).toHaveLength(12);
-    expect(picks.filter((p) => p.key.startsWith('c'))).toHaveLength(8);
-    expect(picks.filter((p) => p.key.startsWith('q'))).toHaveLength(4);
-    expect(new Set(picks.map((p) => p.key)).size).toBe(12);
+    expect(picks.filter(p => p.key.startsWith('c'))).toHaveLength(8);
+    expect(picks.filter(p => p.key.startsWith('q'))).toHaveLength(4);
+    expect(new Set(picks.map(p => p.key)).size).toBe(12);
   });
 
   it('新题里优先抽还没见过的（没有复习记录的）', () => {
-    const pool = cards('q', 30), fresh = cards('c', 14);
-    const seen = Object.fromEntries(fresh.slice(0, 6).map((c) => [c.key, srsCard()]));
+    const pool = cards('q', 30),
+      fresh = cards('c', 14);
+    const seen = Object.fromEntries(fresh.slice(0, 6).map(c => [c.key, srsCard()]));
     for (let k = 0; k < 20; k++) {
-      const picks = pickStageQuestions(pool, fresh, seen).filter((p) => p.key.startsWith('c'));
+      const picks = pickStageQuestions(pool, fresh, seen).filter(p => p.key.startsWith('c'));
       // 未见过的 8 道正好填满 8 个名额，见过的 6 道一道也不会被抽到
-      expect(picks.every((p) => !seen[p.key])).toBe(true);
+      expect(picks.every(p => !seen[p.key])).toBe(true);
     }
   });
 
   it('新题不够 8 道：有几道用几道，其余用常规题补满 12 题', () => {
     const picks = pickStageQuestions(cards('q', 30), cards('c', 3), {});
     expect(picks).toHaveLength(12);
-    expect(picks.filter((p) => p.key.startsWith('c'))).toHaveLength(3);
-    expect(picks.filter((p) => p.key.startsWith('q'))).toHaveLength(9);
+    expect(picks.filter(p => p.key.startsWith('c'))).toHaveLength(3);
+    expect(picks.filter(p => p.key.startsWith('q'))).toHaveLength(9);
   });
 
   it('题库太小时不会凑够 12 题（现有行为：没有重复题凑数）', () => {

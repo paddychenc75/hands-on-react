@@ -6,11 +6,21 @@ import type { LessonProgress, Progress } from '../types.ts';
 export const STORE_KEY = 'hands-on-react-v1';
 export const progress: Progress = {};
 if (typeof window !== 'undefined') {
-  try { Object.assign(progress, JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {}); } catch { /* 读不到就当空 */ }
+  try {
+    Object.assign(progress, JSON.parse(window.localStorage.getItem(STORE_KEY) || '{}') || {});
+  } catch {
+    /* 读不到就当空 */
+  }
 }
-export const save = () => { try { window.localStorage.setItem(STORE_KEY, JSON.stringify(progress)); } catch {} };
+export const save = () => {
+  try {
+    window.localStorage.setItem(STORE_KEY, JSON.stringify(progress));
+  } catch {}
+};
 export const lp = (id: string): LessonProgress => (progress[id] = progress[id] || { quiz: {}, ex: false, done: false });
 export const isDone = (id: string): boolean => !!(progress[id] && progress[id].done);
 /* 进度变化通知：旧版的 refreshChrome() 在这里变成一个事件，侧栏标记等组件监听它 */
 export const PROGRESS_EVENT = 'hoc-progress';
-export const emitProgress = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event(PROGRESS_EVENT)); };
+export const emitProgress = () => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(PROGRESS_EVENT));
+};

@@ -24,7 +24,8 @@ export default {
       q: '服务端组件写 &lt;AddToCart onAdded={() =&gt; console.log("ok")} /&gt;，AddToCart 是客户端组件。会怎样？',
       options: ['正常工作', '报错：函数不能序列化，不能从服务端组件传给客户端组件', '点击时，函数回到服务器上执行', '函数被悄悄忽略，onAdded 是 undefined'],
       answer: 1,
-      explain: 'props 要从服务器经过网络发到浏览器，只有可序列化的值和 Server Function 可以传。普通函数无法序列化，React 会报错，而不是悄悄忽略。“回到服务器执行”是 Server Function 的行为，普通函数没有这个能力。',
+      explain:
+        'props 要从服务器经过网络发到浏览器，只有可序列化的值和 Server Function 可以传。普通函数无法序列化，React 会报错，而不是悄悄忽略。“回到服务器执行”是 Server Function 的行为，普通函数没有这个能力。',
     },
     {
       q: 'app/actions.js 顶部写了 "use server"，并导出 async function deletePost(id)。哪项说法正确？',
@@ -35,18 +36,15 @@ export default {
         '"use server" 让这个文件里的组件变成服务端组件',
       ],
       answer: 1,
-      explain: '"use server" 标记的是可以被客户端调用的服务器函数。框架为它生成接口，浏览器通过网络调用它，函数代码留在服务器。第一项是最危险的误解：以为“server”就代表外人调不到，于是省掉权限检查。组件默认就是服务端组件，不需要标记。',
+      explain:
+        '"use server" 标记的是可以被客户端调用的服务器函数。框架为它生成接口，浏览器通过网络调用它，函数代码留在服务器。第一项是最危险的误解：以为“server”就代表外人调不到，于是省掉权限检查。组件默认就是服务端组件，不需要标记。',
     },
     {
       q: '商品页是服务端组件，里面只有“加入购物车”按钮需要点击。"use client" 写在哪里最好？',
-      options: [
-        '写在商品页 page.jsx 的顶部',
-        '写在只包含按钮的 AddToCart.jsx 顶部',
-        '写在根布局 layout.jsx 的顶部，一次覆盖所有页面',
-        '每个文件都写',
-      ],
+      options: ['写在商品页 page.jsx 的顶部', '写在只包含按钮的 AddToCart.jsx 顶部', '写在根布局 layout.jsx 的顶部，一次覆盖所有页面', '每个文件都写'],
       answer: 1,
-      explain: '"use client" 标记的是边界：被它导入的所有模块都会打包到浏览器。写在叶子 AddToCart 上，商品列表、数据库查询都留在服务器。写在 page.jsx 上，整个页面都变成客户端代码，还不能直接查数据库。',
+      explain:
+        '"use client" 标记的是边界：被它导入的所有模块都会打包到浏览器。写在叶子 AddToCart 上，商品列表、数据库查询都留在服务器。写在 page.jsx 上，整个页面都变成客户端代码，还不能直接查数据库。',
     },
   ],
   exercise: {
@@ -204,22 +202,36 @@ function App() {
   );
 }`,
     exports: ['canCross'],
-    test: async (t) => {
-      const cell = (name) => t.text('#row-' + name);
-      const ok = (name) => cell(name).includes('✅');
+    test: async t => {
+      const cell = name => t.text('#row-' + name);
+      const ok = name => cell(name).includes('✅');
       t.assert(['title', 'price', 'tags'].every(ok), 'title、price、tags 都只含字符串和数字，应该可以传');
       t.assert(!ok('onBuy'), 'onBuy 是一个普通函数，不能传：函数的代码没法变成数据发给浏览器。只有 Server Function（isServerFunction 为 true）可以');
       t.assert(ok('addToCart'), 'addToCart 是 Server Function，可以传：浏览器拿到的只是一个引用，调用时请求会回到服务器执行');
       t.assert(ok('releasedAt'), 'releasedAt 是 Date，可以传。检查 Date 的判断写在“其他对象”之前了吗？');
       t.assert(ok('seller'), 'seller 是普通对象，每个属性值都可以传，所以它也可以传');
-      t.assert(!ok('owner'), 'owner 是 class User 的实例，不能传：浏览器只收到数据，原型和 greet 方法都会丢失。用 Object.getPrototypeOf 区分普通对象和 class 实例');
+      t.assert(
+        !ok('owner'),
+        'owner 是 class User 的实例，不能传：浏览器只收到数据，原型和 greet 方法都会丢失。用 Object.getPrototypeOf 区分普通对象和 class 实例',
+      );
       t.assert(!ok('variants'), 'variants 数组里的第二个对象有一个函数 onPick，所以整个数组都不能传。数组和对象要递归检查每一项');
       const { canCross } = t.exports;
       t.assert(typeof canCross === 'function', '没有找到 canCross 函数');
-      class Point { declare x: number; constructor() { this.x = 1; } }
+      class Point {
+        declare x: number;
+        constructor() {
+          this.x = 1;
+        }
+      }
       const cases = [
-        [null, true, 'null'], [undefined, true, 'undefined'], [0, true, '0'], ['', true, '空字符串'], [false, true, 'false'],
-        [[], true, '空数组'], [{}, true, '空对象'], [Object.assign(Object.create(null), { a: 1 }), true, '原型为 null 的对象 { a: 1 }'],
+        [null, true, 'null'],
+        [undefined, true, 'undefined'],
+        [0, true, '0'],
+        ['', true, '空字符串'],
+        [false, true, 'false'],
+        [[], true, '空数组'],
+        [{}, true, '空对象'],
+        [Object.assign(Object.create(null), { a: 1 }), true, '原型为 null 的对象 { a: 1 }'],
         [{ a: { b: [1, { c: () => 1 }] } }, false, '深层藏着一个函数的 { a: { b: [1, { c: () => 1 }] } }'],
         [{ when: new Date(0) }, true, '{ when: new Date(0) }'],
         [[new Point()], false, '[new Point()]（class 的实例）'],
@@ -251,7 +263,8 @@ export default function Page() {
         '只能把 Stats 改成 props 而不是 children',
       ],
       answer: 0,
-      explain: '客户端组件不能 <b>import</b> 服务端组件，但可以通过 children 接收它。Stats 由服务端组件 Page 创建，在服务器上渲染。Tabs 收到的只是渲染结果。这样交互部分在客户端，数据部分留在服务器。',
+      explain:
+        '客户端组件不能 <b>import</b> 服务端组件，但可以通过 children 接收它。Stats 由服务端组件 Page 创建，在服务器上渲染。Tabs 收到的只是渲染结果。这样交互部分在客户端，数据部分留在服务器。',
     },
     {
       q: `这个组件能运行吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">'use client';
@@ -268,7 +281,8 @@ export default async function Cart() {
         '能：客户端组件也可以 await',
       ],
       answer: 0,
-      explain: '<code>\'use client\'</code> 表示这个文件及它导入的模块都会发送到浏览器。客户端组件不支持 async/await，React 会报错。即使能运行，浏览器里也拿不到数据库连接，而且密钥可能泄露。修复：去掉 <code>\'use client\'</code>，让它成为服务端组件；需要交互的部分再拆成小的客户端组件。“框架会自动放到服务器上运行”是最常见的误解：这条指令正好表示相反的意思。',
+      explain:
+        "<code>'use client'</code> 表示这个文件及它导入的模块都会发送到浏览器。客户端组件不支持 async/await，React 会报错。即使能运行，浏览器里也拿不到数据库连接，而且密钥可能泄露。修复：去掉 <code>'use client'</code>，让它成为服务端组件；需要交互的部分再拆成小的客户端组件。“框架会自动放到服务器上运行”是最常见的误解：这条指令正好表示相反的意思。",
     },
   ],
   plays: {},

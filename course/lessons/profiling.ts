@@ -29,13 +29,15 @@ export default {
         '给所有函数加 useCallback',
       ],
       answer: 1,
-      explain: 'actual 接近 base，说明每次都完整重新渲染；原因是父组件渲染，props 没变。memo 或状态下移能让它跳过。虚拟列表能减少耗时，但没有解决“不必要的渲染”。生产版本只会变快一些。ResultList 没有收到函数 props，useCallback 无用。',
+      explain:
+        'actual 接近 base，说明每次都完整重新渲染；原因是父组件渲染，props 没变。memo 或状态下移能让它跳过。虚拟列表能减少耗时，但没有解决“不必要的渲染”。生产版本只会变快一些。ResultList 没有收到函数 props，useCallback 无用。',
     },
     {
       q: '一个 8000 行的表格。Profiler 显示每次更新只要 2ms，memo 全都生效了。但第一次打开表格要 1.5 秒。Performance 面板显示大部分时间花在“样式计算”和“布局”上。应该怎么做？',
       options: ['再给每一行加 useMemo', '用 useTransition 包裹所有更新', '用虚拟列表，只渲染可见行', '把表格拆成更多小组件'],
       answer: 2,
-      explain: '时间花在浏览器处理 DOM 上，不在 React 渲染上。虚拟列表直接减少 DOM 节点。记忆化和拆组件都不能减少 DOM，而 Profiler 已经显示 memo 全都生效。startTransition 最有迷惑性：它让界面在等待时仍可交互，但工作量一点没少，第一次打开照样要 1.5 秒。',
+      explain:
+        '时间花在浏览器处理 DOM 上，不在 React 渲染上。虚拟列表直接减少 DOM 节点。记忆化和拆组件都不能减少 DOM，而 Profiler 已经显示 memo 全都生效。startTransition 最有迷惑性：它让界面在等待时仍可交互，但工作量一点没少，第一次打开照样要 1.5 秒。',
     },
     {
       q: '在本地开发服务器上测得某次提交耗时 120ms。下面哪个结论最合理？',
@@ -46,7 +48,8 @@ export default {
         '把 <Profiler> 留在生产代码里，线上就能测到同样的 120ms',
       ],
       answer: 1,
-      explain: '开发版本通常比生产版本慢好几倍，但相对变化仍有参考价值。“测量没有意义”是矫枉过正：修改前 120ms、修改后 30ms，这个变化在生产版本里通常也成立。生产版本默认关闭 Profiler，要用 react-dom/profiling 才能测量。',
+      explain:
+        '开发版本通常比生产版本慢好几倍，但相对变化仍有参考价值。“测量没有意义”是矫枉过正：修改前 120ms、修改后 30ms，这个变化在生产版本里通常也成立。生产版本默认关闭 Profiler，要用 react-dom/profiling 才能测量。',
     },
   ],
   exercise: {
@@ -132,28 +135,38 @@ function App() {
   );
 }`,
     hint: '回到本课的“虚拟列表前后对比”示例，看 WindowedList。想一想：scrollTop 除以行高，得到的是哪一行？只渲染一部分行以后，怎样让第 2501 行仍然出现在 75000px 的位置？上下占位 div 和 position: absolute 两种方法都可以。',
-    test: async (t) => {
+    test: async t => {
       const vp = t.q('#viewport');
       t.assert(vp, '找不到 id="viewport" 的滚动容器');
       const rows = () => t.qa('#viewport .row');
-      const nums = () => rows().map(r => Number((r.textContent.match(/第\s*(\d+)\s*行/) || [])[1])).filter(n => n > 0);
-      const range = (a) => a.length ? Math.min(...a) + '–' + Math.max(...a) : '（没有）';
+      const nums = () =>
+        rows()
+          .map(r => Number((r.textContent.match(/第\s*(\d+)\s*行/) || [])[1]))
+          .filter(n => n > 0);
+      const range = a => (a.length ? Math.min(...a) + '–' + Math.max(...a) : '（没有）');
       t.assert(rows().length > 0, '找不到 className="row" 的行。每行要保留 className="row"');
       t.assert(rows().length <= 80, `DOM 中有 ${rows().length} 行。只渲染可见行和少量 overscan（不超过 80 行）`);
       t.assert(nums().includes(1), '一开始应显示“第 1 行”');
-      t.assert(vp.scrollHeight >= 149000 && vp.scrollHeight <= 151000,
-        `内容的总高度应为 5000 × 30 = 150000px，实际是 ${vp.scrollHeight}px。没渲染的行也要占位`);
-      const scrollTo = async (y) => { vp.scrollTop = y; vp.dispatchEvent(new Event('scroll')); await t.wait(150); };
+      t.assert(
+        vp.scrollHeight >= 149000 && vp.scrollHeight <= 151000,
+        `内容的总高度应为 5000 × 30 = 150000px，实际是 ${vp.scrollHeight}px。没渲染的行也要占位`,
+      );
+      const scrollTo = async y => {
+        vp.scrollTop = y;
+        vp.dispatchEvent(new Event('scroll'));
+        await t.wait(150);
+      };
       await scrollTo(75000);
       const mid = nums();
-      t.assert(mid.includes(2501) && mid.includes(2510),
-        `滚动到 75000px 后，应显示第 2501–2510 行。现在 DOM 中是第 ${range(mid)} 行。滚动时要更新 state，并重新计算范围`);
+      t.assert(
+        mid.includes(2501) && mid.includes(2510),
+        `滚动到 75000px 后，应显示第 2501–2510 行。现在 DOM 中是第 ${range(mid)} 行。滚动时要更新 state，并重新计算范围`,
+      );
       t.assert(!mid.includes(1), '滚动后，第 1 行应该从 DOM 中移除');
       t.assert(rows().length <= 80, `滚动后 DOM 中有 ${rows().length} 行，太多了`);
       const row = rows().find(r => /第\s*2501\s*行/.test(r.textContent));
       const dy = row.getBoundingClientRect().top - vp.getBoundingClientRect().top;
-      t.assert(Math.abs(dy) <= 35,
-        `第 2501 行应出现在可见区域顶部，实际偏离 ${Math.round(dy)}px。检查每行的位置：上方占位的高度，或 top 的值`);
+      t.assert(Math.abs(dy) <= 35, `第 2501 行应出现在可见区域顶部，实际偏离 ${Math.round(dy)}px。检查每行的位置：上方占位的高度，或 top 的值`);
       await scrollTo(vp.scrollHeight);
       const end = nums();
       t.assert(end.includes(5000), `滚动到底部后应显示“第 5000 行”。现在 DOM 中是第 ${range(end)} 行`);
@@ -174,20 +187,17 @@ function App() {
         '只有 BigList 变化时才打印',
       ],
       answer: 0,
-      explain: 'Profiler 内任何组件提交更新，都会调用 onRender。actualDuration 只算这次真正渲染的组件：只有 Clock，所以很小。baseDuration 估算整棵子树不用 memo 时的耗时，包含 BigList。两者差距大，说明 memo 生效了。',
+      explain:
+        'Profiler 内任何组件提交更新，都会调用 onRender。actualDuration 只算这次真正渲染的组件：只有 Clock，所以很小。baseDuration 估算整棵子树不用 memo 时的耗时，包含 BigList。两者差距大，说明 memo 生效了。',
     },
     {
       q: `Row 用 memo 包裹。Profiler 显示每打一个字，500 行 Row 都重新渲染，而且每行的“展开/收起”状态被重置。最可能的原因是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">{rows.map(r =&gt; (
   &lt;Row key={Math.random()} row={r} /&gt;
 ))}</code></pre></div>`,
-      options: [
-        'key 每次都不同，行被重新挂载',
-        'row 每次都是新对象，memo 的浅比较失败',
-        '开发模式下 Profiler 的结果不准',
-        'memo 对列表中的组件不起作用',
-      ],
+      options: ['key 每次都不同，行被重新挂载', 'row 每次都是新对象，memo 的浅比较失败', '开发模式下 Profiler 的结果不准', 'memo 对列表中的组件不起作用'],
       answer: 0,
-      explain: 'key 每次渲染都是新的随机数，React 认为所有行都是新组件。它卸载旧的 Row，挂载新的 Row，memo 根本没有机会比较 props，state 也随之丢失。用稳定的 <code>key={r.id}</code>。“row 是新对象”有迷惑性：它确实会让 memo 失效，但只会导致重新渲染，不会重置 state。state 被重置，说明组件被重新挂载了。',
+      explain:
+        'key 每次渲染都是新的随机数，React 认为所有行都是新组件。它卸载旧的 Row，挂载新的 Row，memo 根本没有机会比较 props，state 也随之丢失。用稳定的 <code>key={r.id}</code>。“row 是新对象”有迷惑性：它确实会让 memo 失效，但只会导致重新渲染，不会重置 state。state 被重置，说明组件被重新挂载了。',
     },
   ],
   plays: {
@@ -201,7 +211,7 @@ function App() {
       },
       pkey: 'profiling|读懂 actualDuration 和 baseDuration',
     },
-    '虚拟列表前后对比': {
+    虚拟列表前后对比: {
       note: '分别点两个按钮，比较 mount 的耗时和 DOM 行数。然后在虚拟列表中滚动：每次 update 只要很短的时间。',
     },
   },

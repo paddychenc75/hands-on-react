@@ -24,13 +24,15 @@ export default {
       q: '<code>const ref = useRef(0)</code>。按钮点击时执行 <code>ref.current++</code>，JSX 里显示 <code>{ref.current}</code>。点 3 次后，页面上显示几？',
       options: ['3', '0', '1', '先显示 1，每点一次加 1'],
       answer: 1,
-      explain: '修改 ref.current 不会触发重新渲染，所以页面一直停在第一次渲染的 0。值其实已经是 3，等别的原因引起重新渲染时才会显示出来。最迷惑的是“3”：ref 的值确实变了，但 React 不知道。',
+      explain:
+        '修改 ref.current 不会触发重新渲染，所以页面一直停在第一次渲染的 0。值其实已经是 3，等别的原因引起重新渲染时才会显示出来。最迷惑的是“3”：ref 的值确实变了，但 React 不知道。',
     },
     {
       q: '下面哪个最适合用 useRef 存储？',
       options: ['购物车商品列表（需要显示）', 'setInterval 返回的定时器 id', '用户输入的搜索词（需要显示）', '当前选中的标签页（决定显示哪一页）'],
       answer: 1,
-      explain: '定时器 id 只在内部使用，不需要显示，改了也不需要重新渲染。最迷惑的是最后一项：它不显示成文字，但它决定界面显示什么，改了界面必须更新，所以要用 state。',
+      explain:
+        '定时器 id 只在内部使用，不需要显示，改了也不需要重新渲染。最迷惑的是最后一项：它不显示成文字，但它决定界面显示什么，改了界面必须更新，所以要用 state。',
     },
     {
       q: '把定时器 id 存在组件里的普通变量 <code>let timerId</code> 中。点“开始”后，数字每 100 毫秒更新一次。再点“停止”，为什么停不下来？',
@@ -41,7 +43,8 @@ export default {
         '“停止”按钮的点击被定时器挡住了',
       ],
       answer: 0,
-      explain: '每次 setTime 都会重新渲染，组件函数重新执行，timerId 被重新声明。停止时拿到的是 undefined。最迷惑的是第三项：用 state 也能停下来，但每次存 id 都多一次无用的渲染；ref 正是为这种“幕后数据”准备的。',
+      explain:
+        '每次 setTime 都会重新渲染，组件函数重新执行，timerId 被重新声明。停止时拿到的是 undefined。最迷惑的是第三项：用 state 也能停下来，但每次存 id 都多一次无用的渲染；ref 正是为这种“幕后数据”准备的。',
     },
   ],
   exercise: {
@@ -124,8 +127,9 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
-      const b = t.byText('button', '聚焦'); t.assert(b, '找不到“聚焦”按钮');
+    test: async t => {
+      const b = t.byText('button', '聚焦');
+      t.assert(b, '找不到“聚焦”按钮');
       const code = t.source.replace(/^\s*import.*$/gm, '');
       t.assert(/useRef\(/.test(code), '请调用 useRef() 创建 ref');
       t.assert(/<input[^>]*\bref=\{/.test(code), '请把 ref 绑定到 <input> 的 ref 属性');
@@ -134,7 +138,8 @@ function App() {
       await t.click(b);
       t.assert(document.activeElement === t.q('#field'), '点击“聚焦”后输入框没有获得焦点。点击时调用 ref.current.focus()');
       const n = () => Number(t.text('#ticks'));
-      const go = t.byText('button', '开始'), halt = t.byText('button', '停止');
+      const go = t.byText('button', '开始'),
+        halt = t.byText('button', '停止');
       t.assert(go && halt, '需要“开始”和“停止”两个按钮');
       t.assert(n() === 0, '初始应为 0');
       await t.click(go);
@@ -142,10 +147,16 @@ function App() {
       const a = n();
       t.assert(a >= 3, `点“开始”0.45 秒后应约为 4，实际是 ${a}。start 里要启动定时器：每 100 毫秒把 ticks 加 1`);
       await t.click(halt);
-      const s0 = n(); await t.wait(350);
-      t.assert(n() === s0, `点“停止”后数字还在变（${s0} → ${n()}）。停止时要用 ref 里的 id 调用 clearInterval。如果 id 存在组件里的普通变量中，重新渲染后它就变回了 undefined`);
-      await t.click(go); await t.click(go);
-      const c0 = n(); await t.wait(520);
+      const s0 = n();
+      await t.wait(350);
+      t.assert(
+        n() === s0,
+        `点“停止”后数字还在变（${s0} → ${n()}）。停止时要用 ref 里的 id 调用 clearInterval。如果 id 存在组件里的普通变量中，重新渲染后它就变回了 undefined`,
+      );
+      await t.click(go);
+      await t.click(go);
+      const c0 = n();
+      await t.wait(520);
       const d = n() - c0;
       // 定时器在跑：它的 id 应该在 App 的某个 ref 里
       const fk = Object.keys(t.q('#ticks')).find(k => k.startsWith('__reactFiber$'));
@@ -153,14 +164,29 @@ function App() {
       while (app && ![0, 11, 15].includes(app.tag)) app = app.return;
       const hooks = [];
       for (let h = app && app.memoizedState; h && typeof h === 'object' && 'next' in h; h = h.next) hooks.push(h);
-      const refVals = hooks.filter(h => !h.queue && h.memoizedState && typeof h.memoizedState === 'object' && !Array.isArray(h.memoizedState) && Object.keys(h.memoizedState).join() === 'current').map(h => h.memoizedState.current);
+      const refVals = hooks
+        .filter(
+          h =>
+            !h.queue &&
+            h.memoizedState &&
+            typeof h.memoizedState === 'object' &&
+            !Array.isArray(h.memoizedState) &&
+            Object.keys(h.memoizedState).join() === 'current',
+        )
+        .map(h => h.memoizedState.current);
       const idInRef = refVals.some(v => v != null && v !== false && !(v instanceof Element));
-      const extraState = hooks.filter(h => h.queue && typeof h.queue.dispatch === 'function').some(h => typeof h.memoizedState === 'number' && h.memoizedState !== n() && h.memoizedState !== n() - 1 && h.memoizedState !== n() + 1);
-      t.assert(idInRef, extraState
-        ? '定时器在跑，但 ref 里没有它的 id：id 存在了 state 里。这样也能停下来，但每次存 id 都会多一次无用的重新渲染。id 不需要显示，请用 useRef 保存它：timerRef.current = setInterval(…)'
-        : '定时器在跑，但 App 的 ref 里没有它的 id。如果 id 存在组件外面的变量里，页面上有两个秒表时，它们会共用这一个 id，互相干扰。请用 useRef 保存它：timerRef.current = setInterval(…)');
+      const extraState = hooks
+        .filter(h => h.queue && typeof h.queue.dispatch === 'function')
+        .some(h => typeof h.memoizedState === 'number' && h.memoizedState !== n() && h.memoizedState !== n() - 1 && h.memoizedState !== n() + 1);
+      t.assert(
+        idInRef,
+        extraState
+          ? '定时器在跑，但 ref 里没有它的 id：id 存在了 state 里。这样也能停下来，但每次存 id 都会多一次无用的重新渲染。id 不需要显示，请用 useRef 保存它：timerRef.current = setInterval(…)'
+          : '定时器在跑，但 App 的 ref 里没有它的 id。如果 id 存在组件外面的变量里，页面上有两个秒表时，它们会共用这一个 id，互相干扰。请用 useRef 保存它：timerRef.current = setInterval(…)',
+      );
       await t.click(halt);
-      const e0 = n(); await t.wait(300);
+      const e0 = n();
+      await t.wait(300);
       t.assert(d <= 7, `连点两次“开始”后，0.5 秒内加了 ${d}，应约为 5：第二次点击又启动了一个定时器。start 开头先检查 ref 里是否已有 id`);
       t.assert(n() === e0, '连点两次“开始”再点“停止”，数字还在变：有一个定时器没被停掉。start 开头先检查 ref 里是否已有 id');
       // 再渲染一个秒表：两个秒表应该各走各的
@@ -169,16 +195,22 @@ function App() {
       const root = ReactDOM.createRoot(box);
       try {
         ReactDOM.flushSync(() => root.render(React.createElement(t.exports.App)));
-        const btn2 = (txt) => [...box.querySelectorAll('button')].find(x => x.textContent.trim() === txt);
+        const btn2 = txt => [...box.querySelectorAll('button')].find(x => x.textContent.trim() === txt);
         const n2 = () => Number(box.querySelector('#ticks').textContent);
-        await t.click(go); btn2('开始').click(); await t.wait(350);
-        const m1 = n(), m2 = n2();
-        btn2('停止').click(); await t.wait(300);
+        await t.click(go);
+        btn2('开始').click();
+        await t.wait(350);
+        const m1 = n(),
+          m2 = n2();
+        btn2('停止').click();
+        await t.wait(300);
         const k1 = n() - m1;
         await t.click(halt);
         t.assert(m2 >= 2, '页面上有两个秒表。第一个在跑时，第二个点“开始”没有反应：两个秒表共用了同一个定时器 id。请把 id 存进每个组件自己的 ref');
         t.assert(k1 >= 2, '页面上有两个秒表。停止第二个时，第一个也停了：两个秒表共用了同一个定时器 id。请把 id 存进每个组件自己的 ref');
-      } finally { root.unmount(); }
+      } finally {
+        root.unmount();
+      }
     },
   },
   checkOnly: [
@@ -191,7 +223,8 @@ const [, setTick] = useState(0);
 &lt;p&gt;{count.current}&lt;/p&gt;</code></pre></div>`,
       options: ['点 +1 时一直是 0；点“刷新”后显示 3', '点 +1 时依次显示 1、2、3', '一直是 0，点“刷新”后也是 0', '点“刷新”后显示 1'],
       answer: 0,
-      explain: '修改 ref.current 不会触发重新渲染，所以点 +1 时界面不变。但 ref 的值在渲染之间会保留，一直在增加。点“刷新”触发重新渲染，这时读到的 count.current 是 3。普通变量做不到这一点：每次渲染都会重新初始化。',
+      explain:
+        '修改 ref.current 不会触发重新渲染，所以点 +1 时界面不变。但 ref 的值在渲染之间会保留，一直在增加。点“刷新”触发重新渲染，这时读到的 count.current 是 3。普通变量做不到这一点：每次渲染都会重新初始化。',
     },
     {
       q: `组件第一次渲染时会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Search() {
@@ -199,14 +232,10 @@ const [, setTick] = useState(0);
   inputRef.current.focus();
   return &lt;input ref={inputRef} /&gt;;
 }</code></pre></div>`,
-      options: [
-        '输入框获得焦点',
-        '报错：current 是 null',
-        '没有效果：ref 会等 DOM 创建好再执行 focus',
-        '每次渲染都调用一次 focus，能用但浪费性能',
-      ],
+      options: ['输入框获得焦点', '报错：current 是 null', '没有效果：ref 会等 DOM 创建好再执行 focus', '每次渲染都调用一次 focus，能用但浪费性能'],
       answer: 1,
-      explain: '组件函数运行时，React 还没创建 input 的 DOM 节点。ref 要等到提交阶段才被赋值。所以第一次渲染时 <code>inputRef.current</code> 是 null，调用 focus 抛出 TypeError。操作 DOM 要放在 effect 或事件处理函数里：<code>useEffect(() =&gt; { inputRef.current.focus(); }, [])</code>。“ref 会等 DOM 创建好”是误解：ref 不会等待，渲染期间它就是 null。',
+      explain:
+        '组件函数运行时，React 还没创建 input 的 DOM 节点。ref 要等到提交阶段才被赋值。所以第一次渲染时 <code>inputRef.current</code> 是 null，调用 focus 抛出 TypeError。操作 DOM 要放在 effect 或事件处理函数里：<code>useEffect(() =&gt; { inputRef.current.focus(); }, [])</code>。“ref 会等 DOM 创建好”是误解：ref 不会等待，渲染期间它就是 null。',
     },
   ],
   plays: {
@@ -217,7 +246,8 @@ const [, setTick] = useState(0);
         q: '点“开始”，过 1 秒再点“停止”。灰色那行“组件已渲染 N 次”会怎样变？',
         options: ['一直不变：ref 的变化不会触发渲染', '大约增加 10 次', '只增加 2 次：点“开始”和点“停止”各一次', '大约增加 20 次'],
         answer: 1,
-        explain: '每 0.1 秒调用一次 setTime，time 是 state，每次都会重新渲染，1 秒约 10 次。最迷惑的是第一项：存定时器 id 的 timerRef 确实不触发渲染，但渲染来自 setTime。点“开始”和“停止”本身不改 state。',
+        explain:
+          '每 0.1 秒调用一次 setTime，time 是 state，每次都会重新渲染，1 秒约 10 次。最迷惑的是第一项：存定时器 id 的 timerRef 确实不触发渲染，但渲染来自 setTime。点“开始”和“停止”本身不改 state。',
       },
       pkey: 'use-ref|用 ref 保存定时器 id 的秒表',
     },

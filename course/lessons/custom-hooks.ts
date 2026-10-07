@@ -21,14 +21,10 @@ export default {
   quiz: [
     {
       q: '下面哪种写法违反了 Hooks 规则？',
-      options: [
-        '在组件顶层调用 useState',
-        'if (show) { useEffect(...) }',
-        '在自定义 Hook 中调用 useState',
-        '在组件里调用自定义 Hook',
-      ],
+      options: ['在组件顶层调用 useState', 'if (show) { useEffect(...) }', '在自定义 Hook 中调用 useState', '在组件里调用自定义 Hook'],
       answer: 1,
-      explain: '不能在条件语句中调用 Hook，否则 show 变化时 Hook 的调用顺序会变。最迷惑的是第三项：自定义 Hook 本来就是“在函数里调用 Hook”，只要它自己在组件顶层被调用，就是合法的。',
+      explain:
+        '不能在条件语句中调用 Hook，否则 show 变化时 Hook 的调用顺序会变。最迷惑的是第三项：自定义 Hook 本来就是“在函数里调用 Hook”，只要它自己在组件顶层被调用，就是合法的。',
     },
     {
       q: '组件 A 和 B 都调用了 useCounter()。A 中计数增加，B 的计数会怎样？',
@@ -39,7 +35,8 @@ export default {
         '只有两个组件写在同一个文件里才同步',
       ],
       answer: 1,
-      explain: '自定义 Hook 复用的是逻辑，不是 state。每次调用里的 useState 都创建一份独立的 state。最迷惑的是第一项：想共享同一份数据，要做状态提升或用 Context。',
+      explain:
+        '自定义 Hook 复用的是逻辑，不是 state。每次调用里的 useState 都创建一份独立的 state。最迷惑的是第一项：想共享同一份数据，要做状态提升或用 Context。',
     },
     {
       q: '同事写了 <code>function getCounter() { const [n, setN] = useState(0); … }</code>，在组件顶层调用它，能正常运行。为什么还要把它改名为 <code>useCounter</code>？',
@@ -50,7 +47,8 @@ export default {
         '改名后 React 会把它当成组件，单独渲染一次',
       ],
       answer: 0,
-      explain: '名字是工具识别 Hook 的唯一依据。叫 getCounter 时，有人把它写进 if 里，lint 不会报错，运行时 Hook 顺序就会错乱。最迷惑的是第二项：今天能运行，不代表以后改代码时不出错。第三项也不对：改名不会改变“每次调用各有一份 state”。',
+      explain:
+        '名字是工具识别 Hook 的唯一依据。叫 getCounter 时，有人把它写进 if 里，lint 不会报错，运行时 Hook 顺序就会错乱。最迷惑的是第二项：今天能运行，不代表以后改代码时不出错。第三项也不对：改名不会改变“每次调用各有一份 state”。',
     },
   ],
   exercise: {
@@ -159,41 +157,58 @@ function Stock() {
 function App() {
   return <div><Likes /><Stock /></div>;
 }`,
-    test: async (t) => {
+    test: async t => {
       const useCounter = t.exports.useCounter;
       t.assert(typeof useCounter === 'function', '请保留名为 useCounter 的函数');
       // 单独测试 Hook 本身：在一个探针组件里调用它
       let api = null;
-      const Probe = () => { api = useCounter(5); return null; };
+      const Probe = () => {
+        api = useCounter(5);
+        return null;
+      };
       const box = document.createElement('div');
       const root = ReactDOM.createRoot(box);
       try {
         ReactDOM.flushSync(() => root.render(React.createElement(Probe)));
         t.assert(api && api.count === 5, `useCounter(5) 返回的 count 应为 5，实际是 ${api && api.count}。count 要用 useState(initial) 保存`);
-        t.assert(['inc', 'dec', 'reset'].every(k => typeof api[k] === 'function'), 'useCounter 应返回 { count, inc, dec, reset }，其中 inc、dec、reset 都是函数');
-        ReactDOM.flushSync(() => api.inc()); ReactDOM.flushSync(() => api.inc());
+        t.assert(
+          ['inc', 'dec', 'reset'].every(k => typeof api[k] === 'function'),
+          'useCounter 应返回 { count, inc, dec, reset }，其中 inc、dec、reset 都是函数',
+        );
+        ReactDOM.flushSync(() => api.inc());
+        ReactDOM.flushSync(() => api.inc());
         t.assert(api.count === 7, `调用两次 inc 后应为 7，实际是 ${api.count}`);
         ReactDOM.flushSync(() => api.dec());
         t.assert(api.count === 6, `再调用一次 dec 后应为 6，实际是 ${api.count}`);
         ReactDOM.flushSync(() => api.reset());
         t.assert(api.count === 5, `调用 reset 后应恢复为初始值 5，实际是 ${api.count}。reset 要设回 initial，不是 0`);
-      } finally { root.unmount(); }
+      } finally {
+        root.unmount();
+      }
       // 只看 Likes 和 Stock 两个函数的代码：它们要调用 useCounter，不再自己调用 useState。useCounter 内部怎么写不限制
-      const bodyOf = (name) => {
+      const bodyOf = name => {
         const m = new RegExp('^[ \\t]*(?:export\\s+)?(?:function\\s+' + name + '\\b|(?:const|let|var)\\s+' + name + '\\s*=)', 'm').exec(t.source);
         if (!m) return null;
         const rest = t.source.slice(m.index + m[0].length);
         const end = rest.search(/^(?:export\s+)?(?:function|const|let|var|class)\s/m);
         return end < 0 ? rest : rest.slice(0, end);
       };
-      for (const [name, init] of [['Likes', 0], ['Stock', 10]]) {
+      for (const [name, init] of [
+        ['Likes', 0],
+        ['Stock', 10],
+      ]) {
         const body = bodyOf(name);
         t.assert(body != null, `找不到组件 ${name}。请保留它的名字`);
         t.assert(/\buseCounter\s*\(/.test(body), `${name} 里没有调用 useCounter。请把它自己的计数逻辑换成 useCounter(${init})`);
-        t.assert(!/\b(useState|useReducer)\s*\(/.test(body), `${name} 里还直接调用了 useState。计数逻辑应只写在 useCounter 里一次，${name} 只调用 useCounter(${init})`);
+        t.assert(
+          !/\b(useState|useReducer)\s*\(/.test(body),
+          `${name} 里还直接调用了 useState。计数逻辑应只写在 useCounter 里一次，${name} 只调用 useCounter(${init})`,
+        );
       }
       t.assert(t.text('#likes') === '0' && t.text('#stock') === '10', `初始值应分别为 0 和 10，实际是 ${t.text('#likes')} 和 ${t.text('#stock')}`);
-      await t.click('#likes-inc'); await t.click('#likes-inc'); await t.click('#stock-dec');
+      await t.click('#likes-inc');
+      await t.click('#likes-inc');
+      await t.click('#stock-dec');
       t.assert(t.text('#likes') === '2', `点两次“赞”后应为 2，实际是 ${t.text('#likes')}`);
       t.assert(t.text('#stock') === '9', `点一次“卖出一件”后库存应为 9，实际是 ${t.text('#stock')}。两个组件的计数应互相独立`);
       await t.click('#likes-reset');
@@ -219,7 +234,8 @@ function App() {
 }</code></pre></div>`,
       options: ['false：切换了两次，回到原值', 'true', '报错：同一个 Hook 不能调用两次', 'a 在 true 和 false 之间不停闪烁'],
       answer: 1,
-      explain: '两次 toggleA 是同一次渲染创建的函数，读到的 on 都是 false。两次都执行 <code>setOn(true)</code>，结果是 true。自定义 Hook 不会改变 state 的快照规则。想连续切换，应写 <code>setOn(o =&gt; !o)</code>。',
+      explain:
+        '两次 toggleA 是同一次渲染创建的函数，读到的 on 都是 false。两次都执行 <code>setOn(true)</code>，结果是 true。自定义 Hook 不会改变 state 的快照规则。想连续切换，应写 <code>setOn(o =&gt; !o)</code>。',
     },
     {
       q: `id 一开始是 null，之后变成 5。Header 会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function useCurrentUser(id) {
@@ -243,7 +259,8 @@ function Header({ id }) {
         '报错：自定义 Hook 不能返回 null',
       ],
       answer: 1,
-      explain: '自定义 Hook 里的 Hook 都算在调用它的组件头上。id 为 null 时，Header 只调用了 1 个 Hook（open 的 useState）。id 变成 5 后，Header 依次调用 useState、useEffect、useState，一共 3 个。React 按调用顺序对应 Hook，数量变了就报错“Rendered more hooks than during the previous render”。最迷惑的是第一项：Hooks 规则同样适用于自定义 Hook 内部。修法：先调用所有 Hook，再在 effect 里判断 <code>if (id == null) return;</code>。',
+      explain:
+        '自定义 Hook 里的 Hook 都算在调用它的组件头上。id 为 null 时，Header 只调用了 1 个 Hook（open 的 useState）。id 变成 5 后，Header 依次调用 useState、useEffect、useState，一共 3 个。React 按调用顺序对应 Hook，数量变了就报错“Rendered more hooks than during the previous render”。最迷惑的是第一项：Hooks 规则同样适用于自定义 Hook 内部。修法：先调用所有 Hook，再在 effect 里判断 <code>if (id == null) return;</code>。',
     },
   ],
   plays: {

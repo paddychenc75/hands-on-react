@@ -29,7 +29,8 @@ export default {
         'fetchUser 要放进 useEffect 里调用',
       ],
       answer: 1,
-      explain: '挂起时，没有提交过的组件不会保留任何 state。React 重试时把它当成全新的组件，useState 的初始化函数再次执行，又发出一个请求。缓存要放在组件外：模块级的 Map、Context 提供的缓存对象，或者数据库。第一项是常见误解：初始化函数只在挂载时执行，问题在于挂载从未完成。放进 useEffect 就不再是 Suspense 模式：effect 要等提交后才执行。',
+      explain:
+        '挂起时，没有提交过的组件不会保留任何 state。React 重试时把它当成全新的组件，useState 的初始化函数再次执行，又发出一个请求。缓存要放在组件外：模块级的 Map、Context 提供的缓存对象，或者数据库。第一项是常见误解：初始化函数只在挂载时执行，问题在于挂载从未完成。放进 useEffect 就不再是 Suspense 模式：effect 要等提交后才执行。',
     },
     {
       q: '商品页先读取商品，再在子组件 Reviews 里读取评价。两个请求各要 500ms，页面要 1 秒才完整显示。不改组件结构，最直接的改法是？',
@@ -40,7 +41,8 @@ export default {
         '把两个请求都放进商品组件的 useEffect',
       ],
       answer: 2,
-      explain: 'Reviews 是挂起组件的子组件，要等商品数据到了才会渲染，才会开始请求。提前在点击时发出两个请求，渲染时只是从缓存读取，总时间约 500ms。最有迷惑性的是第一项：多一个 Suspense 只能让两块分别显示，不能让评价的请求提前开始，因为 Reviews 仍然要等父组件渲染完才会被渲染。',
+      explain:
+        'Reviews 是挂起组件的子组件，要等商品数据到了才会渲染，才会开始请求。提前在点击时发出两个请求，渲染时只是从缓存读取，总时间约 500ms。最有迷惑性的是第一项：多一个 Suspense 只能让两块分别显示，不能让评价的请求提前开始，因为 Reviews 仍然要等父组件渲染完才会被渲染。',
     },
     {
       q: '标签页切换写成 <code>&lt;Suspense key={tab} fallback={&lt;Spinner /&gt;}&gt;&lt;TabContent tab={tab} /&gt;&lt;/Suspense&gt;</code>，并用 startTransition 调用 setTab。切换时仍然闪出 Spinner。为什么？',
@@ -51,7 +53,8 @@ export default {
         'Spinner 太快了，要加 300ms 延迟',
       ],
       answer: 1,
-      explain: '过渡更新的规则是：不要把已经显示的内容换成 fallback。加了 key={tab} 之后，每个标签都是一个新的边界，它没有“已经显示的内容”可以保留，只能显示 fallback。去掉 key，让同一个边界跨标签复用，startTransition 就会保留旧标签页。加延迟只是让 Spinner 晚一点出现，没有解决“边界是新的”这个原因。',
+      explain:
+        '过渡更新的规则是：不要把已经显示的内容换成 fallback。加了 key={tab} 之后，每个标签都是一个新的边界，它没有“已经显示的内容”可以保留，只能显示 fallback。去掉 key，让同一个边界跨标签复用，startTransition 就会保留旧标签页。加延迟只是让 Spinner 晚一点出现，没有解决“边界是新的”这个原因。',
     },
     {
       q: '文章区请求失败，错误边界显示“重试”按钮。点击后，边界只执行了 <code>this.setState({ error: null })</code>。会怎样？',
@@ -62,7 +65,8 @@ export default {
         'React 报错：错误边界不能重置自己的 state',
       ],
       answer: 1,
-      explain: '重置边界只是让 children 重新渲染。read 在缓存里找到 status 为 error 的记录，直接抛出同一个错误，不会发新请求。正确的重试先删掉这条缓存记录，再重置边界。第一项是最常见的误解：它假设“重新渲染”就等于“重新请求”。',
+      explain:
+        '重置边界只是让 children 重新渲染。read 在缓存里找到 status 为 error 的记录，直接抛出同一个错误，不会发新请求。正确的重试先删掉这条缓存记录，再重置边界。第一项是最常见的误解：它假设“重新渲染”就等于“重新请求”。',
     },
     {
       q: '个人主页有三块：用户信息（必需）、最近文章、推荐关注。推荐关注的接口经常超时。Suspense 和错误边界怎样放置最合适？',
@@ -73,7 +77,8 @@ export default {
         '每篇文章、每个推荐用户各包一对边界',
       ],
       answer: 1,
-      explain: '三块内容互不依赖，用户可以单独使用其中任何一块。各包一对边界后，推荐关注超时或失败，只影响它自己，也能单独重试。整页一个边界会让最慢、最不稳定的接口拖住整页。第三项看似省事，但用户信息和文章没有自己的边界，它们挂起或失败会影响更大的范围。每一项都包会导致布局不停跳动。',
+      explain:
+        '三块内容互不依赖，用户可以单独使用其中任何一块。各包一对边界后，推荐关注超时或失败，只影响它自己，也能单独重试。整页一个边界会让最慢、最不稳定的接口拖住整页。第三项看似省事，但用户信息和文章没有自己的边界，它们挂起或失败会影响更大的范围。每一项都包会导致布局不停跳动。',
     },
   ],
   exercise: {
@@ -343,28 +348,53 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       const { ProfilePage, api } = t.exports;
       t.assert(typeof ProfilePage === 'function', '请保留名为 ProfilePage 的组件，它接收 userId');
       t.assert(api && typeof api.fetchUser === 'function' && typeof api.fetchPosts === 'function', '请保留模拟接口 api，以及它的 fetchUser 和 fetchPosts');
       // 换上检查程序自己的接口：记录每次请求的时间，可以让某次请求失败
-      const origUser = api.fetchUser, origPosts = api.fetchPosts;
+      const origUser = api.fetchUser,
+        origPosts = api.fetchPosts;
       const log = [];
       const failPosts = new Set();
       const names = ['阿青', '小林', '老周', '美玲', '大伟', '思思', '阿杰', '晓燕', '国强', '小米'];
-      const nm = (id) => names[(id - 1) % names.length];
-      const delay = (ms, fn) => new Promise((res, rej) => window.setTimeout(() => { try { res(fn()); } catch (e) { rej(e); } }, ms));
-      api.fetchUser = (id) => { log.push({ what: 'user', id, at: performance.now() }); return delay(400, () => ({ id, name: nm(id) })); };
-      api.fetchPosts = (id) => {
+      const nm = id => names[(id - 1) % names.length];
+      const delay = (ms, fn) =>
+        new Promise((res, rej) =>
+          window.setTimeout(() => {
+            try {
+              res(fn());
+            } catch (e) {
+              rej(e);
+            }
+          }, ms),
+        );
+      api.fetchUser = id => {
+        log.push({ what: 'user', id, at: performance.now() });
+        return delay(400, () => ({ id, name: nm(id) }));
+      };
+      api.fetchPosts = id => {
         log.push({ what: 'posts', id, at: performance.now() });
-        if (failPosts.has(id)) { failPosts.delete(id); return delay(300, () => { throw new Error('网络错误'); }); }
+        if (failPosts.has(id)) {
+          failPosts.delete(id);
+          return delay(300, () => {
+            throw new Error('网络错误');
+          });
+        }
         return delay(800, () => [1, 2, 3].map(n => nm(id) + ' 的第 ' + n + ' 篇文章'));
       };
       const reqs = (what, id) => log.filter(x => x.what === what && x.id === id);
-      const countSuspense = (container) => {
+      const countSuspense = container => {
         const ck = Object.keys(container).find(k => k.startsWith('__reactContainer$'));
-        let n = 0; const stack = ck ? [container[ck]] : [];
-        while (stack.length) { const f = stack.pop(); if (!f) continue; if (f.tag === 13) n++; if (f.sibling) stack.push(f.sibling); if (f.child) stack.push(f.child); }
+        let n = 0;
+        const stack = ck ? [container[ck]] : [];
+        while (stack.length) {
+          const f = stack.pop();
+          if (!f) continue;
+          if (f.tag === 13) n++;
+          if (f.sibling) stack.push(f.sibling);
+          if (f.child) stack.push(f.child);
+        }
         return n;
       };
       const box = document.createElement('div');
@@ -376,7 +406,8 @@ function App() {
         const t0 = performance.now();
         root = ReactDOM.createRoot(box);
         root.render(React.createElement(ProfilePage, { userId: id }));
-        let userAt = null, postsAt = null;
+        let userAt = null,
+          postsAt = null;
         while (performance.now() - t0 < 1600) {
           await t.wait(20);
           const now = performance.now() - t0;
@@ -384,15 +415,34 @@ function App() {
           if (postsAt === null && box.querySelectorAll('#posts li').length === 3) postsAt = now;
           if (reqs('user', id).length > 3) break;
         }
-        const nu = reqs('user', id).length, np = reqs('posts', id).length;
+        const nu = reqs('user', id).length,
+          np = reqs('posts', id).length;
         t.assert(nu > 0, '渲染 ProfilePage 后，没有调用 api.fetchUser。请通过 api.fetchUser(id) 请求用户信息');
-        t.assert(nu === 1, '同一个用户的信息被请求了 ' + nu + ' 次。read 要把记录存进缓存：同一个 key 只请求一次，之后按状态返回数据或抛出同一个 Promise（步骤 1）');
-        t.assert(np === 1, np === 0 ? '1.6 秒内没有请求文章。请通过 api.fetchPosts(id) 请求文章' : '同一个用户的文章被请求了 ' + np + ' 次。同一个 key 只能请求一次（步骤 1）');
+        t.assert(
+          nu === 1,
+          '同一个用户的信息被请求了 ' + nu + ' 次。read 要把记录存进缓存：同一个 key 只请求一次，之后按状态返回数据或抛出同一个 Promise（步骤 1）',
+        );
+        t.assert(
+          np === 1,
+          np === 0 ? '1.6 秒内没有请求文章。请通过 api.fetchPosts(id) 请求文章' : '同一个用户的文章被请求了 ' + np + ' 次。同一个 key 只能请求一次（步骤 1）',
+        );
         const gap = Math.abs(reqs('posts', id)[0].at - reqs('user', id)[0].at);
-        t.assert(gap < 50, '文章请求比用户请求晚了约 ' + Math.round(gap) + 'ms 才发出，这是请求瀑布。Posts 在 UserInfo 里面，要等用户信息到了才渲染。让两个请求同时发出（步骤 2）');
+        t.assert(
+          gap < 50,
+          '文章请求比用户请求晚了约 ' +
+            Math.round(gap) +
+            'ms 才发出，这是请求瀑布。Posts 在 UserInfo 里面，要等用户信息到了才渲染。让两个请求同时发出（步骤 2）',
+        );
         t.assert(userAt !== null && postsAt !== null, '1.6 秒内用户信息或文章没有显示出来。检查 #user 和 #posts li 是否还在');
         t.assert(countSuspense(box) >= 2, '页面里只找到 ' + countSuspense(box) + ' 个 Suspense。用户信息和文章要各用一个 Suspense（步骤 3）');
-        t.assert(postsAt - userAt > 150, '用户信息要等文章一起才显示（用户 ' + Math.round(userAt) + 'ms，文章 ' + Math.round(postsAt) + 'ms）。用户信息和文章要放在两个独立的 Suspense 里（步骤 3）');
+        t.assert(
+          postsAt - userAt > 150,
+          '用户信息要等文章一起才显示（用户 ' +
+            Math.round(userAt) +
+            'ms，文章 ' +
+            Math.round(postsAt) +
+            'ms）。用户信息和文章要放在两个独立的 Suspense 里（步骤 3）',
+        );
         t.assert(postsAt < 1150, '文章约 ' + Math.round(postsAt) + 'ms 才显示，应在约 800ms 显示（步骤 2）');
 
         // 2. 文章请求失败：只影响文章区，重试能恢复
@@ -402,16 +452,18 @@ function App() {
         root = ReactDOM.createRoot(box);
         root.render(React.createElement(ProfilePage, { userId: bad }));
         // Suspense 会用 display: none 藏起旧内容，所以只看可见的元素
-        const visible = (sel) => Array.from(box.querySelectorAll(sel)).filter(e => !e.closest('[style*="display: none"]'));
+        const visible = sel => Array.from(box.querySelectorAll(sel)).filter(e => !e.closest('[style*="display: none"]'));
         const findRetry = () => visible('button').find(b => b.textContent.trim() === '重试');
         const userOk = () => visible('#user').some(e => e.textContent.includes(nm(bad)));
         const t1 = performance.now();
         while (performance.now() - t1 < 1500 && !(findRetry() && userOk())) await t.wait(20);
         const retryBtn = findRetry();
-        t.assert(retryBtn || reqs('posts', bad).length < 2, '文章请求失败后，read 又发出了新请求，错误一直没有交给错误边界。失败也要记进缓存：status 为 error 时抛出这个错误（步骤 1、5）');
+        t.assert(
+          retryBtn || reqs('posts', bad).length < 2,
+          '文章请求失败后，read 又发出了新请求，错误一直没有交给错误边界。失败也要记进缓存：status 为 error 时抛出这个错误（步骤 1、5）',
+        );
         t.assert(retryBtn, '文章请求失败后，找不到“重试”按钮。文章区要有自己的错误边界（步骤 5）');
-        t.assert(userOk(),
-          '文章请求失败时，用户信息也不见了。错误边界只包住文章区，用户信息才能照常显示（步骤 5）');
+        t.assert(userOk(), '文章请求失败时，用户信息也不见了。错误边界只包住文章区，用户信息才能照常显示（步骤 5）');
         retryBtn.click();
         const t2 = performance.now();
         while (performance.now() - t2 < 1500 && visible('#posts li').length !== 3) await t.wait(20);
@@ -419,7 +471,8 @@ function App() {
         t.assert(tries >= 2, '点“重试”后没有重新请求文章：缓存里还留着失败的记录，read 又抛出了同一个错误。onRetry 要先删掉这条缓存记录（步骤 5）');
         t.assert(visible('#posts li').length === 3, '点“重试”后，文章没有显示出来（步骤 5）');
         t.assert(!findRetry(), '重试成功后，错误提示应该消失');
-        root.unmount(); root = null;
+        root.unmount();
+        root = null;
 
         // 3. 在预览中点“下一位用户”：保留旧内容，不闪 fallback
         const t3 = performance.now();
@@ -430,7 +483,9 @@ function App() {
         t.assert(nextBtn, '找不到“下一位用户”按钮');
         const before = log.length;
         nextBtn.click();
-        let sawFallback = false, sawPending = false, lostOld = false;
+        let sawFallback = false,
+          sawPending = false,
+          lostOld = false;
         const t4 = performance.now();
         while (performance.now() - t4 < 2000) {
           await t.wait(15);
@@ -443,9 +498,13 @@ function App() {
         const fresh = log.slice(before);
         t.assert(fresh.length >= 2, '点“下一位用户”后，没有通过 api 请求下一位用户的数据');
         const newId = fresh[0].id;
-        const fu = fresh.find(x => x.what === 'user'), fp = fresh.find(x => x.what === 'posts');
+        const fu = fresh.find(x => x.what === 'user'),
+          fp = fresh.find(x => x.what === 'posts');
         t.assert(fu && fp && Math.abs(fu.at - fp.at) < 50, '切换用户时，两个请求没有同时发出（步骤 2）');
-        t.assert(!sawFallback && !lostOld, '切换用户时，旧内容被 fallback 替换了。把切换 userId 的 set 函数调用放进 startTransition，已经显示的内容就会保留到新数据到齐（步骤 4）');
+        t.assert(
+          !sawFallback && !lostOld,
+          '切换用户时，旧内容被 fallback 替换了。把切换 userId 的 set 函数调用放进 startTransition，已经显示的内容就会保留到新数据到齐（步骤 4）',
+        );
         t.assert(sawPending, '切换期间没有出现 #pending。用 useTransition 拿到 isPending，显示 <small id="pending">切换中…</small>（步骤 4）');
         t.assert(t.text('#user') === nm(newId), '2 秒后仍没有显示下一位用户。应显示“' + nm(newId) + '”，实际是“' + t.text('#user') + '”');
         t.assert(t.qa('#posts li').length === 3 && t.qa('#posts li')[0].textContent.includes(nm(newId)), '切换后，文章列表应是“' + nm(newId) + '”的文章');
@@ -454,7 +513,8 @@ function App() {
       } finally {
         if (root) root.unmount();
         box.remove();
-        api.fetchUser = origUser; api.fetchPosts = origPosts;
+        api.fetchUser = origUser;
+        api.fetchPosts = origPosts;
       }
     },
   },
@@ -480,7 +540,8 @@ function Orders({ id }) {
         '永远不显示：Page 在自己的 Suspense 外面读取数据',
       ],
       answer: 1,
-      explain: 'Page 读取用户时挂起，它返回的 JSX（包括 Orders）根本没有生成，所以 Orders 的请求要等用户数据到了才发出。这是父子瀑布。注意 Page 在自己的 Suspense 之外读取数据，挂起时由更上层的边界显示 fallback，不会“永远不显示”。修法：在 Page 开头或更早的地方同时发出两个请求。',
+      explain:
+        'Page 读取用户时挂起，它返回的 JSX（包括 Orders）根本没有生成，所以 Orders 的请求要等用户数据到了才发出。这是父子瀑布。注意 Page 在自己的 Suspense 之外读取数据，挂起时由更上层的边界显示 fallback，不会“永远不显示”。修法：在 Page 开头或更早的地方同时发出两个请求。',
     },
     {
       q: `这个 read 有什么问题？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const cache = new Map();
@@ -498,7 +559,8 @@ function read(key, load) {
         'throw promise 会被当成错误交给错误边界',
       ],
       answer: 1,
-      explain: '请求进行中时，缓存里还没有这个 key。如果组件在数据到达之前重新渲染（例如父组件更新、兄弟组件的 Promise 先完成），read 会再发一次请求。失败时 cache 永远不会被写入，Promise 被拒绝后 React 重试，又发新请求，形成循环，错误边界也收不到错误。正确的做法是先存一条 pending 记录，并记录 error 状态。',
+      explain:
+        '请求进行中时，缓存里还没有这个 key。如果组件在数据到达之前重新渲染（例如父组件更新、兄弟组件的 Promise 先完成），read 会再发一次请求。失败时 cache 永远不会被写入，Promise 被拒绝后 React 重试，又发新请求，形成循环，错误边界也收不到错误。正确的做法是先存一条 pending 记录，并记录 error 状态。',
     },
     {
       q: `已经显示了 id = 1 的商品。点击后，界面会怎样变化？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function handleNext() {
@@ -510,7 +572,8 @@ function read(key, load) {
 &lt;/Suspense&gt;</code></pre></div>`,
       options: ['先显示“加载中…”，数据到后显示商品 2', '商品 1 保持显示，数据到后直接换成商品 2', '商品 1 立刻消失，区域变成空白', '商品 2 的内容先显示一半'],
       answer: 1,
-      explain: '这个 Suspense 边界已经显示过内容，切换是过渡更新，所以 React 不会用 fallback 替换它。新数据到齐后一次性提交。如果要提示用户，用 useTransition 拿到 isPending。去掉 startTransition，才会先显示“加载中…”。',
+      explain:
+        '这个 Suspense 边界已经显示过内容，切换是过渡更新，所以 React 不会用 fallback 替换它。新数据到齐后一次性提交。如果要提示用户，用 useTransition 拿到 isPending。去掉 startTransition，才会先显示“加载中…”。',
     },
     {
       q: `用户 3 的文章请求失败了。点“重试”后，会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;ErrorBoundary
@@ -526,7 +589,8 @@ function read(key, load) {
         '什么都不发生：Posts 没有 Suspense，不能重试',
       ],
       answer: 0,
-      explain: '缓存记录被删掉后，Posts 重新渲染时发出新请求并挂起。这里的错误边界里没有 Suspense，挂起会一直向上找，找到更外层的 Suspense，所以替换的范围更大，可能是整个页面。通常把 Suspense 放在错误边界里面，成对使用，把等待和失败限制在同一块区域。',
+      explain:
+        '缓存记录被删掉后，Posts 重新渲染时发出新请求并挂起。这里的错误边界里没有 Suspense，挂起会一直向上找，找到更外层的 Suspense，所以替换的范围更大，可能是整个页面。通常把 Suspense 放在错误边界里面，成对使用，把等待和失败限制在同一块区域。',
     },
   ],
   plays: {
@@ -536,7 +600,8 @@ function read(key, load) {
         q: '点“写法 B”。QuoteB 用 useMemo 创建资源，依赖数组是空的。会发生什么？',
         options: ['约 0.8 秒后显示句子，和写法 A 一样', '一直显示“加载中…”，请求次数不断增加', '报错：挂起的组件里不能调用 useMemo', '请求 2 次后显示句子'],
         answer: 1,
-        explain: '挂起的组件如果是第一次挂载，React 会丢弃这次渲染的一切，包括 useMemo 的结果。每次重试都会创建新的 Promise，它永远处于 pending。useMemo 只在组件已经提交过之后才能复用结果。',
+        explain:
+          '挂起的组件如果是第一次挂载，React 会丢弃这次渲染的一切，包括 useMemo 的结果。每次重试都会创建新的 Promise，它永远处于 pending。useMemo 只在组件已经提交过之后才能复用结果。',
       },
       pkey: 'suspense-data|资源在哪里创建？',
     },

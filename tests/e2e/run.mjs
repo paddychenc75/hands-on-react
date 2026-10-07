@@ -21,12 +21,15 @@ for (const a of args) {
     process.exit(2);
   }
 }
-if (!runs.length) SUITES.forEach((suite) => runs.push({ suite, ids: [] }));
+if (!runs.length) SUITES.forEach(suite => runs.push({ suite, ids: [] }));
 
 let failed = 0;
 for (const { suite, ids } of runs) {
   console.log(`\n=== ${suite}${ids.length ? ' ' + ids.join(' ') : ''} ===`);
   const r = spawnSync(process.execPath, [path.join(here, suite + '.mjs'), ...ids], { stdio: 'inherit' });
-  if (r.status !== 0) { failed++; console.error(`\n${suite} 失败（退出码 ${r.status}）`); }
+  if (r.status !== 0) {
+    failed++;
+    console.error(`\n${suite} 失败（退出码 ${r.status}）`);
+  }
 }
 process.exit(failed ? 1 : 0);

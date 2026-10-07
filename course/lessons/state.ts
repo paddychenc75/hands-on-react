@@ -24,7 +24,8 @@ export default {
       q: 'count 为 0。点击时执行 setCount(count + 1); setCount(c => c + 1);，渲染后 count 是？',
       options: ['2', '1', '3', '0'],
       answer: 0,
-      explain: '第一次请求“替换为 1”。第二次传的是函数，它在队列里拿到最新值 1，再加 1，所以是 2。最容易误选的是 1：第二次调用不读本次渲染的 count，而是读队列里的值。',
+      explain:
+        '第一次请求“替换为 1”。第二次传的是函数，它在队列里拿到最新值 1，再加 1，所以是 2。最容易误选的是 1：第二次调用不读本次渲染的 count，而是读队列里的值。',
     },
     {
       q: '以下哪种更新对象 state 的方式能让界面更新？',
@@ -35,7 +36,8 @@ export default {
         'setUser(user); user.name = "a"',
       ],
       answer: 1,
-      explain: '必须传入一个新对象。React 用 Object.is 比较新旧值，引用相同就判定“没变”，跳过更新。第三项最迷惑：name 确实改了，但改的是原对象，传回去的还是同一个引用。',
+      explain:
+        '必须传入一个新对象。React 用 Object.is 比较新旧值，引用相同就判定“没变”，跳过更新。第三项最迷惑：name 确实改了，但改的是原对象，传回去的还是同一个引用。',
     },
     {
       q: '在组件里写 <code>let count = 0</code>，点击时执行 <code>count = count + 1</code>。为什么界面不变？',
@@ -46,7 +48,8 @@ export default {
         'let 声明的变量在组件里是只读的',
       ],
       answer: 0,
-      explain: '组件函数每次渲染都重新执行，局部变量会重置。修改它也不会通知 React。最容易误选的是第二项：那描述的是 state 的“快照”行为，而普通变量根本不会触发渲染。',
+      explain:
+        '组件函数每次渲染都重新执行，局部变量会重置。修改它也不会通知 React。最容易误选的是第二项：那描述的是 state 的“快照”行为，而普通变量根本不会触发渲染。',
     },
   ],
   exercise: {
@@ -98,23 +101,34 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       const c = () => t.text('#count');
       t.assert(t.q('#count'), '找不到 id="count" 的元素');
       t.assert(c() === '0', '初始值应为 0');
-      const plus = t.byText('button', '+1'), minus = t.byText('button', '-1');
+      const plus = t.byText('button', '+1'),
+        minus = t.byText('button', '-1');
       t.assert(plus && minus, '需要文字为 +1 和 -1 的两个按钮');
-      await t.click(plus); await t.click(plus); await t.click(plus);
+      await t.click(plus);
+      await t.click(plus);
+      await t.click(plus);
       t.assert(c() === '3', `点 3 次 +1 后应为 3，实际是 ${c()}`);
       await t.click(minus);
       t.assert(c() === '2', `再点一次 -1 后应为 2，实际是 ${c()}`);
-      const plus3 = t.byText('button', '+3'); t.assert(plus3, '需要文字为 +3 的按钮');
+      const plus3 = t.byText('button', '+3');
+      t.assert(plus3, '需要文字为 +3 的按钮');
       await t.click(plus3);
-      t.assert(c() === '5', `点 +3 后应从 2 变成 5，实际是 ${c()}。连续调用三次 setCount(count + 1) 时，三次读到的是同一个 count。请用函数式更新 setCount(c => c + 1)`);
+      t.assert(
+        c() === '5',
+        `点 +3 后应从 2 变成 5，实际是 ${c()}。连续调用三次 setCount(count + 1) 时，三次读到的是同一个 count。请用函数式更新 setCount(c => c + 1)`,
+      );
       // 同一轮里连点两次：第二次点击时 React 还没重新渲染。只有基于最新值的更新才能得到 11
-      plus3.click(); plus3.click();
+      plus3.click();
+      plus3.click();
       await t.wait(60);
-      t.assert(c() === '11', `快速连点两次 +3，应从 5 变成 11，实际是 ${c()}。第二次点击时，处理函数读到的还是旧的 count。每次加 1 都要基于最新值：setCount(c => c + 1)`);
+      t.assert(
+        c() === '11',
+        `快速连点两次 +3，应从 5 变成 11，实际是 ${c()}。第二次点击时，处理函数读到的还是旧的 count。每次加 1 都要基于最新值：setCount(c => c + 1)`,
+      );
     },
   },
   checkOnly: [
@@ -128,7 +142,8 @@ function handle() {
 }</code></pre></div>`,
       options: ['显示 10，打印 0', '显示 10，打印 10', '显示 5，打印 0', '显示 10，打印 5'],
       answer: 0,
-      explain: 'React 按顺序处理更新队列：<ol class="task-steps"><li><code>setN(n + 5)</code>：这次渲染的 n 是 0，所以设为 5。</li><li><code>m =&gt; m * 2</code>：拿到上一步的 5，得到 10。</li></ol>console.log 读的是这次渲染的快照，n 仍是 0。',
+      explain:
+        'React 按顺序处理更新队列：<ol class="task-steps"><li><code>setN(n + 5)</code>：这次渲染的 n 是 0，所以设为 5。</li><li><code>m =&gt; m * 2</code>：拿到上一步的 5，得到 10。</li></ol>console.log 读的是这次渲染的快照，n 仍是 0。',
     },
     {
       q: `在姓名输入框里输入“a”。下面的 <code>&lt;p&gt;</code> 显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [form, setForm] = useState({ name: '', email: 'a@b.c' });
@@ -140,11 +155,12 @@ function handle() {
 &lt;p&gt;{form.email}&lt;/p&gt;</code></pre></div>`,
       options: ['空白：email 没有了', 'a@b.c：set 函数会把新对象合并进旧对象', '报错：缺少 email 字段', 'a@b.c，但输入框里打不进字'],
       answer: 0,
-      explain: 'useState 的 set 函数用新值<b>替换</b>旧值，不做合并。新对象只有 name，email 变成 undefined，所以 p 什么都不显示。修复：<code>setForm({ ...form, name: e.target.value })</code>。“会合并”来自 class 组件的 <code>this.setState</code>，它会浅合并；函数组件的 set 函数不会。',
+      explain:
+        'useState 的 set 函数用新值<b>替换</b>旧值，不做合并。新对象只有 name，email 变成 undefined，所以 p 什么都不显示。修复：<code>setForm({ ...form, name: e.target.value })</code>。“会合并”来自 class 组件的 <code>this.setState</code>，它会浅合并；函数组件的 set 函数不会。',
     },
   ],
   plays: {
-    '失败的计数器': {
+    失败的计数器: {
       note: '点几下按钮，看看下方控制台：变量确实增加了，但界面没变。',
       predict: {
         q: '连续点击按钮 3 次后，按钮上显示的数字是多少？',
@@ -154,7 +170,7 @@ function handle() {
       },
       pkey: 'state|失败的计数器',
     },
-    '正确的计数器': {},
+    正确的计数器: {},
     '快照 vs 函数式更新': {
       note: '写法 A 只加了 1。这次渲染里 count 是 0，三次调用都在请求“设为 1”。控制台也打印 0：调用 set 函数后，本次渲染里的 count 没有变。写法 B 传入的是函数，React 按队列依次计算：0 → 1 → 2 → 3。',
       predict: {
@@ -165,6 +181,6 @@ function handle() {
       },
       pkey: 'state|快照 vs 函数式更新',
     },
-    '不可变更新': {},
+    不可变更新: {},
   },
 } satisfies Lesson;

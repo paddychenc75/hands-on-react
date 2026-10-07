@@ -28,18 +28,15 @@ export default {
         'useReducer 的 state 不能包含嵌套数组',
       ],
       answer: 1,
-      explain: '每列各存一个数组时，移动卡片要从一个数组删除、往另一个数组添加。两步中漏一步，卡片就会消失或同时出现在两列。只存 col，移动只改一个字段。“列数组更方便排序”有一定道理，但排序可以另存一个 order 字段，不需要重复存卡片。useReducer 的 state 可以是任何值。',
+      explain:
+        '每列各存一个数组时，移动卡片要从一个数组删除、往另一个数组添加。两步中漏一步，卡片就会消失或同时出现在两列。只存 col，移动只改一个字段。“列数组更方便排序”有一定道理，但排序可以另存一个 order 字段，不需要重复存卡片。useReducer 的 state 可以是任何值。',
     },
     {
       q: '把 dispatch 放进 Context 的主要好处是？',
-      options: [
-        'Context 让 dispatch 不再触发重新渲染',
-        '深层组件可以直接派发 action，无需层层传递回调',
-        '可以替代 reducer',
-        '可以让 reducer 读取组件的 props',
-      ],
+      options: ['Context 让 dispatch 不再触发重新渲染', '深层组件可以直接派发 action，无需层层传递回调', '可以替代 reducer', '可以让 reducer 读取组件的 props'],
       answer: 1,
-      explain: '深层组件直接拿到 dispatch，不用层层传递回调。第一个选项有迷惑性：dispatch 的引用是稳定的，所以这个 Context 的值不会变，读取它的组件不会因为 Context 而重新渲染；但 dispatch 引起的 state 变化仍然会让 App 重新渲染。',
+      explain:
+        '深层组件直接拿到 dispatch，不用层层传递回调。第一个选项有迷惑性：dispatch 的引用是稳定的，所以这个 Context 的值不会变，读取它的组件不会因为 Context 而重新渲染；但 dispatch 引起的 state 变化仍然会让 App 重新渲染。',
     },
   ],
   exercise: {
@@ -221,9 +218,9 @@ function boardReducer(state, action) {
       return state;
   }
 }`,
-    test: async (t) => {
-      const titles = (col) => t.qa(`.column[data-col="${col}"] .card`).map(c => c.firstChild.textContent);
-      const card = (title) => t.qa('.card').find(c => c.firstChild.textContent === title);
+    test: async t => {
+      const titles = col => t.qa(`.column[data-col="${col}"] .card`).map(c => c.firstChild.textContent);
+      const card = title => t.qa('.card').find(c => c.firstChild.textContent === title);
       const btn = (c, label) => Array.from<HTMLElement>(c.querySelectorAll('button')).find(b => b.textContent === label);
       await t.type('#card-input', '写测试');
       await t.click(t.byText('button', '添加卡片'));
@@ -239,7 +236,14 @@ function boardReducer(state, action) {
       t.assert(titles('doing').includes('写测试') && !titles('done').includes('写测试'), '点 ← 应移回“进行中”');
       const r = t.exports.boardReducer;
       t.assert(typeof r === 'function', '没有找到 boardReducer');
-      const s0 = { columns: ['todo', 'doing', 'done'], cards: [{ id: 1, title: 'a', col: 'done' }, { id: 2, title: 'b', col: 'todo' }], nextId: 3 };
+      const s0 = {
+        columns: ['todo', 'doing', 'done'],
+        cards: [
+          { id: 1, title: 'a', col: 'done' },
+          { id: 2, title: 'b', col: 'todo' },
+        ],
+        nextId: 3,
+      };
       const s1 = r(s0, { type: 'move', id: 1, dir: 1 });
       t.assert(s1.cards[0].col === 'done', '已在最右列的卡片向右移动时应保持不变');
       const s2 = r(s0, { type: 'move', id: 2, dir: -1 });
@@ -270,7 +274,8 @@ function boardReducer(state, action) {
   };</code></pre></div>`,
       options: ['右移一列', '右移两列', '不移动：返回的还是同一个数组', '报错：reducer 不能用逗号表达式'],
       answer: 1,
-      explain: '<code>c.col += action.dir</code> 直接修改了旧的卡片对象。严格模式在开发环境会把 reducer 调用两次，用来暴露这种副作用。两次调用改的是同一个对象，所以卡片移动了两列。纯函数写法：<code>c.id === action.id ? { ...c, col: c.col + action.dir } : c</code>。',
+      explain:
+        '<code>c.col += action.dir</code> 直接修改了旧的卡片对象。严格模式在开发环境会把 reducer 调用两次，用来暴露这种副作用。两次调用改的是同一个对象，所以卡片移动了两列。纯函数写法：<code>c.id === action.id ? { ...c, col: c.col + action.dir } : c</code>。',
     },
   ],
   plays: {},

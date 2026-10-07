@@ -29,7 +29,8 @@ export default {
         '没了，但只是因为没有用 useNavigate',
       ],
       answer: 1,
-      explain: '普通 a 标签会让浏览器重新加载整个页面，React 应用从头启动，state 全部丢失。&lt;Link&gt; 拦截点击，只改 URL 并重新渲染。“URL 变回了首页”有迷惑性：URL 相同不代表 state 还在，state 只存在于这一次页面加载的内存里。',
+      explain:
+        '普通 a 标签会让浏览器重新加载整个页面，React 应用从头启动，state 全部丢失。&lt;Link&gt; 拦截点击，只改 URL 并重新渲染。“URL 变回了首页”有迷惑性：URL 相同不代表 state 还在，state 只存在于这一次页面加载的内存里。',
     },
     {
       q: '路由是 <code>users/:id</code>，当前 URL 是 <code>/users/2</code>。组件里写 <code>const { id } = useParams(); const user = USERS.find(u =&gt; u.id === id);</code>，USERS 里的 id 是数字。结果是？',
@@ -40,18 +41,15 @@ export default {
         'id 是 undefined，要用 useLocation 解析 pathname 才能读到',
       ],
       answer: 1,
-      explain: 'URL 里的一切都是字符串，useParams 返回 { id: "2" }，而 "2" === 2 为 false。要写 Number(id) 再比较。读取方式本身没错，所以“id 是 undefined”不对；useParams 也正是在路由匹配到的组件里使用。',
+      explain:
+        'URL 里的一切都是字符串，useParams 返回 { id: "2" }，而 "2" === 2 为 false。要写 Number(id) 再比较。读取方式本身没错，所以“id 是 undefined”不对；useParams 也正是在路由匹配到的组件里使用。',
     },
     {
       q: '父路由 <code>/</code> 渲染 Layout（导航栏），子路由 <code>users</code> 渲染 UserList。访问 /users 时只看到导航栏，没看到列表。最可能漏了什么？',
-      options: [
-        'Layout 里没有写 &lt;Outlet /&gt;',
-        'UserList 没有用 useParams',
-        '子路由必须写成完整路径 /users',
-        'Layout 要把 children 渲染出来',
-      ],
+      options: ['Layout 里没有写 &lt;Outlet /&gt;', 'UserList 没有用 useParams', '子路由必须写成完整路径 /users', 'Layout 要把 children 渲染出来'],
       answer: 0,
-      explain: '子路由的内容渲染在父布局的 &lt;Outlet /&gt; 位置。没有 Outlet，子路由匹配成功也无处显示。“渲染 children”是最有迷惑性的选项：React Router 不通过 children 把子路由交给布局，要用 Outlet。',
+      explain:
+        '子路由的内容渲染在父布局的 &lt;Outlet /&gt; 位置。没有 Outlet，子路由匹配成功也无处显示。“渲染 children”是最有迷惑性的选项：React Router 不通过 children 把子路由交给布局，要用 Outlet。',
     },
     {
       q: '应用部署到静态服务器。在 /users/2 刷新后出现 404。原因是？',
@@ -62,7 +60,8 @@ export default {
         'BrowserRouter 只能在开发环境使用',
       ],
       answer: 1,
-      explain: '刷新时，浏览器直接向服务器请求 /users/2。要配置服务器：所有路径都返回 index.html，再由 React Router 匹配。“路由表里没有写”不对：在站内点击链接能打开这个页面，说明路由表没问题，问题出在请求根本没到 React。',
+      explain:
+        '刷新时，浏览器直接向服务器请求 /users/2。要配置服务器：所有路径都返回 index.html，再由 React Router 匹配。“路由表里没有写”不对：在站内点击链接能打开这个页面，说明路由表没问题，问题出在请求根本没到 React。',
     },
   ],
   exercise: {
@@ -317,16 +316,19 @@ function App() {
   );
 }`,
     hint: '迷你 <code>Routes</code> 按数组顺序取<b>第一个</b>匹配的路由，而 <code>*</code> 匹配一切。详情页的内容要来自 <code>useParams()</code> 返回的 <code>id</code>，不要写死某个用户。',
-    test: async (t) => {
+    test: async t => {
       // 普通 <a href> 会让整个页面跳走。这里拦住浏览器的默认跳转，只看迷你路由有没有更新地址。
-      const guard = (e) => { if (e.target.closest && e.target.closest('a')) e.preventDefault(); };
+      const guard = e => {
+        if (e.target.closest && e.target.closest('a')) e.preventDefault();
+      };
       t.root.addEventListener('click', guard, true);
       try {
         const path = () => t.text('#address').replace('https://example.com', '');
-        const go = async (to) => {
+        const go = async to => {
           const a = t.qa('nav a').find(x => x.getAttribute('href') === to);
           t.assert(a, '找不到导航链接 ' + to + '。不要修改 nav 里的链接');
-          await t.click(a); await t.wait(30);
+          await t.click(a);
+          await t.wait(30);
         };
         t.assert(t.q('#address'), '找不到地址栏 #address。不要修改迷你路由库');
         t.assert(/useParams\s*\(\s*\)/.test(t.source), '详情页要用 useParams() 读出 id（步骤 3）');
@@ -344,13 +346,18 @@ function App() {
         const open = async (id, name, city) => {
           const a = t.qa('li.user a').find(x => x.getAttribute('href') === '/users/' + id);
           t.assert(a, '用户 ' + name + ' 的链接应指向 /users/' + id + '（步骤 2）');
-          await t.click(a); await t.wait(30);
+          await t.click(a);
+          await t.wait(30);
           t.assert(path() === '/users/' + id, '点击“' + name + '”后，地址应是 /users/' + id + '，实际是 ' + path() + '。站内跳转要用 Link，不要用 <a href>');
-          t.assert(t.text('#user-name') === name, '在 /users/' + id + '，#user-name 应显示“' + name + '”，实际是“' + t.text('#user-name') + '”。名字要按 useParams 的 id 查找（步骤 3）');
+          t.assert(
+            t.text('#user-name') === name,
+            '在 /users/' + id + '，#user-name 应显示“' + name + '”，实际是“' + t.text('#user-name') + '”。名字要按 useParams 的 id 查找（步骤 3）',
+          );
           t.assert(t.text('#user-city') === city, '在 /users/' + id + '，#user-city 应显示“' + city + '”，实际是“' + t.text('#user-city') + '”');
           t.assert(!t.q('#not-found'), '用户存在时不应显示 #not-found');
           t.assert(t.q('#back'), '详情页应有返回按钮 #back（步骤 4）');
-          await t.click('#back'); await t.wait(30);
+          await t.click('#back');
+          await t.wait(30);
           t.assert(path() === '/users' && t.qa('li.user').length === 3, '点 #back 后应回到 /users 列表页，实际地址是 ' + path() + '（步骤 4）');
         };
         await open('2', '李四', '上海');
@@ -381,7 +388,8 @@ function App() {
         '嵌套路由必须放在 <Link> 里',
       ],
       answer: 1,
-      explain: '嵌套路由匹配后，父路由的组件先渲染。子路由的内容会显示在父组件中 <code>&lt;Outlet /&gt;</code> 的位置。Users 没有放 Outlet，子路由就没有地方显示。',
+      explain:
+        '嵌套路由匹配后，父路由的组件先渲染。子路由的内容会显示在父组件中 <code>&lt;Outlet /&gt;</code> 的位置。Users 没有放 Outlet，子路由就没有地方显示。',
     },
     {
       q: `URL 是 <code>?page=2</code>。点击“下一页”后，URL 变成什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [params, setParams] = useSearchParams();
@@ -392,7 +400,7 @@ const page = params.get('page') ?? 1;
 &lt;/button&gt;</code></pre></div>`,
       options: ['?page=3', '?page=21', '?page=NaN', '?page=2，不变'],
       answer: 1,
-      explain: '查询参数读出来永远是字符串。<code>\'2\' + 1</code> 是字符串拼接，结果是 \'21\'。读取后要先转成数字：<code>Number(params.get(\'page\') ?? 1)</code>。',
+      explain: "查询参数读出来永远是字符串。<code>'2' + 1</code> 是字符串拼接，结果是 '21'。读取后要先转成数字：<code>Number(params.get('page') ?? 1)</code>。",
     },
     {
       q: `用户已经登录，打开登录页。第一次渲染时会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Login() {
@@ -403,13 +411,15 @@ const page = params.get('page') ?? 1;
 }</code></pre></div>`,
       options: ['立即跳转到 /home', '无限循环：每次渲染都跳转', '报错：navigate 是 undefined', '不跳转，并在控制台警告'],
       answer: 3,
-      explain: 'navigate 是一个副作用，不应在渲染时调用。React Router 在组件第一次渲染时会忽略这次调用，并警告“You should call navigate() in a React.useEffect()”。渲染时就要重定向，应返回 <code>&lt;Navigate to="/home" replace /&gt;</code>。“立即跳转”是最常见的预期，但渲染函数应该是纯函数，不能在里面改变 URL。',
+      explain:
+        'navigate 是一个副作用，不应在渲染时调用。React Router 在组件第一次渲染时会忽略这次调用，并警告“You should call navigate() in a React.useEffect()”。渲染时就要重定向，应返回 <code>&lt;Navigate to="/home" replace /&gt;</code>。“立即跳转”是最常见的预期，但渲染函数应该是纯函数，不能在里面改变 URL。',
     },
     {
       q: '路由是 <code>&lt;Route path="/users/:id" element={&lt;UserDetail /&gt;} /&gt;</code>。访问 <code>/users/2</code> 时，点击 UserDetail 里的这个链接，会去哪个地址？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;Link to="edit"&gt;编辑&lt;/Link&gt;</code></pre></div>',
       options: ['/users/2/edit', '/users/edit', '/edit', '/users/2edit'],
       answer: 0,
-      explain: '不以 <code>/</code> 开头的路径是相对路径。React Router 把它解析为相对于<b>当前路由</b>的路径，这里是 /users/2，所以得到 /users/2/edit。想去根路径，写 <code>to="/edit"</code>；想去上一级，写 <code>to=".."</code>。“/users/edit”是按浏览器解析 <code>&lt;a href="edit"&gt;</code> 的规则推出来的：浏览器会替换最后一段，React Router 不会。',
+      explain:
+        '不以 <code>/</code> 开头的路径是相对路径。React Router 把它解析为相对于<b>当前路由</b>的路径，这里是 /users/2，所以得到 /users/2/edit。想去根路径，写 <code>to="/edit"</code>；想去上一级，写 <code>to=".."</code>。“/users/edit”是按浏览器解析 <code>&lt;a href="edit"&gt;</code> 的规则推出来的：浏览器会替换最后一段，React Router 不会。',
     },
   ],
   plays: {

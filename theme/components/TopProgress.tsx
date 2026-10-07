@@ -8,8 +8,12 @@ export default function TopProgress() {
   const n = mounted ? doneCount() : 0;
   return (
     <div className="hoc top-progress" title="已完成的课数">
-      <div className="bar"><i style={{ width: (n / TOTAL_LESSONS * 100) + '%' }} /></div>
-      <span id="prog-text">已完成 {n}/{TOTAL_LESSONS}</span>
+      <div className="bar">
+        <i style={{ width: (n / TOTAL_LESSONS) * 100 + '%' }} />
+      </div>
+      <span id="prog-text">
+        已完成 {n}/{TOTAL_LESSONS}
+      </span>
     </div>
   );
 }

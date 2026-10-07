@@ -23,7 +23,8 @@ export default {
       q: '在迷你 useState 中，若第二次渲染时 if 跳过了第一个 useState，name 会读到什么？',
       options: ['"小红"', 'count 的值', 'undefined', '报错'],
       answer: 1,
-      explain: '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。也不会报错，这正是这类 bug 难发现的原因。',
+      explain:
+        '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。也不会报错，这正是这类 bug 难发现的原因。',
     },
     {
       q: '一棵 3000 个组件的树正在渲染一次过渡更新，渲染到一半时用户按下了键盘。在 Fiber 架构下会怎样？',
@@ -34,7 +35,8 @@ export default {
         '浏览器强制中断 JavaScript，渲染出错',
       ],
       answer: 1,
-      explain: 'Fiber 把渲染拆成小单元，每做完一个就检查有没有更紧急的任务。渲染阶段不改 DOM，所以可以随时暂停或丢弃。第三项是常见误解：React 从不提交“一半”的结果，提交阶段总是一次性完成。',
+      explain:
+        'Fiber 把渲染拆成小单元，每做完一个就检查有没有更紧急的任务。渲染阶段不改 DOM，所以可以随时暂停或丢弃。第三项是常见误解：React 从不提交“一半”的结果，提交阶段总是一次性完成。',
     },
     {
       q: '为什么提交阶段必须同步一次完成，而渲染阶段可以中断？',
@@ -45,7 +47,8 @@ export default {
         '因为浏览器不允许分多次修改 DOM，中途的修改会被浏览器拒绝',
       ],
       answer: 1,
-      explain: '能不能中断，取决于用户看不看得见。渲染阶段的工作对用户不可见，随时可以重来。提交阶段一旦中断，用户就会看到不一致的界面。第一项是常见误解：分多次改 DOM 也可以很快，问题在于一致性，而不是速度。',
+      explain:
+        '能不能中断，取决于用户看不看得见。渲染阶段的工作对用户不可见，随时可以重来。提交阶段一旦中断，用户就会看到不一致的界面。第一项是常见误解：分多次改 DOM 也可以很快，问题在于一致性，而不是速度。',
     },
   ],
   exercise: {
@@ -202,15 +205,21 @@ api.setName('小红');
 console.log(output);
 console.log('hooks：', JSON.stringify(hooks));`,
     exports: ['mount', 'useState', 'useRef'],
-    test: async (t) => {
+    test: async t => {
       const { mount, useState, useRef } = t.exports;
-      t.assert([mount, useState, useRef].every(f => typeof f === 'function'), '没有找到 mount、useState 和 useRef');
-      let last: any, api: any, refs = [];
+      t.assert(
+        [mount, useState, useRef].every(f => typeof f === 'function'),
+        '没有找到 mount、useState 和 useRef',
+      );
+      let last: any,
+        api: any,
+        refs = [];
       mount(function Probe() {
         const [count, setCount] = useState(0);
         const [name, setName] = useState('小明');
         const r = useRef(0);
-        r.current++; refs.push(r);
+        r.current++;
+        refs.push(r);
         api = { setCount, setName, r };
         last = count + '|' + name + '|' + r.current;
         return last;
@@ -218,21 +227,33 @@ console.log('hooks：', JSON.stringify(hooks));`,
       t.assert(last === '0|小明|1', `第一次渲染应得到 0|小明|1（count|name|ref），实际是 ${last}`);
       api.setCount(c => c + 1);
       t.assert(last !== '0|小明|1' || refs.length > 1, 'setCount 之后组件没有重新渲染。setState 要调用 render()');
-      t.assert(!last.startsWith('0|小明|'), `setCount(c => c + 1) 后，count 仍是初始值（${last}）。游标在每次渲染前归零了吗？没有归零，第二次渲染的 Hook 会跑到新的格子里，读到 initial`);
+      t.assert(
+        !last.startsWith('0|小明|'),
+        `setCount(c => c + 1) 后，count 仍是初始值（${last}）。游标在每次渲染前归零了吗？没有归零，第二次渲染的 Hook 会跑到新的格子里，读到 initial`,
+      );
       t.assert(last === '1|小明|2', `setCount(c => c + 1) 后应得到 1|小明|2，实际是 ${last}。setState 支持函数吗？ref 每次渲染都是同一个对象吗？`);
       api.setName('小红');
       t.assert(last === '1|小红|3', `setName('小红') 后应得到 1|小红|3，实际是 ${last}`);
-      api.setCount(0); api.setName('');
+      api.setCount(0);
+      api.setName('');
       t.assert(last === '0||5', `setCount(0)、setName('') 后应得到 0||5，实际是 ${last}。判断“第一次渲染”时，是不是把 0 和空字符串也当成了“还没有值”？`);
-      t.assert(refs.every(x => x === refs[0]), 'useRef 每次渲染都应返回同一个对象');
+      t.assert(
+        refs.every(x => x === refs[0]),
+        'useRef 每次渲染都应返回同一个对象',
+      );
       const before = refs.length;
       api.r.current = 100;
       t.assert(refs.length === before, '修改 ref.current 不应触发重新渲染');
-      let flag = true, seen: any, setB: any;
+      let flag = true,
+        seen: any,
+        setB: any;
       mount(function Conditional() {
-        if (flag) { useState('A'); }
+        if (flag) {
+          useState('A');
+        }
         const [b, sb] = useState('B');
-        seen = b; setB = sb;
+        seen = b;
+        setB = sb;
         return b;
       });
       t.assert(seen === 'B', `第一次渲染，b 应为 B，实际是 ${seen}`);
@@ -255,9 +276,10 @@ function Comp() {
   // …
 }
 // 第一次渲染后调用 setCount(5)、setName('小红')</code></pre></div>`,
-      options: ['5 和 \'小红\'', '0 和 \'小明\'：下标从 2 开始，占用了新的格子', '\'小红\' 和 undefined', '报错'],
+      options: ["5 和 '小红'", "0 和 '小明'：下标从 2 开始，占用了新的格子", "'小红' 和 undefined", '报错'],
       answer: 1,
-      explain: '第二次渲染时 i 从 2 开始，两个 useState 用的是 hooks[2] 和 hooks[3]。这两格是空的，于是被填入初始值。hooks 变成 <code>[5, "小红", 0, "小明"]</code>。所以真实的 React 在每次渲染组件前，都会把 Hook 指针重置到开头。',
+      explain:
+        '第二次渲染时 i 从 2 开始，两个 useState 用的是 hooks[2] 和 hooks[3]。这两格是空的，于是被填入初始值。hooks 变成 <code>[5, "小红", 0, "小明"]</code>。所以真实的 React 在每次渲染组件前，都会把 Hook 指针重置到开头。',
     },
     {
       q: `用本课 20 行的 render 函数。同事想实现“更新”：state 变化后，再调用一次 <code>render(app, box)</code>。会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function render(element, container) {
@@ -270,11 +292,12 @@ render(app, box);
 render(app, box);</code></pre></div>`,
       options: ['只更新变化的部分', '报错：同一个容器不能渲染两次', '先清空 box，再画新的界面', 'box 里出现两份界面'],
       answer: 3,
-      explain: '这个 render 每次都创建全新的 DOM，然后追加到容器里。它不记得上次画了什么，也不比较。所以第二次调用后出现两份界面。即使先清空再画，也会丢掉输入框的焦点和文字。真实的 React 保存上一次的元素树，在协调阶段比较新旧两棵树，只修改变化的 DOM。“只更新变化的部分”正是这 20 行代码没有实现的功能。',
+      explain:
+        '这个 render 每次都创建全新的 DOM，然后追加到容器里。它不记得上次画了什么，也不比较。所以第二次调用后出现两份界面。即使先清空再画，也会丢掉输入框的焦点和文字。真实的 React 保存上一次的元素树，在协调阶段比较新旧两棵树，只修改变化的 DOM。“只更新变化的部分”正是这 20 行代码没有实现的功能。',
     },
   ],
   plays: {
-    '元素就是一个普通对象': {},
+    元素就是一个普通对象: {},
     '一个 20 行的渲染器': {},
     '20 行实现 useState': {
       predict: {

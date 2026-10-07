@@ -15,7 +15,7 @@ const lessonSidebar = [
   { text: '术语表', link: '/glossary' },
   ...STAGES.flatMap((s, si) => [
     { sectionHeaderText: `${s.no} ${s.name}` },
-    ...LESSONS.filter((l) => l.stage === si).map((l) => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),
+    ...LESSONS.filter(l => l.stage === si).map(l => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),
     { text: '阶段测验', link: '/check/' + si },
   ]),
 ];
@@ -32,9 +32,21 @@ export default defineConfig({
   markdown: {
     remarkPlugins: [remarkPlay],
     globalComponents: [
-      'Playground', 'Quiz', 'Exercise', 'Warmup', 'SelfExplain', 'CallBox', 'Raw',
-      'LessonHeader', 'LessonGoals', 'LessonProse', 'LessonFooter',
-      'HomePage', 'ReviewPage', 'GlossaryPage', 'StageCheck',
+      'Playground',
+      'Quiz',
+      'Exercise',
+      'Warmup',
+      'SelfExplain',
+      'CallBox',
+      'Raw',
+      'LessonHeader',
+      'LessonGoals',
+      'LessonProse',
+      'LessonFooter',
+      'HomePage',
+      'ReviewPage',
+      'GlossaryPage',
+      'StageCheck',
     ].map(component),
     link: { checkDeadLinks: true },
   },

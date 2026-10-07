@@ -27,8 +27,8 @@ function walk(node, fn) {
 }
 
 export default function remarkPlay() {
-  return (tree) => {
-    walk(tree, (node) => {
+  return tree => {
+    walk(tree, node => {
       const m = parsePlayMeta(node.meta);
       if (!m) return null;
       const attributes = [attr('code', node.value)];

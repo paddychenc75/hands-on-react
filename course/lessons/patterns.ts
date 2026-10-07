@@ -28,13 +28,15 @@ export default {
         '把 active 放进模块级的全局变量',
       ],
       answer: 1,
-      explain: 'Context 能穿过任意层级，使用者怎么包都不影响。Children.map 是常见的老写法，但它只能处理直接子元素，中间多一层 div 就失效。全局变量会让同一页面上的两个 Tabs 互相干扰。',
+      explain:
+        'Context 能穿过任意层级，使用者怎么包都不影响。Children.map 是常见的老写法，但它只能处理直接子元素，中间多一层 div 就失效。全局变量会让同一页面上的两个 Tabs 互相干扰。',
     },
     {
       q: '使用者写了 &lt;Toggle value={true} /&gt;，没有传 onChange。点击按钮会怎样？',
       options: ['变为“关”', '保持“开”：它是受控的，父组件没有更新 value', '报错', '在开和关之间来回切换，因为组件内部有自己的 state'],
       answer: 1,
-      explain: '传了 value 就是受控模式，显示什么由父组件决定。这和只写 value、不写 onChange 的原生 input 一样，是只读的。选“变为关”的人以为组件会自己记住点击，但受控模式下内部 state 不起作用。',
+      explain:
+        '传了 value 就是受控模式，显示什么由父组件决定。这和只写 value、不写 onChange 的原生 input 一样，是只读的。选“变为关”的人以为组件会自己记住点击，但受控模式下内部 state 不起作用。',
     },
     {
       q: '老代码用 withMouse(Component) 给组件注入 x、y，两个 HOC 叠加后 props 名字冲突了。今天更推荐怎样复用这段逻辑？',
@@ -45,7 +47,8 @@ export default {
         '把 x、y 存进 Context',
       ],
       answer: 2,
-      explain: '自定义 Hook 直接返回值，名字由调用者决定，也没有多余的包装层。render props 能解决命名冲突，但多层嵌套会形成“回调地狱”。Context 用来共享同一份数据，不是用来复用逻辑的。',
+      explain:
+        '自定义 Hook 直接返回值，名字由调用者决定，也没有多余的包装层。render props 能解决命名冲突，但多层嵌套会形成“回调地狱”。Context 用来共享同一份数据，不是用来复用逻辑的。',
     },
   ],
   exercise: {
@@ -117,13 +120,20 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       t.assert(t.text('#free') === '关' && t.text('#ctrl') === '开', '初始状态不对：非受控应为“关”，受控应为“开”');
-      await t.click('#free'); t.assert(t.text('#free') === '开', '非受控 Toggle 点击后应变为“开”');
-      await t.click('#ctrl'); t.assert(t.text('#ctrl') === '关' && t.text('#parent') === '关', '受控 Toggle 点击后，父组件和按钮都应变为“关”');
-      await t.click('#locked'); t.assert(t.text('#locked') === '关', '父组件不更新 value 时，受控 Toggle 应保持“关”');
-      t.assert(t.text('#free2') === '开', 'free2 的 defaultValue={true}，初始应为“开”。它传了 onChange 但没传 value，所以是非受控的。你是用什么判断受控的？只看 value 是不是 undefined');
-      await t.click('#free2'); t.assert(t.text('#free2') === '关', 'free2 传了 onChange 但没传 value，它是非受控的，点击后应变为“关”。你用什么判断受控？非受控时要更新内部 state');
+      await t.click('#free');
+      t.assert(t.text('#free') === '开', '非受控 Toggle 点击后应变为“开”');
+      await t.click('#ctrl');
+      t.assert(t.text('#ctrl') === '关' && t.text('#parent') === '关', '受控 Toggle 点击后，父组件和按钮都应变为“关”');
+      await t.click('#locked');
+      t.assert(t.text('#locked') === '关', '父组件不更新 value 时，受控 Toggle 应保持“关”');
+      t.assert(
+        t.text('#free2') === '开',
+        'free2 的 defaultValue={true}，初始应为“开”。它传了 onChange 但没传 value，所以是非受控的。你是用什么判断受控的？只看 value 是不是 undefined',
+      );
+      await t.click('#free2');
+      t.assert(t.text('#free2') === '关', 'free2 传了 onChange 但没传 value，它是非受控的，点击后应变为“关”。你用什么判断受控？非受控时要更新内部 state');
     },
   },
   checkOnly: [
@@ -136,7 +146,8 @@ function Tab({ id }) {
 }</code></pre></div>`,
       options: ['正常显示，active 为 undefined', '报错：无法从 null 中解构 active', 'Tab 自动创建一个新的 Tabs', '什么都不渲染'],
       answer: 1,
-      explain: '没有 Provider，useContext 返回默认值 null。从 null 解构会抛出 TypeError，错误信息不容易看懂。常见做法：写一个 <code>useTabs()</code> Hook，在值为 null 时抛出清楚的错误，例如“Tab 必须放在 Tabs 里”。',
+      explain:
+        '没有 Provider，useContext 返回默认值 null。从 null 解构会抛出 TypeError，错误信息不容易看懂。常见做法：写一个 <code>useTabs()</code> Hook，在值为 null 时抛出清楚的错误，例如“Tab 必须放在 Tabs 里”。',
     },
     {
       q: `父组件渲染 <code>&lt;Toggle defaultValue={on} /&gt;</code>。父组件把 on 从 false 改为 true，按钮显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Toggle({ defaultValue = false }) {
@@ -147,7 +158,8 @@ function Tab({ id }) {
 }</code></pre></div>`,
       options: ['开', '关：defaultValue 只决定初始值', '在开和关之间切换', '报错'],
       answer: 1,
-      explain: '这是非受控模式：组件自己保存值，defaultValue 只在第一次渲染时使用。父组件想随时控制显示，应改用受控模式：传 value 和 onChange。或者在 defaultValue 变化时换一个 key，让组件重新挂载。',
+      explain:
+        '这是非受控模式：组件自己保存值，defaultValue 只在第一次渲染时使用。父组件想随时控制显示，应改用受控模式：传 value 和 onChange。或者在 defaultValue 变化时换一个 key，让组件重新挂载。',
     },
     {
       q: `Tabs 用 cloneElement 给每个 Tab 传 selected。使用者这样写，哪个 Tab 会高亮？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Tabs({ active, children }) {
@@ -164,7 +176,8 @@ function Tab({ id }) {
 &lt;/Tabs&gt;</code></pre></div>`,
       options: ['“一”', '都不高亮', '两个都高亮', '“二”'],
       answer: 1,
-      explain: 'Children.map 只遍历<b>直接</b>子元素。这里唯一的直接子元素是 div，selected 加到了 div 上，两个 Tab 都没收到。所以 cloneElement 写的复合组件很脆弱：使用者多包一层就失效。用 Context 共享状态，Tab 通过 useContext 读取，就不受嵌套层级影响。选“一”的人默认 Tab 是直接子元素，但中间多了一层 div。',
+      explain:
+        'Children.map 只遍历<b>直接</b>子元素。这里唯一的直接子元素是 div，selected 加到了 div 上，两个 Tab 都没收到。所以 cloneElement 写的复合组件很脆弱：使用者多包一层就失效。用 Context 共享状态，Tab 通过 useContext 读取，就不受嵌套层级影响。选“一”的人默认 Tab 是直接子元素，但中间多了一层 div。',
     },
   ],
   plays: {

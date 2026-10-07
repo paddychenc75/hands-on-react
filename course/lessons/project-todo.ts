@@ -39,7 +39,8 @@ export default {
         'setTodos(todos.push(x))',
       ],
       answer: 1,
-      explain: '用 map 生成新数组，并为被修改的项创建新对象。第三个选项最有迷惑性：它复制了那一项，但 next 和 todos 是同一个数组，React 比较引用后认为没变，界面不会更新。第一个选项同理。push 也在原数组上修改，而且它返回的是新长度，不是数组。',
+      explain:
+        '用 map 生成新数组，并为被修改的项创建新对象。第三个选项最有迷惑性：它复制了那一项，但 next 和 todos 是同一个数组，React 比较引用后认为没变，界面不会更新。第一个选项同理。push 也在原数组上修改，而且它返回的是新长度，不是数组。',
     },
   ],
   exercise: {
@@ -168,12 +169,17 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
-      const add = async (v) => { await t.type('#new-todo', v); await t.click(t.byText('button', '添加')); };
+    test: async t => {
+      const add = async v => {
+        await t.type('#new-todo', v);
+        await t.click(t.byText('button', '添加'));
+      };
       const items = () => t.qa('li.todo');
       const left = () => t.text('#left').replace(/\s/g, '');
       t.assert(t.q('#new-todo') && t.byText('button', '添加'), '需要 #new-todo 输入框和“添加”按钮');
-      await add('买牛奶'); await add('写周报'); await add('跑步');
+      await add('买牛奶');
+      await add('写周报');
+      await add('跑步');
       t.assert(items().length === 3, `添加 3 条后应有 3 个 li.todo，实际 ${items().length} 个`);
       t.assert(t.q('#new-todo').value === '', '添加后输入框应被清空');
       await add('   ');
@@ -214,7 +220,8 @@ function add(todo) {
 &lt;p&gt;剩余 {left} 项&lt;/p&gt;</code></pre></div>`,
       options: ['自动加 1', '不变：useState 的初始值只在第一次渲染时使用', '变成 0', '报错：不能用 todos 计算初始值'],
       answer: 1,
-      explain: 'useState 的参数只在第一次渲染时使用。之后 todos 变了，left 也不会跟着变。剩余数量可以由 todos 算出，就不要存成 state。直接在渲染时计算：<code>const left = todos.filter(t =&gt; !t.done).length</code>。',
+      explain:
+        'useState 的参数只在第一次渲染时使用。之后 todos 变了，left 也不会跟着变。剩余数量可以由 todos 算出，就不要存成 state。直接在渲染时计算：<code>const left = todos.filter(t =&gt; !t.done).length</code>。',
     },
     {
       q: `列表里有 id 为 1、2、3 的三条待办。先删除 id 为 1 的，再添加“买菜”，然后点击“买菜”的切换按钮。结果是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const add = title =&gt;
@@ -224,7 +231,8 @@ const toggle = id =&gt;
   setTodos(todos.map(t =&gt; t.id === id ? { ...t, done: !t.done } : t));</code></pre></div>`,
       options: ['只有“买菜”被标记完成', '“买菜”和原来 id 为 3 的那条一起被切换', '原来 id 为 3 的那条被切换，“买菜”不变', '报错：找不到 id'],
       answer: 1,
-      explain: '删除后只剩 2 条，<code>todos.length + 1</code> 等于 3。“买菜”的 id 与已有的一条重复。toggle 按 id 匹配，所以两条一起切换。重复的 key 也会让 React 发出警告。id 应该用独立的计数器或 <code>crypto.randomUUID()</code> 生成。',
+      explain:
+        '删除后只剩 2 条，<code>todos.length + 1</code> 等于 3。“买菜”的 id 与已有的一条重复。toggle 按 id 匹配，所以两条一起切换。重复的 key 也会让 React 发出警告。id 应该用独立的计数器或 <code>crypto.randomUUID()</code> 生成。',
     },
   ],
   plays: {},

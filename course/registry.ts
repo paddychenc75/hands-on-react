@@ -7,11 +7,11 @@ import type { Lesson } from './types.ts';
 
 export { LESSON_ORDER };
 
-export const LESSONS: Lesson[] = LESSON_ORDER.map((id) => {
+export const LESSONS: Lesson[] = LESSON_ORDER.map(id => {
   const lesson = LESSON_MODULES[id];
   if (!lesson) throw new Error(`course/order.ts 里有课 "${id}"，但找不到 course/lessons/${id}.ts（新文件要先运行 npm run gen）`);
   return lesson;
 });
 export const lessonNo = (id: string): number => LESSON_ORDER.indexOf(id) + 1;
 export const TOTAL_LESSONS = LESSONS.length;
-export const lessonById = (id: string): Lesson | undefined => LESSONS.find((l) => l.id === id);
+export const lessonById = (id: string): Lesson | undefined => LESSONS.find(l => l.id === id);

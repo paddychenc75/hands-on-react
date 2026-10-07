@@ -78,7 +78,9 @@ describe('代码是否真的改了', () => {
   });
 
   it('只和"上一次"失败比较：在两份失败的代码之间来回改，每次都算（现有行为）', () => {
-    const a = 'const a = 1', b = 'const a = 3', starter = 'const a = 2';
+    const a = 'const a = 1',
+      b = 'const a = 3',
+      starter = 'const a = 2';
     expect(isAttempt(a, starter, normCode(b))).toBe(true);
     expect(isAttempt(b, starter, normCode(a))).toBe(true);
   });

@@ -3,7 +3,8 @@ import { seeded, shuffled } from '../../course/engine/logic/random.ts';
 
 describe('选项打乱的种子随机', () => {
   it('同一个字符串每次得到同一串随机数（预测题的选项顺序固定）', () => {
-    const a = seeded('state|失败的计数器'), b = seeded('state|失败的计数器');
+    const a = seeded('state|失败的计数器'),
+      b = seeded('state|失败的计数器');
     expect([a(), a(), a()]).toEqual([b(), b(), b()]);
   });
   it('固定种子给出固定的值', () => {
@@ -15,7 +16,11 @@ describe('选项打乱的种子随机', () => {
   });
   it('值在 [0, 1) 里', () => {
     const r = seeded('range');
-    for (let i = 0; i < 1000; i++) { const v = r(); expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThan(1); }
+    for (let i = 0; i < 1000; i++) {
+      const v = r();
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
+    }
   });
 });
 

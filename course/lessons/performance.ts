@@ -41,7 +41,8 @@ export default {
         '不会：BigTable 的类型和位置都没变，React 复用上次的渲染结果',
       ],
       answer: 1,
-      explain: '&lt;BigTable /&gt; 这个元素是 App 创建的。App 重新渲染，就会创建一个新元素，BigTable 跟着渲染。“作为 children 传入”只在 Layout 自己的 state 变化时有用：那时 children 还是同一个对象。最有迷惑性的是“类型和位置没变”：这只决定 state 能不能保留，组件函数照样要调用。没有 memo 时，React 也根本不比较 props。',
+      explain:
+        '&lt;BigTable /&gt; 这个元素是 App 创建的。App 重新渲染，就会创建一个新元素，BigTable 跟着渲染。“作为 children 传入”只在 Layout 自己的 state 变化时有用：那时 children 还是同一个对象。最有迷惑性的是“类型和位置没变”：这只决定 state 能不能保留，组件函数照样要调用。没有 memo 时，React 也根本不比较 props。',
     },
   ],
   exercise: {
@@ -137,20 +138,33 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       t.assert(/\bmemo\s*\(/.test(t.source), '请用 memo 包裹 Child。memo(组件) 返回一个 props 不变时会跳过渲染的新组件');
-      const list = () => t.qa('#list li').map(li => li.textContent.trim()).join('、');
+      const list = () =>
+        t
+          .qa('#list li')
+          .map(li => li.textContent.trim())
+          .join('、');
       t.assert(list() === '苹果、香蕉、橙子、葡萄、西瓜、哈密瓜', `初始时列表应显示全部 6 种水果，实际是：${list() || '空'}`);
       const before = t.text('#child-renders');
-      await t.click('#parent'); await t.click('#parent'); await t.click('#parent');
+      await t.click('#parent');
+      await t.click('#parent');
+      await t.click('#parent');
       t.assert(/父组件\s*3/.test(t.text('#parent')), '父组件按钮应正常计数');
-      t.assert(t.text('#child-renders') === before, `点父组件按钮时，Child 仍在重新渲染（${before} → ${t.text('#child-renders')}）。memo 只做浅比较：传给它的 items 和 onPing 每次都是新的吗？数组用 useMemo 固定，函数用 useCallback 固定`);
+      t.assert(
+        t.text('#child-renders') === before,
+        `点父组件按钮时，Child 仍在重新渲染（${before} → ${t.text('#child-renders')}）。memo 只做浅比较：传给它的 items 和 onPing 每次都是新的吗？数组用 useMemo 固定，函数用 useCallback 固定`,
+      );
       await t.type('#kw', '瓜');
       t.assert(list() === '西瓜、哈密瓜', `输入“瓜”后，列表应只剩“西瓜、哈密瓜”，实际是：${list() || '空'}。筛选结果取决于 kw：useMemo 的依赖数组里有 kw 吗？`);
       const after = t.text('#child-renders');
       await t.click('#parent');
-      t.assert(t.text('#child-renders') === after, `筛选后再点父组件按钮，Child 又重新渲染了（${after} → ${t.text('#child-renders')}）。items 只应在 kw 变化时变成新数组`);
-      await t.click('#ping'); await t.click('#ping');
+      t.assert(
+        t.text('#child-renders') === after,
+        `筛选后再点父组件按钮，Child 又重新渲染了（${after} → ${t.text('#child-renders')}）。items 只应在 kw 变化时变成新数组`,
+      );
+      await t.click('#ping');
+      await t.click('#ping');
       t.assert(t.text('#pings') === '2', `点击 2 次 ping 后应为 2，实际是 ${t.text('#pings')}。回调是否读到了旧的 pings？`);
       await t.type('#kw', '');
       t.assert(list() === '苹果、香蕉、橙子、葡萄、西瓜、哈密瓜', `清空输入框后，列表应恢复全部 6 种水果，实际是：${list() || '空'}`);
@@ -163,7 +177,8 @@ function App() {
 });</code></pre></div>`,
       options: ['跳过渲染：内容没有变', '照样重新渲染：children 每次都是新创建的元素对象', '只渲染第一次', '报错：memo 组件不能接收 children'],
       answer: 1,
-      explain: 'children 也是一个 prop。<code>&lt;p&gt;hi&lt;/p&gt;</code> 每次渲染都会创建一个新的元素对象。memo 做浅比较，发现 children 变了，于是重新渲染。要让 memo 生效，可以用 useMemo 记忆化这段 JSX，或者把它放到不会重新渲染的组件里创建。',
+      explain:
+        'children 也是一个 prop。<code>&lt;p&gt;hi&lt;/p&gt;</code> 每次渲染都会创建一个新的元素对象。memo 做浅比较，发现 children 变了，于是重新渲染。要让 memo 生效，可以用 useMemo 记忆化这段 JSX，或者把它放到不会重新渲染的组件里创建。',
     },
     {
       q: `在输入框里输入“你好”，再点击“保存”。<code>save</code> 收到什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [text, setText] = useState('');
@@ -171,9 +186,10 @@ function App() {
 const handleSave = useCallback(() =&gt; {
   save(text);
 }, []);</code></pre></div>`,
-      options: ['\'你好\'', '\'\'（空字符串）', 'undefined', '每次输入都会调用 save'],
+      options: ["'你好'", "''（空字符串）", 'undefined', '每次输入都会调用 save'],
       answer: 1,
-      explain: '依赖数组是空的，useCallback 一直返回第一次渲染创建的函数。这个函数记住的 text 是空字符串。这是过期闭包。修复：把 text 写进依赖数组 <code>[text]</code>。',
+      explain:
+        '依赖数组是空的，useCallback 一直返回第一次渲染创建的函数。这个函数记住的 text 是空字符串。这是过期闭包。修复：把 text 写进依赖数组 <code>[text]</code>。',
     },
     {
       q: `输入框打字时 SlowChart 每次都重新渲染。data 是在组件外定义的常量。下面哪个改法<b>不能</b>减少 SlowChart 的渲染？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function App() {
@@ -192,7 +208,8 @@ const handleSave = useCallback(() =&gt; {
         '用 useMemo 记忆化 <SlowChart data={data} /> 这个元素',
       ],
       answer: 2,
-      explain: 'onChange 传给的是原生 input，不是 SlowChart。把它记忆化，App 仍然重新渲染，SlowChart 也照样渲染。其他三种都有效：memo 让 props 不变的 SlowChart 跳过渲染（data 是常量，引用不变）；把 state 移到 SearchBox，App 就不再重新渲染；记忆化元素对象，React 发现元素没变就跳过。很多人看到“函数”就想用 useCallback，但它只在函数被传给 memo 组件或作为依赖时才有用。',
+      explain:
+        'onChange 传给的是原生 input，不是 SlowChart。把它记忆化，App 仍然重新渲染，SlowChart 也照样渲染。其他三种都有效：memo 让 props 不变的 SlowChart 跳过渲染（data 是常量，引用不变）；把 state 移到 SearchBox，App 就不再重新渲染；记忆化元素对象，React 发现元素没变就跳过。很多人看到“函数”就想用 useCallback，但它只在函数被传给 memo 组件或作为依赖时才有用。',
     },
     {
       q: `某个与 tab 无关的 state 变化，导致组件重新渲染。heavyFilter 会重新运行吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const filter = { type: tab };
@@ -202,7 +219,8 @@ const visible = useMemo(
 );</code></pre></div>`,
       options: ['不会：items 和 tab 都没变', '会：filter 每次渲染都是新对象', '不会：useMemo 会深比较依赖数组里的对象', '只在开发环境会'],
       answer: 1,
-      explain: '依赖用 Object.is 比较。<code>{ type: tab }</code> 每次渲染都创建一个新对象，和上一次不相等，所以每次都重新计算，useMemo 白写了。修复：依赖写原始值 <code>[items, tab]</code>，在计算函数里再创建对象。“useMemo 会深比较”是常见误解：React 的所有依赖数组都只做浅比较。',
+      explain:
+        '依赖用 Object.is 比较。<code>{ type: tab }</code> 每次渲染都创建一个新对象，和上一次不相等，所以每次都重新计算，useMemo 白写了。修复：依赖写原始值 <code>[items, tab]</code>，在计算函数里再创建对象。“useMemo 会深比较”是常见误解：React 的所有依赖数组都只做浅比较。',
     },
   ],
   plays: {
@@ -212,7 +230,8 @@ const visible = useMemo(
         q: '点几次“让父组件渲染”按钮，哪个 Child 的渲染次数会保持不变？',
         options: ['三个都不变', '只有 Child 1', 'Child 2 和 Child 3', '只有 Child 3'],
         answer: 3,
-        explain: 'Child 1 收到每次都新建的函数。Child 2 的 style 每次都是新对象。浅比较判定它们的 props 变了。只有 Child 3 的 props 引用全都稳定，memo 才生效。',
+        explain:
+          'Child 1 收到每次都新建的函数。Child 2 的 style 每次都是新对象。浅比较判定它们的 props 变了。只有 Child 3 的 props 引用全都稳定，memo 才生效。',
       },
       pkey: 'performance|哪个 memo 生效了？',
     },

@@ -26,14 +26,19 @@ export function useSlot<N extends HTMLElement = HTMLElement>(
       if (node) host.appendChild(node);
     };
     if (needsRuntime) {
-      loadRuntime().then(mount).catch((e: Error) => {
-        if (!dead) host.innerHTML = '<div class="pv-err">运行环境加载失败，请检查网络后刷新页面。</div>';
-        console.warn(e);
-      });
+      loadRuntime()
+        .then(mount)
+        .catch((e: Error) => {
+          if (!dead) host.innerHTML = '<div class="pv-err">运行环境加载失败，请检查网络后刷新页面。</div>';
+          console.warn(e);
+        });
     } else mount();
     return () => {
       dead = true;
-      if (node) { cleanup?.(node); node.remove(); }
+      if (node) {
+        cleanup?.(node);
+        node.remove();
+      }
     };
   }, [lesson?.id, ...deps]);
   return { ref, lesson };

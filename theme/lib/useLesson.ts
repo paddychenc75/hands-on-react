@@ -5,6 +5,11 @@ import type { Lesson } from '../../course/types.ts';
 /** 当前页对应的课（数据文件的内容）。课 id 从路由得到：/hands-on-react/lessons/state.html → state */
 export function useLesson(): Lesson | undefined {
   const { pathname } = useLocation();
-  const id = decodeURIComponent(pathname).replace(/\.html$/, '').replace(/\/+$/, '').split('/').pop() || '';
+  const id =
+    decodeURIComponent(pathname)
+      .replace(/\.html$/, '')
+      .replace(/\/+$/, '')
+      .split('/')
+      .pop() || '';
   return lessonById(id);
 }

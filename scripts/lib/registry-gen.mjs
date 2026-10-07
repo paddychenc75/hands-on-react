@@ -9,19 +9,22 @@ export const LESSON_DIR = path.join(ROOT, 'course/lessons');
 export const GENERATED = path.join(ROOT, 'course/lessons.generated.ts');
 
 export const lessonFiles = () =>
-  fs.readdirSync(LESSON_DIR).filter((f) => f.endsWith('.ts')).sort();
+  fs
+    .readdirSync(LESSON_DIR)
+    .filter(f => f.endsWith('.ts'))
+    .sort();
 
-const ident = (id) => 'l_' + id.replace(/[^A-Za-z0-9]/g, '_');
+const ident = id => 'l_' + id.replace(/[^A-Za-z0-9]/g, '_');
 
 export function renderRegistry() {
-  const ids = lessonFiles().map((f) => f.replace(/\.ts$/, ''));
+  const ids = lessonFiles().map(f => f.replace(/\.ts$/, ''));
   return `// 由 scripts/gen-registry.mjs 生成，不要手改。运行 npm run gen 更新（dev、build 会自动运行；check:content 会检查它是否最新）。
 // 这里只"收集"course/lessons 里的所有课；课程顺序在 course/order.ts。
 import type { Lesson } from './types.ts';
-${ids.map((id) => `import ${ident(id)} from './lessons/${id}.ts';`).join('\n')}
+${ids.map(id => `import ${ident(id)} from './lessons/${id}.ts';`).join('\n')}
 
 export const LESSON_MODULES: Record<string, Lesson> = {
-${ids.map((id) => `  '${id}': ${ident(id)},`).join('\n')}
+${ids.map(id => `  '${id}': ${ident(id)},`).join('\n')}
 };
 `;
 }

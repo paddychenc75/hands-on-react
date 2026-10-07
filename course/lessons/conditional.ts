@@ -22,7 +22,8 @@ export default {
       q: 'const items = []; 渲染 {items.length && &lt;List /&gt;} 会显示？',
       options: ['什么都不显示', '0', '空的 List', '报错'],
       answer: 1,
-      explain: 'items.length 是 0。0 && x 返回 0，React 会把数字 0 渲染出来。请写 items.length &gt; 0 &amp;&amp; ...。最容易误选的是“什么都不显示”：false、null、undefined 不会显示，但数字 0 会。',
+      explain:
+        'items.length 是 0。0 && x 返回 0，React 会把数字 0 渲染出来。请写 items.length &gt; 0 &amp;&amp; ...。最容易误选的是“什么都不显示”：false、null、undefined 不会显示，但数字 0 会。',
     },
     {
       q: 'isAdmin 是布尔值。<code>{isAdmin ? &lt;Panel /&gt; : null}</code> 和 <code>{isAdmin &amp;&amp; &lt;Panel /&gt;}</code> 在 isAdmin 为 false 时有什么区别？',
@@ -39,7 +40,8 @@ export default {
         '输入框一直都在，只是 show 为 false 时变灰',
       ],
       answer: 1,
-      explain: 'show 为 false 时，&& 的结果是 false，React 把输入框从页面上移除。改回 true 时，React 新建一个输入框，内容是空的。最迷惑的是第一项：只有元素一直留在页面上，内容才会保留。想保留内容，可以一直渲染它，只用 CSS（display: none）把它藏起来。',
+      explain:
+        'show 为 false 时，&& 的结果是 false，React 把输入框从页面上移除。改回 true 时，React 新建一个输入框，内容是空的。最迷惑的是第一项：只有元素一直留在页面上，内容才会保留。想保留内容，可以一直渲染它，只用 CSS（display: none）把它藏起来。',
     },
   ],
   exercise: {
@@ -79,13 +81,15 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
+    test: async t => {
       t.assert(!t.q('h2'), '未登录时不应显示 h2');
-      const login = t.byText('button', '登录'); t.assert(login, '未登录时应有“登录”按钮');
+      const login = t.byText('button', '登录');
+      t.assert(login, '未登录时应有“登录”按钮');
       await t.click(login);
       t.assert(t.text('h2') === '欢迎回来', '登录后应显示 <h2>欢迎回来</h2>');
       t.assert(!t.byText('button', '登录'), '登录后不应再显示“登录”按钮');
-      const out = t.byText('button', '退出'); t.assert(out, '登录后应有“退出”按钮');
+      const out = t.byText('button', '退出');
+      t.assert(out, '登录后应有“退出”按钮');
       await t.click(out);
       t.assert(!t.q('h2') && t.byText('button', '登录'), '退出后应回到未登录状态');
     },
@@ -97,7 +101,8 @@ function App() {
 }</code></pre></div>`,
       options: ['什么都不渲染', '报错：组件必须返回 null，不能返回 undefined', '显示文字 undefined', '显示文字 false'],
       answer: 0,
-      explain: 'online 为 false 时，函数没有 return，返回 undefined。从 React 18 开始，组件返回 undefined 和返回 null 一样，什么都不渲染。React 17 及以前会报错。为了让意图清楚，仍建议写 <code>return null</code>。',
+      explain:
+        'online 为 false 时，函数没有 return，返回 undefined。从 React 18 开始，组件返回 undefined 和返回 null 一样，什么都不渲染。React 17 及以前会报错。为了让意图清楚，仍建议写 <code>return null</code>。',
     },
     {
       q: `loading 为 true、error 为 null 时，页面显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">return (
@@ -109,7 +114,8 @@ function App() {
 );</code></pre></div>`,
       options: ['只显示 Spinner', '只显示 List', 'Spinner 和 List 同时显示', 'Spinner、ErrorMsg 和 List 都显示'],
       answer: 2,
-      explain: '<code>&amp;&amp;</code> 只控制它后面那一项。List 没有条件，所以一直显示。加载中时，用户同时看到加载图标和旧的（或空的）列表。想三选一，用提前 return：<code>if (loading) return &lt;Spinner /&gt;;</code>，再处理 error，最后返回 List。“只显示 Spinner”是把三行当成了 if/else，但 JSX 里并列的表达式各自独立。',
+      explain:
+        '<code>&amp;&amp;</code> 只控制它后面那一项。List 没有条件，所以一直显示。加载中时，用户同时看到加载图标和旧的（或空的）列表。想三选一，用提前 return：<code>if (loading) return &lt;Spinner /&gt;;</code>，再处理 error，最后返回 List。“只显示 Spinner”是把三行当成了 if/else，但 JSX 里并列的表达式各自独立。',
     },
   ],
   plays: {

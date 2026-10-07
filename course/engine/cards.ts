@@ -23,4 +23,5 @@ export function cardOf(key: string): Card | null {
 }
 export const dueCards = (): Card[] => dueKeys(srsAll(), Date.now()).map(cardOf).filter(Boolean);
 export const learnedCards = (): Card[] => Object.keys(srsAll()).map(cardOf).filter(Boolean);
-export const srcLine = (c: Card): string => `<div class="src">出自第 ${lessonNo(c.l.id)} 课《${esc(c.l.title)}》 · <a href="${lessonHref(c.l.id)}">回看这一课</a></div>`;
+export const srcLine = (c: Card): string =>
+  `<div class="src">出自第 ${lessonNo(c.l.id)} 课《${esc(c.l.title)}》 · <a href="${lessonHref(c.l.id)}">回看这一课</a></div>`;

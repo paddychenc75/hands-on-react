@@ -5,7 +5,7 @@
 import { launch, openSite, lessonUrl, lessonData, lessonOrder } from './_site.mjs';
 
 const only = process.argv.slice(2);
-const ids = (await lessonOrder()).filter((id) => !only.length || only.includes(id));
+const ids = (await lessonOrder()).filter(id => !only.length || only.includes(id));
 const { site, close } = await openSite();
 const b = await launch();
 // 课程里故意演示的错误（错误边界示例会显示“渲染出错”），不算问题
@@ -17,47 +17,76 @@ async function testLesson(id) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   const p = await ctx.newPage();
   const logs = [];
-  p.on('pageerror', (e) => logs.push('PAGEERR ' + e.message));
+  p.on('pageerror', e => logs.push('PAGEERR ' + e.message));
   await p.goto(lessonUrl(site, id));
   await p.waitForSelector('.selfx', { timeout: 60000 });
-  if (L.exercise) await p.waitForFunction(() => [...document.querySelectorAll('.pg')].some((x) => x._editor && x.querySelector('.pg-badge.ex')), null, { timeout: 60000 });
+  if (L.exercise)
+    await p.waitForFunction(() => [...document.querySelectorAll('.pg')].some(x => x._editor && x.querySelector('.pg-badge.ex')), null, { timeout: 60000 });
   await p.waitForTimeout(800);
   // 示例是懒运行的：滚动一遍让所有实验台都运行
-  await p.evaluate(async () => { for (const pg of document.querySelectorAll('.pg')) { pg.scrollIntoView(); await new Promise((r) => setTimeout(r, 60)); } window.scrollTo(0, 0); });
-  await p.evaluate(async () => { document.querySelectorAll('.predict .opts .opt:first-child').forEach((b) => b.click()); await new Promise((r) => setTimeout(r, 50)); document.querySelectorAll('.predict .btn.primary').forEach((b) => b.click()); });
-  await p.waitForTimeout(1500);
-  const r = await p.evaluate(async ({ solution, hasEx }) => {
-    const out = [];
-    document.querySelectorAll('.pv-err').forEach((e) => out.push('PVERR ' + e.textContent.slice(0, 120)));
-    document.querySelectorAll('.err').forEach((e) => out.push('ERR ' + e.textContent.slice(0, 120)));
-    if (hasEx) {
-      const btn = [...document.querySelectorAll('button')].find((x) => x.textContent.trim() === '✓ 检查答案');
-      let pg = btn; while (pg && !pg._editor) pg = pg.parentElement;
-      if (!btn || !pg) out.push('NO BTN/PG');
-      else {
-        pg._editor.value = solution; await new Promise((r) => setTimeout(r, 400));
-        btn.click();
-        for (let i = 0; i < 100 && btn.disabled; i++) await new Promise((r) => setTimeout(r, 200));
-        await new Promise((r) => setTimeout(r, 300));
-        const txt = pg.querySelector('.result').innerText;
-        out.push(txt.includes('通过') && !txt.startsWith('✗') ? 'PASS' : 'FAIL ' + txt.slice(0, 200));
-      }
+  await p.evaluate(async () => {
+    for (const pg of document.querySelectorAll('.pg')) {
+      pg.scrollIntoView();
+      await new Promise(r => setTimeout(r, 60));
     }
-    return out;
-  }, { solution: L.exercise ? L.exercise.solution : '', hasEx: !!L.exercise });
+    window.scrollTo(0, 0);
+  });
+  await p.evaluate(async () => {
+    document.querySelectorAll('.predict .opts .opt:first-child').forEach(b => b.click());
+    await new Promise(r => setTimeout(r, 50));
+    document.querySelectorAll('.predict .btn.primary').forEach(b => b.click());
+  });
+  await p.waitForTimeout(1500);
+  const r = await p.evaluate(
+    async ({ solution, hasEx }) => {
+      const out = [];
+      document.querySelectorAll('.pv-err').forEach(e => out.push('PVERR ' + e.textContent.slice(0, 120)));
+      document.querySelectorAll('.err').forEach(e => out.push('ERR ' + e.textContent.slice(0, 120)));
+      if (hasEx) {
+        const btn = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === '✓ 检查答案');
+        let pg = btn;
+        while (pg && !pg._editor) pg = pg.parentElement;
+        if (!btn || !pg) out.push('NO BTN/PG');
+        else {
+          pg._editor.value = solution;
+          await new Promise(r => setTimeout(r, 400));
+          btn.click();
+          for (let i = 0; i < 100 && btn.disabled; i++) await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 300));
+          const txt = pg.querySelector('.result').innerText;
+          out.push(txt.includes('通过') && !txt.startsWith('✗') ? 'PASS' : 'FAIL ' + txt.slice(0, 200));
+        }
+      }
+      return out;
+    },
+    { solution: L.exercise ? L.exercise.solution : '', hasEx: !!L.exercise },
+  );
   await ctx.close();
   const all = [...logs, ...r];
-  const issue = r.some((x) => !x.startsWith('PASS') && !EXPECTED.some((re) => re.test(x)));
+  const issue = r.some(x => !x.startsWith('PASS') && !EXPECTED.some(re => re.test(x)));
   return { id, line: id + ' ' + all.join(' | '), issue };
 }
 
 const results = new Array(ids.length);
 let next = 0;
-await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
-  while (next < ids.length) { const i = next++; try { results[i] = await testLesson(ids[i]); } catch (e) { results[i] = { id: ids[i], line: ids[i] + ' EXCEPTION ' + e.message.split('\n')[0], issue: true }; } }
-}));
+await Promise.all(
+  Array.from({ length: CONCURRENCY }, async () => {
+    while (next < ids.length) {
+      const i = next++;
+      try {
+        results[i] = await testLesson(ids[i]);
+      } catch (e) {
+        results[i] = { id: ids[i], line: ids[i] + ' EXCEPTION ' + e.message.split('\n')[0], issue: true };
+      }
+    }
+  }),
+);
 let bad = 0;
-for (const r of results) { console.log(r.line); if (r.issue) bad++; }
+for (const r of results) {
+  console.log(r.line);
+  if (r.issue) bad++;
+}
 console.log('lessons', ids.length, 'with issues', bad);
-await b.close(); close();
+await b.close();
+close();
 process.exit(bad ? 1 : 0);

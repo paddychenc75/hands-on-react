@@ -12,7 +12,7 @@ export const COOLDOWN = 30 * 60e3;
 /** 通过 35 天后提示复测 */
 export const RETEST_AFTER = 35 * DAY;
 
-export const percent = (right: number, n: number): number => Math.round(right / n * 100);
+export const percent = (right: number, n: number): number => Math.round((right / n) * 100);
 export const isPass = (pct: number): boolean => pct >= PASS_PERCENT;
 
 /** 还要等多少毫秒才能重测（没有失败记录是 0；已通过的不冷却） */
@@ -28,8 +28,15 @@ export const needsRetest = (rec: StageRecord, now: number): boolean => !!(rec.pa
 export function pickStageQuestions<T extends { key: string }>(pool: T[], fresh: T[], srs: Record<string, SrsCard>, rnd: () => number = Math.random): T[] {
   const N = STAGE_QUESTIONS;
   const nFresh = Math.min(STAGE_FRESH, fresh.length);
-  const freshOrder = shuffled(fresh.length, rnd).map(i => fresh[i]).sort((a, b) => (srs[a.key] ? 1 : 0) - (srs[b.key] ? 1 : 0));
-  const mixed = [...freshOrder.slice(0, nFresh), ...shuffled(pool.length, rnd).slice(0, N - nFresh).map(i => pool[i])];
+  const freshOrder = shuffled(fresh.length, rnd)
+    .map(i => fresh[i])
+    .sort((a, b) => (srs[a.key] ? 1 : 0) - (srs[b.key] ? 1 : 0));
+  const mixed = [
+    ...freshOrder.slice(0, nFresh),
+    ...shuffled(pool.length, rnd)
+      .slice(0, N - nFresh)
+      .map(i => pool[i]),
+  ];
   return shuffled(mixed.length, rnd).map(i => mixed[i]);
 }
 
@@ -38,7 +45,10 @@ export function settlePending(rec: StageRecord): StageRecord {
   const pd = rec.pending;
   const next: StageRecord = { ...rec };
   delete next.pending;
-  next.last = Math.round(pd.right / pd.n * 100); next.passed = false; next.failedAt = pd.at; next.weak = pd.weak || [];
+  next.last = Math.round((pd.right / pd.n) * 100);
+  next.passed = false;
+  next.failedAt = pd.at;
+  next.weak = pd.weak || [];
   return next;
 }
 
@@ -46,7 +56,16 @@ export function settlePending(rec: StageRecord): StageRecord {
 export function settleResult(rec: StageRecord, pct: number, weak: string[], now: number): StageRecord {
   const next: StageRecord = { ...rec };
   delete next.pending;
-  next.best = Math.max(next.best || 0, pct); next.last = pct;
-  if (isPass(pct)) { next.passed = true; next.passedAt = now; delete next.failedAt; } else { next.passed = false; next.failedAt = now; next.weak = weak; }
+  next.best = Math.max(next.best || 0, pct);
+  next.last = pct;
+  if (isPass(pct)) {
+    next.passed = true;
+    next.passedAt = now;
+    delete next.failedAt;
+  } else {
+    next.passed = false;
+    next.failedAt = now;
+    next.weak = weak;
+  }
   return next;
 }

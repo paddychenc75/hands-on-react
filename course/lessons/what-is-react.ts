@@ -28,18 +28,20 @@ export default {
         '监听 DOM 的每一次变化，再把新值同步回 count 变量',
       ],
       answer: 0,
-      explain: '这就是 UI = f(state)：数据变了，React 重新执行 f，只更新有差异的部分。第二项最容易误选：那是你用原生 JS 时要手写的步骤，React 让你不用写它。React 也不会刷新整个页面。',
+      explain:
+        '这就是 UI = f(state)：数据变了，React 重新执行 f，只更新有差异的部分。第二项最容易误选：那是你用原生 JS 时要手写的步骤，React 让你不用写它。React 也不会刷新整个页面。',
     },
     {
       q: '下面哪段代码是“声明式”的写法？',
       options: [
-        'label.textContent = \'点击了 \' + count + \' 次\'',
+        "label.textContent = '点击了 ' + count + ' 次'",
         'return <p>点击了 {count} 次</p>',
-        'btn.addEventListener(\'click\', update)',
+        "btn.addEventListener('click', update)",
         'label.hidden = count === 0',
       ],
       answer: 1,
-      explain: 'JSX 只描述“在这个 count 下界面是什么样”，没有写怎样改 DOM。其他三项都在一步步操作某个 DOM 元素。最容易误选的是最后一项：它看起来像一个“条件”，但仍然是在命令浏览器修改元素。',
+      explain:
+        'JSX 只描述“在这个 count 下界面是什么样”，没有写怎样改 DOM。其他三项都在一步步操作某个 DOM 元素。最容易误选的是最后一项：它看起来像一个“条件”，但仍然是在命令浏览器修改元素。',
     },
   ],
   exercise: {
@@ -54,7 +56,7 @@ export default {
     faded: `function App() {
   return /* ✏️ 一个 h1 标签，文字是“你好，React” */;
 }`,
-    test: async (t) => {
+    test: async t => {
       const el = t.q('h1');
       t.assert(el, '没有找到 <h1> 元素');
       t.assert(el.textContent.replace(/\s/g, '').includes('你好，React'), 'h1 的文字应该是“你好，React”（注意是中文逗号）');
@@ -76,7 +78,8 @@ export default {
 }</code></pre></div>`,
       options: ['1', '100：React 在页面上的当前值上加 1', '99：React 不会再动被手动改过的元素', '0'],
       answer: 0,
-      explain: 'React 不读取 DOM 里的值。它只根据 state 算出界面应该是什么样子。点“改 state”后 n 变成 1，React 发现文字从 0 变成 1，就把 span 改成“1”，手动写的 99 被覆盖。选“100”是把 React 当成了“在 DOM 上修改”的命令式工具。反过来，如果 n 没变，React 不会碰这个节点，99 会一直留着，和 state 对不上。所以在 React 里只改数据，不直接改 DOM。',
+      explain:
+        'React 不读取 DOM 里的值。它只根据 state 算出界面应该是什么样子。点“改 state”后 n 变成 1，React 发现文字从 0 变成 1，就把 span 改成“1”，手动写的 99 被覆盖。选“100”是把 React 当成了“在 DOM 上修改”的命令式工具。反过来，如果 n 没变，React 不会碰这个节点，99 会一直留着，和 state 对不上。所以在 React 里只改数据，不直接改 DOM。',
     },
   ],
   plays: {

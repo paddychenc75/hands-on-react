@@ -17,7 +17,10 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { stage: { type: 'string' }, after: { type: 'string' }, title: { type: 'string' } },
 });
-const die = (msg) => { console.error(`✗ ${msg}\n${usage}`); process.exit(1); };
+const die = msg => {
+  console.error(`✗ ${msg}\n${usage}`);
+  process.exit(1);
+};
 
 const [id] = positionals;
 if (!id) die('缺少课 id');
@@ -32,15 +35,19 @@ if (!values.after) die('缺少 --after（新课排在哪一课后面）');
 const { LESSON_ORDER } = await import('../course/order.ts');
 const { STAGES } = await import('../course/stages.ts');
 if (stage >= STAGES.length) die(`--stage 必须小于阶段数 ${STAGES.length}`);
-if (fs.existsSync(path.join(LESSON_DIR, id + '.ts')) || fs.existsSync(path.join(ROOT, 'docs/lessons', id + '.mdx')) || LESSON_ORDER.includes(id)) die(`课 "${id}" 已经存在`);
+if (fs.existsSync(path.join(LESSON_DIR, id + '.ts')) || fs.existsSync(path.join(ROOT, 'docs/lessons', id + '.mdx')) || LESSON_ORDER.includes(id))
+  die(`课 "${id}" 已经存在`);
 const afterIdx = LESSON_ORDER.indexOf(values.after);
 if (afterIdx < 0) die(`--after "${values.after}" 不是已有的课。已有的课见 course/order.ts`);
 
 // 阶段要和前后相邻的课兼容（同一阶段的课必须连续）
-const stageOf = async (lessonId) => (await import(path.join(LESSON_DIR, lessonId + '.ts'))).default.stage;
+const stageOf = async lessonId => (await import(path.join(LESSON_DIR, lessonId + '.ts'))).default.stage;
 const prevStage = await stageOf(LESSON_ORDER[afterIdx]);
 const nextStage = LESSON_ORDER[afterIdx + 1] ? await stageOf(LESSON_ORDER[afterIdx + 1]) : STAGES.length - 1;
-if (stage < prevStage || stage > nextStage) die(`--stage ${stage} 放不进这个位置：前一课（${values.after}）在阶段 ${prevStage}，后一课${LESSON_ORDER[afterIdx + 1] ? `（${LESSON_ORDER[afterIdx + 1]}）在阶段 ${nextStage}` : '不存在'}。同一阶段的课要连续排列`);
+if (stage < prevStage || stage > nextStage)
+  die(
+    `--stage ${stage} 放不进这个位置：前一课（${values.after}）在阶段 ${prevStage}，后一课${LESSON_ORDER[afterIdx + 1] ? `（${LESSON_ORDER[afterIdx + 1]}）在阶段 ${nextStage}` : '不存在'}。同一阶段的课要连续排列`,
+  );
 
 const TODO = '【待写】';
 const q = JSON.stringify;
@@ -164,20 +171,30 @@ const afterLine = `  '${values.after}',\n`;
 if (!orderSrc.includes(afterLine)) die(`在 course/order.ts 里找不到 '${values.after}' 这一行；请手动加 '${id}',`);
 fs.writeFileSync(orderPath, orderSrc.replace(afterLine, `${afterLine}  '${id}',\n`));
 
-const run = (script, ...a) => spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(ROOT, 'scripts', script), ...a], { stdio: 'inherit' }).status;
+const run = (script, ...a) =>
+  spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(ROOT, 'scripts', script), ...a], { stdio: 'inherit' }).status;
 run('gen-registry.mjs');
 // 追加新卡片键到快照；插在中间时，后面的课号顺延，check:content 可能同时报"第 N 课"引用对不上，那是预期的，按提示改引用
 const checkStatus = run('check-content.mjs', '--update');
 
 // ---------- 提醒：课号顺延 ----------
 const newNo = afterIdx + 2;
-console.log(`\n✓ 已创建第 ${newNo} 课 "${id}"（阶段 ${stage}）：\n  ${path.relative(ROOT, mdxPath)}\n  ${path.relative(ROOT, dataPath)}\n  course/order.ts 已登记；course/lessons.generated.ts、course/card-keys.snapshot.json 已更新`);
+console.log(
+  `\n✓ 已创建第 ${newNo} 课 "${id}"（阶段 ${stage}）：\n  ${path.relative(ROOT, mdxPath)}\n  ${path.relative(ROOT, dataPath)}\n  course/order.ts 已登记；course/lessons.generated.ts、course/card-keys.snapshot.json 已更新`,
+);
 if (afterIdx + 1 < LESSON_ORDER.length) {
-  console.log(`\n⚠ 原来第 ${newNo} 课及以后的课，课号都 +1。下面这些"第 N 课"引用的 N ≥ ${newNo}，请核对是否要改（课文、数据文件、docs/index.mdx、theme/components/HomePage.tsx）：`);
+  console.log(
+    `\n⚠ 原来第 ${newNo} 课及以后的课，课号都 +1。下面这些"第 N 课"引用的 N ≥ ${newNo}，请核对是否要改（课文、数据文件、docs/index.mdx、theme/components/HomePage.tsx）：`,
+  );
   const hits = [];
-  const scan = (file) => fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-    for (const m of line.matchAll(/第\s*(\d+)\s*课/g)) if (+m[1] >= newNo && file !== mdxPath && file !== dataPath) hits.push(`  ${path.relative(ROOT, file)}:${i + 1}  第 ${m[1]} 课`);
-  });
+  const scan = file =>
+    fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        for (const m of line.matchAll(/第\s*(\d+)\s*课/g))
+          if (+m[1] >= newNo && file !== mdxPath && file !== dataPath) hits.push(`  ${path.relative(ROOT, file)}:${i + 1}  第 ${m[1]} 课`);
+      });
   for (const dir of ['docs/lessons', 'course/lessons']) for (const f of fs.readdirSync(path.join(ROOT, dir))) scan(path.join(ROOT, dir, f));
   scan(path.join(ROOT, 'theme/components/HomePage.tsx'));
   console.log(hits.slice(0, 40).join('\n') + (hits.length > 40 ? `\n  …还有 ${hits.length - 40} 处` : ''));

@@ -29,7 +29,8 @@ export default {
         '只是样式和按钮不同，功能完全一样',
       ],
       answer: 1,
-      explain: 'role 只改变读屏软件读出的角色，不添加任何行为。div 默认不能聚焦，也不会把 Enter 和空格转成 click。直接改成 &lt;button type="button"&gt; 就全都解决了。第一个选项是最常见的误解：写了 role="button" 等于承诺实现按钮的全部键盘行为，但浏览器不会替你实现。读屏软件能读出“保存”，所以第三个选项不对。',
+      explain:
+        'role 只改变读屏软件读出的角色，不添加任何行为。div 默认不能聚焦，也不会把 Enter 和空格转成 click。直接改成 &lt;button type="button"&gt; 就全都解决了。第一个选项是最常见的误解：写了 role="button" 等于承诺实现按钮的全部键盘行为，但浏览器不会替你实现。读屏软件能读出“保存”，所以第三个选项不对。',
     },
     {
       q: '保存成功后，代码执行 <code>{saved &amp;&amp; &lt;p role="status"&gt;已保存&lt;/p&gt;}</code>。很多读屏软件没有读出“已保存”。最可能的原因是？',
@@ -40,7 +41,8 @@ export default {
         '应该再加上 aria-live="off"',
       ],
       answer: 1,
-      explain: '读屏软件监听的是“已有实时区域的内容变化”。正确写法是让 &lt;p role="status"&gt; 一直渲染，只改里面的文字。改成 alert 会打断用户，只适合错误消息。aria-live="off" 会关掉播报。',
+      explain:
+        '读屏软件监听的是“已有实时区域的内容变化”。正确写法是让 &lt;p role="status"&gt; 一直渲染，只改里面的文字。改成 alert 会打断用户，只适合错误消息。aria-live="off" 会关掉播报。',
     },
     {
       q: '用户按 Enter 打开确认弹窗，然后点“取消”。弹窗被卸载后，你没有处理焦点。焦点会去哪里？应该去哪里？',
@@ -51,7 +53,8 @@ export default {
         '跳到页面上第一个输入框；这是浏览器的默认行为，也是正确的行为',
       ],
       answer: 1,
-      explain: '获得焦点的元素被移除后，焦点通常落到 body。键盘用户会“迷路”。按照 WAI-ARIA 编写实践指南，关闭后要把焦点还给触发按钮。打开前可以用 ref 记住它。“自动回到触发按钮”是最常见的误解：原生 &lt;dialog&gt; 的部分浏览器会这样做，但自己用 div 写的弹窗不会。',
+      explain:
+        '获得焦点的元素被移除后，焦点通常落到 body。键盘用户会“迷路”。按照 WAI-ARIA 编写实践指南，关闭后要把焦点还给触发按钮。打开前可以用 ref 记住它。“自动回到触发按钮”是最常见的误解：原生 &lt;dialog&gt; 的部分浏览器会这样做，但自己用 div 写的弹窗不会。',
     },
   ],
   exercise: {
@@ -149,17 +152,30 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
-      const ITEMS = [['配送说明', '48 小时'], ['退货政策', '7 天']];
-      const findTrigger = (title) => {
+    test: async t => {
+      const ITEMS = [
+        ['配送说明', '48 小时'],
+        ['退货政策', '7 天'],
+      ];
+      const findTrigger = title => {
         const btn = t.qa('button').find(b => b.textContent.includes(title));
         if (btn) return btn;
-        const other = t.qa('*').filter(e => e.textContent.includes(title)).pop();
-        t.assert(false, '没有找到包含“' + title + '”的 <button>。' + (other ? '你用的是 <' + other.tagName.toLowerCase() + '>。' : '') + '触发器要用真正的 <button>，这样 Tab、Enter 和空格才能自动工作。');
+        const other = t
+          .qa('*')
+          .filter(e => e.textContent.includes(title))
+          .pop();
+        t.assert(
+          false,
+          '没有找到包含“' +
+            title +
+            '”的 <button>。' +
+            (other ? '你用的是 <' + other.tagName.toLowerCase() + '>。' : '') +
+            '触发器要用真正的 <button>，这样 Tab、Enter 和空格才能自动工作。',
+        );
       };
       const isShown = (panel, text) => !!panel && !panel.hidden && panel.getClientRects().length > 0 && panel.textContent.includes(text);
-      const isHidden = (panel) => !panel || panel.hidden || panel.getClientRects().length === 0;
-      const panelOf = (btn) => {
+      const isHidden = panel => !panel || panel.hidden || panel.getClientRects().length === 0;
+      const panelOf = btn => {
         const id = btn.getAttribute('aria-controls');
         return id ? t.root.querySelector('#' + CSS.escape(id)) : null;
       };
@@ -203,14 +219,16 @@ function App() {
         '<button><img src="close.svg" alt="关闭" /></button>',
       ],
       answer: 2,
-      explain: '按钮的名称来自 aria-label 或它里面的文字内容。图片的 alt 也算文字内容。<code>alt=""</code> 表示“这是装饰图片”，读屏软件会跳过它。这样按钮里没有任何文字，读屏软件只会读“按钮”。',
+      explain:
+        '按钮的名称来自 aria-label 或它里面的文字内容。图片的 alt 也算文字内容。<code>alt=""</code> 表示“这是装饰图片”，读屏软件会跳过它。这样按钮里没有任何文字，读屏软件只会读“按钮”。',
     },
     {
       q: `读屏软件把焦点移到这个输入框时，会读出什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;label&gt;邮箱&lt;/label&gt;
 &lt;input type="email" /&gt;</code></pre></div>`,
       options: ['只读“编辑框”，没有名称', '“邮箱，编辑框”：label 就在它前面', '读出 type 的值“email”', '“邮箱”读两次'],
       answer: 0,
-      explain: 'label 没有和 input 关联，挨在一起也不算。输入框没有可访问名称，读屏软件只读出“编辑框”。点击“邮箱”文字也不会聚焦输入框。关联方法：<code>&lt;label htmlFor="email"&gt;</code> 配合 <code>&lt;input id="email"&gt;</code>，或者把 input 放进 label 里。“label 就在它前面”是看界面得出的结论，读屏软件看的是可访问名称。',
+      explain:
+        'label 没有和 input 关联，挨在一起也不算。输入框没有可访问名称，读屏软件只读出“编辑框”。点击“邮箱”文字也不会聚焦输入框。关联方法：<code>&lt;label htmlFor="email"&gt;</code> 配合 <code>&lt;input id="email"&gt;</code>，或者把 input 放进 label 里。“label 就在它前面”是看界面得出的结论，读屏软件看的是可访问名称。',
     },
     {
       q: `页面上渲染了 <code>&lt;Field label="姓名" /&gt;</code> 和 <code>&lt;Field label="电话" /&gt;</code>。点击文字“电话”，会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Field({ label }) {
@@ -223,7 +241,8 @@ function App() {
 }</code></pre></div>`,
       options: ['电话输入框获得焦点', '什么都不发生', '姓名输入框获得焦点', '报错：页面上有重复的 id'],
       answer: 2,
-      explain: '两个 input 的 id 都是 "field"。浏览器按 id 查找时，只找到第一个，也就是姓名输入框。所以两个 label 都指向它，电话输入框没有名称。可复用的组件不能写死 id，要用 <code>const id = useId()</code> 生成唯一的 id。“报错”不对：重复 id 是无效的 HTML，但浏览器和 React 都不会报错，问题只在使用时暴露。',
+      explain:
+        '两个 input 的 id 都是 "field"。浏览器按 id 查找时，只找到第一个，也就是姓名输入框。所以两个 label 都指向它，电话输入框没有名称。可复用的组件不能写死 id，要用 <code>const id = useId()</code> 生成唯一的 id。“报错”不对：重复 id 是无效的 HTML，但浏览器和 React 都不会报错，问题只在使用时暴露。',
     },
   ],
   plays: {
@@ -233,14 +252,15 @@ function App() {
         q: '用 Tab 把焦点移到 ②（加了 role="button" 和 tabIndex 的 div），然后按 Enter。② 的计数会怎样？',
         options: ['加 1', '没有变化', '加 2', '页面报错'],
         answer: 1,
-        explain: 'role 只改变读屏软件读出的角色，不会添加任何行为。tabIndex 只让它能被聚焦。按 Enter 触发 click 是 &lt;button&gt; 的内置行为，div 没有。要让 ② 正常工作，你还得自己监听 keydown，处理 Enter 和空格。直接用 &lt;button&gt; 更简单。',
+        explain:
+          'role 只改变读屏软件读出的角色，不会添加任何行为。tabIndex 只让它能被聚焦。按 Enter 触发 click 是 &lt;button&gt; 的内置行为，div 没有。要让 ② 正常工作，你还得自己监听 keydown，处理 Enter 和空格。直接用 &lt;button&gt; 更简单。',
       },
       pkey: 'accessibility|三个“按钮”',
     },
     'label、useId 与 aria-describedby': {
       note: '点击“邮箱”两个字，对应的输入框会获得焦点。两个字段的 id 不同，所以不会冲突。aria-describedby 把提示和错误文字关联到输入框，读屏软件会在名字之后读出它们。',
     },
-    '弹窗的焦点管理': {
+    弹窗的焦点管理: {
       note: '只用键盘试一试：Tab 到按钮，按 Enter 打开。焦点在“取消”上。多按几次 Tab，焦点不会落到背后的页面上。按 Esc 关闭后，焦点回到“删除文件…”。',
     },
     '用 role="status" 和 role="alert" 播报消息': {

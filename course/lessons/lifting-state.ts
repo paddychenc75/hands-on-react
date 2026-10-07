@@ -29,7 +29,8 @@ export default {
         '放进模块顶层的变量，两个组件直接读写',
       ],
       answer: 1,
-      explain: '状态提升让数据只有一个来源。最迷惑的是第一项：两份 state 靠 effect 同步，中间总有一次渲染是不一致的，还会多渲染一次。模块变量被修改时，React 不知道，不会重新渲染。',
+      explain:
+        '状态提升让数据只有一个来源。最迷惑的是第一项：两份 state 靠 effect 同步，中间总有一次渲染是不一致的，还会多渲染一次。模块变量被修改时，React 不知道，不会重新渲染。',
     },
     {
       q: 'TempInput 通过 props 收到 <code>value</code> 和 <code>onChange</code>。用户在输入框里打字时，TempInput 应该怎么做？',
@@ -40,7 +41,8 @@ export default {
         '用 document.querySelector 改另一个输入框',
       ],
       answer: 0,
-      explain: '数据向下流，事件向上传。子组件调用父组件传入的回调，请求父组件修改。最迷惑的是第三项：子组件自己再存一份，它和父组件的数据就对不上了，另一个输入框也不会更新。',
+      explain:
+        '数据向下流，事件向上传。子组件调用父组件传入的回调，请求父组件修改。最迷惑的是第三项：子组件自己再存一份，它和父组件的数据就对不上了，另一个输入框也不会更新。',
     },
     {
       q: '温度转换器为什么不同时存 celsius 和 fahrenheit 两个 state？',
@@ -51,7 +53,8 @@ export default {
         '存两份也可以，只是多占一点内存',
       ],
       answer: 0,
-      explain: '这是唯一数据源原则：能算出来的值不存成 state。最迷惑的是最后一项：问题不在内存，而在两份数据随时可能对不上。第三项也不对：同一个事件里的多次更新会合并成一次渲染。',
+      explain:
+        '这是唯一数据源原则：能算出来的值不存成 state。最迷惑的是最后一项：问题不在内存，而在两份数据随时可能对不上。第三项也不对：同一个事件里的多次更新会合并成一次渲染。',
     },
   ],
   exercise: {
@@ -138,27 +141,39 @@ function App() {
     </div>
   );
 }`,
-    test: async (t) => {
-      const sec = (id) => t.q('#' + id);
-      const isOpen = (id) => !!sec(id).querySelector('.content');
-      const showBtn = (id) => [...sec(id).querySelectorAll('button')].find(b => b.textContent.trim() === '展开');
+    test: async t => {
+      const sec = id => t.q('#' + id);
+      const isOpen = id => !!sec(id).querySelector('.content');
+      const showBtn = id => [...sec(id).querySelectorAll('button')].find(b => b.textContent.trim() === '展开');
       t.assert(sec('p1') && sec('p2'), '找不到 id 为 p1 和 p2 的面板。请保留 <section id={id}>');
-      t.assert(isOpen('p1') && !isOpen('p2'), '一开始应只展开 p1。App 里 activeId 的初始值应为 \'p1\'');
+      t.assert(isOpen('p1') && !isOpen('p2'), "一开始应只展开 p1。App 里 activeId 的初始值应为 'p1'");
       t.assert(showBtn('p2'), '没展开的面板应显示“展开”按钮');
       await t.click(showBtn('p2'));
       t.assert(isOpen('p2'), '点 p2 的“展开”后，p2 应展开。Panel 的按钮要调用 onShow，App 再更新 activeId');
-      t.assert(!isOpen('p1'), '点 p2 的“展开”后，p1 应自动收起。两个面板各自保存 isActive 时，互相不知道对方的状态。请把 state 提升到 App，由 App 决定哪个面板展开');
+      t.assert(
+        !isOpen('p1'),
+        '点 p2 的“展开”后，p1 应自动收起。两个面板各自保存 isActive 时，互相不知道对方的状态。请把 state 提升到 App，由 App 决定哪个面板展开',
+      );
       t.assert(showBtn('p1'), 'p1 收起后应显示“展开”按钮');
       await t.click(showBtn('p1'));
       t.assert(isOpen('p1') && !isOpen('p2'), '再点 p1 的“展开”，应只展开 p1，p2 收起');
       // 检查 state 放在哪里：渲染 <section> 的组件（Panel）不应再有自己的 state，它的上层组件（App）要有
-      const fiberOf = (node) => { const k = Object.keys(node).find(k => k.startsWith('__reactFiber$')); return k && node[k]; };
-      const isComp = (f) => !!f && [0, 11, 15].includes(f.tag); // 函数组件、forwardRef、memo
-      const hasState = (f) => { for (let h = f.memoizedState; h && typeof h === 'object' && 'next' in h; h = h.next) if (h.queue && typeof h.queue.dispatch === 'function') return true; return false; };
+      const fiberOf = node => {
+        const k = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
+        return k && node[k];
+      };
+      const isComp = f => !!f && [0, 11, 15].includes(f.tag); // 函数组件、forwardRef、memo
+      const hasState = f => {
+        for (let h = f.memoizedState; h && typeof h === 'object' && 'next' in h; h = h.next) if (h.queue && typeof h.queue.dispatch === 'function') return true;
+        return false;
+      };
       let panel = fiberOf(sec('p1'));
       while (panel && !isComp(panel)) panel = panel.return;
       t.assert(panel, '找不到渲染 <section> 的组件。请保留 Panel 组件');
-      t.assert(!hasState(panel), 'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上（用 effect 同步也会慢一拍）。请删掉 Panel 的 useState，只通过 props 接收 isActive');
+      t.assert(
+        !hasState(panel),
+        'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上（用 effect 同步也会慢一拍）。请删掉 Panel 的 useState，只通过 props 接收 isActive',
+      );
       let owner = panel.return;
       while (owner && !(isComp(owner) && hasState(owner))) owner = owner.return;
       t.assert(owner, '找不到保存 activeId 的组件。请在 App 里用 useState 声明 activeId，再通过 props 传给 Panel');
@@ -179,9 +194,16 @@ function App() {
         const root3 = ReactDOM.createRoot(box3);
         try {
           ReactDOM.flushSync(() => root3.render(React.createElement(t.exports.App)));
-          t.assert(box3.querySelector('#p1 .content') && !box3.querySelector('#p2 .content'), '在另一份 App 里展开 p2 之后，新渲染的 App 一开始就展开了 p2，应展开 p1。' + shared);
-        } finally { root3.unmount(); }
-      } finally { root.unmount(); }
+          t.assert(
+            box3.querySelector('#p1 .content') && !box3.querySelector('#p2 .content'),
+            '在另一份 App 里展开 p2 之后，新渲染的 App 一开始就展开了 p2，应展开 p1。' + shared,
+          );
+        } finally {
+          root3.unmount();
+        }
+      } finally {
+        root.unmount();
+      }
     },
   },
   checkOnly: [
@@ -192,7 +214,8 @@ function App() {
 }</code></pre></div>`,
       options: ['5', '0', '先显示 0，下一次渲染显示 5', '报错'],
       answer: 1,
-      explain: 'useState(value) 只在第一次渲染时读取 value。之后 props 变了，v 不会更新。数据应该只有一个来源。Child 直接显示 <code>value</code> 就行，不要再复制一份到 state。',
+      explain:
+        'useState(value) 只在第一次渲染时读取 value。之后 props 变了，v 不会更新。数据应该只有一个来源。Child 直接显示 <code>value</code> 就行，不要再复制一份到 state。',
     },
     {
       q: `Celsius 和 Fahrenheit 各自保存温度。需求：改一个，另一个跟着变。最好的做法是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Celsius() {
@@ -211,7 +234,8 @@ function App() {
         '只在 App 里存摄氏度；两个组件通过 props 拿值和回调，华氏度在渲染时算出',
       ],
       answer: 3,
-      explain: '两个组件要显示同一份数据，就把 state 提升到最近的共同父组件，只存一处。子组件通过 props 拿到值，改动时调用父组件传入的回调。华氏度能由摄氏度算出，不必再存。用 effect 互相同步，看起来能工作，但每次修改都多渲染一轮，两边还可能互相触发、短暂不一致。ref 的修改不会触发重新渲染，另一个组件看不到变化。',
+      explain:
+        '两个组件要显示同一份数据，就把 state 提升到最近的共同父组件，只存一处。子组件通过 props 拿到值，改动时调用父组件传入的回调。华氏度能由摄氏度算出，不必再存。用 effect 互相同步，看起来能工作，但每次修改都多渲染一轮，两边还可能互相触发、短暂不一致。ref 的修改不会触发重新渲染，另一个组件看不到变化。',
     },
   ],
   plays: {
@@ -221,7 +245,8 @@ function App() {
         q: '把“华氏度 °F”框里的数字改成 212。“摄氏度 °C”框会显示什么？',
         options: ['20：它有自己的值，不受影响', '212：两个框显示同一个值', '100', '空白'],
         answer: 2,
-        explain: 'App 只存一份 state：{ value: \'212\', scale: \'f\' }。每次渲染时，摄氏度由它算出来：(212 − 32) × 5 / 9 = 100。最迷惑的是“20”：只有两个输入框各存一份 state 时才会这样。',
+        explain:
+          "App 只存一份 state：{ value: '212', scale: 'f' }。每次渲染时，摄氏度由它算出来：(212 − 32) × 5 / 9 = 100。最迷惑的是“20”：只有两个输入框各存一份 state 时才会这样。",
       },
       pkey: 'lifting-state|温度转换器：两个输入框共享一份状态',
     },

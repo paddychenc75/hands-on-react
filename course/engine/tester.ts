@@ -9,12 +9,27 @@ export function makeTester(root: HTMLElement, rawSource: string, exports?: Recor
   const source = stripComments(rawSource);
   const q = (s: string) => root.querySelector(s);
   const qa = (s: string) => Array.from(root.querySelectorAll(s));
-  const pick = (x: string | Element) => { const e = typeof x === 'string' ? q(x) : x; if (!e) throw new TestFail('找不到元素：' + x); return e as HTMLElement; };
+  const pick = (x: string | Element) => {
+    const e = typeof x === 'string' ? q(x) : x;
+    if (!e) throw new TestFail('找不到元素：' + x);
+    return e as HTMLElement;
+  };
   return {
-    root, source, rawSource, exports: exports || {}, q, qa,
-    text: (s) => { const e = q(s); return e ? e.textContent.trim() : ''; },
+    root,
+    source,
+    rawSource,
+    exports: exports || {},
+    q,
+    qa,
+    text: s => {
+      const e = q(s);
+      return e ? e.textContent.trim() : '';
+    },
     byText: (tag, text) => qa(tag).find(e => e.textContent.trim() === text),
-    click: async (x) => { pick(x).click(); await sleep(40); },
+    click: async x => {
+      pick(x).click();
+      await sleep(40);
+    },
     type: async (x, value) => {
       const e = pick(x);
       const proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -23,6 +38,8 @@ export function makeTester(root: HTMLElement, rawSource: string, exports?: Recor
       await sleep(40);
     },
     wait: sleep,
-    assert: (cond, msg) => { if (!cond) throw new TestFail(msg); },
+    assert: (cond, msg) => {
+      if (!cond) throw new TestFail(msg);
+    },
   };
 }

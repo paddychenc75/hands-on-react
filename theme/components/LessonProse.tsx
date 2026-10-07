@@ -7,7 +7,10 @@ export default function LessonProse({ children }: { children?: ReactNode }) {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
-    if (!root.dataset.termsMarked) { root.dataset.termsMarked = '1'; markTerms(root); } // 开发模式下 effect 会跑两次，只标一次
+    if (!root.dataset.termsMarked) {
+      root.dataset.termsMarked = '1';
+      markTerms(root);
+    } // 开发模式下 effect 会跑两次，只标一次
     // 触屏上没有悬停提示，点一下术语就显示释义（旧版是全局点击监听，这里只管本课正文）
     const onClick = (e: MouseEvent) => {
       const t = (e.target as Element).closest?.('abbr.term') as HTMLElement | null;
@@ -16,5 +19,9 @@ export default function LessonProse({ children }: { children?: ReactNode }) {
     root.addEventListener('click', onClick);
     return () => root.removeEventListener('click', onClick);
   }, []);
-  return <div ref={ref} className="hoc prose" id="sec-read">{children}</div>;
+  return (
+    <div ref={ref} className="hoc prose" id="sec-read">
+      {children}
+    </div>
+  );
 }
