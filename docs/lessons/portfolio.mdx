@@ -119,7 +119,7 @@ npm run dev          # 打开 http://localhost:5173
 | 无障碍 | 拔掉鼠标，只用 Tab、Shift+Tab、Enter、空格、Esc 完成核心流程 | 每一步都能完成，并且能看见焦点在哪里；弹窗关闭后焦点回到打开它的按钮 |
 | 无障碍 | 运行 Lighthouse 的“无障碍”检查 | 得分 ≥ 90 |
 | 测试 | 运行 `npm test`；再按下一节“自我检验”故意改坏一处 | 全部通过；改坏后至少一个测试变红，改回后全绿 |
-| 交付 | 推送代码到 GitHub | GitHub Actions 自动运行 `tsc --noEmit`、ESLint 和测试，全部通过 |
+| 交付 | 推送代码到 GitHub | GitHub Actions 自动运行类型检查（`npm run typecheck`）、lint 和测试，全部通过 |
 | 交付 | 检查项目的 React 版本 | 项目使用 React 19 或更新版本，并至少用到一个表单 Action（useActionState） |
 | 交付 | 用手机打开线上网址 | 页面能正常使用，没有横向滚动条 |
 | 交付 | 打开 README | 有截图、线上链接、三个设计取舍，以及“最难的问题和解决方法” |

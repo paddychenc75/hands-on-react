@@ -46,7 +46,7 @@ title: "实战四：城市天气应用"
 
 ## 数据来源
 
-天气和城市数据来自 **Open-Meteo**（open-meteo.com）。它**不需要注册，也不需要密钥**，浏览器可以直接请求。我在写这一课时核对过：下面三个请求都能返回数据，响应头允许跨域（`access-control-allow-origin: *`）。
+天气和城市数据来自 **Open-Meteo**（open-meteo.com）。它**不需要注册，也不需要密钥**，浏览器可以直接请求。下面三个请求都能直接返回数据，响应头允许跨域（`access-control-allow-origin: *`）。
 
 | 用途 | 请求 | 返回 |
 |---|---|---|
@@ -116,14 +116,14 @@ function SearchBox({ initial }) {
 
 ## 里程碑 0：搭建项目
 
-**在本机终端里做。**具体命令、目录和说明见第 31 课。
+**在本机终端里做。**具体命令、目录和说明见第 31 课。Node.js 用 24，原因见本课末尾的“常见坑”。
 
 ```bash title="在本机终端里做"
 npm create vite@latest weather-app -- --template react-compiler-ts --eslint
 cd weather-app
 npm install
 npm install react-router @tanstack/react-query
-npm install -D vitest jsdom @testing-library/react @testing-library/user-event @testing-library/jest-dom
+npm install -D vitest jsdom @testing-library/react @testing-library/dom @testing-library/user-event @testing-library/jest-dom
 ```
 
 然后：
@@ -719,7 +719,7 @@ export function renderApp(path: string) {
 
 <CallBox kind="warn" label="常见坑">
 
-测试里不关重试，“请求失败”的测试会失败。`useQuery` 默认失败后重试 3 次，间隔 1 秒起；而 `findBy…` 默认只等 1 秒，等不到错误提示就超时。我在这个项目里实测过：去掉 `retry: false`，错误测试在约 1 秒后报“找不到 role="alert"”。
+测试里不关重试，“请求失败”的测试会失败。`useQuery` 默认失败后重试 3 次，间隔 1 秒起；而 `findBy…` 默认只等 1 秒，等不到错误提示就超时。在这个项目里去掉 `retry: false`，错误测试会在约 1 秒后报“找不到 role="alert"”。
 
 </CallBox>
 
@@ -836,7 +836,7 @@ describe('详情页', () => {
 | 后退后输入框里是旧文字，结果列表是新的 | 草稿用 `useState(q)` 初始化，之后和 URL 脱节 | 给 `SearchForm` 加 `key={q}` |
 | 错误时页面崩溃，报 `Cannot read properties of undefined` | 先读了 `data.length`，再判断 `isError` | 顺序：`isPending`、`isError`、再读 `data` |
 | 切换城市后，先短暂看到上一个城市的天气 | `queryKey` 里漏了城市 id | 把 id 写进 `queryKey` |
-| `localStorage.getItem is not a function`（运行测试时） | Node 25 这类非 LTS 版本里，Node 自带的 `localStorage` 盖住了 jsdom 的 | 换 LTS 版本（例如 24），或运行前设置 `NODE_OPTIONS=--no-experimental-webstorage` |
+| `localStorage.getItem is not a function`（运行测试时） | Node 25 及以后的版本默认带 `localStorage`，盖住了 jsdom 的 | 用 Node 24，或把 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（新版本的 Vitest 修好后可以去掉） |
 | 收藏一点就报“getSnapshot 应该被缓存” | `getSnapshot` 每次返回新数组 | 按原始字符串缓存解析结果 |
 | 刷新详情页得到 404 | 静态托管没有路由回退 | 见第 31 课的 `vercel.json` |
 

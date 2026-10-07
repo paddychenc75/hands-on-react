@@ -407,7 +407,7 @@ function App() {
       const ul = () => box.querySelector('ul');
       const lis = () => Array.from(box.querySelectorAll<HTMLElement>('li'));
       const press = async key => {
-        const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+        const ev = new KeyboardEvent('keydown', { key, code: key === ' ' ? 'Space' : key, bubbles: true, cancelable: true });
         ul().dispatchEvent(ev);
         await t.wait(30);
         return ev;

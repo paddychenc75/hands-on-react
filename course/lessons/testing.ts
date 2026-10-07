@@ -603,7 +603,7 @@ expect(screen.getByText('登录成功')).toBeInTheDocument();</code></pre></div>
       ],
       answer: 1,
       explain:
-        'user.click 只等点击事件处理完，不会等请求返回。getBy… 立刻查找，找不到就抛错。findBy… 会反复查找，默认最多等 1 秒，适合异步出现的内容。getByLabelText 按 &lt;label&gt; 的文字查找，不需要 id。',
+        'user.click 只等点击事件处理完，不会等请求返回。getBy… 立刻查找，找不到就抛错。findBy… 会反复查找，默认最多等 1 秒，适合异步出现的内容。getByLabelText 按 &lt;label&gt; 的文字查找，前提是 label 和输入框有关联（htmlFor 对上 id，或者 label 包住输入框）。',
     },
   ],
   plays: {

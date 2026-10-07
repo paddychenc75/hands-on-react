@@ -302,7 +302,7 @@ return &lt;CityList cities={search.data} /&gt;;</code></pre></div>`,
         '请求失败后，isPending 变成 false，data 仍是 undefined。第二个 if 先执行了 search.data.length，抛出 TypeError，根本走不到 isError 那一行。正确的顺序是：isPending、isError，最后才读 data。“显示没有找到”有迷惑性，但那要 data 是空数组才成立。',
     },
     {
-      q: `详情页这样写天气查询。用户先看了上海的详情页，回到搜索页后点进北京。北京页刚打开、北京的天气还没返回时，天气区先显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useQuery({
+      q: `详情页这样写天气查询。用户先看了上海的详情页，回到搜索页后点进北京。北京页刚打开、城市数据到达之后，天气区显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useQuery({
   queryKey: ['forecast'],
   queryFn: ({ signal }) =&gt; getForecast(city, signal),
   enabled: city !== undefined,
@@ -355,7 +355,7 @@ expect(await screen.findByRole('alert')).toBeInTheDocument();</code></pre></div>
       pkey: 'project-weather|URL 才是搜索词的唯一数据源',
     },
     '加载、出错、没有找到、成功：四种状态': {
-      note: '“火星”没有结果，接口返回空数组，界面显示“没有找到”：这是正常结果，不是错误。“错误”请求失败，界面显示错误和重试按钮。判断的顺序是先 pending，再 error，最后才读 data。本机项目里这些状态由 useQuery 提供，顺序要你自己写对。',
+      note: '“火星”没有结果，接口返回空数组，界面显示“没有找到”：这是正常结果，不是错误。“错误”请求失败，界面显示错误和重试按钮。这个模拟接口对“错误”永远失败，所以点“重试”会再次出错；真实项目里重试是为网络恢复后用的。判断的顺序是先 pending，再 error，最后才读 data。本机项目里这些状态由 useQuery 提供，顺序要你自己写对。',
     },
     '服务器缓存与收藏：互不干扰': {
       note: '页面一打开就请求了上海（1 条），点“北京”请求北京（2 条）。点回“上海”时，上海的数据在缓存里，不再请求。点“收藏”只改了界面状态，也没有请求。服务器状态按 id 缓存，收藏单独保存，两者互不影响。',

@@ -39,7 +39,7 @@ import Link from 'next/link';
 // import { redirect } from 'next/navigation';    redirect('/login')
 ```
 
-它和第 33 课的 `<Link to>` 作用相同，属性名是 `href`。链接进入视口时，Next.js 会预取目标页面，点击后几乎立即切换。用普通的 `<a>` 会整页刷新。
+它和第 33 课的 `<Link to>` 作用相同，属性名是 `href`。生产环境里，链接进入视口时 Next.js 会预取目标页面（开发模式不预取），点击后几乎立即切换。用普通的 `<a>` 会整页刷新。
 
 ## 页面：在服务端直接取数据
 
@@ -126,7 +126,7 @@ export async function addComment(postId: number, formData: FormData) {
 
 ## 渲染策略：两种模型
 
-Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目默认使用 **Cache Components**（`next.config.ts` 里的 `cacheComponents: true` 和 `partialPrefetching: true`）。Next.js 17 会把它变成唯一默认。没开这个开关的老项目用后面的“旧模型”表。
+Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目默认使用 **Cache Components**（`next.config.ts` 里的 `cacheComponents: true` 和 `partialPrefetching: true`）。Next.js 17 会把它变成默认。没开这个开关的老项目用后面的“旧模型”表。
 
 ### 新模型：Cache Components
 

@@ -22,19 +22,21 @@ title: "项目搭建与交付"
 
 ## 用 Vite 创建项目
 
-**在本机终端里做。**先准备 Node.js。Vite 要求 Node.js 20.19 以上，或 22.12 以上。运行 `node -v` 查看版本。版本太低就去 nodejs.org 安装 LTS 版本。
+**在本机终端里做。**先准备 Node.js。Vite 要求 Node.js 20.19 以上，或 22.12 以上。运行 `node -v` 查看版本。版本太低就去 nodejs.org 安装 Node.js 24。本课的命令和测试都按 24 讲。
 
 ```bash title="在本机终端里做：创建并启动项目"
 # 先确认 Node 版本
 node -v
-npm create vite@latest my-app -- --template react-ts
+npm create vite@latest my-app -- --template react-ts --eslint
 cd my-app
 npm install
 # 启动后，打开终端里显示的地址，通常是 http://localhost:5173
 npm run dev
 ```
 
-`--template react-ts` 是“React + TypeScript”模板。省略它，命令会在终端里问你。Vite 也有一个带 React Compiler 的模板：`react-compiler-ts`。Vite 的模板会随版本变化，例如目前默认附带的检查工具是 Oxlint，加 `--eslint` 才用 ESLint。**以命令运行时的提示和 [vite.dev/guide](https://vite.dev/guide/) 为准。**
+`--template react-ts` 是“React + TypeScript”模板。省略它，命令会在终端里问你。Vite 也有一个带 React Compiler 的模板：`react-compiler-ts`。
+
+`--eslint` 让模板用 ESLint，并配好 `eslint-plugin-react-hooks`（配置文件是 `eslint.config.js`）。本课和后面的课都按这个配置讲。省略它，目前的模板改用 Oxlint：`npm run lint` 跑的是 `oxlint`，配置文件是 `.oxlintrc.json`。Oxlint 默认也会对漏写的 effect 依赖给出警告，但规则的名字和提示文字与 ESLint 不同。Vite 的模板会随版本变化，**以命令运行时的提示和 [vite.dev/guide](https://vite.dev/guide/) 为准。**
 
 什么时候不用 Vite，直接用框架？
 
@@ -163,7 +165,7 @@ function App() {
 
 选哪一种？没有绝对的答案，一个常见的约定：**组件文件用默认导出，工具函数、常量、类型用具名导出**。团队里先约定，再统一。
 
-另外，模板里的 ESLint 规则（`react-refresh/only-export-components`）会提醒你：一个文件如果导出了组件，就别同时导出 Hook 或常量。否则开发时改这个文件，页面会整页刷新，而不是局部更新。把它们放进单独的文件即可。
+另外，模板里的 `only-export-components` 规则会提醒你（ESLint 里叫 `react-refresh/only-export-components`，Oxlint 里叫 `react/only-export-components`）：一个文件如果导出了组件，就别同时导出 Hook 或常量。否则开发时改这个文件，页面会整页刷新，而不是局部更新。把它们放进单独的文件即可。
 
 文件多了怎么放？**按功能组织**，不要把所有文件按类型堆在一起：
 
@@ -225,7 +227,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 Tailwind 的安装方式随大版本变化，**以 [tailwindcss.com/docs/installation](https://tailwindcss.com/docs/installation) 为准**。
 
-CSS Modules 到底做了什么？下面的示例用一个函数模拟它：两个文件里都有 `.button`，改名之后互不影响。
+CSS Modules 到底做了什么？下面的示例用一个函数模拟构建这一步。两个文件里都写了 `.button`，先预测页面上两个按钮各是什么颜色。
 
 ```jsx play title="CSS Modules：类名被改写成唯一名字"
 // 构建时，每个 .module.css 里的类名都会加上文件相关的哈希，
@@ -250,8 +252,8 @@ function App() {
   return (
     <div>
       <style>{`
-        .${buttonCss.button} { background: royalblue; color: white; border: 0; padding: 6px 14px; margin: 4px; }
-        .${cardCss.button} { background: seagreen; color: white; border: 0; padding: 6px 14px; margin: 4px; }
+        button.${buttonCss.button}, button.${buttonCss.button}:hover { background: royalblue; color: white; border: 0; padding: 6px 14px; margin: 4px; }
+        button.${cardCss.button}, button.${cardCss.button}:hover { background: seagreen; color: white; border: 0; padding: 6px 14px; margin: 4px; }
       `}</style>
       <button className={buttonCss.button}>按钮 A</button>
       <button className={cardCss.button}>按钮 B</button>
@@ -396,7 +398,7 @@ Netlify 用 `public/_redirects` 文件（构建时会复制到 `dist/`）：
 /*  /index.html  200
 ```
 
-GitHub Pages 没有这种回退配置，所以有多级路由的应用不适合放在它上面，优先选 Vercel 或 Netlify。
+GitHub Pages 没有这种回退配置，所以有多级路由的应用不适合放在它上面，优先选 Vercel 或 Netlify。（变通办法是把 `index.html` 复制成 `404.html`，或者改用 hash 路由；都不如真正的回退规则干净。）
 
 ### 最小的持续集成
 
@@ -445,7 +447,7 @@ jobs:
 
 1. 改了环境变量，页面没变化：开发服务器要重启；线上要重新构建。
 2. CI 里 Node 版本和本机差别太大，出现“本机能过，CI 不过”：让 `node-version` 的大版本和 `node -v` 一致。
-3. 在 Node.js 25 这类非 LTS 版本上，用 jsdom 跑测试时，浏览器环境的 `localStorage` 可能被 Node 自带的同名对象盖住，报 `localStorage.getItem is not a function`。换成 LTS 版本，或者运行前设置环境变量 `NODE_OPTIONS=--no-experimental-webstorage`。
+3. 在 Node.js 25 及以后的版本上，用 jsdom 跑测试时，浏览器环境的 `localStorage` 可能被 Node 自带的同名对象盖住，报 `localStorage.getItem is not a function`。用 Node 24，或者把 `package.json` 里的 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（Windows 的 PowerShell 要先单独设置这个环境变量）。新版本的 Vitest 修好这个问题后，可以去掉它。
 4. Actions 的版本标签（例如 `@v7`）会更新。以各个 Action 仓库的最新发布为准，Dependabot 可以帮你自动升级。
 
 </CallBox>
@@ -458,11 +460,11 @@ jobs:
 
 | 任务 | 怎样做 | 应该看到 |
 |---|---|---|
-| 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
+| 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-ts --eslint`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
 | 2. 搬代码并拆文件 | 把第 9 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件） | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错 |
 | 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红，终端或浏览器报“没有名为 Counter 的导出”；改回后恢复 |
 | 4. 样式 | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
-| 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；故意把 `useEffect` 的依赖数组写漏一项 | 两个命令都通过；漏写依赖后 lint 报警告 |
+| 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
 | 6. 环境变量 | 新建 `.env`，写 `VITE_API_BASE=...` 和 `SECRET_TOKEN=abc`，在代码里分别读取并显示，再 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索这两个值 | 能搜到 `VITE_API_BASE` 的值；搜不到 `SECRET_TOKEN` 的值，代码里读到 `undefined` |
 | 7. 部署 | 推送到 GitHub，在 Vercel 导入项目 | 得到一个网址，用手机也能打开 |
 | 8. 路由回退 | 如果应用有多个路由，在线上网址直接打开一个子路径，再刷新 | 不出现 404；没有 `vercel.json` 时对比一下 |

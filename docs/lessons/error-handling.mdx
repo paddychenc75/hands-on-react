@@ -91,7 +91,7 @@ export default function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>开发版本会多报。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误（通常是两次：第一次渲染和同步重试各一次，jsdom 下验证）。生产版本不会这样。React 19 取消了这个做法。测试全局上报时，用生产版本确认数量。
+<strong>开发版本会多报。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误（通常是两次：第一次渲染和同步重试各一次）。生产版本不会这样。React 19 取消了这个做法。测试全局上报时，用生产版本确认数量。
 
 </CallBox>
 

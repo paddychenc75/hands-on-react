@@ -245,7 +245,7 @@ function Tabs({ tab }) {
 }
 ```
 
-`mode="hidden"` 时，组件的 DOM 被隐藏，**state 保留**，它的 effect 被清理（不再运行），也不再响应更新。切回 `visible` 时，state 还在，effect 重新运行。三种隐藏方式的区别：
+`mode="hidden"` 时，组件的 DOM 被隐藏，**state 保留**，它的 effect 被清理（不再运行）；更新仍会处理，但推迟到更低的优先级。切回 `visible` 时，state 还在，effect 重新运行。三种隐藏方式的区别：
 
 | 做法 | state | effect | 隐藏时的渲染 |
 |---|---|---|---|
