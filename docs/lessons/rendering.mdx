@@ -14,6 +14,8 @@ title: "渲染机制：React 到底做了什么"
 
 很多性能问题和奇怪的 bug 都有同一个根源。那就是没搞清楚 React 的渲染过程。这一课我们打开引擎盖看一看。
 
+本课的示例运行在没有 React Compiler 的实验台上，所以你看到的是 React 的默认行为。如果你的项目启用了 React Compiler，部分“子组件跟着重新渲染”的现象会被它消除。第 20 课会讲。
+
 ## 三个阶段：触发 → 渲染 → 提交
 
 <Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 触发 Trigger</b><span>首次挂载，或某个组件的 state 被更新</span></div><div class=\"step\"><b>② 渲染 Render</b><span>React 调用组件函数，得到新的 React 元素树，与上一次对比算出差异</span></div><div class=\"step\"><b>③ 提交 Commit</b><span>只把<em>差异</em>应用到真实 DOM，然后运行 effect</span></div></div><figcaption>在 React 里，“渲染”指的是调用你的组件函数，并不等于修改页面</figcaption>"} />
@@ -33,11 +35,11 @@ title: "渲染机制：React 到底做了什么"
 还有两个细节：
 
 1. **自动批处理**：同一个事件中多次调用 set 函数，只触发一次渲染。React 18 起，setTimeout 和 Promise 回调中也是这样。
-2. **同值跳过**：新值与旧值用 `Object.is` 比较相等时，React 跳过这次更新。
+2. **同值跳过**：新值与旧值用 `Object.is` 比较相等时，React 跳过这次更新。个别情况下，React 会先调用一次你的组件函数再放弃这次更新。这时它不会渲染子组件，也不会运行 effect。
 
 <CallBox kind="warn" label="常见坑">
 
-一个常见误解是“props 变了组件才会重新渲染”。实际上，**父组件渲染时，子组件默认一律重新渲染**。React 在渲染阶段算出差异，提交阶段只修改变化的 DOM。所以多数时候这并不会造成问题。只有当子组件非常“重”时，才需要用下一课的 memo 来优化。
+一个常见误解是“props 变了组件才会重新渲染”。实际上，**父组件渲染时，子组件默认一律重新渲染**。React 在渲染阶段算出差异，提交阶段只修改变化的 DOM。所以多数时候这并不会造成问题。只有当子组件非常“重”，而且改结构解决不了时，才需要用下一课的 memo 来优化。
 
 </CallBox>
 
@@ -89,6 +91,53 @@ function App() {
 }
 ```
 
+## 先改结构，再考虑 memo
+
+从刚才的演示出发：点 Counter 的按钮，只有 Counter 闪烁。因为 state 在 Counter 里，App 没有重新渲染。
+
+所以，想让一次更新少带动几个组件，就把 state 放进真正用它的最小组件。这叫**把 state 下移**。
+
+```jsx title="只读：把 state 下移"
+// 之前：text 在 App 里，每次打字，App 和 Slow 都重新渲染
+function App() {
+  const [text, setText] = useState('');
+  return (
+    <>
+      <input value={text} onChange={e => setText(e.target.value)} />
+      <Slow />
+    </>
+  );
+}
+
+// 之后：text 只在 TextInput 里，打字时 App 不渲染，Slow 也不渲染
+function TextInput() {
+  const [text, setText] = useState('');
+  return <input value={text} onChange={e => setText(e.target.value)} />;
+}
+function App() {
+  return (
+    <>
+      <TextInput />
+      <Slow />
+    </>
+  );
+}
+```
+
+另一种结构：把不变的内容作为 children 传进有 state 的组件。children 是外层创建的元素，外层没有重新渲染，它就是同一个对象，React 会跳过它。
+
+```jsx title="只读：用 children 跳过渲染"
+function Tabs({ children }) {
+  const [tab, setTab] = useState(0); // Tabs 自己的 state 变化时
+  return <div><button onClick={() => setTab(tab + 1)}>{tab}</button>{children}</div>;
+}
+function App() {
+  return <Tabs><Slow /></Tabs>; // <Slow /> 由 App 创建；App 没渲染，Slow 就被跳过
+}
+```
+
+注意边界：只有 Tabs 自己的 state 变化时，children 才会被跳过。创建它的 App 重新渲染时，会创建新的元素，Slow 照样渲染。
+
 ## 虚拟 DOM 与协调（Reconciliation）
 
 组件返回的 React 元素树常被称为**虚拟 DOM**：它是用普通 JS 对象描述的界面结构。每次渲染后，React 对比新树和旧树，找出需要的改动，再修改真实 DOM。这个过程叫**协调**。
@@ -133,6 +182,35 @@ function App() {
 **永远不要在组件内部定义组件**。例如在 App 函数体里写 `function Input() {...}`。每次 App 渲染，都会创建一个“新类型”的 Input。结果是每次输入后，Input 的 state 和焦点都会丢失。
 
 </CallBox>
+
+## 严格模式做了什么
+
+**严格模式**（`StrictMode`）是只在开发环境生效的检查工具。它在组件外面包一层 `<StrictMode>` 就能打开。它做两件事：
+
+- 把组件函数、`useState` 的初始化函数和更新函数各多调用一次，用来暴露渲染里的副作用。
+- 让每个 effect 多做一轮“开始同步 → 停止同步 → 再开始同步”（第 14 课讲过）。
+
+生产环境没有这些额外调用。
+
+为什么要多调用一次？因为渲染必须是纯的：同样的 props 和 state，一定返回同样的 JSX，渲染时不修改外部的东西。React 可以随时丢弃一次渲染再重来（并发渲染就是这样）。如果组件在渲染时改了外部变量，多调用一次就会让结果出错。严格模式让这类问题在开发时马上出现。
+
+```jsx play title="严格模式下的组件函数"
+import { StrictMode, useState } from 'react';
+
+function Demo() {
+  const [n, setN] = useState(0);
+  console.log('Demo 函数被调用');
+  return <button onClick={() => setN(n + 1)}>点击次数：{n}</button>;
+}
+
+function App() {
+  return (
+    <StrictMode>
+      <Demo />
+    </StrictMode>
+  );
+}
+```
 
 <CallBox kind="deep" label="深入一点">
 

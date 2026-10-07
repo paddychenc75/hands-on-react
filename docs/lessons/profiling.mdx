@@ -30,6 +30,8 @@ title: "性能测量：先找到慢在哪里"
 
 测量时，打开浏览器 DevTools 的 **CPU 节流**（Performance 面板 → CPU：4x slowdown）。你的电脑通常比用户的手机快很多。
 
+单次录制的耗时会有波动，垃圾回收、JIT 预热和后台标签页都会影响它，开发版本尤其明显。同一个操作多录几次（例如 5 次），看中间值。改动前后的差别小于几次之间的波动，就不算变好。录制前关掉其他占 CPU 的标签页和浏览器扩展。
+
 </CallBox>
 
 ## 工具一：React DevTools 的 Profiler 面板
@@ -308,7 +310,7 @@ const virtualizer = useVirtualizer({
 <details className="optional">
 <summary><span className="opt-tag">选读</span>React Compiler 改变了什么<small>可以先跳过，需要时再展开</small></summary>
 
-React Compiler 在编译时自动做记忆化。启用后，很多“不必要的重新渲染”自然消失。在 React DevTools 中，被编译器优化的组件旁边有 “Memo ✨” 标记。
+React Compiler 在编译时自动做记忆化。什么时候仍要手写记忆化，见[性能优化一课](/lessons/performance)的“先看项目有没有启用 React Compiler”。启用后，很多“不必要的重新渲染”自然消失。在 React DevTools 中，被编译器优化的组件旁边有 “Memo ✨” 标记。
 
 但测量仍然必要。编译器不能解决这些问题：
 

@@ -4,19 +4,19 @@ export default {
   id: 'closures',
   stage: 2,
   title: '闭包陷阱与 Effect 依赖',
-  mins: 25,
+  mins: 29,
   summary: '为什么定时器里的 state 总是旧值？彻底理解渲染、闭包与依赖。',
   goals: [
     '能解释为什么每次渲染都有自己的 props、state 和函数',
     '能找出 effect 和定时器回调里的“过期闭包”',
-    '能用补全依赖、函数式更新或 ref 修复过期闭包',
+    '能用补全依赖、函数式更新、useEffectEvent 或 ref 修复过期闭包',
     '能修改代码让 effect 少依赖一个值，而不是直接删掉依赖',
   ],
   keyPoints: [
     '组件每次渲染都会新建一批变量和函数。函数通过闭包记住的是创建它的那次渲染里的值。',
     '过期闭包：effect 只在挂载时运行，它里面的回调就一直读第一次渲染的 state 和 props。',
-    '依赖数组要写上 effect 用到的所有 props 和 state。不想依赖某个值，就改代码：用函数式更新、把函数移进 effect，或把常量移到组件外。',
-    '长期存在的回调要读最新值，又不想重启 effect，可以用 ref 保存最新值。',
+    '依赖数组要写上 effect 用到的所有 props、state，以及由它们算出的变量和函数。不想依赖某个值，就改代码：用函数式更新、把函数移进 effect，或把常量移到组件外。',
+    '长期存在的回调要读最新值，又不想重启 effect：React 19.2 用 useEffectEvent，React 18 用 ref 保存最新值。',
     '常见坑：把组件内定义的对象或函数写进依赖。它每次渲染都是新引用，effect 每次都会重新执行。',
   ],
   quiz: [
@@ -258,8 +258,32 @@ function alertLater() {
       explain:
         'alertLater 是第一次渲染创建的函数，它读到的 count 是那次渲染的快照 0。定时器回调记住的就是这个 0。之后的点击创建了新的渲染和新的 count，但旧的回调看不到。“3”是把 count 当成了一个会被修改的变量；实际上每次渲染都有自己的 count 常量。想读到最新值，可以把最新值存进 ref，在回调里读 <code>ref.current</code>。',
     },
+    {
+      q: `React 19.2 项目。切换主题时，聊天室不应该重新连接。下面哪种写法正确？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const onConnected = useEffectEvent(() =&gt; showToast(theme));
+
+useEffect(() =&gt; {
+  const conn = createConnection(roomId);
+  conn.on('connected', () =&gt; onConnected());
+  conn.connect();
+  return () =&gt; conn.disconnect();
+}, /* 依赖数组 */);</code></pre></div>`,
+      options: ['[roomId, theme]', '[roomId]', '[roomId, onConnected]', '[]'],
+      answer: 1,
+      explain:
+        'roomId 变了必须重连，所以留在依赖里。theme 只用在 Effect Event 里，它读到的总是最新值，不需要依赖。Effect Event 本身也不放进依赖数组。写成 [roomId, theme] 会让切换主题时重连。写成 [] 会漏掉 roomId，切换房间时仍连着旧房间：不能为了少依赖就把真正的依赖删掉。',
+    },
   ],
   plays: {
+    '聊天室：读到最新主题': {
+      note: '切换主题时没有“断开”和“连接”，但之后每秒的消息里已经是新主题。切换房间才会断开旧房间、连接新房间。ref 在这里扮演的就是 useEffectEvent。',
+      predict: {
+        q: '先观察控制台的“连接”。点“切换主题”，等 2 秒。控制台会怎样？',
+        options: ['先“断开”再“连接”，然后显示新主题', '没有“断开”和“连接”，之后每秒显示新主题', '没有“断开”和“连接”，之后仍显示旧主题', '报错'],
+        answer: 1,
+        explain: 'effect 的依赖只有 roomId，切换主题不会重新运行它。回调读的是 latestTheme.current，每次渲染后都同步成了最新的主题，所以显示新主题。',
+      },
+      pkey: 'closures|聊天室：读到最新主题',
+    },
     '3 秒后打印什么？': {
       note: '先点“3 秒后打印”，再快速点几次 +1。控制台打印的是点击时那次渲染的值。',
       predict: {

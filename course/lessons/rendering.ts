@@ -4,27 +4,30 @@ export default {
   id: 'rendering',
   stage: 2,
   title: '渲染机制：React 到底做了什么',
-  mins: 22,
+  mins: 27,
   summary: '理解触发、渲染、提交三个阶段，以及虚拟 DOM 与协调算法。',
   goals: [
     '能解释“渲染”和“更新 DOM”的区别',
     '能判断一次更新会让哪些组件重新渲染',
     '能根据位置、类型和 key 预测 state 是保留还是丢失',
     '能用“把 state 下移”减少不必要的渲染',
+    '能说出严格模式在开发环境多做了什么，以及为什么渲染必须是纯的',
   ],
   keyPoints: [
     '一次更新分三步：触发 → 渲染 → 提交。渲染只是调用组件函数并算出差异，提交才修改 DOM。',
-    '组件的 state 变化时，它和它的全部后代都会重新渲染。props 没变的子组件也一样，除非用了 memo。',
+    '组件的 state 变化时，它和它的全部后代都会重新渲染。props 没变的子组件也一样，除非用了 memo，或项目启用了 React Compiler。',
     'React 按“树中的位置 + 元素类型”保存 state。位置和类型不变，state 保留；类型变了或 key 变了，state 被丢弃。',
     '最常见的坑：在组件内部定义组件。每次渲染它都是新类型，state 和焦点都会丢失。',
     '先试结构性优化：把 state 下移到真正用它的小组件里，其他组件就不会跟着重新渲染。',
+    '严格模式只在开发环境生效：多调用一次组件函数、初始化函数和更新函数，并让 effect 多做一轮。它用来暴露渲染里的副作用。',
   ],
   quiz: [
     {
       q: '父组件重新渲染时，props 没变的子组件会怎样（未使用 memo）？',
       options: ['跳过渲染，因为 props 没变', '也会重新渲染', '只更新 DOM，不调用组件函数', '被卸载后重新挂载'],
       answer: 1,
-      explain: '默认情况下，父组件渲染会带动所有子组件渲染。“props 没变就跳过”是 memo 的行为。没有 memo 时，React 根本不比较 props。',
+      explain:
+        '默认情况下，父组件渲染会带动所有子组件渲染。“props 没变就跳过”是 memo 的行为。在没有 memo 且没有启用 React Compiler 时，React 根本不比较 props。',
     },
     {
       q: '某位置的元素从 &lt;div&gt;&lt;Counter/&gt;&lt;/div&gt; 变成 &lt;span&gt;&lt;Counter/&gt;&lt;/span&gt;，Counter 的 state？',
@@ -209,6 +212,18 @@ function App() {
       explain:
         '<code>&lt;Clock /&gt;</code> 这个元素是 App 创建的，作为 children 传给 Tabs。<ol class="task-steps"><li>点“切换”：只有 Tabs 的 state 变了。App 没有重新渲染，children 还是同一个元素对象，React 跳过 Clock。</li><li>点“主题”：App 重新渲染，创建了新的 <code>&lt;Clock /&gt;</code> 元素。Tabs 没有用 memo，所以 Tabs 和 Clock 都重新渲染。</li></ol>最迷惑的是第一项：“父组件重新渲染，子组件都重新渲染”只适用于组件在自己的 JSX 里写出来的子组件。第三项也不对：children 不是永远跳过，创建它的组件重新渲染时，它就会重新渲染。',
     },
+    {
+      q: `应用包在 <code>&lt;StrictMode&gt;</code> 里，在开发环境第一次挂载 Page。挂载完成后，visits 是多少？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">let visits = 0;
+
+function Page() {
+  visits++;
+  return &lt;p&gt;欢迎&lt;/p&gt;;
+}</code></pre></div>`,
+      options: ['2：严格模式把组件函数多调用一次', '1：组件函数只运行一次', '0：visits 只在 effect 里才会变', '3：函数调用两次，effect 再多一轮'],
+      answer: 0,
+      explain:
+        '开发环境的严格模式会把组件函数多调用一次，所以 visits 变成 2。这正是它的用途：渲染里修改外部变量是副作用，多调用一次，结果就出错，你在开发时就能发现。生产环境没有这次额外调用。第四项把 effect 的多一轮和函数的多一次混在一起：这个组件没有 effect，所以不会多出调用。修法是别在渲染时修改外部变量。',
+    },
   ],
   plays: {
     '谁被重新渲染了？': {
@@ -221,8 +236,18 @@ function App() {
       },
       pkey: 'rendering|谁被重新渲染了？',
     },
+    严格模式下的组件函数: {
+      note: '控制台里“Demo 函数被调用”会成对出现：严格模式把组件函数多调用一次。去掉 &lt;StrictMode&gt; 再运行，每次只打印一行。生产环境没有这次额外调用。',
+      predict: {
+        q: '运行后，页面第一次显示完。再点一下按钮。控制台一共打印了几行“Demo 函数被调用”？',
+        options: ['2 行', '3 行', '4 行', '1 行'],
+        answer: 2,
+        explain: '挂载时调用 2 次，点击后重新渲染又调用 2 次，共 4 行。严格模式对每次渲染都多调用一次组件函数。',
+      },
+      pkey: 'rendering|严格模式下的组件函数',
+    },
     状态跟着位置走: {
-      note: '情况 1：同一位置、同一类型，state 保留。情况 2：外层从 section 变成 div，整棵子树重建，state 丢失。情况 3：key 不同，React 把它们当成两个组件，各自的 state 独立。',
+      note: '情况 1：同一位置、同一类型，state 保留。情况 2：外层从 section 变成 div，整棵子树重建，state 丢失。情况 3：key 不同，React 把它们当成两个组件。切换时旧的被卸载，state 丢弃；再切回来也是从 0 开始。',
       predict: {
         q: '把三个计数器都点到非 0 的数字，然后勾选“红色”。哪些计数器会保留原来的数字？',
         options: ['三个都保留', '只有情况 1', '情况 1 和 3', '都不保留'],
