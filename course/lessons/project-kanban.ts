@@ -265,17 +265,32 @@ function boardReducer(state, action) {
   },
   checkOnly: [
     {
-      q: `应用包在 <code>&lt;StrictMode&gt;</code> 里，在开发环境运行。点一次“右移”，卡片会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">case 'move':
+      q: `应用包在 <code>&lt;StrictMode&gt;</code> 里，在开发环境运行。卡片在“待办”列，点一次“→”，它会到哪一列？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">case 'move':
   return {
     ...state,
-    cards: state.cards.map(c =&gt;
-      c.id === action.id ? (c.col += action.dir, c) : c
-    ),
+    cards: state.cards.map(c =&gt; {
+      if (c.id !== action.id) return c;
+      const i = state.columns.indexOf(c.col) + action.dir;
+      if (i &gt;= 0 &amp;&amp; i &lt; state.columns.length) c.col = state.columns[i];
+      return c;
+    }),
   };</code></pre></div>`,
-      options: ['右移一列', '右移两列', '不移动：返回的还是同一个数组', '报错：reducer 不能用逗号表达式'],
+      options: ['进行中', '已完成', '还在待办：返回的还是同一个卡片对象', '报错：reducer 不能给参数赋值'],
       answer: 1,
       explain:
-        '<code>c.col += action.dir</code> 直接修改了旧的卡片对象。严格模式在开发环境会把 reducer 调用两次，用来暴露这种副作用。两次调用改的是同一个对象，所以卡片移动了两列。纯函数写法：<code>c.id === action.id ? { ...c, col: c.col + action.dir } : c</code>。',
+        '<code>c.col = …</code> 直接修改了旧的卡片对象。严格模式在开发环境会把 reducer 调用两次。两次改的是同一个对象：第一次从待办改到进行中，第二次从进行中改到已完成。纯函数写法：<code>return { ...c, col: state.columns[i] }</code>。',
+    },
+    {
+      q: `App 里忘了写 <code>&lt;DispatchCtx.Provider&gt;</code>，其他代码不变。点卡片上的“删除”会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const DispatchCtx = createContext(null);
+
+function Card({ card }) {
+  const dispatch = useContext(DispatchCtx);
+  return &lt;button onClick={() =&gt; dispatch({ type: 'remove', id: card.id })}&gt;删除&lt;/button&gt;;
+}</code></pre></div>`,
+      options: ['卡片被正常删除', '点击时报错：dispatch 是 null，不是函数', '渲染时就报错，页面打不开', '什么也不发生：dispatch 是空函数'],
+      answer: 1,
+      explain:
+        '找不到 Provider 时，useContext 返回创建 Context 时给的默认值，这里是 null。组件能正常渲染，点击时才执行 <code>null(…)</code>，抛出 TypeError。“渲染时就报错”不对：渲染阶段只是读到 null，没有调用它。所以真实项目常写一个自定义 Hook，找不到 Provider 时抛出清楚的错误。',
     },
   ],
   plays: {},

@@ -21,7 +21,6 @@ title: "Context：跨层级共享数据"
 const ThemeContext = createContext('light');
 
 // ② 提供：用 Provider 包住子树，传入 value
-// （React 19 也可以直接写 <ThemeContext value="dark">，本课运行环境是 React 18）
 <ThemeContext.Provider value="dark">
   <Page />
 </ThemeContext.Provider>
@@ -29,6 +28,18 @@ const ThemeContext = createContext('light');
 // ③ 消费：在任意后代组件中读取
 const theme = useContext(ThemeContext); // 'dark'
 ```
+
+<CallBox kind="tip" label="React 18 与 19 的写法">
+
+第 ② 步，React 18 写 `<ThemeContext.Provider value="dark">`，这是本课实验台（React 18.3.1）能运行的写法。React 19 可以把 Context 本身当作 Provider：`<ThemeContext value="dark">`。官方说明以后会弃用 `.Provider`。两种写法的行为一样，读到旧项目里的 `.Provider` 时不用奇怪。
+
+```jsx title="React 19 写法（只能阅读，实验台是 React 18）"
+<ThemeContext value="dark">
+  <Page />
+</ThemeContext>
+```
+
+</CallBox>
 
 ```jsx play title="主题切换"
 import { createContext, useContext, useState } from 'react';
@@ -121,7 +132,9 @@ function ClearButton() {
 
 <CallBox kind="warn" label="常见坑">
 
-**Context 的 value 变化时，所有读取它的组件都会重新渲染**。不要把变化频繁、又互不相关的数据都塞进一个巨大的 Context。解决方法：拆成多个 Context，例如把数据和修改数据的函数分开；或使用专门的状态管理库。
+**Context 的 value 变化时，所有读取它的组件都会重新渲染**。不要把变化频繁、又互不相关的数据都塞进一个巨大的 Context。解决方法：拆成多个 Context。例如把数据和修改数据的函数分开；函数那一份的引用要保持不变，第 11 课的 `dispatch` 就满足这一点，普通函数要用第 20 课的 useCallback、useMemo。也可以使用专门的状态管理库。
+
+另外注意：`value={{ items, add }}` 每次渲染都是一个新对象，Provider 所在的组件一重新渲染，所有读取者都跟着渲染。
 
 </CallBox>
 

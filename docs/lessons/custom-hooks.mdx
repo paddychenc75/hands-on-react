@@ -88,6 +88,14 @@ function App() {
 
 </CallBox>
 
+**返回值怎么选**：
+
+- 只有一个值，直接返回（`useWindowWidth`）。
+- 两个值，调用者常要自己起名，返回数组（`useToggle`，和 `useState` 一样）。
+- 三个以上，返回对象，调用者按名字取用（`useFetch`）。
+
+参数会变时（例如 `url`），把它写进 Hook 内部 effect 的依赖数组。
+
 ## 一个更完整的例子：useFetch
 
 ```jsx title="把请求逻辑封装成 Hook"

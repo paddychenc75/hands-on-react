@@ -51,7 +51,7 @@ export default {
       ],
       answer: 1,
       explain:
-        '能从现有 props 和 state 算出来的值，直接在渲染时计算。最迷惑的是第一项：它能工作，但每次都多一次渲染，而且中间有一帧显示的是旧值。第三项多出一份要手动保持一致的 state。',
+        '能从现有 props 和 state 算出来的值，直接在渲染时计算。最迷惑的是第一项：它能工作，但每次都先用旧的 fullName 完整渲染一遍，再马上渲染第二遍。第三项多出一份要手动保持一致的 state。',
     },
   ],
   exercise: {
@@ -182,11 +182,11 @@ return &lt;List items={visible} /&gt;;</code></pre></div>`,
         '会无限循环：effect 里调用 set 函数会触发渲染，渲染又触发 effect',
         '依赖数组漏了 setVisible',
         '没问题，这是派生数据的标准写法',
-        '多一轮渲染，先显示旧结果；应在渲染时直接计算',
+        '多一轮渲染：先用旧结果渲染一遍；应在渲染时直接计算',
       ],
       answer: 3,
       explain:
-        'visible 可以由 items 和 filter 算出，不需要 state，也不需要 effect。现在的流程是：先用旧的 visible 渲染并显示，effect 再设置新值，又渲染一次。直接写 <code>const visible = items.filter(…)</code> 即可；计算很慢时再用 useMemo。“无限循环”不对：依赖是 items 和 filter，setVisible 不会改变它们，所以 effect 不会反复执行。set 函数是稳定的，不需要写进依赖。',
+        'visible 可以由 items 和 filter 算出，不需要 state，也不需要 effect。现在的流程是：先用旧的 visible 渲染一遍，effect 再设置新值，又渲染一次。直接写 <code>const visible = items.filter(…)</code> 即可；计算很慢时再用 useMemo。“无限循环”不对：依赖是 items 和 filter，setVisible 不会改变它们，所以 effect 不会反复执行。set 函数是稳定的，不需要写进依赖。',
     },
   ],
   plays: {

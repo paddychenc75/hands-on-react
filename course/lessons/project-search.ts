@@ -197,6 +197,12 @@ function App() {
       await t.wait(1100);
       t.assert(names().join() === '李四', `快速输入“李”→“李四”后应只显示 李四，实际是：${names().join('、') || '无'}。过期请求的结果覆盖了新结果（需求 7）`);
       t.assert(!t.q('#error') && !t.q('#empty'), '显示结果时不应同时显示错误或“没有找到”');
+      // 失败分支的竞态：“错误”的请求约 300 ms 后失败，“李四娜”的请求约 100 ms 后返回空结果
+      await t.type('#search', '错误');
+      await t.wait(30);
+      await t.type('#search', '李四娜');
+      await t.wait(600);
+      t.assert(!t.q('#error') && t.text('#empty') === '没有找到', '过期请求的失败覆盖了新结果。失败的回调里也要先检查 ignore（需求 7）');
       await t.type('#search', '');
       await t.wait(100);
       t.assert(names().length === 0 && !t.q('#empty') && !t.q('#loading') && !t.q('#error'), '清空输入框后不应显示任何结果或提示（需求 2）');

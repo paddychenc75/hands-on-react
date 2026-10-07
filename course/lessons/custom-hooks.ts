@@ -41,14 +41,14 @@ export default {
     {
       q: '同事写了 <code>function getCounter() { const [n, setN] = useState(0); … }</code>，在组件顶层调用它，能正常运行。为什么还要把它改名为 <code>useCounter</code>？',
       options: [
-        'React 和 lint 工具靠“use + 大写字母”开头的名字认出 Hook，才会检查它有没有被写进 if 或循环',
+        'lint 工具靠“use + 大写字母”开头的名字认出 Hook，才会检查它有没有被写进 if 或循环',
         '没有实际作用，只是团队的命名习惯',
         '改名后，调用它的几个组件会共享同一份 n',
         '改名后 React 会把它当成组件，单独渲染一次',
       ],
       answer: 0,
       explain:
-        '名字是工具识别 Hook 的唯一依据。叫 getCounter 时，有人把它写进 if 里，lint 不会报错，运行时 Hook 顺序就会错乱。最迷惑的是第二项：今天能运行，不代表以后改代码时不出错。第三项也不对：改名不会改变“每次调用各有一份 state”。',
+        'React 运行时不看名字，但 lint 工具（以及 React Compiler）只靠名字认出 Hook。叫 getCounter 时，有人把它写进 if 里，lint 不会报错，运行时 Hook 顺序就会错乱。最迷惑的是第二项：今天能运行，不代表以后改代码时不出错。第三项也不对：改名不会改变“每次调用各有一份 state”。',
     },
   ],
   exercise: {

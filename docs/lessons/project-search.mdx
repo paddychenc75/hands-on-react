@@ -51,6 +51,22 @@ function useUserSearch(query) {
 }
 ```
 
+ignore 只是不采用过期的结果，请求照常完成。`AbortController` 会中断请求，省下流量。被取消的 `fetch` 会抛出 `AbortError`，要在 `catch` 里忽略它，因为它不是真的出错。
+
+```jsx title="用 AbortController 真的取消请求（模拟接口不支持，只能阅读）"
+useEffect(() => {
+  const controller = new AbortController();
+  fetch('/api/users?q=' + encodeURIComponent(query), { signal: controller.signal })
+    .then(res => res.json())
+    .then(data => setState({ status: 'success', data, error: null }))
+    .catch(error => {
+      if (error.name === 'AbortError') return;   // 被取消的请求：不是真的出错
+      setState({ status: 'error', data: [], error });
+    });
+  return () => controller.abort();
+}, [query]);
+```
+
 <CallBox kind="deep" label="深入一点">
 
 真实的搜索框通常还会加**防抖**：用户停止输入一段时间后，才发请求。
