@@ -1,0 +1,86 @@
+---
+title: "状态提升与组件通信"
+---
+
+# 状态提升与组件通信
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 的数据是**单向流动**的：父组件通过 props 把数据传给子组件。那么两个兄弟组件要共享数据怎么办？答案是：**把状态移到它们最近的共同父组件中**，再分别通过 props 传下去。这叫**状态提升（Lifting State Up）**。
+
+<Raw tag="figure" className="fig wide" html={"<svg viewBox=\"0 0 420 170\" class=\"tree\" role=\"img\" aria-label=\"状态提升示意图\">\n      <g class=\"t-edge\"><line x1=\"210\" y1=\"44\" x2=\"110\" y2=\"116\"/><line x1=\"210\" y1=\"44\" x2=\"310\" y2=\"116\"/></g>\n      <g class=\"t-node t-hot\"><rect x=\"140\" y=\"14\" width=\"140\" height=\"44\" rx=\"10\"/><text x=\"210\" y=\"34\">Parent</text><text x=\"210\" y=\"50\" class=\"t-small\">state: value</text></g>\n      <g class=\"t-node\"><rect x=\"40\" y=\"116\" width=\"140\" height=\"40\" rx=\"10\"/><text x=\"110\" y=\"141\">摄氏度输入</text></g>\n      <g class=\"t-node\"><rect x=\"240\" y=\"116\" width=\"140\" height=\"40\" rx=\"10\"/><text x=\"310\" y=\"141\">华氏度输入</text></g>\n      <text x=\"128\" y=\"84\" class=\"t-small t-lbl\">↓ props 数据</text><text x=\"292\" y=\"84\" class=\"t-small t-lbl\">↑ onChange 回调</text>\n    </svg><figcaption>数据向下流（props），事件向上传（回调函数）</figcaption>"} />
+
+```jsx play title="温度转换器：两个输入框共享一份状态"
+import { useState } from 'react';
+
+function TempInput({ label, value, onChange }) {
+  return (
+    <p>
+      <label>{label}：
+        <input value={value} onChange={e => onChange(e.target.value)} />
+      </label>
+    </p>
+  );
+}
+
+function App() {
+  // 唯一数据源：只存用户刚输入的值，以及它的单位
+  const [temp, setTemp] = useState({ value: '20', scale: 'c' });
+
+  const n = parseFloat(temp.value);
+  const round = x => String(Math.round(x * 10) / 10);
+  // 两个框各自显示的值
+  const celsius = temp.scale === 'c' ? temp.value : (isNaN(n) ? '' : round((n - 32) * 5 / 9));
+  const fahrenheit = temp.scale === 'f' ? temp.value : (isNaN(n) ? '' : round(n * 9 / 5 + 32));
+  const c = parseFloat(celsius);
+
+  return (
+    <div>
+      <TempInput label="摄氏度 °C" value={celsius} onChange={v => setTemp({ value: v, scale: 'c' })} />
+      <TempInput label="华氏度 °F" value={fahrenheit} onChange={v => setTemp({ value: v, scale: 'f' })} />
+      <p>{c >= 100 ? '💨 水会沸腾' : '💧 水不会沸腾'}</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+**唯一数据源**：同一份数据只存一份 state。另一个单位的温度可以算出来。所以不要同时存 celsius 和 fahrenheit 两个 state，否则两者很容易不同步。
+
+</CallBox>
+
+## state 该放在哪里？
+
+一个实用的判断流程：
+
+- 找出所有**用到**这个 state 的组件
+- 找到它们**最近的共同父组件**
+- 把 state 放在那个父组件（或更上层）里
+- 如果只有一个组件用到，就留在那个组件里，不要过早提升
+
+## Props 层层传递的问题
+
+共同父组件可能离使用者很远。这时，中间的每层组件都要接收并转发 props。即使它们自己不用，也要转发。这叫 **prop drilling（逐层传递 props）**。小范围可以接受；层级很深时，可以用第 12 课的 **Context** 解决。
+
+<CallBox kind="like" label="打个比方">
+
+状态提升像家里的电视遥控器。遥控器只有一个，放在客厅（共同的父组件）。哥哥和妹妹（子组件）不能各自藏一个遥控器。想换台时，他们对客厅喊一声“换到 5 台”（调用回调）。电视显示什么（props），由客厅那个遥控器决定。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

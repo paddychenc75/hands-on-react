@@ -1,0 +1,225 @@
+---
+title: "路由：React Router"
+---
+
+# 路由：React Router
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 本身只负责渲染界面，并不知道“页面”是什么。在单页应用（SPA）里，切换页面分三步：
+
+1. URL 变化。
+2. 路由库读取 URL。
+3. 路由库决定渲染哪个组件。
+
+整个过程中浏览器不刷新。React Router 是最常用的路由库。
+
+## 核心 API
+
+```jsx title="React Router 的标准写法"
+import { BrowserRouter, Routes, Route, Link, Outlet, useParams, useNavigate } from 'react-router';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout />}>          {/* 父路由：公共布局 */}
+          <Route index element={<Home />} />           {/* 访问 / 时 */}
+          <Route path="users" element={<UserList />} />
+          <Route path="users/:id" element={<UserDetail />} />  {/* 动态参数 */}
+          <Route path="*" element={<NotFound />} />    {/* 兜底 404 */}
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function Layout() {
+  return (
+    <>
+      <nav><Link to="/">首页</Link> <Link to="/users">用户</Link></nav>
+      <Outlet />   {/* 子路由渲染在这里 */}
+    </>
+  );
+}
+
+function UserDetail() {
+  const { id } = useParams();          // 读取 URL 中的 :id
+  const navigate = useNavigate();      // 用代码跳转
+  return <button onClick={() => navigate('/users')}>返回列表（当前 {id}）</button>;
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+站内跳转要用 `<Link to="...">`，不要用 `<a href="...">`。普通链接会让浏览器整页刷新，所有 state 都会丢失。
+
+</CallBox>
+
+## 自己动手：一个 40 行的迷你路由
+
+本页的沙箱不能加载 React Router。所以我们用学过的 Context 和 state 写一个**迷你版**。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。路由表用数组传入，写法类似 `createBrowserRouter`，也不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
+
+```jsx play title="迷你路由（Link 和 Hook 的用法与 React Router 一致）"
+import { createContext, useContext, useState } from 'react';
+
+// ===== 迷你路由库 =====
+const RouterCtx = createContext(null);
+const ParamsCtx = createContext({});
+
+function Router({ children }) {
+  const [path, setPath] = useState('/');   // 真实的库会读写 window.location
+  return <RouterCtx.Provider value={{ path, navigate: setPath }}>{children}</RouterCtx.Provider>;
+}
+
+// 把 '/users/:id' 和 '/users/42' 匹配，得到 { id: '42' }
+function matchPath(pattern, path) {
+  const a = pattern.split('/').filter(Boolean), b = path.split('/').filter(Boolean);
+  if (a.length !== b.length) return null;
+  const params = {};
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startsWith(':')) params[a[i].slice(1)] = decodeURIComponent(b[i]);
+    else if (a[i] !== b[i]) return null;
+  }
+  return params;
+}
+
+function Routes({ routes }) {
+  const { path } = useContext(RouterCtx);
+  for (const r of routes) {
+    const params = matchPath(r.path, path);
+    if (params) return <ParamsCtx.Provider value={params}>{r.element}</ParamsCtx.Provider>;
+  }
+  return <p>404：没有页面匹配 {path}</p>;
+}
+
+// 注意：这个迷你 Link 会加粗当前页，方便观察。
+// 真实的 React Router 里，Link 不加样式；高亮当前页要用 NavLink。
+function Link({ to, children }) {
+  const { path, navigate } = useContext(RouterCtx);
+  return <a href={to} onClick={e => { e.preventDefault(); navigate(to); }}
+    style={{ marginRight: 10, fontWeight: path === to ? 700 : 400 }}>{children}</a>;
+}
+const useParams = () => useContext(ParamsCtx);
+const useNavigate = () => useContext(RouterCtx).navigate;
+const useLocation = () => ({ pathname: useContext(RouterCtx).path });
+
+// ===== 应用代码 =====
+const USERS = [{ id: '1', name: '张三' }, { id: '2', name: '李四' }];
+
+function Home() { return <h3>🏠 首页</h3>; }
+function UserList() {
+  return <ul>{USERS.map(u => <li key={u.id}><Link to={'/users/' + u.id}>{u.name}</Link></li>)}</ul>;
+}
+function UserDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const user = USERS.find(u => u.id === id);
+  return (
+    <div>
+      <h3>👤 {user ? user.name : '未知用户'}（id = {id}）</h3>
+      <button onClick={() => navigate('/users')}>← 返回列表</button>
+    </div>
+  );
+}
+
+function AddressBar() {
+  const { pathname } = useLocation();
+  return <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>https://example.com{pathname}</div>;
+}
+
+function App() {
+  return (
+    <Router>
+      <AddressBar />
+      <nav style={{ margin: '8px 0' }}>
+        <Link to="/">首页</Link><Link to="/users">用户</Link><Link to="/about">关于</Link>
+      </nav>
+      <Routes routes={[
+        { path: '/', element: <Home /> },
+        { path: '/users', element: <UserList /> },
+        { path: '/users/:id', element: <UserDetail /> },
+      ]} />
+    </Router>
+  );
+}
+```
+
+## URL 也是状态
+
+搜索词、页码、筛选条件最适合放在 URL 的查询参数里。这样用户刷新页面不会丢失，复制链接发给别人能看到同样的结果。
+
+```jsx
+import { useSearchParams } from 'react-router';
+
+function ProductList() {
+  const [params, setParams] = useSearchParams();   // 用法和 useState 很像
+  const q = params.get('q') ?? '';
+  const page = Number(params.get('page') ?? 1);
+  // URL: /products?q=键盘&page=2&sort=price
+  return <input value={q} onChange={e => setParams(prev => {
+    prev.set('q', e.target.value);   // 只改 q 和 page，保留 sort 等其他参数
+    prev.set('page', '1');
+    return prev;
+  }, { replace: true })} />;          // 替换当前历史记录，不新增
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+输入框这类高频更新，用 `{ replace: true }`。否则每输入一个字就多一条历史记录，用户要按很多次“后退”。翻页这类用户想后退的操作，用默认的 push。
+
+</CallBox>
+
+## 选哪种模式？
+
+| 情况 | 模式 |
+|---|---|
+| 已有的纯客户端应用 | 声明式（`<BrowserRouter>`） |
+| 要在进入页面前取数据，或要显示待定状态 | 数据模式（`createBrowserRouter`） |
+| 新项目，需要服务端渲染 | 框架模式（react.dev 推荐从框架开始） |
+
+版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。
+
+## 上线前必遇的三件事
+
+```jsx
+// 1. 受保护路由：未登录时跳到登录页
+function RequireAuth({ children }) {
+  const user = useUser();
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+// 2. 路由级代码分割：进入详情页时才下载它的代码
+const UserDetail = lazy(() => import('./UserDetail'));
+// 在布局里：<Suspense fallback={<p>加载中…</p>}><Outlet /></Suspense>
+```
+
+<CallBox kind="warn" label="常见坑">
+
+第 3 件事（上面的代码写了前两件）：部署 SPA 时，服务器要把所有路径都返回 `index.html`。Vercel 用 rewrites，Netlify 用 `_redirects`。否则在 `/users/2` 刷新或直接打开链接，会得到 404。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+React Router 的数据模式（`createBrowserRouter`）和框架模式还提供两个功能。`loader` 在进入页面前加载数据。路由 `action` 处理表单提交。本课用的 `<BrowserRouter>` 属于声明式模式，不支持这两个功能。这和第 29 课的 Server Components、Server Functions 思路相同。**数据跟着路由加载**，不在组件里用 effect 请求。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

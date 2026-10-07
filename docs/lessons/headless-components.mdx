@@ -1,0 +1,377 @@
+---
+title: "组件库 API 设计：Headless 组件"
+---
+
+# 组件库 API 设计：Headless 组件
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 25 课写了 Tabs 和 Toggle。它们的标记和样式都写死在组件里。使用者想把 Tab 换成链接，或者换一套视觉，就只能复制代码再改。
+
+组件库越大，这个问题越严重。不同产品的视觉差别很大，但键盘行为、焦点管理、ARIA 属性的要求是一样的，而且最难写对。**Headless 组件**（无头组件）就是把这两部分拆开：库负责状态、行为和无障碍属性，使用者负责标记和样式。React Aria、Downshift、Headless UI、Radix 的底层都是这个思路。
+
+本课按一个 Listbox（可选列表）的实现顺序讲四件事：受控与非受控的通用抽象、prop getters、复合组件、键盘焦点。最后讲 API 怎样演进。
+
+## 一、受控与非受控：抽成 useControllableState
+
+第 25 课的 Toggle 自己判断受控。每个组件都写一遍，就会有的组件用 `value !== undefined` 判断，有的用 `value != null`，有的看有没有 onChange。组件库应该把这个判断抽成一个 Hook，所有组件共用。
+
+这个 Hook 的规则有三条：
+
+1. 传了 `value`（包括 `null`）就是受控。`null` 表示“受控，但没有选中”，不是“没传”。
+2. 受控时，只调用 `onChange(新值)`，不修改内部 state。显示什么由父组件决定。
+3. 非受控时，修改内部 state，同时也调用 `onChange`。使用者可以只监听，不接管。
+
+还有一个容易漏掉的边界：**函数式更新**。React 的 set 函数接受 `v => v + 1`，于是很多人让 setValue 也支持函数。下面的 Stepper 在一次点击里调用两次 `setValue(v => v + 1)`。先预测，再运行。
+
+```jsx play title="受控模式下的函数式更新"
+import { useState } from 'react';
+
+function useControllableState({ value, defaultValue, onChange }) {
+  const [inner, setInner] = useState(defaultValue);
+  const isControlled = value !== undefined;
+  const current = isControlled ? value : inner;
+
+  function setValue(next) {
+    if (isControlled) {
+      const resolved = typeof next === 'function' ? next(value) : next;
+      onChange?.(resolved);
+    } else {
+      setInner(next); // 简化：这里省略了非受控时的 onChange
+    }
+  }
+  return [current, setValue];
+}
+
+function Stepper({ label, value, defaultValue, onChange }) {
+  const [n, setN] = useControllableState({ value, defaultValue, onChange });
+  function addTwo() {
+    setN(v => v + 1);
+    setN(v => v + 1);
+  }
+  return (
+    <p>
+      {label}：<b>{n}</b>{' '}
+      <button onClick={addTwo}>+2</button>
+    </p>
+  );
+}
+
+function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <Stepper label="非受控" defaultValue={0} />
+      <Stepper label="受控" value={count} onChange={setCount} />
+    </div>
+  );
+}
+```
+
+这个问题没有完美的修法。父组件可以拒绝新值，Hook 无法知道“最新值”到底是什么。成熟的库通常这样处理：
+
+- 库的内部代码在一个事件里**只调用一次** setValue。先算出最终值，例如 `setValue(n + 2)`。
+- 文档写明：受控模式下，函数式更新基于本次渲染的 value 计算。
+- 在开发环境检测“先非受控、后受控”的切换并警告，就像 React 对 `<input>` 做的那样。实现方法：用 ref 记住第一次渲染时的模式，之后每次比较。
+
+<CallBox kind="warn" label="常见坑">
+
+`value={user?.city}` 是最常见的模式切换来源。数据到达前 value 是 undefined，组件是非受控的。数据到达后变成受控，用户之前的选择被丢掉。想表达“受控，但还没有值”，就传 `null`：`value={user?.city ?? null}`。
+
+</CallBox>
+
+## 二、Headless Hook 与 prop getters
+
+Hook 管状态，但键盘事件、`aria-*` 属性、id 都必须落到使用者渲染的元素上。Hook 看不到这些元素，所以它返回一组函数，由使用者展开到元素上。这种函数叫 **prop getter**：调用它，得到一组应该放在某个元素上的 props。
+
+为什么是函数，而不是一个现成的对象？因为使用者也有自己的 props，尤其是事件处理函数。getter 接收使用者的 props，把两边合并，保证两边的 onClick 都执行。下面两个组件用同一个 Hook，画出两种完全不同的界面。
+
+```jsx play title="同一个 Hook，两种界面"
+import { useState, useId } from 'react';
+
+// 依次调用多个函数，跳过 undefined
+function callAll(...fns) {
+  return (...args) => fns.forEach(fn => fn && fn(...args));
+}
+
+function useDisclosure({ defaultOpen = false } = {}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId() + '-panel';
+  return {
+    open,
+    getButtonProps: (props = {}) => ({
+      ...props,
+      'aria-expanded': open,
+      'aria-controls': panelId,
+      onClick: callAll(props.onClick, () => setOpen(o => !o)),
+    }),
+    getPanelProps: (props = {}) => ({ ...props, id: panelId, hidden: !open }),
+  };
+}
+
+function FaqItem({ q, a }) {
+  const d = useDisclosure();
+  return (
+    <div style={{ borderBottom: '1px solid #ccc', padding: '6px 0' }}>
+      <button {...d.getButtonProps({ onClick: () => console.log('统计：展开或收起了', q) })}
+        style={{ border: 0, background: 'none', font: 'inherit', cursor: 'pointer' }}>
+        {d.open ? '▾' : '▸'} {q}
+      </button>
+      <p {...d.getPanelProps({ style: { margin: '4px 0 0 18px' } })}>{a}</p>
+    </div>
+  );
+}
+
+function FilterBox() {
+  const d = useDisclosure();
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button {...d.getButtonProps()} onClick={() => console.log('统计：点了筛选')}>
+        筛选条件 {d.open ? '（收起）' : '（展开）'}
+      </button>
+      <div {...d.getPanelProps()}>价格、品牌、评分</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <FaqItem q="可以退货吗？" a="收货后 7 天内可以。" />
+      <FaqItem q="多久发货？" a="付款后 48 小时内。" />
+      <FilterBox />
+    </div>
+  );
+}
+```
+
+写 getter 时注意三点：
+
+- <strong>先展开使用者的 props，再写自己的属性。</strong>这样 role、aria-\* 这类必须正确的属性不会被意外覆盖。需要合并的（事件处理函数、className、style、ref）单独合并。
+- <strong>事件按固定顺序调用。</strong>常见约定是先调用使用者的，再执行 Hook 的。Downshift 还允许使用者设置一个标记，跳过 Hook 的默认行为。
+- <strong>ref 也要合并。</strong>Hook 常常需要元素的 ref（例如聚焦、滚动）。使用者也可能传 ref。React 18 中要写一个 mergeRefs，依次给每个 ref 赋值。
+
+## 三、Hook 加 Context：复合组件
+
+prop getters 最灵活，但使用者要自己写很多展开。大多数使用者更想写 `<Listbox.Option>`。第 25 课学过用 Context 组合复合组件。把两者叠起来，就得到组件库常见的三层结构：
+
+| 层 | 使用者写什么 | 适合谁 |
+|---|---|---|
+| headless Hook | `useListbox()` + 自己展开 getter | 要求特殊结构的少数场景 |
+| 无样式复合组件 | `<Listbox><Listbox.Option>` | 要自己定视觉的团队 |
+| 带样式的组件 | `<Select options={…} />` | 大多数页面 |
+
+上层只用下层，不重复实现行为。使用者先用最上层；不够用时，往下退一层，而不是给上层再加一个配置 prop。
+
+```jsx title="复合组件内部调用 headless Hook"
+const ListboxContext = createContext(null);
+
+function Listbox({ value, defaultValue, onChange, children, ...rest }) {
+  // 从 children 收集选项：这里假设 Option 都是直接子元素
+  const options = Children.toArray(children).map(c => ({ value: c.props.value }));
+  const lb = useListbox({ options, value, defaultValue, onChange });
+  return (
+    <ListboxContext.Provider value={{ lb, options }}>
+      <ul {...lb.getListboxProps(rest)}>{children}</ul>
+    </ListboxContext.Provider>
+  );
+}
+
+function Option({ value, children }) {
+  const { lb, options } = useContext(ListboxContext);
+  const index = options.findIndex(o => o.value === value);
+  return <li {...lb.getOptionProps(index)}>{children}</li>;
+}
+Listbox.Option = Option;
+
+// 使用者只写结构，不碰键盘和 aria
+<Listbox aria-label="水果" defaultValue="banana">
+  <Listbox.Option value="apple">苹果</Listbox.Option>
+  <Listbox.Option value="banana">香蕉</Listbox.Option>
+</Listbox>
+```
+
+这里有一个真实的难点：键盘导航需要知道“下一个选项是谁”，也就是选项的顺序。上面用 `Children.toArray` 读取，只认直接子元素。使用者给 Option 包一层 div，顺序就丢了。成熟的库有两种做法：
+
+- **集合 API**：使用者传 `items` 数组，再用 render 函数渲染每一项。顺序明确，适合虚拟列表；写法不那么像 HTML。
+- **注册**：每个 Option 挂载时把自己的 ref 交给父组件，父组件按 DOM 位置排序（`compareDocumentPosition`）。写法自由；实现复杂，首次渲染时还拿不到顺序。
+
+## 四、键盘焦点的两种方案
+
+列表、菜单、工具栏、标签页都是“一组项目”。WAI-ARIA 编写实践指南（APG）规定：整组只占 **一个** Tab 停靠点，组内用方向键移动。第 26 课讲过 Tab 顺序。这里要决定的是：方向键移动时，**真实的焦点**在哪里。
+
+- **roving tabindex**（流动的 tabindex）：焦点真的移到当前项。当前项 `tabIndex={0}`，其他项 `tabIndex={-1}`，按方向键时调用 `element.focus()`。
+- **aria-activedescendant**：焦点一直留在容器上。容器的 `aria-activedescendant` 写当前项的 id，读屏软件据此读出当前项。当前项的高亮由你用样式画出来。
+
+下面左边的工具栏用第一种，右边的列表用第二种。点一下示例上方的空白处，然后只用 Tab 和方向键操作，观察最下面一行。
+
+```jsx play title="roving tabindex 与 aria-activedescendant"
+import { useState, useRef, useEffect, useId } from 'react';
+
+const TOOLS = ['加粗', '斜体', '下划线', '链接'];
+
+function Toolbar() {
+  const [active, setActive] = useState(0);
+  const refs = useRef([]);
+  function onKeyDown(e) {
+    let next;
+    if (e.key === 'ArrowRight') next = (active + 1) % TOOLS.length;
+    else if (e.key === 'ArrowLeft') next = (active - 1 + TOOLS.length) % TOOLS.length;
+    else return;
+    e.preventDefault();
+    setActive(next);
+    refs.current[next].focus(); // 方案一：焦点真的移过去
+  }
+  return (
+    <div role="toolbar" aria-label="文字格式" onKeyDown={onKeyDown} style={{ display: 'flex', gap: 4 }}>
+      {TOOLS.map((name, i) => (
+        <button key={name} ref={el => (refs.current[i] = el)}
+          tabIndex={i === active ? 0 : -1} onClick={() => setActive(i)}>
+          {name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const SIZES = ['小号', '中号', '大号', '特大号'];
+
+function SizeList() {
+  const [active, setActive] = useState(0);
+  const id = useId();
+  function onKeyDown(e) {
+    let next;
+    if (e.key === 'ArrowDown') next = Math.min(active + 1, SIZES.length - 1);
+    else if (e.key === 'ArrowUp') next = Math.max(active - 1, 0);
+    else return;
+    e.preventDefault();
+    setActive(next); // 方案二：焦点不动，只改指向
+  }
+  return (
+    <ul role="listbox" aria-label="字号" tabIndex={0} onKeyDown={onKeyDown}
+      aria-activedescendant={id + '-' + active}
+      style={{ listStyle: 'none', padding: 4, margin: 0, border: '1px solid #999', width: 120 }}>
+      {SIZES.map((s, i) => (
+        <li key={s} id={id + '-' + i} role="option" aria-selected={i === active}
+          style={{ padding: '2px 8px', background: i === active ? '#dbeafe' : 'transparent', color: '#222' }}>
+          {s}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FocusWatcher() {
+  const [desc, setDesc] = useState('（还没有焦点）');
+  useEffect(() => {
+    function onFocusIn(e) {
+      const el = e.target;
+      setDesc(el.tagName.toLowerCase() + '：' + (el.getAttribute('aria-label') || el.textContent));
+    }
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+  return <p>焦点所在的元素 → <b>{desc}</b></p>;
+}
+
+function App() {
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <Toolbar />
+        <SizeList />
+      </div>
+      <FocusWatcher />
+    </div>
+  );
+}
+```
+
+|  | roving tabindex | aria-activedescendant |
+|---|---|---|
+| 焦点在哪里 | 当前项本身 | 容器或输入框 |
+| 当前项要求 | 能聚焦的元素 | 有 id，且在 DOM 中 |
+| 滚动到可见 | 浏览器聚焦时自动滚动 | 要自己调用 scrollIntoView |
+| 适合 | 工具栏、单选组、标签页、菜单 | Combobox（边输入边选）、长列表 |
+| 常见坑 | 只改了 tabIndex，忘了调用 focus() | 容器没有 tabIndex，键盘事件根本到不了 |
+
+判断规则只有一条：<strong>用户要一边打字一边选择吗？</strong>Combobox 的焦点必须留在输入框里，否则打字会中断，所以只能用 aria-activedescendant。其他情况两种都可以，roving tabindex 的读屏兼容性通常更好。
+
+<CallBox kind="deep" label="深入一点">
+
+Listbox 有两种选择方式。“选择跟随焦点”：方向键移到哪项就选中哪项，适合选项少、选中没有副作用的情况（例如标签页）。“显式选择”：方向键只移动高亮，按 Enter 或空格才选中，适合选中会触发请求或跳转的情况。本课练习用后者，所以 Hook 里要区分“高亮的项”（activeIndex）和“选中的值”（value）。
+
+</CallBox>
+
+## 五、API 设计的取舍
+
+写好一个组件只是开始。它会被几十个页面使用，每次改动都可能弄坏别人的代码。设计 API 时要回答三个问题。
+
+<strong>1. 默认值是什么？</strong>好的默认值让 80% 的使用者什么都不用配：默认非受控，能直接用；ARIA 属性默认正确，使用者不需要知道 aria-activedescendant 是什么；键盘行为默认符合 APG。默认值一旦发布，就是 API 的一部分。
+
+<strong>2. 灵活还是易用？</strong>两者冲突时，不要靠加 prop 解决。`renderOption`、`optionClassName`、`showCheck`、`checkPosition`……每加一个 prop，组合的情况就翻倍，测试和文档都跟不上。更好的做法是上面的分层：上层易用，下层灵活，使用者自己选。
+
+<strong>3. 这次改动是破坏性的吗？</strong>判断标准：使用者不改代码，升级后行为会不会变。
+
+| 改动 | 破坏性？ | 怎样发布 |
+|---|---|---|
+| 新增可选 prop，默认值保持旧行为 | 否 | 小版本 |
+| 修改已有 prop 的默认值 | 是 | 新增一个 prop 表达新行为；或等大版本 |
+| 改回调参数：onChange(value) 改成 onChange(event) | 是 | 新增 onValueChange，旧的标记为废弃 |
+| getter 多返回一个属性 | 通常否；可能覆盖使用者的同名属性 | 发布说明里写明 |
+| 删除 prop | 是 | 先在开发环境警告至少一个大版本，再删除；能写 codemod 就写 |
+| 修改 DOM 结构或类名 | 对依赖选择器的使用者是 | 在文档里声明：哪些属于公开 API |
+
+<CallBox kind="warn" label="常见坑">
+
+“废弃”不等于“删除”。废弃时，旧 prop 继续工作，只在开发环境打印一次警告，并告诉使用者换成什么。直接删除会让升级变成一次性的大改动，团队就不敢升级了。
+
+</CallBox>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>六、多态组件与 asChild<small>可以先跳过，需要时再展开</small></summary>
+
+使用者常常想“行为是按钮，元素是链接”。有两种 API。下面的代码只能阅读：TypeScript 类型在本页的运行环境里不检查。
+
+```jsx title="多态组件的两种写法"
+// 方案一：as prop。类型要从 as 推导出可用的 props
+type ButtonProps<C extends React.ElementType> = {
+  as?: C;
+  variant?: 'primary' | 'ghost';
+} & Omit<React.ComponentPropsWithoutRef<C>, 'as' | 'variant'>;
+
+function Button<C extends React.ElementType = 'button'>({ as, variant, ...rest }: ButtonProps<C>) {
+  const Comp = as ?? 'button';
+  return <Comp data-variant={variant} {...rest} />;
+}
+
+<Button as="a" href="/docs">文档</Button>      // href 有类型提示
+<Button as="a" disabled>文档</Button>           // 类型报错：a 没有 disabled
+
+// 方案二：asChild（Radix 的写法）。把行为和属性合并到唯一的子元素上
+<Dialog.Trigger asChild>
+  <a href="#">打开</a>
+</Dialog.Trigger>
+```
+
+`as` 的泛型类型写起来很重，会拖慢类型检查。`asChild` 用 `cloneElement` 合并 props，类型简单，但要求子元素正好一个，并且能接收 ref。两者都要处理事件和 ref 的合并，这正是上面 prop getter 做的事。
+
+组件库通常还配一个 **Storybook**：每个组件、每种状态（受控、非受控、禁用、出错）写一个“故事”，作为活文档和视觉回归测试的基础。API 的每次改动都应该先改故事，再看哪些故事坏了。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

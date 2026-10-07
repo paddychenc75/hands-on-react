@@ -1,0 +1,125 @@
+---
+title: "闭包陷阱与 Effect 依赖"
+---
+
+# 闭包陷阱与 Effect 依赖
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+这是从“会用 React”到“精通 React”必须跨过的一道坎。核心规则：**每一次渲染，都有自己的 props、state、事件处理函数和 effect**。先用一个演示检验这条规则。
+
+```jsx play title="3 秒后打印什么？"
+import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  function showLater() {
+    setTimeout(() => {
+      console.log('打印 count：' + count);
+    }, 3000);
+  }
+
+  return (
+    <div>
+      <p>count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+      <button onClick={showLater}>3 秒后打印 count</button>
+    </div>
+  );
+}
+```
+
+组件函数每次执行，都会创建一批新的局部变量和函数。这些函数通过**闭包**“记住”了创建它们的那次渲染中的值，并且永远不会改变。
+
+这不是 bug，而是一种可预测的特性：事件处理函数“属于”它被创建的那次渲染。
+
+## 经典陷阱：effect 中的过期闭包
+
+```jsx play title="这个计数器会怎样？"
+import { useState, useEffect } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCount(count + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return <h2>{count}</h2>;
+}
+```
+
+effect 只在挂载时运行一次。所以 interval 回调中的 `count` 永远是第一次渲染时的 0。回调每秒都执行 `setCount(0 + 1)`。
+
+## 三种修复方式
+
+| 方法 | 代码 | 评价 |
+|---|---|---|
+| ① 补全依赖 | `}, [count])` | 能用，但每秒都要清理并重建定时器 |
+| ② 函数式更新 | `setCount(c => c + 1)` | **最佳**：不再读取 count，依赖可以为空 |
+| ③ useReducer | `dispatch({ type: 'tick' })` | 适合逻辑依赖多个状态时，dispatch 引用永远稳定 |
+
+<CallBox kind="tip" label="要点">
+
+减少依赖时，不要直接删掉依赖数组里的值。正确的做法是**修改代码，让 effect 不再需要那个值**。常用方法有三个：
+
+1. 使用函数式更新。
+2. 把函数移到 effect 内部。
+3. 把不依赖 props 和 state 的对象移到组件外部。
+
+</CallBox>
+
+## 用 ref 读取最新值
+
+有时，长期存在的回调需要读取最新的值。但你不想让这个值触发 effect 重新执行。这时可以用 ref 保存最新值：
+
+```jsx
+const latestCount = useRef(count);
+useEffect(() => { latestCount.current = count; }); // 每次渲染后同步
+
+useEffect(() => {
+  const id = setInterval(() => {
+    console.log('最新的 count:', latestCount.current);
+  }, 1000);
+  return () => clearInterval(id);
+}, []); // 依赖为空，但能读到最新值
+```
+
+<CallBox kind="deep" label="深入一点">
+
+React 19.2 起提供 `useEffectEvent`。它从 effect 中提取不应成为依赖的逻辑，总能读到最新的 props 和 state。限制有两条：
+
+1. 只能在 effect 内部调用。
+2. 不要把它放进依赖数组。
+
+在 19.2 及以上版本中，它可以代替上面的 ref 方案。
+
+</CallBox>
+
+## 对象和函数作为依赖
+
+<CallBox kind="warn" label="常见坑">
+
+在组件内定义的对象或函数，每次渲染都是新引用。把它放进依赖数组后，effect 会**每次渲染都执行**。如果 effect 里又调用 set 函数，就会**无限循环**。解决方法：把它移到组件外部，或移到 effect 内部，或用 useMemo、useCallback 固定它的引用。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

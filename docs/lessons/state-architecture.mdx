@@ -1,0 +1,109 @@
+---
+title: "状态管理架构"
+---
+
+# 状态管理架构
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+“该用 Redux 还是 Zustand 还是 Context？”这个问题的答案，取决于你先把状态**分类**。
+
+| 状态类型 | 例子 | 推荐方案 |
+|---|---|---|
+| 局部 UI 状态 | 弹窗开关、输入框内容 | useState / useReducer |
+| 服务端状态（远程数据的缓存） | 用户列表、商品详情 | **TanStack Query**、SWR、框架自带的数据加载 |
+| 全局客户端状态 | 主题、购物车、编辑器状态 | Context（低频）、**Zustand**、Redux Toolkit、Jotai |
+| URL 状态 | 搜索词、页码、筛选条件 | 路由的查询参数（可分享、可刷新） |
+| 表单状态 | 复杂多步表单 | React Hook Form 等 |
+
+<CallBox kind="tip" label="要点">
+
+一个重要的认知转变：大多数“全局状态”其实是**服务端数据的缓存**。把这些数据交给 TanStack Query 这类库管理。这类库自带缓存、重新验证、去重和乐观更新。之后，真正需要全局管理的客户端 state 通常很少。
+
+</CallBox>
+
+## 外部 Store 的原理
+
+Redux、Zustand 这类库把状态存在 React **外部**的一个普通 JS 对象里。组件需要：① 读取当前值；② 订阅变化，在变化时重新渲染。React 18 为此提供了专用 Hook：`useSyncExternalStore`。它还能避免并发渲染中的“撕裂”问题。撕裂指同一时刻不同组件读到不同的值。
+
+```jsx
+const value = useSyncExternalStore(
+  subscribe,   // (callback) => unsubscribe：store 变化时调用 callback
+  getSnapshot  // () => 当前值：必须在没变化时返回相同的引用
+);
+```
+
+```jsx play title="亲手实现 Zustand"
+import { useSyncExternalStore } from 'react';
+
+// —— 一个 20 行的迷你 Zustand ——
+function create(initializer) {
+  let state;
+  const listeners = new Set();
+  const setState = (partial) => {
+    const next = typeof partial === 'function' ? partial(state) : partial;
+    state = { ...state, ...next };
+    listeners.forEach(l => l());
+  };
+  const getState = () => state;
+  const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
+  state = initializer(setState, getState);
+
+  // 返回一个 Hook，组件用它读取 store
+  return function useStore(selector = s => s) {
+    return useSyncExternalStore(subscribe, () => selector(getState()));
+  };
+}
+
+// —— 使用方式和真正的 Zustand 几乎一样 ——
+const useBear = create((set) => ({
+  bears: 0,
+  honey: 10,
+  addBear: () => set(s => ({ bears: s.bears + 1 })),
+  eatHoney: () => set(s => ({ honey: s.honey - 1 })),
+}));
+
+function BearCounter() {
+  const bears = useBear(s => s.bears);
+  console.log('BearCounter 渲染');
+  return <p>🐻 熊的数量：{bears}</p>;
+}
+
+function HoneyPot() {
+  const honey = useBear(s => s.honey);
+  console.log('HoneyPot 渲染');
+  return <p>🍯 蜂蜜：{honey}</p>;
+}
+
+function Controls() {
+  const addBear = useBear(s => s.addBear);
+  const eatHoney = useBear(s => s.eatHoney);
+  return <p><button onClick={addBear}>加一只熊</button> <button onClick={eatHoney}>吃蜂蜜</button></p>;
+}
+
+function App() {
+  return <div><BearCounter /><HoneyPot /><Controls /></div>;
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+`getSnapshot` 必须在 store 没变化时返回**同一个引用**。如果 selector 每次都返回新对象（如 `s => ({ a: s.a, b: s.b })`），React 会认为值一直在变。结果是无限渲染。Zustand 为此提供了 `useShallow`。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

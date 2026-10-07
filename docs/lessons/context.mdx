@@ -1,0 +1,142 @@
+---
+title: "Context：跨层级共享数据"
+---
+
+# Context：跨层级共享数据
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+主题色、当前用户、语言设置这类数据，会被**很多层的很多个组件**使用。一层一层传 props 非常繁琐。**Context** 让父组件把数据“广播”给整棵子树。任何深度的组件都能直接读取。
+
+## 三步使用 Context
+
+```jsx
+// ① 创建：给一个默认值
+const ThemeContext = createContext('light');
+
+// ② 提供：用 Provider 包住子树，传入 value
+// （React 19 也可以直接写 <ThemeContext value="dark">，本课运行环境是 React 18）
+<ThemeContext.Provider value="dark">
+  <Page />
+</ThemeContext.Provider>
+
+// ③ 消费：在任意后代组件中读取
+const theme = useContext(ThemeContext); // 'dark'
+```
+
+```jsx play title="主题切换"
+import { createContext, useContext, useState } from 'react';
+
+const ThemeContext = createContext('light');
+
+function App() {
+  const [theme, setTheme] = useState('light');
+  return (
+    <>
+      <ThemeContext.Provider value={theme}>
+        <button onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>切换主题</button>
+        <Page />
+      </ThemeContext.Provider>
+      <ThemedCard title="卡片 C（在 Provider 外面）" />
+    </>
+  );
+}
+
+// 中间层组件：完全不需要知道 theme 的存在
+function Page() {
+  return <Sidebar />;
+}
+function Sidebar() {
+  return <div><ThemedCard title="卡片 A" /><ThemedCard title="卡片 B" /></div>;
+}
+
+// 深层组件：直接读取
+function ThemedCard({ title }) {
+  const theme = useContext(ThemeContext);
+  const style = theme === 'dark'
+    ? { background: '#1e2a30', color: '#e6f1f5' }
+    : { background: '#f2f6f8', color: '#14222a' };
+  return <div style={{ ...style, padding: 12, margin: 6, borderRadius: 8 }}>{title}：当前是 {theme} 主题</div>;
+}
+```
+
+## Context + State：可修改的全局数据
+
+Context 本身只是“传递”数据的通道。把 state 和修改它的函数一起放进 value，后代组件就既能读也能改。下面把 state 和 Provider 一起封装成 `CartProvider` 组件，后代组件直接用 `useContext(CartContext)` 读取：
+
+```jsx play title="购物车 Context"
+import { createContext, useContext, useState } from 'react';
+
+const CartContext = createContext(null);
+
+function CartProvider({ children }) {
+  const [items, setItems] = useState([]);
+  const add = (name) => setItems(list => [...list, name]);
+  const clear = () => setItems([]);
+  return (
+    <CartContext.Provider value={{ items, add, clear }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+function Header() {
+  const { items } = useContext(CartContext);
+  return <h3>🛒 购物车（{items.length}）</h3>;
+}
+
+function Product({ name }) {
+  const { add } = useContext(CartContext);
+  return <button onClick={() => add(name)}>加入 {name}</button>;
+}
+
+function App() {
+  return (
+    <CartProvider>
+      <Header />
+      <Product name="键盘" />
+      <Product name="鼠标" />
+      <ClearButton />
+    </CartProvider>
+  );
+}
+
+function ClearButton() {
+  const { clear } = useContext(CartContext);
+  return <button onClick={clear}>清空</button>;
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+真实项目常再写一个 `useCart()` 函数：里面调用 `useContext(CartContext)`，找不到 Provider 时抛出错误，提醒“必须在 CartProvider 里使用”。这种以 use 开头、内部调用 Hook 的函数叫自定义 Hook。第 15 课会讲它，学完可以回来看这个写法。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+**Context 的 value 变化时，所有读取它的组件都会重新渲染**。不要把变化频繁、又互不相关的数据都塞进一个巨大的 Context。解决方法：拆成多个 Context，例如把数据和修改数据的函数分开；或使用专门的状态管理库。
+
+</CallBox>
+
+<CallBox kind="tip" label="要点">
+
+Context 适合**变化不频繁的“全局”数据**：主题、语言、当前用户、权限。对于只隔了两三层的数据，直接传 props 往往更清晰。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

@@ -1,0 +1,216 @@
+---
+title: "数据请求：TanStack Query"
+---
+
+# 数据请求：TanStack Query
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 14 课我们用 useEffect 请求数据。那时要自己处理 loading、error 和竞态。真实应用还会遇到更多问题：
+
+- 两个组件请求同一个接口，发了两次请求
+- 切走再切回页面，又要重新等待加载
+- 数据在别处被修改了，这里显示的还是旧的
+- 请求失败要不要自动重试？窗口重新获得焦点时要不要刷新？
+
+这些都属于**服务端状态**的管理问题。TanStack Query（原名 React Query）解决了这些问题。它是目前最流行的方案。
+
+## useQuery：读取数据
+
+```jsx title="和第 14 课的手写版本对比一下"
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Todos />
+    </QueryClientProvider>
+  );
+}
+
+// fetch 遇到 404/500 不会自己抛错，所以要检查 res.ok
+async function getJSON(url, init) {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error('请求失败：' + res.status);
+  return res.json();
+}
+
+function Todos() {
+  const { data, isPending, isError, error, isFetching } = useQuery({
+    queryKey: ['todos'],                  // 缓存的“名字”
+    queryFn: () => getJSON('/api/todos'), // 失败时必须抛错，isError 才会为 true
+    staleTime: 60_000,                    // 1 分钟内认为数据是新鲜的
+  });
+
+  if (isPending) return <p>加载中…</p>;
+  if (isError) return <p>出错了：{error.message}</p>;
+  return <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>;
+}
+```
+
+## queryKey：缓存的身份证
+
+`queryKey` 决定数据存在缓存的哪个位置。**查询依赖的所有变量都要写进 key**，比如 `['user', userId]`。userId 变了，key 就变了，会自动请求新数据；切回之前的 userId 时，页面立刻显示缓存。同时，它在后台检查是否需要更新。
+
+## 自己动手：迷你 useQuery
+
+本页的沙箱不能加载 TanStack Query。下面用 `useSyncExternalStore` 实现一个带缓存的迷你 useQuery。这是原理演示，真实项目的写法见上面的代码块。
+
+注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：只有 queryKey 变化才重新请求。
+
+```jsx play title="迷你 useQuery"
+import { useSyncExternalStore, useEffect, useState } from 'react';
+
+// ===== 迷你 Query 缓存 =====
+const cache = new Map();      // key -> { data, updatedAt, fetching, promise }
+const listeners = new Set();
+const notify = () => listeners.forEach(l => l());
+const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
+
+function fetchQuery(key, fn) {
+  const entry = cache.get(key) || {};
+  if (entry.promise) return entry.promise;                  // ① 这个 key 已有 promise 时
+  const promise = fn().then(
+    data => { cache.set(key, { data, updatedAt: Date.now() }); notify(); },
+    // 失败：记下错误，清掉 promise。下次需要时可以重新请求
+    error => { cache.set(key, { ...cache.get(key), error, fetching: false, promise: null }); notify(); }
+  );
+  cache.set(key, { ...entry, error: null, fetching: true, promise }); notify();
+  return promise;
+}
+
+function useQuery({ queryKey, queryFn, staleTime = 0 }) {
+  const key = JSON.stringify(queryKey);
+  const entry = useSyncExternalStore(subscribe, () => cache.get(key));
+  useEffect(() => {
+    const e = cache.get(key);
+    const stale = !e || !e.updatedAt || Date.now() - e.updatedAt > staleTime;
+    if (stale) fetchQuery(key, queryFn);
+  }, [key]); // 只写 key：queryFn 用到的变量都已在 key 里（见正文）
+  return {
+    data: entry && entry.data,
+    isPending: !entry || (entry.data === undefined && !entry.error),
+    isFetching: !!(entry && entry.fetching),
+    isError: !!(entry && entry.error),
+    error: entry && entry.error,
+  };
+}
+
+// ===== 模拟后端 =====
+let calls = 0;
+const api = (id) => new Promise(r => setTimeout(() => {
+  calls++;
+  console.log('🌐 发出请求：用户 ' + id + '（累计 ' + calls + ' 次）');
+  r({ id, name: ['张三', '李四', '王五'][id - 1], at: new Date().toLocaleTimeString('zh-CN') });
+}, 900));
+
+// ===== 应用 =====
+function User({ id }) {
+  const { data, isPending, isFetching, isError, error } = useQuery({ queryKey: ['user', id], queryFn: () => api(id), staleTime: 5000 });
+  if (isPending) return <p>⏳ 首次加载中…</p>;
+  if (isError && !data) return <p>❌ 出错了：{error.message}</p>;
+  return <p>👤 {data.name}，数据获取于 {data.at} {isFetching && <small>（后台刷新中…）</small>}</p>;
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  return (
+    <div>
+      {[1, 2, 3].map(n => <button key={n} onClick={() => setId(n)} disabled={n === id}>用户 {n}</button>)}
+      <User id={id} />
+      <User id={id} />
+      <p style={{ color: 'gray', fontSize: 13 }}>两个 User 组件，同一个 id。</p>
+    </div>
+  );
+}
+```
+
+## useMutation：修改数据
+
+```jsx title="修改后让相关缓存失效，是最简单可靠的同步方式"
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+function AddTodo() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (title) => getJSON('/api/todos', {   // getJSON 见上一个示例
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }),
+    onSuccess: () => {
+      // 让 ['todos'] 缓存失效 → 所有用到它的组件自动重新获取
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+  });
+
+  return (
+    <button disabled={mutation.isPending} onClick={() => mutation.mutate('新任务')}>
+      {mutation.isPending ? '保存中…' : '添加'}
+    </button>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+分工规则：**服务端数据交给 TanStack Query；纯客户端 state 交给 useState 或 Zustand**。很多项目引入它之后，Redux 里的大部分代码都可以删掉了。
+
+</CallBox>
+
+## 乐观更新：先改界面，失败再回滚
+
+步骤如下：
+
+1. 在 `onMutate` 中取消进行中的请求，保存旧数据，再用 `setQueryData` 写入新数据。
+2. `onMutate` 返回旧数据。
+3. 在 `onError` 中把旧数据写回去，并提示用户。
+4. 在 `onSettled` 中调用 `invalidateQueries`，和服务器对齐。
+
+```jsx title="React 19 的 useOptimistic 是另一种写法（第 28 课）"
+useMutation({
+  mutationFn: addTodo,
+  onMutate: async (title) => {
+    await queryClient.cancelQueries({ queryKey: ['todos'] });
+    const prev = queryClient.getQueryData(['todos']);
+    queryClient.setQueryData(['todos'], old => [...(old ?? []), { id: 'temp', title }]);
+    return { prev };                                 // 会作为 onError 的第 3 个参数
+  },
+  onError: (err, title, result) => queryClient.setQueryData(['todos'], result?.prev),
+  onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
+});
+```
+
+## 常见坑
+
+| 现象或需求 | 做法 |
+|---|---|
+| 接口失败后，约 7 秒才显示错误 | 默认会重试 3 次，间隔 1、2、4 秒。测试里要设 `retry: false` |
+| key 到处手写，容易拼错 | 用 key 工厂集中定义：`userKeys = { all: ['users'], detail: id => ['users', id] }`。`invalidateQueries({ queryKey: userKeys.all })` 能一次让所有用户缓存失效 |
+| 翻页或搜索时，界面闪回“加载中” | `placeholderData: keepPreviousData`：换 key 时先显示上一页数据 |
+| 要等前一个数据到了再请求 | `enabled: !!userId` |
+| 只请求一次、不需要缓存；或数据已在服务端组件、loader 里取好 | 不必引入 Query |
+
+<CallBox kind="deep" label="深入一点">
+
+在 Next.js App Router 中，很多数据可以在服务端组件里直接 `await`。这时不需要 useQuery。TanStack Query 适合客户端频繁交互的数据。例如无限滚动、轮询和乐观更新。两者可以搭配使用。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

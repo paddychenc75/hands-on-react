@@ -1,0 +1,366 @@
+---
+title: "调度、优先级与撕裂"
+---
+
+# 调度、优先级与撕裂
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 23 课说过：过渡更新“可以被打断”。这一课打开盖子，回答三个问题：React 怎样打断自己？多个更新谁先谁后？打断之后会出现什么新问题？
+
+学完这一课，你应该能从调度的角度解释一些“奇怪”的现象。例如：同一段慢代码，放进 setTimeout 就卡，放进 startTransition 就不卡；渲染函数里的日志打印了 10 次，界面却只更新了 1 次。
+
+## 一、为什么要时间切片
+
+浏览器的主线程一次只做一件事。一段 JS 在运行时，点击、按键和绘制都在排队。超过 50ms 的任务叫**长任务**（第 24 课），用户会明显感到卡顿。
+
+**时间切片**就是把一次长渲染拆成很多小片。每片只做约 5ms 的工作，然后把主线程还给浏览器。浏览器处理完排队的输入，再执行下一片。
+
+React 用一个独立的**调度器**（scheduler 包）做这件事。渲染每处理完一个 Fiber，就调用一次 `shouldYield()`，问“这一片的时间用完了吗”。用完了，就记住下一个要处理的 Fiber，预约下一片，然后返回。
+
+“预约下一片”用什么 API？这决定了浏览器有没有机会插进来：
+
+| 让出方式 | 属于 | 浏览器能在两片之间处理输入吗 | 问题 |
+|---|---|---|---|
+| `Promise.then`、`queueMicrotask` | 微任务 | 不能 | 当前任务结束前，所有微任务都会执行完。浏览器根本插不进来 |
+| `setTimeout(fn, 0)` | 宏任务 | 能 | 嵌套多层后，浏览器强制至少等 4ms。100 片就白等 400ms |
+| `requestAnimationFrame` | 帧回调 | 能 | 每帧只调用一次（约 16ms）；页面在后台时会暂停 |
+| `MessageChannel` | 宏任务 | 能 | 没有 4ms 下限。React 18 的调度器在浏览器里用它 |
+
+下面的示例把 300 个 1ms 的工作单元用三种方式执行。另有一个每 10ms 跳一次的“心跳”定时器。心跳次数越多，说明浏览器在中间越有机会做别的事。先预测，再运行。
+
+```jsx play title="三种让出方式的心跳对比"
+import { useState } from 'react';
+
+function busy(ms) {
+  const start = performance.now();
+  while (performance.now() - start < ms) {}
+}
+
+const channel = new MessageChannel();
+let onMessage = null;
+channel.port1.onmessage = () => onMessage();
+
+// 把 units 个 1ms 的工作单元分片执行，每片约 5ms
+function runJob(mode, units, done) {
+  let i = 0, slices = 0;
+  const t0 = performance.now();
+  function slice() {
+    slices++;
+    const deadline = performance.now() + 5;
+    while (i < units) {
+      busy(1);
+      i++;
+      if (mode !== 'sync' && performance.now() >= deadline) break;
+    }
+    if (i < units) {
+      if (mode === 'micro') Promise.resolve().then(slice);
+      else { onMessage = slice; channel.port2.postMessage(null); }
+    } else {
+      done({ slices, ms: Math.round(performance.now() - t0) });
+    }
+  }
+  slice();
+}
+
+const NAMES = { sync: '一次做完', micro: '微任务让出', channel: 'MessageChannel 让出' };
+
+function App() {
+  const [text, setText] = useState('');
+  const [log, setLog] = useState([]);
+
+  function start(mode) {
+    let beats = 0;
+    const id = setInterval(() => beats++, 10); // 心跳：主线程空闲时才会跳
+    runJob(mode, 300, ({ slices, ms }) => {
+      clearInterval(id);
+      setLog(l => [...l, NAMES[mode] + '：' + slices + ' 片，用时 ' + ms + 'ms，心跳 ' + beats + ' 次']);
+    });
+  }
+
+  return (
+    <div>
+      <p>
+        <button onClick={() => start('sync')}>一次做完</button>{' '}
+        <button onClick={() => start('micro')}>微任务让出</button>{' '}
+        <button onClick={() => start('channel')}>MessageChannel 让出</button>
+      </p>
+      <input value={text} onChange={e => setText(e.target.value)} placeholder="运行期间在这里打字" />
+      <ul>{log.map((s, i) => <li key={i}>{s}</li>)}</ul>
+    </div>
+  );
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+调度器内部用最小堆保存任务，按过期时间排序。每片的长度是常量 `frameYieldMs = 5`。5ms 是一个折中：太短，调度本身的开销变大；太长，输入的延迟变大。这些都是 React 18.3.1 的实现细节，版本之间可能变化。
+
+</CallBox>
+
+## 二、优先级：lanes 的心智模型
+
+React 给每个更新分配一个 **lane**（车道）。lane 是一个 31 位二进制数中的某一位。位越低，优先级越高。用位运算，React 可以一次合并或比较很多组更新。
+
+你不必记住 31 条车道。记住下面 5 档，以及每档在 React 18 中会不会被切片：
+
+| 档位（从高到低） | 谁会产生 | 18.3.1 中的 lane | 会被切片吗 |
+|---|---|---|---|
+| 同步 / 离散事件 | click、keydown、input 等事件里的 set 函数；`flushSync` | `SyncLane` | 不会。当前事件结束后立刻同步完成 |
+| 连续事件 | pointermove、scroll、wheel 等事件里的 set 函数 | `InputContinuousLane` | 不会 |
+| 默认 | setTimeout、请求回调、effect 里的 set 函数 | `DefaultLane` | 不会 |
+| 过渡 | `startTransition`、`useDeferredValue` | `TransitionLanes`（16 条） | 会，可以被打断 |
+| 空闲 | 18 没有公开 API；隐藏的屏幕外内容 | `IdleLane`、`OffscreenLane` | 会 |
+
+表里最容易被忽略的是第三行。在 React 18 中，setTimeout 或请求回调触发的更新**不会被切片**。一次 300ms 的“默认”渲染，就是一个 300ms 的长任务。想让它可以被打断，必须明确地放进 startTransition。
+
+低优先级的更新可能一直被高优先级的更新插队，这叫**饥饿**。React 给每个 lane 记一个过期时间：过渡更新等待超过约 5 秒，就被标为“已过期”，改用同步方式渲染完。输入类的更新约 250ms 就过期。
+
+<CallBox kind="tip" label="要点">
+
+lane 的名字、数量和过期时间都是内部实现，不同版本会变。只记“档位顺序”和“只有过渡类更新可被切片”这两条结论。
+
+</CallBox>
+
+## 三、被打断的过渡更新会从头再来
+
+过渡渲染做到一半时，用户按了一个键。React 按下面的顺序处理：
+
+1. 当前片结束，调度器让出主线程。
+2. 浏览器派发按键事件，组件调用 set 函数，产生一个 SyncLane 更新。
+3. React 发现有更高优先级的工作，**丢弃**过渡渲染的进度（还没提交的那棵 Fiber 树）。
+4. React 同步渲染并提交紧急更新。用户马上看到输入框里的新字。
+5. React 从根开始，用最新的 state **重新**渲染过渡更新。
+
+为什么不接着做？紧急更新可能修改了过渡渲染读过的 state。旧进度建立在过期的数据上，接着做会得到前后矛盾的结果。从头再来更简单，也一定正确。
+
+代价是重复计算。下面的列表放在过渡更新里渲染。快速打字，看“开始”和“提交”的次数。
+
+```jsx play title="打断一次，就重来一次"
+import { useState, useEffect, useTransition, memo } from 'react';
+
+const stats = { started: 0, committed: 0 };
+
+function busy(ms) {
+  const start = performance.now();
+  while (performance.now() - start < ms) {}
+}
+
+function SlowRow({ text }) {
+  busy(2);
+  return <li>{text}</li>;
+}
+
+const SlowList = memo(function SlowList({ query }) {
+  stats.started++; // 反例：只为演示。渲染期间不要修改外部变量
+  useEffect(() => { stats.committed++; });
+  const rows = [];
+  for (let i = 0; i < 80; i++) rows.push(<SlowRow key={i} text={query + ' #' + i} />);
+  return <ul style={{ height: 120, overflow: 'auto' }}>{rows}</ul>;
+});
+
+function Stats() {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 200);
+    return () => clearInterval(id);
+  }, []);
+  return <p>列表渲染开始 <b>{stats.started}</b> 次，提交 <b>{stats.committed}</b> 次</p>;
+}
+
+function App() {
+  const [text, setText] = useState('');
+  const [query, setQuery] = useState('');
+  const [isPending, startTransition] = useTransition();
+
+  function handleChange(e) {
+    setText(e.target.value);                         // 紧急：输入框
+    startTransition(() => setQuery(e.target.value)); // 过渡：慢列表
+  }
+
+  return (
+    <div>
+      <input value={text} onChange={handleChange} placeholder="快速连续打字" />
+      {isPending && <small> 列表更新中…</small>}
+      <Stats />
+      <SlowList query={query} />
+    </div>
+  );
+}
+```
+
+<strong>为什么提交不能被打断？</strong>提交阶段在修改真实 DOM。如果改到一半让出主线程，浏览器就会绘制出一半新、一半旧的界面。所以只有渲染阶段可以切片，提交阶段总是同步一口气完成。渲染阶段能被随意丢弃，前提是渲染是纯的：它只计算，不修改外部世界。
+
+<CallBox kind="warn" label="常见坑">
+
+StrictMode 在开发环境故意把组件渲染两次，就是在模拟“渲染被丢弃、再来一次”。如果组件在渲染时发请求、修改模块变量或上报日志，StrictMode 下会出错，并发渲染下也会出错。把这些代码放进 effect 或事件处理函数。
+
+</CallBox>
+
+## 四、批处理与 flushSync
+
+调用 set 函数时，React 不会马上渲染。它把更新放进组件的更新队列，标上 lane，再请求调度器“稍后渲染一次”。同一个任务里的多次 set 函数调用，共用这一次渲染。这就是**自动批处理**。在 React 18 中，用 createRoot 创建的根对事件、setTimeout 和 Promise 回调都自动批处理。
+
+批处理按 lane 分组。同一个事件里，紧急更新和过渡更新不会合并：React 先渲染并提交紧急的那一组，再单独渲染过渡的那一组。
+
+```jsx title="一个事件里的四种更新"
+import { flushSync } from 'react-dom';
+
+function handleClick() {
+  setCount(c => c + 1);
+  setFlag(f => !f);            // 与上一行合并成一次渲染
+
+  startTransition(() => {
+    setFilter('done');         // 另一组：稍后单独渲染，可被打断
+  });
+
+  flushSync(() => {
+    setOpen(true);             // 立刻以 SyncLane 渲染并提交
+  });
+  // 这里 DOM 已经更新；前面排队的同步更新也一并被冲刷了
+}
+```
+
+`flushSync` 让 React 在函数返回前就同步渲染并提交。它会把排队中的同步更新一起冲刷掉，破坏批处理，还会让这次渲染无法切片。只在“下一行代码必须读到新 DOM”时使用，例如第 16 课里的滚动到新添加的一项。
+
+## 五、撕裂：外部数据在两片之间变了
+
+**撕裂**（tearing）指同一次提交里，界面的不同部分显示了同一个数据源的不同版本。
+
+React 自己的 state 不会撕裂。更新先进队列，一次渲染中所有组件读的都是同一份快照。可是组件如果在渲染时直接读一个**可变的外部变量**（模块变量、全局 store、`window` 上的值），情况就不同了：
+
+1. 过渡渲染处理完前 10 行，读到的值是 5，然后让出主线程。
+2. 浏览器执行一个定时器，把外部变量改成 6。
+3. 下一片继续渲染第 11 行之后，读到的是 6。
+4. 提交后，同一个列表的前后两段显示不同的值。
+
+同步渲染中间不让出主线程，外部代码没机会修改变量，所以不会撕裂。撕裂是并发渲染才有的问题。下面在 React 18.3.1 中复现它。先预测，再运行。
+
+```jsx play title="在过渡更新中读可变的外部变量"
+import { useState, useRef, useLayoutEffect, useTransition, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
+
+// 一个最小的外部 store
+let value = 0;
+const listeners = new Set();
+const store = {
+  get: () => value,
+  set(v) { value = v; listeners.forEach(l => l()); },
+  subscribe(l) { listeners.add(l); return () => listeners.delete(l); },
+};
+
+function busy(ms) {
+  const start = performance.now();
+  while (performance.now() - start < ms) {}
+}
+
+// 写法 A：渲染时直接读外部变量
+function DirectRow({ i }) {
+  busy(2);
+  return <li>{i}：{store.get()}</li>;
+}
+
+// 写法 B：通过 useSyncExternalStore 读
+function SafeRow({ i }) {
+  const v = useSyncExternalStore(store.subscribe, store.get);
+  busy(2);
+  return <li>{i}：{v}</li>;
+}
+
+function App() {
+  const [safe, setSafe] = useState(false);
+  const [shown, setShown] = useState(false);
+  const [round, setRound] = useState(0);
+  const [report, setReport] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const timer = useRef(null);
+  const listRef = useRef(null);
+
+  function start() {
+    flushSync(() => setShown(false)); // 先清空列表
+    clearInterval(timer.current);
+    timer.current = setInterval(() => store.set(store.get() + 1), 4); // 渲染期间不停修改 store
+    startTransition(() => {
+      setShown(true);
+      setRound(r => r + 1);
+    });
+  }
+
+  useLayoutEffect(() => {
+    clearInterval(timer.current); // 提交后立刻停止修改
+    if (!round) return;
+    const values = new Set(Array.from(listRef.current.children, li => li.textContent.split('：')[1]));
+    setReport('第 ' + round + ' 轮：50 行里出现了 ' + values.size + ' 种不同的值');
+  }, [round]);
+
+  const Row = safe ? SafeRow : DirectRow;
+  const rows = [];
+  if (shown) for (let i = 0; i < 50; i++) rows.push(<Row key={i} i={i} />);
+
+  return (
+    <div>
+      <label>
+        <input type="checkbox" checked={safe} onChange={e => { setSafe(e.target.checked); setShown(false); }} />
+        {' '}用 useSyncExternalStore 读取（写法 B）
+      </label>
+      <p><button onClick={start}>在过渡更新中渲染 50 行</button> {isPending && <small>渲染中…</small>}</p>
+      <p><b>{report}</b></p>
+      <ul ref={listRef} style={{ columns: 5, fontSize: 13, paddingLeft: 18 }}>{rows}</ul>
+    </div>
+  );
+}
+```
+
+`useSyncExternalStore(subscribe, getSnapshot)` 防止撕裂的方法分 3 步：
+
+1. 渲染时，React 记下每个组件通过 getSnapshot 读到的值。
+2. 并发渲染完成后、提交之前，React 再调用一次 getSnapshot，用 `Object.is` 比较。
+3. 有任何一个不同，React 就丢弃这次结果，改用同步渲染重做一遍，再提交。
+
+另外，store 通过 subscribe 通知变化时，React 总是用 SyncLane 安排更新。所以**外部 store 的更新不能成为过渡更新**：`startTransition(() => store.set(x))` 仍然会同步渲染。想让依赖 store 的慢列表不阻塞输入，就把读到的值交给 `useDeferredValue`，再传给用 memo 包裹的慢组件。
+
+| 数据放在哪里 | 会撕裂吗 | 能享受过渡更新吗 |
+|---|---|---|
+| useState / useReducer / Context | 不会 | 能 |
+| 外部 store + useSyncExternalStore | 不会 | store 的更新不能；读到的值可以再交给 useDeferredValue |
+| 外部可变变量，渲染时直接读 | 会 | 能，但结果可能不一致 |
+| 外部 store + useEffect 订阅 + useState 保存 | 可能出现短暂不一致 | 能，但每次变化多一轮渲染 |
+
+<CallBox kind="tip" label="要点">
+
+只有 React 自己用的数据，就放在 useState 或 useReducer 里，不需要外部 store。用 useSyncExternalStore 的典型场景：Redux、Zustand 这类库，浏览器 API（`navigator.onLine`、媒体查询），以及和非 React 代码共享的数据。getSnapshot 必须在数据没变时返回同一个引用（第 27 课）。
+
+</CallBox>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>六、读源码的路线<small>可以先跳过，需要时再展开</small></summary>
+
+想在 react-dom 18.3.1 的开发版源码里跟一遍流程，可以按下面的函数名搜索：
+
+1. `requestUpdateLane`：set 函数被调用时，按“是否在 transition 中”“当前事件类型”决定 lane。
+2. `scheduleUpdateOnFiber` → `ensureRootIsScheduled`：把根节点上最高优先级的 lane 交给调度器。
+3. `performConcurrentWorkOnRoot`：按 lane 决定用 `workLoopSync` 还是 `workLoopConcurrent`。
+4. `workLoopConcurrent`：`while (workInProgress !== null && !shouldYield()) performUnitOfWork(workInProgress)`。
+5. `prepareFreshStack`：丢弃进度、从根重新开始的地方。
+6. `isRenderConsistentWithExternalStores`：useSyncExternalStore 在提交前的一致性检查。
+7. `markStarvedLanesAsExpired`：把等待太久的 lane 标为过期。
+
+读源码时，先用一个最小示例在这些函数里打断点，比从头通读有效得多。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

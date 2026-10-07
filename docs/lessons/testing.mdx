@@ -1,0 +1,227 @@
+---
+title: "测试：Vitest + Testing Library"
+---
+
+# 测试：Vitest + Testing Library
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 31 课简单提到过测试。这一课动手写。目标不是追求覆盖率数字，而是让你**敢于重构**：改完代码跑一遍测试，绿了就放心上线。
+
+## 一个完整的测试文件
+
+```jsx title="运行：npx vitest"
+// Counter.test.jsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect } from 'vitest';
+import Counter from './Counter';
+
+describe('Counter', () => {
+  it('初始显示 0', () => {
+    render(<Counter />);
+    expect(screen.getByText('计数：0')).toBeInTheDocument();
+  });
+
+  it('点击 +1 后变为 1', async () => {
+    const user = userEvent.setup();
+    render(<Counter />);
+    await user.click(screen.getByRole('button', { name: '+1' }));
+    expect(screen.getByText('计数：1')).toBeInTheDocument();
+  });
+});
+```
+
+<CallBox kind="tip" label="要点">
+
+这个文件需要两项配置才能运行：
+
+1. 在 vitest.config 中设置 `environment: 'jsdom'` 和 `globals: true`。否则 Testing Library 不会在每个测试后自动清理 DOM。
+2. 在 setup 文件中写 `import '@testing-library/jest-dom/vitest'`。这样才能用 `toBeInTheDocument`。
+
+</CallBox>
+
+## 该用哪种查询？
+
+| 优先级 | 查询 | 说明 |
+|---|---|---|
+| 1（首选） | `getByRole('button', { name: '提交' })` | 按无障碍角色和名称找，最贴近用户和读屏软件 |
+| 2 | `getByLabelText('邮箱')` | 表单字段，通过 label 找 |
+| 3 | `getByText('欢迎')` | 非交互内容 |
+| 最后 | `getByTestId('cart')` | 实在没办法时才用 |
+
+官方完整顺序：Role → LabelText → PlaceholderText → Text → DisplayValue → AltText → Title → TestId。
+
+| 前缀 | 找不到时 | 用途 |
+|---|---|---|
+| `getBy…` | 立刻报错 | 断言元素一定存在 |
+| `queryBy…` | 返回 null | 断言元素**不存在**：`expect(queryByText('x')).toBeNull()` |
+| `findBy…` | 返回 Promise，等待出现 | 异步内容：`await screen.findByText('加载完成')` |
+
+<CallBox kind="warn" label="常见坑">
+
+不要测试实现细节。例如：state 里的 count 是不是 1；某个函数被调用了几次。这样的测试在重构时会大面积报错，哪怕功能完全正常。只测试用户能看到的结果。
+
+</CallBox>
+
+## 自己动手：一个迷你测试运行器
+
+本页不能运行 Vitest。下面的代码用 30 行实现了 `render`、`getByText`、`getByRole` 和 `test`。我们用它测试一个真实组件。试着把 Counter 改出 bug（比如把 +1 改成 +2），再运行，看测试变红。
+
+```jsx play title="在浏览器里跑测试"
+import { useState } from 'react';
+
+// ===== 被测组件 =====
+function Counter() {
+  const [n, setN] = useState(0);
+  return (
+    <div>
+      <p>计数：{n}</p>
+      <button onClick={() => setN(n + 1)}>+1</button>
+      <button onClick={() => setN(0)} disabled={n === 0}>重置</button>
+    </div>
+  );
+}
+
+// ===== 迷你测试库 =====
+const ROLES = {          // 角色 → 对应的 HTML 元素。role 不是标签名
+  button: 'button', link: 'a[href]', heading: 'h1,h2,h3,h4,h5,h6',
+  textbox: 'input:not([type]),input[type=text],textarea', checkbox: 'input[type=checkbox]',
+};
+let container;
+function render(ui) {
+  container = document.createElement('div');
+  ReactDOM.flushSync(() => ReactDOM.createRoot(container).render(ui));
+}
+const screen = {
+  getByText(text) {
+    const el = [...container.querySelectorAll('*')].find(e => e.children.length === 0 && e.textContent === text);
+    if (!el) throw new Error('找不到文字：' + text);
+    return el;
+  },
+  // 简化版：只认 5 种角色。名称先看 aria-label，再看文字（真实库还会看 <label>、alt 等）
+  getByRole(role, { name }) {
+    const el = [...container.querySelectorAll(ROLES[role])].find(e => (e.getAttribute('aria-label') ?? e.textContent) === name);
+    if (!el) throw new Error('找不到 ' + role + '：' + name);
+    return el;
+  },
+};
+const tick = () => new Promise(r => setTimeout(r, 0));
+const user = { async click(el) { el.click(); await tick(); } };
+function expect(v) {
+  return { toBe(x) { if (v !== x) throw new Error('期望 ' + x + '，实际 ' + v); } };
+}
+const tests = [];
+const test = (name, fn) => tests.push({ name, fn });
+
+// ===== 测试用例 =====
+test('初始显示 0，重置按钮不可用', async () => {
+  render(<Counter />);
+  screen.getByText('计数：0');
+  expect(screen.getByRole('button', { name: '重置' }).disabled).toBe(true);
+});
+
+test('点击 +1 两次后显示 2', async () => {
+  render(<Counter />);
+  await user.click(screen.getByRole('button', { name: '+1' }));
+  await user.click(screen.getByRole('button', { name: '+1' }));
+  screen.getByText('计数：2');
+});
+
+test('重置后回到 0', async () => {
+  render(<Counter />);
+  await user.click(screen.getByRole('button', { name: '+1' }));
+  await user.click(screen.getByRole('button', { name: '重置' }));
+  screen.getByText('计数：0');
+});
+
+(async () => {
+  let pass = 0;
+  for (const t of tests) {
+    try { await t.fn(); pass++; console.log('✅ ' + t.name); }
+    catch (e) { console.error('❌ ' + t.name + ' → ' + e.message); }
+  }
+  console.log(pass + '/' + tests.length + ' 通过');
+})();
+
+// 右侧同时显示组件本身
+function App() { return <Counter />; }
+```
+
+## 异步与 Hook 的测试
+
+```jsx
+// 异步：用 findBy 等待内容出现；网络请求用 MSW 在网络层模拟
+it('加载后显示用户名', async () => {
+  render(<UserProfile id={1} />);
+  expect(screen.getByText('加载中…')).toBeInTheDocument();
+  expect(await screen.findByText('张三')).toBeInTheDocument();
+});
+
+// 自定义 Hook：用 renderHook
+import { renderHook, act } from '@testing-library/react';
+it('useToggle 可以切换', () => {
+  const { result } = renderHook(() => useToggle(false));
+  act(() => result.current[1]());
+  expect(result.current[0]).toBe(true);
+});
+```
+
+## 真实项目：模拟网络，包好 Provider
+
+```jsx title="组件用了 Router 或 Query，测试里就要包上对应的 Provider"
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+
+// 1. MSW 2：在网络层模拟接口。组件里的 fetch 不用改
+const server = setupServer(
+  http.get('/api/users/1', () => HttpResponse.json({ name: '张三' })),
+);
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+// 2. 自定义 render：每个测试新建 QueryClient，并关掉重试
+function renderWithProviders(ui, { route = '/' } = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+// 3. 错误状态也要测：只在这个测试里让接口返回 500
+it('接口失败时显示错误', async () => {
+  server.use(http.get('/api/users/1', () => new HttpResponse(null, { status: 500 })));
+  renderWithProviders(<UserProfile id={1} />);
+  expect(await screen.findByRole('alert')).toBeInTheDocument();
+});
+```
+
+<CallBox kind="tip" label="要点">
+
+推荐的测试比例叫“测试奖杯”。从底层到顶层有四层：
+
+1. 静态检查：TypeScript 和 ESLint，成本最低，覆盖最广。
+2. 少量单元测试：测试纯函数和 reducer。
+3. **大量集成测试**：用 Testing Library 测试一个页面或一个功能。
+4. 少量端到端测试：用 Playwright 在真实浏览器里走完整流程。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

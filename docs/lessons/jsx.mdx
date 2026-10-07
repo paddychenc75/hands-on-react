@@ -1,0 +1,128 @@
+---
+title: "JSX：在 JS 里写界面"
+---
+
+# JSX：在 JS 里写界面
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+JSX 是一种看起来像 HTML 的 JavaScript 语法扩展。它让你在 JS 代码中直接写出界面结构，读起来非常直观。
+
+```jsx
+const element = <h1 className="title">你好</h1>;
+```
+
+浏览器其实不认识 JSX。在运行前，编译工具（如 Babel）会把它翻译成普通的函数调用。现代工具链（Vite、Next.js）生成 `jsx()` 调用。旧写法是 `React.createElement()`。两者作用相同。下面用旧写法演示：
+
+```jsx title="JSX 是创建元素函数的语法糖"
+// 上面那行 JSX 会被编译成（旧写法）：
+const element = React.createElement('h1', { className: 'title' }, '你好');
+// 返回的是一个普通 JS 对象，描述“要画什么”：
+// { type: 'h1', props: { className: 'title', children: '你好' } }
+```
+
+<CallBox kind="tip" label="要点">
+
+记住：**JSX 最终就是一个 JS 对象**。所以它可以赋值给变量、作为函数参数、从函数中返回、放进数组里。
+
+</CallBox>
+
+## 用花括号 \{\} 嵌入 JavaScript
+
+在 JSX 中，花括号 `{}` 是通往 JavaScript 世界的“窗口”。里面可以写任何**表达式**（会产生一个值的代码）：变量、运算、函数调用、三元运算符等。
+
+```jsx play title="花括号里放表达式"
+function App() {
+  const name = '小红';
+  const price = 99;
+  const user = { avatar: '🐱', city: '杭州' };
+  const today = new Date().toLocaleDateString('zh-CN');
+
+  return (
+    <div>
+      <h2>{user.avatar} 你好，{name}！</h2>
+      <p>来自：{user.city}</p>
+      <p>两件商品共 {price * 2} 元</p>
+      <p>今天是 {today}</p>
+      <p>名字长度：{name.length}</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+花括号里只能放**表达式**，不能放**语句**。`{if (x) ...}`、`{for (...)}` 都是错的。需要判断时用三元运算符 `{x ? a : b}` 或 `&&`，需要循环时用 `.map()`，后面会专门讲。
+
+</CallBox>
+
+## JSX 的几条硬规则
+
+| 规则 | 错误写法 | 正确写法 |
+|---|---|---|
+| 只能返回**一个**根元素 | `return <h1/><p/>` | 用 `<div>` 或片段 `<>...</>` 包起来 |
+| 标签必须闭合 | `<img src="a.png">` | `<img src="a.png" />` |
+| class 要写成 className | `class="box"` | `className="box"` |
+| 属性用驼峰命名（例外：`aria-*` 和 `data-*` 保留短横线） | `onclick`、`tabindex` | `onClick`、`tabIndex` |
+| style 接收对象 | `style="color:red"` | `style={{ color: 'red' }}` |
+
+为什么 `style` 有两层花括号？外层 `{}` 表示“这里是 JS”，内层 `{}` 是一个 JS 对象字面量。CSS 属性名也要改成驼峰：`font-size` → `fontSize`。
+
+```jsx play title="规则演示"
+function App() {
+  const big = true;
+  return (
+    <>
+      <h3 className="hello" style={{ color: 'tomato', fontSize: big ? 28 : 14 }}>
+        片段 {'<></>'} 不会产生多余的 DOM 节点
+      </h3>
+      <input placeholder="自闭合标签要写 />" />
+      <label htmlFor="x">for 也要写成 htmlFor</label>
+    </>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：<br />`Adjacent JSX elements must be wrapped in an enclosing tag`：组件返回了多个并列的根元素。用 `<div>` 或片段 `<>...</>` 把它们包起来。<br />`Objects are not valid as a React child`：你在 `{}` 里放了一个对象，例如 `{user}`。改成显示它的字段，例如 `{user.name}`。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+为什么只能有一个根元素？因为 JSX 会变成一次函数调用（`jsx(...)` 或 `createElement(...)`），而一个函数只能返回一个值。片段 `<></>` 是 `React.Fragment` 的简写，它能把多个元素打包成一个值，又不会在页面上多出一层 div。
+
+</CallBox>
+
+## 安全：花括号会转义文字
+
+`{}` 中的字符串只会显示为文字。即使字符串里有 `<script>` 或 `<img onerror>`，React 也会先转义。所以用 `{}` 显示用户输入是安全的。下面三种写法会绕过这层保护：
+
+- **dangerouslySetInnerHTML**：它把字符串当作 HTML 插入，不转义。只用于可信的内容。用户提供的 HTML，先用 DOMPurify 清洗，或者不用它。
+- **href 中的 javascript: 网址**：点击时会执行代码。React 19 会阻止这种网址，React 18 只在控制台警告。使用用户提供的网址前，先检查它以 https:// 或 http:// 开头。
+- **拼接 HTML 字符串**：不要写 `'<b>' + name + '</b>'` 再插入页面。用 JSX 描述结构。
+
+```jsx title="XSS：跨站脚本攻击"
+const comment = '<img src=x onerror="alert(1)">'; // 来自用户
+
+<p>{comment}</p>                                        // ✅ 显示为文字，不执行
+<p dangerouslySetInnerHTML={{ __html: comment }} />     // ❌ onerror 会执行
+<p dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comment) }} /> // 必须插入 HTML 时，先清洗
+```
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

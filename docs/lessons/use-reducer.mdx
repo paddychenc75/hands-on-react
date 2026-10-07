@@ -1,0 +1,127 @@
+---
+title: "useReducer：集中管理复杂状态"
+---
+
+# useReducer：集中管理复杂状态
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+有的组件有很多种修改 state 的方式，例如添加、删除、编辑、切换、清空。这些逻辑分散在多个事件处理函数里，代码会越来越难维护。`useReducer` 让你把所有“状态如何变化”的逻辑**集中到一个纯函数**里。
+
+```jsx
+const [state, dispatch] = useReducer(reducer, initialState);
+
+// reducer：接收旧状态和一个“动作”，返回新状态
+function reducer(state, action) {
+  switch (action.type) {
+    case 'increment': return { count: state.count + 1 };
+    default: return state;
+  }
+}
+
+// 组件中只需要“派发”动作，描述发生了什么
+dispatch({ type: 'increment' });
+```
+
+<CallBox kind="like" label="打个比方">
+
+reducer 像银行柜台。你不能自己进金库拿钱。你填一张单子（action：“取款 100 元”），交给柜员（dispatch）。柜员按规定流程（reducer）更新账户（state）。所有账户变动都遵守同一套规则。
+
+</CallBox>
+
+```jsx play title="待办清单 reducer"
+import { useReducer, useState } from 'react';
+
+const initialTodos = [
+  { id: 1, text: '学习 useReducer', done: false },
+  { id: 2, text: '喝杯咖啡', done: true },
+];
+
+let nextId = 3; // 放在组件外
+
+function todosReducer(todos, action) {
+  switch (action.type) {
+    case 'added':
+      return [...todos, { id: action.id, text: action.text, done: false }];
+    case 'toggled':
+      return todos.map(t => t.id === action.id ? { ...t, done: !t.done } : t);
+    case 'deleted':
+      return todos.filter(t => t.id !== action.id);
+    case 'clearedDone':
+      return todos.filter(t => !t.done);
+    default:
+      throw new Error('未知的 action: ' + action.type);
+  }
+}
+
+function App() {
+  const [todos, dispatch] = useReducer(todosReducer, initialTodos);
+  const [text, setText] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!text) return;
+    dispatch({ type: 'added', id: nextId++, text });
+    setText('');
+    console.log('todos.length =', todos.length);
+  }
+
+  return (
+    <div>
+      <form onSubmit={handleSubmit}>
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="新待办" />
+        <button>添加</button>
+      </form>
+      <ul>
+        {todos.map(t => (
+          <li key={t.id}>
+            <label style={{ textDecoration: t.done ? 'line-through' : 'none' }}>
+              <input type="checkbox" checked={t.done} onChange={() => dispatch({ type: 'toggled', id: t.id })} />
+              {t.text}
+            </label>
+            <button onClick={() => dispatch({ type: 'deleted', id: t.id })}>删除</button>
+          </li>
+        ))}
+      </ul>
+      <button onClick={() => dispatch({ type: 'clearedDone' })}>清除已完成</button>
+    </div>
+  );
+}
+```
+
+## useState 还是 useReducer？
+
+| 场景 | 推荐 |
+|---|---|
+| 简单的独立值（开关、输入框文本、数字） | useState |
+| 多个相互关联的状态需要一起变化 | useReducer |
+| 更新逻辑复杂、种类多 | useReducer |
+| 需要单独测试状态逻辑 | useReducer（reducer 是纯函数，极易测试） |
+
+<CallBox kind="tip" label="要点">
+
+reducer 必须是**纯函数**。同样的输入必须得到同样的输出。reducer 不发请求，不修改原来的 state，不使用随机数或 Date.now()。所以上例在 dispatch 之前生成 id，再放进 action。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+useReducer 和下一课的 Context 可以组合使用，学完 Context 可以回来看这一段。把 state 和 dispatch 分别放进两个 Context。这样，任何深层组件都能读取 state 和派发 action。这正是 Redux 的核心思想，只不过用的是 React 内置能力。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

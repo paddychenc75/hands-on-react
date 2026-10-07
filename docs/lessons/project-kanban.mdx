@@ -1,0 +1,66 @@
+---
+title: "实战三：看板应用"
+---
+
+# 实战三：看板应用
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+看板（Kanban）把任务分成三列：待办、进行中、已完成。卡片可以在列之间移动。Trello、Jira、飞书项目都是这种形态。
+
+这个项目的界面已经写好了，你的任务是实现最核心的**状态逻辑**：一个 reducer。真实团队经常这样分工。组件只负责显示和派发 action。所有规则集中在 reducer 里，可以单独测试。
+
+## 状态设计
+
+```jsx
+const initialState = {
+  columns: ['todo', 'doing', 'done'],
+  cards: [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+  ],
+  nextId: 3,
+};
+// 每张卡片只记录它在哪一列（col），列里有哪些卡片由 filter 计算得出
+```
+
+## 需要实现的 action
+
+| action | 效果 |
+|---|---|
+| `{ type: 'add', title }` | 在“待办”列新增一张卡片。title 去掉首尾空格后为空则忽略 |
+| `{ type: 'move', id, dir: 1 }` | 把卡片移到右边一列；已在最右列则不变 |
+| `{ type: 'move', id, dir: -1 }` | 把卡片移到左边一列；已在最左列则不变 |
+| `{ type: 'remove', id }` | 删除卡片 |
+
+<CallBox kind="tip" label="要点">
+
+移动卡片的步骤：
+
+1. 找到卡片当前列在 `columns` 中的下标。
+2. 下标加上 `dir`。
+3. 新下标在 0 到 2 之间时，更新 `col`。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+应用变大后，这个 reducer 几乎不用修改。它可以直接迁移到 Zustand 或 Redux Toolkit。这说明一个观点：**先把状态逻辑写成纯函数，用什么库只是“接线”问题**。第 27 课《状态管理架构》和第 40 课会展开讲。<br />真实项目开启 StrictMode 时，开发环境里 React 会调用 reducer 两次。如果 reducer 修改了原 state，卡片就会被加两次。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

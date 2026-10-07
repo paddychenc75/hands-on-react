@@ -1,0 +1,376 @@
+---
+title: "流式 SSR、选择性水合与 RSC 缓存"
+---
+
+# 流式 SSR、选择性水合与 RSC 缓存
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 29 课讲了服务端组件的边界规则和一次请求的六个步骤。本课往下挖三个问题。
+
+1. HTML 怎样分批到达浏览器？
+2. 哪一块先能点？
+3. 服务端拿到的数据，能缓存多久？
+
+**哪些能运行：**`ReactDOM.hydrateRoot` 在本页的 React 18.3.1 中可以运行。本页没有加载 `react-dom/server`，所以示例里的“服务端 HTML”是手写的字符串，格式与 React 18 的真实输出相同。服务端 API 和 Next.js 的代码只能阅读。
+
+## 一、renderToString 与流式渲染
+
+**流式 SSR** 指服务器边渲染边发送 HTML，不等整页都准备好。React 18 提供了两类服务端 API：
+
+|  | renderToString | renderToPipeableStream（Node）/ renderToReadableStream（Web Streams） |
+|---|---|---|
+| 返回什么 | 一个完整的字符串 | 一个流，可以分多次写给浏览器 |
+| 遇到数据还没准备好的组件 | 不等待。该 Suspense 边界输出 fallback，由浏览器再渲染内容 | 先发 fallback，数据好了再把内容发出去，并附一段替换脚本 |
+| 首字节时间 | 取决于最慢的那部分 | 取决于外壳 |
+| 适合 | 旧项目、无数据依赖的页面 | 有慢数据的页面；框架（Next.js、Remix）内部都用它 |
+
+**外壳**（shell）指所有 Suspense 边界之外的部分。外壳渲染完，`onShellReady` 就会被调用，服务器开始发送。
+
+```jsx title="只能阅读：Node 服务端代码。给搜索引擎爬虫时，改在 onAllReady 里 pipe，等全部内容就绪"
+import { renderToPipeableStream } from 'react-dom/server';
+
+app.get('/product/:id', (req, res) => {
+  let didError = false;
+  const { pipe, abort } = renderToPipeableStream(<App url={req.url} />, {
+    bootstrapScripts: ['/main.js'],      // 浏览器端：hydrateRoot(document, <App />)
+    onShellReady() {
+      // 外壳好了：状态码和响应头只能在这里决定，开始发送后就改不了
+      res.statusCode = didError ? 500 : 200;
+      res.setHeader('Content-Type', 'text/html');
+      pipe(res);
+    },
+    onShellError() {
+      res.statusCode = 500;               // 外壳都渲染不出来：发一个兜底页面
+      res.send('<h1>出错了</h1>');
+    },
+    onError(err) {
+      didError = true;                    // 边界内部出错：该边界改由浏览器渲染
+      console.error(err);
+    },
+  });
+  setTimeout(abort, 10000);               // 超时：还没完成的边界交给浏览器渲染
+});
+```
+
+流里的 HTML 大致分两批。第一批里，没准备好的边界只是一个占位：
+
+```jsx title="只能阅读：React 18 流式输出的简化形式。<!--$--> 表示已完成的边界，<!--$?--> 表示还在等待"
+<!-- 第一批：外壳 + fallback -->
+<header>…</header>
+<!--$?--><template id="B:0"></template><p>评论加载中…</p><!--/$-->
+<footer>…</footer>
+
+<!-- 几秒后，同一个响应里的第二批：真正的内容 + 一段替换脚本 -->
+<div hidden id="S:0"><ul><li>很好用</li>…</ul></div>
+<script>$RC("B:0", "S:0")</script>
+```
+
+注意 footer 在第一批里。边界之后的内容不用等边界。所以边界放在哪里，决定了用户先看到什么。
+
+- **边界太粗**：一个边界包住整页，等于没有流式。
+- **边界太细**：十几个区块各自弹出，页面不停跳动。按“用户会一起看的内容”分组。
+- **外壳里不要放慢数据**：外壳里有一个组件等 2 秒，整页的首字节就晚 2 秒。
+
+## 二、选择性水合：哪一块先能点
+
+React 17 的水合是整页一次完成。任何一块的 JS 没下载完，整页都不能交互。
+
+React 18 把每个 Suspense 边界当作独立的水合单位。外壳先水合，各边界随后以低优先级逐个水合。**选择性水合**指：用户点击一个还没水合的边界，React 就先水合这个边界。
+
+下面每个区块的渲染故意占用主线程 500 毫秒。点按钮开始水合，然后立刻点“页脚”。
+
+```jsx play title="选择性水合：点哪块，哪块先水合"
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+const BLOCKS = ['评论', '推荐', '页脚'];
+let t0 = 0;
+const stamp = () => Math.round(performance.now() - t0) + 'ms';
+
+// 故意很慢的组件：每次渲染占用主线程 500 毫秒
+function SlowBlock({ name }) {
+  const [clicks, setClicks] = useState(0);
+  const end = performance.now() + 500;
+  while (performance.now() < end) {}
+  useEffect(() => { console.log(stamp(), name + '：水合完成'); }, []);
+  return (
+    <button onClick={() => { console.log(stamp(), name + '：收到点击'); setClicks(clicks + 1); }}>
+      {name + '（点击 ' + clicks + '）'}
+    </button>
+  );
+}
+
+// 手写的服务端 HTML。<!--$--> 和 <!--/$--> 是 React 给 Suspense 边界做的记号
+const SERVER_HTML = BLOCKS
+  .map(n => '<!--$--><button>' + n + '（点击 0）</button><!--/$-->')
+  .join('');
+
+function App() {
+  const box = useRef(null);
+  const [run, setRun] = useState(0);
+  useEffect(() => {
+    if (run === 0) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+    el.innerHTML = SERVER_HTML;
+    box.current.replaceChildren(el);
+    t0 = performance.now();
+    console.log('0ms 开始水合');
+    const root = hydrateRoot(el, (
+      <>
+        {BLOCKS.map(n => (
+          <Suspense key={n} fallback={null}><SlowBlock name={n} /></Suspense>
+        ))}
+      </>
+    ), { onRecoverableError: (e) => console.log('可恢复错误：' + e.message) });
+    return () => { Promise.resolve().then(() => root.unmount()); };
+  }, [run]);
+  return (
+    <div>
+      <button onClick={() => setRun(r => r + 1)}>载入服务端 HTML 并开始水合</button>
+      <div ref={box} style={{ marginTop: 8 }} />
+    </div>
+  );
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+React 18.3.1 的源码里，点击（离散事件）落在未水合的边界上时，React 尝试同步水合它。如果该边界的代码还没下载完（例如 `lazy` 组件），这次点击会被丢弃，React 只是提高该边界的优先级。悬停这类连续事件会排队，水合后重放。所以首屏关键按钮的代码不要放进懒加载的块里。
+
+</CallBox>
+
+## 三、水合不匹配：React 实际做了什么
+
+水合时，React 不重新创建 DOM。它沿着服务端 HTML 逐个节点“认领”，并假设内容一致。不一致时，React 18 的处理分两种：
+
+- **文字或结构不一致**：抛出错误。React 丢弃最近的 Suspense 边界里的服务端 HTML，在浏览器重新渲染这一块。没有边界时，丢弃整个根。错误交给 `onRecoverableError`。
+- **属性不一致**（className、href、id）：只在开发版里警告，生产版没有任何提示。React **不会修正**属性，DOM 里留着服务端的值。
+
+下面三个容器使用同一段服务端 HTML，客户端组件收到的数据不同。
+
+```jsx play title="同一段 HTML，三种客户端数据"
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+
+// 服务端 HTML：库存在边界外，评分在 Suspense 边界内
+const SERVER_HTML = '<p>库存：<b>12</b></p><!--$--><p>评分：<b>4.8</b></p><!--/$-->';
+
+const CASES = [
+  { name: '甲：完全一致', stock: '12', rating: '4.8' },
+  { name: '乙：边界外的库存不一致', stock: '11', rating: '4.8' },
+  { name: '丙：边界内的评分不一致', stock: '12', rating: '4.9' },
+];
+
+function Product({ stock, rating }) {
+  return (
+    <>
+      <p>库存：<b>{stock}</b></p>
+      <Suspense fallback={<p>加载中…</p>}>
+        <p>评分：<b>{rating}</b></p>
+      </Suspense>
+    </>
+  );
+}
+
+function Case({ c }) {
+  const box = useRef(null);
+  const [report, setReport] = useState('水合中…');
+  useEffect(() => {
+    const el = document.createElement('div');
+    el.innerHTML = SERVER_HTML;
+    box.current.replaceChildren(el);
+    const [stockP, ratingP] = el.querySelectorAll('p'); // 记住服务端生成的节点
+    const errors = [];
+    const root = hydrateRoot(el, <Product stock={c.stock} rating={c.rating} />, {
+      onRecoverableError: (error) => errors.push(error.message),
+    });
+    const timer = setTimeout(() => {
+      setReport('库存段落' + (stockP.isConnected ? '保留' : '被替换')
+        + '，评分段落' + (ratingP.isConnected ? '保留' : '被替换')
+        + '，可恢复错误 ' + errors.length + ' 条');
+      errors.forEach(m => console.log(c.name + '：' + m));
+    }, 300);
+    return () => { clearTimeout(timer); Promise.resolve().then(() => root.unmount()); };
+  }, [c]);
+  return (
+    <div style={{ borderTop: '1px solid #8884', padding: '4px 0' }}>
+      <b>{c.name}</b>
+      <div ref={box} />
+      <small>{report}</small>
+    </div>
+  );
+}
+
+function App() {
+  return <div>{CASES.map(c => <Case key={c.name} c={c} />)}</div>;
+}
+```
+
+客户端重新渲染一块，代价是：这块的服务端 HTML 白做了；用户可能看到内容闪一下；正在输入的文字可能丢失。所以开发时看到不匹配，要修，不要忽略。
+
+## 四、不匹配的常见原因和修法
+
+| 原因 | 为什么不一致 | 修法 |
+|---|---|---|
+| 渲染时读 `Date.now()`、`new Date()` | 服务端和浏览器的“现在”不同。静态页面可能几天前就生成了 | 首次渲染输出由数据算出的固定值（如发布日期）。水合后在 effect 里换成相对时间 |
+| `toLocaleString()`、`Intl` | 服务器的时区和语言常是 UTC 和英文 | 服务端和浏览器传入相同的 timeZone、locale；或水合后再格式化 |
+| `Math.random()` 生成 id | 两边随机数不同 | 用 `useId`。注意 id 是属性，不一致时不会报错，也不会被修正 |
+| `typeof window`、`localStorage`、`innerWidth` | 服务端没有这些值 | `useSyncExternalStore` 的第三个参数 `getServerSnapshot` 返回服务端的值；或 effect 里再读 |
+| 无效的 HTML 嵌套 | 浏览器解析 HTML 时会“修正”结构，和 React 的树对不上 | 改成有效嵌套：`<p>` 里不放 `<div>`，表格写上 `<tbody>` |
+| 浏览器扩展、第三方脚本改了 DOM | 水合前 DOM 已被修改 | 先在无痕窗口排除。React 19 会跳过 head 和 body 里多出的标签 |
+
+无效嵌套最难发现，因为 JSX 看起来没问题。浏览器解析服务端 HTML 时会改写结构：
+
+```jsx play title="浏览器会改写无效的 HTML"
+const SAMPLES = [
+  '<p>价格<div>¥99</div></p>',
+  '<table><tr><td>1</td></tr></table>',
+  '<a href="#a">外层<a href="#b">内层</a></a>',
+];
+
+function App() {
+  return (
+    <ul>
+      {SAMPLES.map(html => {
+        const box = document.createElement('div');
+        box.innerHTML = html; // 用浏览器的 HTML 解析器解析，和加载服务端页面时一样
+        return (
+          <li key={html} style={{ marginBottom: 8, wordBreak: 'break-all' }}>
+            <div>服务端发出：<code>{html}</code></div>
+            <div>浏览器得到：<code>{box.innerHTML}</code></div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+```
+
+读浏览器值的组件，推荐用 `useSyncExternalStore`。水合时 React 调用 `getServerSnapshot`，保证与服务端一致；水合后发现 `getSnapshot` 的值不同，再重新渲染一次。
+
+```jsx title="漏掉第三个参数时，React 18 在水合时报错：Missing getServerSnapshot"
+function subscribe(callback) {
+  window.addEventListener('online', callback);
+  window.addEventListener('offline', callback);
+  return () => {
+    window.removeEventListener('online', callback);
+    window.removeEventListener('offline', callback);
+  };
+}
+
+function useOnline() {
+  return useSyncExternalStore(
+    subscribe,
+    () => navigator.onLine,   // 浏览器的值
+    () => true,               // 服务端和水合时用的值
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+`suppressHydrationWarning` 只作用于一个元素的文字和属性，不作用于子元素。它适合“一个时间戳”这类无法避免的差异。把它加在外层容器上，下面的不匹配照样报错。用它掩盖结构差异，等于把问题留到生产环境。
+
+</CallBox>
+
+## 五、RSC 的序列化边界与组合
+
+第 29 课讲过：服务端组件传给客户端组件的 props 必须可序列化。这里补三点。
+
+<strong>1. JSX 本身可以跨边界。</strong>服务端组件渲染好的结果可以作为 children 或任意 prop 传给客户端组件。客户端组件拿到的是渲染结果，不是组件代码。
+
+```jsx title="只能阅读：客户端组件负责交互，服务端组件负责数据。Tabs 里不能 import SalesStats，否则它会变成客户端代码"
+// Tabs.jsx
+'use client';
+export function Tabs({ tabs }) {
+  const [i, setI] = useState(0);
+  return <>{tabs.map((t, k) => <button key={k} onClick={() => setI(k)}>{t.label}</button>)}{tabs[i].body}</>;
+}
+
+// page.jsx（服务端组件）
+import { Tabs } from './Tabs';
+import { SalesStats } from './SalesStats';   // async 服务端组件，直接查数据库
+
+export default function Page() {
+  return <Tabs tabs={[
+    { label: '销售', body: <SalesStats /> },   // 在服务器渲染，结果放进 RSC Payload
+    { label: '说明', body: <p>数据每小时更新</p> },
+  ]} />;
+}
+```
+
+<strong>2. Promise 也可以跨边界。</strong>服务端组件不 await，直接把 Promise 传下去。客户端组件用 React 19 的 `use()` 读取，外面包 Suspense。页面外壳不用等这份数据。
+
+<strong>3. 小心服务端的数据瀑布。</strong>父组件 `await` 用户信息后才渲染子组件，子组件再 `await` 订单。两个请求串行了。修法与第 38 课相同：在父组件里同时发起请求（`Promise.all`，或先创建 Promise 再分别传下去）。
+
+## 六、缓存与重新验证
+
+服务端组件每次请求都查数据库，代价很高。缓存分几层，作用范围不同：
+
+| 层 | 范围 | 怎样失效 |
+|---|---|---|
+| React `cache(fn)` | 一次请求内。同一请求里多个组件调用同一个函数，只执行一次 | 请求结束即丢弃 |
+| Next.js 数据缓存（fetch / 'use cache'） | 跨请求、跨用户，部署后仍可能保留 | 按时间（revalidate）或按标签、路径手动失效 |
+| Next.js 整页缓存 | 静态生成的 HTML 和 RSC Payload | 页面用到的数据失效时重新生成 |
+| 浏览器端路由缓存 | 一个用户的一个标签页 | 刷新页面、router.refresh()、Server Action 里重新验证 |
+
+Next.js 的默认值在几个大版本之间变过。读文章和旧代码时，先看版本：
+
+| 版本 | fetch 默认 | 常用写法 |
+|---|---|---|
+| 13、14 | 默认缓存（force-cache） | `fetch(url, { next: { revalidate: 60 } })`；`{ next: { tags: ['post-7'] } }` 配合 `revalidateTag('post-7')` |
+| 15 | 默认不缓存 | 需要缓存时写 `cache: 'force-cache'` 或 revalidate |
+| 16（开启 cacheComponents） | 默认按请求动态渲染 | 在函数或组件里写 `'use cache'`，用 `cacheLife()` 设时长，`cacheTag()` 打标签 |
+
+```jsx title="只能阅读：API 名称以 Next.js 16 官方文档为准。13–15 用 fetch 的 next.tags 和 revalidateTag(tag)"
+// Next.js 16：缓存一个数据函数，并打上标签
+async function getProduct(id) {
+  'use cache';
+  cacheTag('product-' + id);
+  cacheLife('hours');
+  return db.product.find(id);
+}
+
+// Server Action：改价格后让带这个标签的缓存失效
+'use server';
+export async function updatePrice(id, price) {
+  await checkAdmin();                 // 先检查权限
+  await db.product.update(id, { price });
+  updateTag('product-' + id);         // 16：立即失效，本次操作的用户马上看到新值
+  // revalidateTag('product-' + id, 'max'); // 另一种：先返回旧值，后台更新
+}
+```
+
+- **按时间重新验证是“先给旧的，后台更新”**：revalidate 为 60，第 61 秒的第一个请求仍拿到旧数据，同时触发后台重新生成。下一个请求才拿到新数据。
+- **按路径还是按标签**：`revalidatePath('/product/7')` 只管这一条路由。同一个商品还出现在首页、搜索页时，给数据打标签，用标签失效。
+- **个人数据不要放进跨用户的缓存**：读 cookies 或用户信息的函数，不要加 'use cache'。否则 A 用户的数据可能被 B 用户看到。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>七、迁移评估：什么时候不该用 SSR 或 RSC<small>可以先跳过，需要时再展开</small></summary>
+
+- **登录后才能用的强交互应用**（编辑器、设计工具、后台表格）：SEO 没有意义，首屏之后全是客户端交互。CSR 加好的加载状态通常就够了。
+- **没有 Node 服务器的团队**：SSR 和 RSC 需要运行、监控和扩容服务器。纯静态托管更省事。
+- **依赖大量浏览器 API 的第三方库**：每个都要包进 'use client' 或推迟到水合后加载。
+- **迁移成本清单**：Context Provider 要移到客户端组件；运行时 CSS-in-JS 要换方案；全局 store 要按请求创建，防止用户之间串数据；测试要分服务端和客户端；部署多了缓存失效这个新故障源。
+
+判断顺序：先问“首屏内容是否依赖每个请求的数据，是否需要被搜索引擎收录”。都不需要，用静态生成或 CSR。需要，再考虑流式 SSR。组件树里大量组件只展示数据、不交互时，RSC 才能明显减少 JS 体积。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

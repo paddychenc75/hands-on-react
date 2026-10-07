@@ -31,7 +31,8 @@ function App() {
 
 有两个原因：
 
-<Raw className="p-block" html={"<ol class=\"task-steps\"><li>修改普通变量<b>不会通知 React</b> 重新渲染。</li><li>就算重新渲染了，函数重新执行时 <code>let count = 0</code> 又会把它重置为 0。</li></ol>"} />
+1. 修改普通变量**不会通知 React** 重新渲染。
+2. 就算重新渲染了，函数重新执行时 `let count = 0` 又会把它重置为 0。
 
 ## useState 登场
 

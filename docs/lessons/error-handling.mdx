@@ -1,0 +1,378 @@
+---
+title: "错误处理与监控"
+---
+
+# 错误处理与监控
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 22 课写过一个错误边界：子组件渲染出错时，显示备用界面。真实项目还要回答更多问题：
+
+1. 哪些错误边界接不住？它们去了哪里？
+2. 请求失败了，怎样让边界显示备用界面？
+3. 用户点“重试”，或者切换到别的数据，边界怎样恢复？
+4. 边界放在哪一层？
+5. 线上出了错，开发者怎样知道？
+
+这一课按这个顺序讲。目标是一个完整的体系：**接住**、**恢复**、**上报**。
+
+## 一、错误从哪里来，谁能接住
+
+错误边界的原理很简单。React 渲染组件时，把调用包在 try/catch 里。所以只有**在 React 调用你的代码时**抛出的错误，边界才能接住。
+
+| 错误抛出的位置 | 谁能接住 | 应该怎样处理 |
+|---|---|---|
+| 组件函数、class 的生命周期方法 | 最近的错误边界 | 边界显示备用界面，onError 上报 |
+| effect 函数体（同步部分） | 最近的错误边界 | 同上 |
+| 事件处理函数 | 没有边界。错误到达 window 的 `error` 事件 | try/catch。需要备用界面时，交给边界（第二节） |
+| setTimeout、Promise 的 then/catch 回调 | window 的 `error` 或 `unhandledrejection` 事件 | 同上 |
+| effect 里发起的 Promise | 同上。effect 已经返回，React 不在调用栈上 | 同上 |
+| 错误边界自己的 render | 更上层的边界 | 让 fallback 尽量简单 |
+
+最容易误判的是最后一类异步错误。effect 的函数体是 React 调用的，但 `.then` 里的回调不是。下面的示例把几种错误放在同一个边界里。先预测，再运行。
+
+```jsx play title="边界能接住哪一个？"
+import { Component, useState, useEffect } from 'react';
+
+class Boundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <p style={{ background: '#fde8e8', padding: 8 }}>
+          边界接住了：{this.state.error.message}{' '}
+          <button onClick={() => this.setState({ error: null })}>恢复</button>
+        </p>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function RenderBomb() {
+  throw new Error('渲染时出错');
+}
+
+function EffectPromise() {
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      throw new Error('effect 里的 Promise 出错');
+    });
+  }, []);
+  return <p>我在 effect 里发起了一个 Promise。</p>;
+}
+
+function Panel() {
+  const [mode, setMode] = useState('none');
+  return (
+    <div>
+      <p><button onClick={() => setMode('render')}>① 渲染时 throw</button></p>
+      <p><button onClick={() => { throw new Error('事件处理函数出错'); }}>② 事件处理函数里 throw</button></p>
+      <p><button onClick={() => setMode('effect')}>③ effect 里的 Promise 失败</button></p>
+      {mode === 'render' && <RenderBomb />}
+      {mode === 'effect' && <EffectPromise />}
+    </div>
+  );
+}
+
+export default function App() {
+  return <Boundary><Panel /></Boundary>;
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+<strong>开发版本会多报一次。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误。生产版本不会这样。测试全局上报时，用生产版本确认数量。
+
+</CallBox>
+
+## 二、把异步错误交给边界
+
+请求失败了，你想让最近的边界显示“出错了，重试”。边界接不住 Promise 里的错误。办法是：**让错误在下一次渲染时再抛出来**。
+
+```jsx title="把异步错误交给错误边界"
+function useAsyncError() {
+  const [, setState] = useState();
+  // 更新函数在下次渲染时执行。在里面 throw，错误就发生在渲染期间
+  return useCallback((error) => {
+    setState(() => { throw error; });
+  }, []);
+}
+
+function Weather({ city }) {
+  const throwToBoundary = useAsyncError();
+  function refresh() {
+    fetchWeather(city).then(setData).catch(throwToBoundary);
+  }
+  // …
+}
+```
+
+为什么可行？set 函数不会立刻执行更新函数。React 把它放进队列，下次渲染这个组件时才执行。这时 React 在调用栈上，错误就按渲染错误处理，交给最近的边界。
+
+<CallBox kind="deep" label="深入一点">
+
+React 有时会在 set 函数被调用时，提前执行一次更新函数，用来判断新旧 state 是否相同（eager state）。源码在这里包了 try/catch，注释写着“错误会在渲染时再抛一次”。所以这个写法在 18.3.1 中可靠。React 19 的 `startTransition` 里抛出的错误，以及 `use()` 读取的失败 Promise，都会直接交给边界，不需要这个技巧。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+**预期内的失败不要交给边界。**表单校验失败、404、没有权限，都是正常的业务结果。把它们存进 state，在原地显示提示，用户的输入也保留。边界负责的是**意外**：代码 bug、接口返回了坏数据、服务暂时不可用。
+
+</CallBox>
+
+## 三、可重置的边界：reset 与 resetKeys
+
+第 22 课的边界只有一个出口：用户点“重试”，清空 error。真实页面还需要第二个出口。例如商品页出错后，用户换了一个商品，边界应该自动恢复。
+
+常见的设计是给边界加三个 props。它们来自流行的 react-error-boundary 库：
+
+- `fallbackRender({ error, reset })`：备用界面由调用者决定。它拿到错误和一个 reset 函数，可以显示“重试”按钮。
+- `resetKeys`：一个数组。数组中的某个值变化时，边界自动重置。例如 `[productId]`。
+- `onError(error, info)`：在 componentDidCatch 中调用，用来上报。`info.componentStack` 是组件栈：出错组件到根组件的路径。
+
+下面的边界实现了 resetKeys，但有一个缺陷。商品 3 的数据是坏的。先预测，再运行。
+
+```jsx play title="一次故障，上报几次？"
+import { Component, useState } from 'react';
+
+const PRODUCTS = {
+  1: { name: '键盘', price: 299 },
+  2: { name: '鼠标', price: 129 },
+  3: { name: '显示器', price: null }, // 坏数据
+};
+
+let reports = 0;
+function report(error, info) {
+  reports++;
+  const where = info.componentStack.trim().split('\n')[0].trim().replace(/ \(.*$/, '');
+  console.log('第 ' + reports + ' 次上报：' + error.message + '（' + where + '）');
+}
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    this.props.onError(error, info);
+  }
+  componentDidUpdate(prevProps) {
+    const changed = this.props.resetKeys.some((k, i) => k !== prevProps.resetKeys[i]);
+    if (this.state.error && changed) this.setState({ error: null });
+  }
+  render() {
+    if (this.state.error) {
+      return this.props.fallbackRender({
+        error: this.state.error,
+        reset: () => this.setState({ error: null }),
+      });
+    }
+    return this.props.children;
+  }
+}
+
+function Price({ id }) {
+  const p = PRODUCTS[id];
+  return <p>{p.name}：¥{p.price.toFixed(2)}</p>;
+}
+
+export default function App() {
+  const [id, setId] = useState(1);
+  return (
+    <div>
+      {[1, 2, 3].map(n => (
+        <button key={n} onClick={() => setId(n)} disabled={n === id}>商品 {n}</button>
+      ))}
+      <ErrorBoundary
+        resetKeys={[id]}
+        onError={report}
+        fallbackRender={({ error, reset }) => (
+          <p style={{ background: '#fde8e8', padding: 8 }}>
+            价格加载失败 <button onClick={reset}>重试</button>
+          </p>
+        )}
+      >
+        <Price id={id} />
+      </ErrorBoundary>
+    </div>
+  );
+}
+```
+
+关于重置，还有三条规则：
+
+1. <strong>resetKeys 逐项比较，不比较数组本身。</strong>父组件每次渲染都会写一个新的 `[id]`。如果比较数组引用，每次父组件渲染都会重置，子组件又出错，上报就会刷屏。
+2. <strong>重试要先消除原因。</strong>如果出错的是缓存过的请求，重置前先清掉缓存或重新请求。否则组件再次读到同一个失败结果，立刻又出错。第 38 课的资源缓存就要这样做。
+3. **用 key 也能重置，但代价更大。**`<ErrorBoundary key={id}>` 在 id 变化时卸载整棵子树，即使没有出错。子树里的局部 state（展开的面板、滚动位置）都会丢失。resetKeys 只在出错时才起作用。
+
+## 四、边界放在哪一层
+
+边界的位置决定了出错时**多大的范围**被备用界面替换。范围太大，一个小部件出错，整页都没了。范围太小，到处是边界，备用界面零碎，上报也变多。
+
+| 层级 | 用途 | 备用界面 |
+|---|---|---|
+| 根（最外层） | 最后一道防线。没有它，React 会卸载整棵树，页面变白 | 整页提示：“出错了”，加“刷新页面”按钮 |
+| 路由 / 页面 | 一个页面坏了，导航栏和其他页面还能用 | 页面区域内的提示，加“返回首页” |
+| 独立的小部件 | 有自己数据源的卡片：天气、推荐位、评论区 | 和卡片一样大的提示，加“重试” |
+| 不要放 | 每个列表项、每个按钮 | 数量太多。一行出错往往说明整份数据有问题 |
+
+判断的方法：问一句“这部分坏了，用户还能继续做别的事吗？”能，就给它一个边界。另外，**用户正在输入的内容要放在边界外面**。编辑器的草稿放在出错的小部件之外，或者先存进 localStorage。备用界面替换的是边界内的整棵子树，里面的 state 都会丢失。
+
+## 五、上报：让错误带上上下文
+
+只上报 `error.message`，开发者很难复现。一条有用的报告至少包含：
+
+- **错误和 JS 调用栈**：`error.stack`。生产代码经过压缩，要配合 source map 才能看懂。
+- **组件栈**：`info.componentStack`，说明错误出在哪个组件、它在哪个页面里。
+- **操作记录（breadcrumbs）**：出错前用户最近的 10～20 个操作，例如“点击 商品 3”“路由 /cart”。
+- **环境**：版本号、页面地址、浏览器。版本号最重要：它把错误和某次发布对应起来。
+
+错误边界之外的错误，用两个全局事件接住。下面是一个最小的上报模块：
+
+```jsx title="上报队列：去重、采样、批量发送"
+const crumbs = [];             // 最近的操作记录
+const queue = [];              // 待发送的报告
+const seen = new Set();        // 去重：同一个错误只报一次
+const SAMPLE_RATE = 0.2;       // 采样：流量大时只报 20%
+
+export function addCrumb(text) {
+  crumbs.push({ text, at: Date.now() });
+  if (crumbs.length > 20) crumbs.shift();
+}
+
+export function capture(error, extra = {}) {
+  const key = error.message + '|' + (error.stack || '').split('\n')[1];
+  if (seen.has(key) || Math.random() > SAMPLE_RATE) return;
+  seen.add(key);
+  queue.push({
+    message: error.message, stack: error.stack,
+    componentStack: extra.componentStack,
+    crumbs: crumbs.slice(), release: APP_VERSION, url: location.href,
+  });
+}
+
+// 错误边界之外的错误
+window.addEventListener('error', (e) => capture(e.error || new Error(e.message)));
+window.addEventListener('unhandledrejection', (e) =>
+  capture(e.reason instanceof Error ? e.reason : new Error(String(e.reason))));
+
+// 页面隐藏时批量发送。sendBeacon 在页面关闭时也能发出
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && queue.length) {
+    navigator.sendBeacon('/api/errors', JSON.stringify(queue.splice(0)));
+  }
+});
+```
+
+<CallBox kind="tip" label="要点">
+
+从别的域名加载的脚本出错时，window 的 error 事件只能拿到 “Script error.”，没有调用栈。给 `<script>` 加 `crossorigin="anonymous"`，服务器返回 CORS 响应头，才能拿到完整信息。
+
+</CallBox>
+
+## 六、根级回调：onRecoverableError
+
+有些错误 React 自己就恢复了，用户什么也看不到。例如水合时服务端 HTML 和客户端不一致，React 放弃水合，改为在客户端重新渲染。这类错误交给根的 `onRecoverableError`。
+
+React 18.3.1 的 `createRoot` 和 `hydrateRoot` 都接受这个选项。回调收到两个参数：错误，以及 `{ componentStack, digest }`。不传时，React 用浏览器的 `reportError` 报告它。React 18 还有一个少有人知的行为：渲染出错后，React 会**同步重试一次**整次渲染。如果重试成功，第一次的错误就交给 onRecoverableError。
+
+```jsx play title="一次能恢复的渲染错误"
+import { useRef, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+
+let configReady = false; // 模拟一个第一次读取时还没准备好的全局配置
+
+function Banner() {
+  if (!configReady) {
+    configReady = true;
+    throw new Error('配置还没加载完');
+  }
+  return <p>横幅显示正常</p>;
+}
+
+export default function App() {
+  const boxRef = useRef(null);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    const root = createRoot(boxRef.current, {
+      onRecoverableError(error, info) {
+        console.log('onRecoverableError：' + error.message);
+        console.log('组件栈：' + info.componentStack.trim().split('\n')[0].trim().replace(/ \(.*$/, ''));
+      },
+    });
+    rootRef.current = root;
+    return () => queueMicrotask(() => root.unmount());
+  }, []);
+
+  function show() {
+    configReady = false;
+    rootRef.current.render(<Banner />);
+  }
+
+  return (
+    <div>
+      <button onClick={show}>渲染横幅</button>
+      <div ref={boxRef} style={{ border: '1px dashed gray', padding: 8, marginTop: 8 }} />
+    </div>
+  );
+}
+```
+
+React 19 把根级回调补全了。下面的代码只能阅读，本课程的运行环境是 18.3.1：
+
+```jsx title="React 19 的三个根级错误回调（只能阅读）"
+// React 19：createRoot 和 hydrateRoot 都接受这三个回调
+const root = createRoot(container, {
+  // 没有任何边界接住：React 卸载整棵树
+  onUncaughtError(error, info) {
+    capture(error, { level: 'fatal', componentStack: info.componentStack });
+  },
+  // 被某个边界接住。info.errorBoundary 是那个边界的实例
+  onCaughtError(error, info) {
+    capture(error, { level: 'error', componentStack: info.componentStack });
+  },
+  // React 自动恢复了。有些错误把原始错误放在 error.cause 里
+  onRecoverableError(error, info) {
+    capture(error.cause || error, { level: 'warning', componentStack: info.componentStack });
+  },
+});
+```
+
+在 React 18 中，没有这两个新回调。被边界接住的错误，靠边界的 onError 上报；没被接住的错误，React 会卸载整棵树，再把错误抛到 window，由全局的 error 事件接住。所以 React 18 项目需要**根边界 + 全局事件 + onRecoverableError** 三处配合。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>七、接入监控服务<small>可以先跳过，需要时再展开</small></summary>
+
+自己写上报模块适合学习。生产环境通常用 Sentry 这类监控服务。它们的 SDK 做了上面所有事情，还有更多：
+
+- **自动收集**：全局错误、Promise 拒绝、请求失败、路由变化，并自动记录操作记录。
+- **React 集成**：提供现成的 ErrorBoundary 组件，自动带上组件栈；React 19 项目还可以把 SDK 的处理函数传给根级回调。
+- **source map**：构建时上传 source map，后台把压缩后的调用栈还原成源码位置。不要把 source map 公开部署到线上。
+- **按版本聚合**：同一个错误合并成一个“问题”，显示首次出现在哪个版本、影响了多少用户。
+- **隐私**：发送前删掉 token、邮箱、表单内容。默认只发必要字段。
+
+告警要看**比率**，不要看次数。“每千次会话的崩溃数在一次发布后翻倍”比“今天有 300 个错误”更有用。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

@@ -1,0 +1,181 @@
+---
+title: "Server Components 与全栈 React"
+---
+
+# Server Components 与全栈 React
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 正在从“浏览器里的 UI 库”演进为**全栈架构**。理解这一课，你就能看懂 Next.js App Router 等现代框架的设计。
+
+<strong>本课的示例代码只能阅读。</strong>原因是：服务端组件和 Server Function 要在服务器上运行，还要由 Next.js 这类框架打包。本页的沙箱只是浏览器里的 React 18。课末的练习是纯 JavaScript，可以运行。想在真实项目里试，见“在本地动手试”。
+
+先认识本课反复出现的两个词：
+
+- **水合（hydration）**：服务器发来的 HTML 只能看，不能交互。浏览器下载 JS 后，React 在这份现成的 HTML 上运行组件，绑定事件处理函数，接上 state。这个过程叫水合。水合完成后，按钮才能点。
+- **RSC Payload**：服务端组件的渲染结果。它不是 HTML，而是一种描述界面的数据格式。客户端组件在里面只是一个“占位引用”，指向浏览器要下载的 JS 文件。
+
+## 三种渲染方式
+
+|  | 做法 | 优点 | 缺点 |
+|---|---|---|---|
+| CSR 客户端渲染 | 服务器发一个空 HTML + 大 JS 包，浏览器执行 JS 生成界面 | 交互丰富，服务器简单 | 首屏白屏久，SEO 差，JS 包大 |
+| SSR 服务端渲染 | 服务器先把组件渲染成 HTML 发给浏览器，浏览器再下载 JS 进行<strong>水合（hydration）</strong>让它可交互 | 首屏快，SEO 好 | 所有组件的 JS 仍要下载并水合 |
+| RSC 服务端组件 | 部分组件**只在服务器运行**，它们的代码永远不会发送到浏览器 | JS 包更小，可直接访问数据库/文件 | 心智模型更复杂，需要框架支持 |
+
+注意：RSC 不取代 SSR，两者通常一起用。下图是第一次打开页面时的完整流程：
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 请求</b><span>浏览器请求页面，例如 /products</span></div><div class=\"step\"><b>② 运行服务端组件</b><span>在服务器上查数据库、渲染，产生 <em>RSC Payload</em>。客户端组件在这里只是占位引用</span></div><div class=\"step\"><b>③ SSR</b><span>在服务器上把整棵树（包括客户端组件）渲染成 <em>HTML</em></span></div><div class=\"step\"><b>④ 显示 HTML</b><span>浏览器立刻显示内容。这时按钮还不能点</span></div><div class=\"step\"><b>⑤ 下载 JS</b><span>只下载<em>客户端组件</em>的代码。服务端组件的代码不下载</span></div><div class=\"step\"><b>⑥ 水合</b><span>React 给客户端组件绑定事件、接上 state。页面可以交互了</span></div></div><figcaption>② ③ 在服务器上进行，④ ⑤ ⑥ 在浏览器里进行。服务端组件只参与 ② 和 ③，所以它不需要水合</figcaption>"} />
+
+之后在页面之间导航时，服务器只发送新的 RSC Payload。浏览器把它合并进现有界面，客户端组件的 state 会保留。
+
+<CallBox kind="like" label="打个比方">
+
+SSR 像餐厅先给你端上一盘看起来做好的菜（HTML），但要等厨师到你桌边“通电”（水合）之后才能吃。RSC 则是有些菜在后厨就完全做好了，根本不需要厨师来你桌边。
+
+</CallBox>
+
+## 服务端组件长什么样
+
+```jsx title="服务端组件可以是 async 函数"
+// app/products/page.jsx —— 默认就是服务端组件
+import db from '@/lib/db';
+import AddToCart from './AddToCart';
+
+export default async function ProductsPage() {
+  // 直接在组件里查数据库！这段代码不会出现在浏览器中
+  const products = await db.product.findMany();
+
+  return (
+    <ul>
+      {products.map(p => (
+        <li key={p.id}>
+          {p.name} - ¥{p.price}
+          <AddToCart productId={p.id} />  {/* 需要交互的部分交给客户端组件 */}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+```jsx title="需要 state、effect、事件的组件才标记为客户端组件"
+// app/products/AddToCart.jsx
+'use client'; // 声明：这是客户端组件，它和它导入的模块会被打包到浏览器
+
+import { useState } from 'react';
+
+export default function AddToCart({ productId }) {
+  const [added, setAdded] = useState(false);
+  return <button onClick={() => setAdded(true)}>{added ? '已加入' : '加入购物车'}</button>;
+}
+```
+
+## 边界规则
+
+|  | 服务端组件 | 客户端组件 |
+|---|---|---|
+| useState / useEffect / 事件处理 | ❌ 不能用 | ✅ |
+| async/await 直接取数据 | ✅ | ❌（用 use() 读取服务端传来的 Promise，或用 TanStack Query 等库） |
+| 访问数据库、密钥、文件系统 | ✅ 安全 | ❌ 会暴露 |
+| 代码是否发送到浏览器 | 否 | 是 |
+| 可以导入对方吗 | 可以导入并渲染客户端组件 | 不能导入服务端组件，但可以通过 **children** 接收 |
+
+<CallBox kind="warn" label="常见坑">
+
+`"use client"` 标记的是**边界**，而不是单个组件：被它导入的所有模块都会成为客户端代码。所以要尽量把 "use client" 放在组件树的**叶子**上，让大部分组件留在服务器。另外，服务端传给客户端组件的 props 必须**可序列化**。不能传函数，Server Function 除外。
+
+</CallBox>
+
+## Server Functions：从客户端调用服务器函数
+
+用 `"use server"` 标记的异步函数叫 **Server Function**。把它用作表单或按钮的 action 时，也叫 Server Action。Next.js 文档常用后一个名字。
+
+```jsx
+// app/actions.js
+'use server';
+
+export async function addComment(formData) {
+  const text = formData.get('text');
+  await db.comment.create({ data: { text } }); // 在服务器执行
+  revalidatePath('/post');                     // 刷新相关页面的数据
+}
+
+// 在任意组件中直接作为表单 action 使用，无需手写 API 路由
+<form action={addComment}>
+  <input name="text" />
+  <button>发表评论</button>
+</form>
+```
+
+<CallBox kind="tip" label="要点">
+
+**"use server" 不标记服务端组件**。组件默认就是服务端组件，不需要标记。它标记**可以被客户端调用的服务器函数**。框架会为这个函数自动生成一个 API 接口。所以务必在其中做权限校验和输入验证。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+RSC 的传输格式不是 HTML。它是一种特殊的序列化格式，叫 RSC Payload。它描述服务端组件渲染出的树，以及客户端组件的“占位引用”。这让页面导航时可以只获取新的 RSC 数据并与现有客户端状态合并，而不用整页刷新。
+
+</CallBox>
+
+## 安全：服务器代码也要设防
+
+- **每个 Server Function 都是一个公开的接口**。任何人都能直接发请求调用它，不必经过你的界面。所以在函数内部：1. 检查登录和权限。2. 验证每个输入。
+- **不要把密钥放进 props**。传给客户端组件的 props 会发送到浏览器。在 Next.js 等框架中，只能在服务器用的模块顶部写 `import 'server-only'`。客户端组件导入它时，构建会报错。
+- **带公开前缀的环境变量会进入浏览器**，例如 Next.js 的 `NEXT_PUBLIC_`、Vite 的 `VITE_`。密钥不要用这些前缀。
+- **及时升级 React 和框架**。2025 年 12 月，React 公布了多个 RSC 漏洞：一个可远程执行代码（CVE-2025-55182），还有拒绝服务和源码泄露。修复版本是 19.0.4、19.1.5、19.2.4 或更新的版本。没有服务器的纯客户端应用不受影响。
+
+```jsx title="不要假设调用者一定来自你的界面"
+'use server';
+
+export async function deletePost(postId) {
+  const user = await getCurrentUser();                       // 1. 检查登录
+  if (!user) throw new Error('请先登录');
+  if (typeof postId !== 'string') throw new Error('参数错误'); // 2. 验证输入
+  const post = await db.post.find(postId);
+  if (!post || post.authorId !== user.id) throw new Error('没有权限'); // 3. 检查权限
+  await db.post.delete(postId);
+}
+```
+
+## 水合不匹配
+
+水合时，浏览器第一次渲染的结果必须与服务器的 HTML 一致。不一致时，React 会报错，并在客户端重新渲染这部分。常见原因和修复：
+
+| 原因 | 修复 |
+|---|---|
+| 渲染时用了 `new Date()`、`Math.random()` | 在 useEffect 中计算客户端的值。只有时间戳这类情况，才加 `suppressHydrationWarning`（只作用于一层） |
+| 渲染时读取 `window`、`localStorage` 等浏览器 API | 首次渲染输出与服务器相同的内容，再在 useEffect 中更新 |
+| 用随机数生成元素 id | 用 `useId`。它在服务器和浏览器上生成相同的 id |
+| 无效的 HTML 嵌套，例如 `<p>` 里放 `<div>` | 浏览器会自动修正 HTML，结构就变了。改成有效的嵌套 |
+| 浏览器扩展在水合前修改了页面 | 无法完全避免。先在无痕窗口中排除扩展的影响 |
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>在本地动手试<small>可以先跳过，需要时再展开</small></summary>
+
+需要 Node.js 18 或更新的版本。按下面的步骤，亲眼看看代码在哪里运行：
+
+1. 运行 `npx create-next-app@latest rsc-demo`，按默认选项创建项目，再运行 `npm run dev`。
+2. 在 `app/page.tsx` 的组件里加一行 `console.log('在哪里打印？')`，刷新页面。这句话打印在运行 npm 的终端里：它在服务器上运行。开发模式下，浏览器控制台也会转发一份，前面带“Server”标记。
+3. 新建 `app/LikeButton.tsx`，顶部写 `'use client'`，用 useState 做一个点赞按钮，在 onClick 里 console.log 一句话。在 page.tsx 里渲染它。点击按钮，这句话只出现在浏览器控制台里。
+4. 把 `'use client'` 删掉再刷新。框架会报错：服务端组件不能使用 useState。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

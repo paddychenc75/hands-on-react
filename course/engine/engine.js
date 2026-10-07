@@ -1,13 +1,13 @@
 /* 引擎：由 src/app.js 改造而来的 ES 模块。学习机制的逻辑保持原样，只做适配：
    全局变量改 import；React/ReactDOM/Babel/Prism 来自 runtime.js 动态加载的全局（开发版 UMD）；
    去掉整页渲染外壳（侧栏、顶栏、路由、boot），交给 Rspress。 */
+import { prepare, compile, stripComments, HOOK_NAMES } from './exec.js';
 import { progress, save, lp, isDone, emitProgress } from './store.js';
 import { $, esc, sleep, el, highlight, toast, smooth } from './util.js';
 import { LESSONS, lessonNo } from '../registry.js';
 import { GLOSSARY } from '../glossary.js';
 import { lessonHref } from '../site.js';
 
-const HOOK_NAMES = ['useState', 'useEffect', 'useLayoutEffect', 'useRef', 'useMemo', 'useCallback', 'useContext', 'useReducer', 'useId', 'useTransition', 'useDeferredValue', 'useSyncExternalStore', 'useImperativeHandle', 'useInsertionEffect', 'useDebugValue', 'createContext', 'createElement', 'memo', 'lazy', 'Suspense', 'Component', 'PureComponent', 'Fragment', 'forwardRef', 'startTransition', 'createRef', 'Children', 'cloneElement', 'isValidElement', 'StrictMode', 'Profiler'];
 
 /* ---------- 代码执行引擎 ---------- */
 let activeRunner = null;
@@ -19,33 +19,6 @@ function formatArg(a) {
   if (typeof a === 'function') return 'ƒ ' + (a.name || 'anonymous') + '()';
   if (a && a.nodeType) return '<' + (a.nodeName || 'node').toLowerCase() + '>';
   try { return JSON.stringify(a, (k, v) => (v && v.$$typeof ? '[React 元素]' : v), 2); } catch (e) { return String(a); }
-}
-
-function prepare(source, exportNames) {
-  const imported = new Set();
-  const fromDom = new Set();
-  let code = source.replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm, (m, what, from) => {
-    if (from === 'react' || from === 'react-dom' || from === 'react-dom/client') {
-      const braces = what.match(/\{([\s\S]*)\}/);
-      if (braces) braces[1].split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
-        const [orig, alias] = s.split(/\s+as\s+/).map(x => x.trim());
-        imported.add(alias ? orig + ': ' + alias : orig);
-        if (from !== 'react') fromDom.add(alias ? orig + ': ' + alias : orig);
-      });
-    }
-    return '';
-  }).replace(/^\s*import\s+['"][^'"]+['"];?/gm, '')
-    .replace(/^\s*export\s+default\s+(?=function|class)/gm, '')
-    .replace(/^\s*export\s+(?=function|const|let|class)/gm, '');
-  const compiled = window.Babel.transform(code, { presets: ['react', ['typescript', { isTSX: true, allExtensions: true }]], sourceType: 'script', filename: 'App.jsx' }).code;
-  const names = [...imported];
-  const reactNames = names.filter(n => HOOK_NAMES.includes(n.split(':')[0].trim()));
-  // react-dom 的具名导入（createPortal、flushSync 等）从 ReactDOM 取
-  const domNames = names.filter(n => fromDom.has(n) && !HOOK_NAMES.includes(n.split(':')[0].trim()) && n.split(':')[0].trim() in window.ReactDOM);
-  const head = (reactNames.length ? 'const { ' + reactNames.join(', ') + ' } = React;\n' : '')
-    + (domNames.length ? 'const { ' + domNames.join(', ') + ' } = ReactDOM;\n' : '');
-  const ex = (exportNames || []).map(n => JSON.stringify(n) + ': typeof ' + n + " !== 'undefined' ? " + n + ' : undefined').join(', ');
-  return head + compiled + "\n;return { App: typeof App !== 'undefined' ? App : undefined, exports: { " + ex + ' } };';
 }
 
 function makeBoundary(onError) {
@@ -133,22 +106,6 @@ class Runner {
     }
     return result || {};
   }
-}
-
-// 优先使用 new Function；若环境禁止 eval，则退回到注入 <script> 的方式
-let evalAllowed = null;
-function compile(params, body) {
-  if (evalAllowed !== false) {
-    try { const f = new Function(...params, body); evalAllowed = true; return f; }
-    catch (e) { if (e instanceof SyntaxError) throw e; evalAllowed = false; }
-  }
-  const key = '__pg' + Math.random().toString(36).slice(2);
-  const s = document.createElement('script');
-  s.textContent = 'window.' + key + ' = function(' + params.join(',') + '){' + body + '\n};';
-  document.head.appendChild(s); s.remove();
-  const f = window[key]; delete window[key];
-  if (!f) throw new Error('代码无法执行（可能存在语法错误）');
-  return f;
 }
 
 function installHooks() {
@@ -364,10 +321,6 @@ export function disposePlayground(box) {
 }
 /* ---------- 练习检查器 ---------- */
 export class TestFail extends Error {}
-// 检查代码时先去掉注释，避免“把答案写在注释里”也能通过
-function stripComments(src) {
-  return src.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
-}
 export function makeTester(root, rawSource, exports) {
   const source = stripComments(rawSource);
   const q = (s) => root.querySelector(s);

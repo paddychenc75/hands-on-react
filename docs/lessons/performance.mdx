@@ -1,0 +1,146 @@
+---
+title: "性能优化：memo、useMemo、useCallback"
+---
+
+# 性能优化：memo、useMemo、useCallback
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+上一课我们知道：父组件渲染会带动所有子组件渲染。大多数时候这很快，不用担心。但如果某个子组件渲染代价很高（比如渲染一个几千行的表格），就值得优化了。
+
+## React.memo：props 没变就跳过
+
+`memo` 包裹一个组件后，React 会在渲染前**浅比较**新旧 props（逐个属性用 `Object.is` 比较）。全都相同就跳过这次渲染，直接复用上次的结果。
+
+```jsx
+const ExpensiveList = memo(function ExpensiveList({ items }) {
+  // ... 渲染很多内容
+});
+```
+
+## 陷阱：每次渲染都会创建新的函数和对象
+
+在 JavaScript 中，`{} !== {}`，`(() => {}) !== (() => {})`。组件每次渲染时，函数体里定义的对象、数组、函数都是**全新的**。把它们作为 props 传给 memo 组件，浅比较会判断为“变了”，memo 就失效了。JSX 也是对象。把 `<p>…</p>` 作为 children 传给 memo 组件，每次也是新引用。
+
+这就是 `useCallback` 和 `useMemo` 的用武之地：它们能在依赖不变时**返回上一次的同一个引用**。
+
+```jsx
+// useMemo：记忆化“计算结果”
+const sorted = useMemo(() => items.slice().sort(compare), [items]);
+
+// useCallback：记忆化“函数本身”
+const handleClick = useCallback(() => { doSomething(id); }, [id]);
+// 等价于：useMemo(() => () => { doSomething(id); }, [id])
+```
+
+<CallBox kind="warn" label="常见坑">
+
+useCallback 本身不会让任何东西变快。只有两种情况它才有用：
+
+1. 函数传给了 memo 组件。
+2. 函数是某个 effect 或 useMemo 的依赖。
+
+其他情况下，它只增加开销。
+
+</CallBox>
+
+```jsx play title="哪个 memo 生效了？"
+import { useState, memo, useCallback, useMemo, useRef } from 'react';
+
+const Child = memo(function Child({ label, onClick, style }) {
+  const renders = useRef(0);
+  renders.current++; // 仅用于演示计数：正式代码不要在渲染时读写 ref
+  return (
+    <p style={style}>
+      <button onClick={onClick}>{label}</button> 渲染了 {renders.current} 次
+    </p>
+  );
+});
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  const fnA = () => console.log('A');
+  const fnB = useCallback(() => console.log('B'), []);
+  const styleC = useMemo(() => ({ color: 'teal' }), []);
+
+  return (
+    <div>
+      <button onClick={() => setCount(count + 1)}>让父组件渲染：{count}</button>
+      <Child label="Child 1" onClick={fnA} />
+      <Child label="Child 2" onClick={fnB} style={{ color: 'teal' }} />
+      <Child label="Child 3" onClick={fnB} style={styleC} />
+    </div>
+  );
+}
+```
+
+## useMemo：跳过昂贵的重复计算
+
+```jsx play title="useMemo 跳过重复计算"
+import { useState, useMemo } from 'react';
+
+function slowPrimes(max) {
+  const start = performance.now();
+  const primes = [];
+  for (let n = 2; primes.length < max; n++) {
+    let ok = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) { ok = false; break; }
+    if (ok) primes.push(n);
+  }
+  console.log('计算耗时', (performance.now() - start).toFixed(1), 'ms');
+  return primes;
+}
+
+function App() {
+  const [count, setCount] = useState(20000);
+  const [dark, setDark] = useState(false);
+
+  // 只有 count 变化时才重新计算；切换主题不会触发计算
+  const primes = useMemo(() => slowPrimes(count), [count]);
+
+  return (
+    <div style={{ background: dark ? '#222' : '#fff', color: dark ? '#eee' : '#222', padding: 12 }}>
+      <button onClick={() => setDark(!dark)}>切换主题（看控制台，不会重新计算）</button>
+      <button onClick={() => setCount(count + 1000)}>多算 1000 个</button>
+      <p>第 {count} 个质数是 {primes[primes.length - 1]}</p>
+    </div>
+  );
+}
+```
+
+## 什么时候该优化？
+
+<CallBox kind="tip" label="要点">
+
+**先测量，再优化**。使用 React DevTools 的 Profiler 找出真正慢的组件。memo、useMemo、useCallback 也有成本。它们要比较依赖，还要占用内存。到处使用它们会让代码更难读，收益却很小。
+
+</CallBox>
+
+在动手 memo 之前，先试试这些**更简单的结构性优化**：
+
+- **状态下移**：把 state 放到真正用到它的小组件里（上一课的练习）
+- **把内容作为 children 传入**：children 中的 JSX 在更外层创建。所以包裹组件自己的 state 变化时，children 不会重新渲染
+- **避免不必要的 effect**：不要让 effect 串成链（A 变 → effect 改 B → effect 改 C）。每一环都多一次渲染
+
+<CallBox kind="deep" label="深入一点">
+
+**React Compiler** 1.0 已于 2025 年 10 月发布稳定版。它在编译时自动为组件和值添加记忆化。官方建议新项目依靠它，只在需要精确控制时手写 useMemo 和 useCallback。但理解它们背后的“引用相等”原理依然重要。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

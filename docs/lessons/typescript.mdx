@@ -1,0 +1,162 @@
+---
+title: "TypeScript + React"
+---
+
+# TypeScript + React
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+在实际工作中，绝大多数 React 项目都使用 TypeScript。TypeScript 不改变 React 的用法。它在你写代码时检查错误。传错 prop、拼错字段名、忘记处理 null，编辑器都会立即标红。你不必等到用户发现 bug。
+
+<CallBox kind="tip" label="要点">
+
+本课的代码框支持 TypeScript 语法，可以直接运行。不过这里只会**去掉类型**后执行，并不做类型检查。真正的类型报错要在 VS Code 等编辑器或 `tsc` 里才能看到。
+
+</CallBox>
+
+## 给 props 写类型
+
+最常用的做法是用 `type` 或 `interface` 描述 props 的形状。`?` 表示可选，`'a' | 'b'` 是联合类型，只允许这几个值。
+
+```jsx play title="带类型的 Button"
+type ButtonProps = {
+  label: string;
+  variant?: 'primary' | 'ghost';   // 只能是这两个值之一
+  count?: number;
+  onClick?: () => void;
+};
+
+function Button({ label, variant = 'primary', count, onClick }: ButtonProps) {
+  const style = variant === 'primary'
+    ? { background: '#087ea4', color: '#fff', border: 0 }
+    : { background: 'transparent', color: '#087ea4', border: '1px solid #087ea4' };
+  return (
+    <button style={{ ...style, padding: '6px 12px', borderRadius: 6 }} onClick={onClick}>
+      {label}{count !== undefined && ` (${count})`}
+    </button>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Button label="保存" onClick={() => console.log('保存')} />
+      <Button label="消息" variant="ghost" count={3} />
+      {/* <Button label="错误" variant="danger" />  ← 在编辑器里这里会被标红 */}
+    </div>
+  );
+}
+```
+
+## children 与原生属性
+
+```jsx
+type CardProps = {
+  title: string;
+  children: React.ReactNode;        // 任何可渲染的内容：元素、字符串、数组、null
+};
+
+// 继承原生 <button> 的全部属性（type、disabled、aria-*、onClick……）
+type IconButtonProps = React.ComponentProps<'button'> & {
+  icon: string;
+};
+function IconButton({ icon, children, ...rest }: IconButtonProps) {
+  return <button {...rest}>{icon} {children}</button>;
+}
+```
+
+## State、事件与 ref
+
+大多数时候 TypeScript 能**自动推断**类型，比如 `useState(0)` 就是 number。只有初始值不能说明全部类型时，才需要手写。最常见的情况是：开始是 null，以后会有值。
+
+```jsx title="常用类型速查"
+type User = { id: number; name: string };
+
+const [count, setCount] = useState(0);                 // 推断为 number
+const [user, setUser] = useState<User | null>(null);   // 需要手动标注
+const inputRef = useRef<HTMLInputElement>(null);
+
+function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  setName(e.target.value);
+}
+function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) { // 旧版 @types/react 写作 React.FormEvent
+  e.preventDefault();
+}
+
+// 使用可能为 null 的值时，TypeScript 会强迫你先判断
+return <p>{user ? user.name : '未登录'}</p>;
+```
+
+<CallBox kind="warn" label="常见坑">
+
+不要到处写 `any`。`any` 等于关掉了类型检查，TypeScript 的好处也就没了。实在不确定类型时用 `unknown`，它会强迫你先判断再使用。
+
+</CallBox>
+
+## 泛型组件：一个列表组件，适配任何数据
+
+```jsx play title="泛型组件"
+type ListProps<T> = {
+  items: T[];
+  getKey: (item: T) => string | number;
+  renderItem: (item: T) => React.ReactNode;
+};
+
+function List<T>({ items, getKey, renderItem }: ListProps<T>) {
+  return <ul>{items.map(item => <li key={getKey(item)}>{renderItem(item)}</li>)}</ul>;
+}
+
+type Book = { isbn: string; title: string; price: number };
+const books: Book[] = [
+  { isbn: '001', title: '深入浅出 React', price: 79 },
+  { isbn: '002', title: 'TypeScript 编程', price: 99 },
+];
+
+function App() {
+  return (
+    <List
+      items={books}
+      getKey={b => b.isbn}
+      renderItem={b => <span>{b.title} · ¥{b.price}</span>}  // b 自动推断为 Book
+    />
+  );
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+给自定义 Hook 加类型时，返回元组记得写 `as const`：`return [on, toggle] as const;`。否则 TypeScript 会把它推断成 `(boolean | (() => void))[]` 这种混合数组，使用时失去精确类型。
+
+</CallBox>
+
+## 可辨识联合：让矛盾的状态写不出来
+
+```jsx title="第 17 课的搜索状态、第 18 课的 action 都可以这样写"
+type SearchState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: string[] }
+  | { status: 'error'; error: Error };
+
+function show(s: SearchState) {
+  if (s.status === 'success') return s.data.join('、');  // 这里才允许访问 data
+  // if (s.status === 'loading') s.data  ← 编译报错：loading 状态没有 data
+  return s.status;
+}
+```
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

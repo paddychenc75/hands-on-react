@@ -1,0 +1,98 @@
+---
+title: "条件渲染"
+---
+
+# 条件渲染
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+因为 JSX 就是 JavaScript，所以条件渲染用的就是普通的 JS 条件语法。根据场景选择最清晰的写法。
+
+## 方式一：if 提前返回
+
+适合整个组件根据条件输出完全不同的内容。提前 return 要放在所有 useState 之后。
+
+```jsx
+function Greeting({ isLoggedIn }) {
+  if (!isLoggedIn) {
+    return <button>请登录</button>;
+  }
+  return <h2>欢迎回来！</h2>;
+}
+```
+
+## 方式二和方式三：三元运算符 ? : 与逻辑与 \&\&
+
+三元运算符适合在 JSX 内部“二选一”：`{ok ? <A /> : <B />}`。逻辑与 `&&` 适合“满足条件才显示，否则什么都不显示”：`{ok && <A />}`。下面的演示同时用到这两种写法。
+
+```jsx play title="三元运算符与 &&"
+import { useState } from 'react';
+
+function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [unread, setUnread] = useState(3);
+
+  return (
+    <div>
+      {loggedIn ? <h3>欢迎回来 👋</h3> : <h3>你还没有登录</h3>}
+
+      {loggedIn && unread > 0 && <p>你有 {unread} 条未读消息</p>}
+
+      <button onClick={() => setLoggedIn(!loggedIn)}>
+        {loggedIn ? '退出' : '登录'}
+      </button>
+      <button onClick={() => setUnread(0)}>全部已读</button>
+    </div>
+  );
+}
+```
+
+`&&` 左边不一定是布尔值。下面两种写法只差一点：写法 A 直接用 count，写法 B 先比较 `count > 0`。
+
+```jsx play title="count 为 0 时的两种写法"
+function App() {
+  const count = 0;
+  return (
+    <div>
+      <p>写法 A：{count && <b>有 {count} 条</b>}</p>
+      <p>写法 B：{count > 0 && <b>有 {count} 条</b>}</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+`{count && <p>...</p>}` 当 count 为 **0** 时，页面上会显示一个“0”！因为 `0 && x` 的结果是 0，而 React 会渲染数字。正确写法：`{count > 0 && ...}` 或 `{!!count && ...}`。
+
+</CallBox>
+
+## 不渲染任何东西：return null
+
+组件返回 `null`、`false` 或 `undefined` 时什么也不渲染。比如一个 `Modal` 组件，在 `open` 为 false 时直接 `return null`。
+
+提前 return 要写在所有 Hook（例如 useState）之后。原因第 15 课会讲，这里先记住这条规则。
+
+条件变成 false 时，React 会把对应的元素从页面上移除。元素里输入的内容、组件里的 state 都会丢失。条件再变回 true，得到的是一个全新的元素。
+
+<CallBox kind="tip" label="要点">
+
+条件很多时，可以把判断提取到变量或一个小函数里，让 JSX 保持干净。也可以用对象映射：`const icons = { success: '✅', error: '❌' }; {icons[status]}`。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

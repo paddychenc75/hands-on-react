@@ -1,0 +1,336 @@
+---
+title: "性能测量：先找到慢在哪里"
+---
+
+# 性能测量：先找到慢在哪里
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+前几课教了 memo、useMemo、useTransition。它们都有成本。用错地方，代码变复杂，速度却不变。
+
+所以优化之前，一定要先**测量**。这一课教你怎样测量。
+
+<CallBox kind="like" label="打个比方">
+
+像看医生。医生先做检查，再开药。没有检查就开药，可能治错病，还会带来副作用。
+
+</CallBox>
+
+## 优化的四个步骤
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 复现</b><span>找到一个具体的慢操作，例如“在搜索框打字”</span></div><div class=\"step\"><b>② 测量</b><span>录制这个操作，找出<em>最耗时</em>的组件</span></div><div class=\"step\"><b>③ 修改</b><span>只改最耗时的这一处</span></div><div class=\"step\"><b>④ 再测量</b><span>用同样的操作再录一次。数字变好才保留修改</span></div></div><figcaption>一次只改一处。每次修改后都重新测量</figcaption>"} />
+
+<CallBox kind="tip" label="要点">
+
+测量时，打开浏览器 DevTools 的 **CPU 节流**（Performance 面板 → CPU：4x slowdown）。你的电脑通常比用户的手机快很多。
+
+</CallBox>
+
+## 工具一：React DevTools 的 Profiler 面板
+
+React DevTools 是浏览器扩展。安装后，DevTools 中多出两个面板：**Components** 和 **Profiler**。Components 面板显示组件树，以及每个组件的 props、state 和 Hook。Profiler 面板记录每次提交的耗时。
+
+<CallBox kind="tip" label="录制一次操作">
+
+1. 打开 Profiler 面板，点齿轮图标。
+2. 勾选 “Record why each component rendered while profiling”。
+3. 点圆形的录制按钮。
+4. 在页面上执行慢操作，例如打 5 个字。
+5. 点停止按钮。
+6. 在右上角的柱状图中选一次提交。每根柱子是一次提交，越高越慢。
+7. 读火焰图，找出最宽、颜色最黄的组件。
+8. 点这个组件。右侧的 “Why did this render?” 显示渲染原因。
+
+</CallBox>
+
+| 你看到的 | 含义 |
+|---|---|
+| 灰色条 | 这次提交中，这个组件**没有**渲染 |
+| 条的宽度 | 这个组件和它的子组件上一次渲染的总耗时 |
+| 条的颜色 | 这次提交中，组件自身的耗时。黄色慢，蓝绿色快 |
+| Ranked 视图 | 按自身耗时排序。最慢的组件在最上面 |
+| Why did this render? | 例如 “Props changed: (onClick)”、“Hooks changed”、“The parent component rendered” |
+
+还有一个快速检查的方法：
+
+1. 在 DevTools 设置的 General 页，勾选 “Highlight updates when components render”。
+2. 在页面上操作。
+3. 每个重新渲染的组件都会闪一个边框。打一个字，整页都在闪？这就是线索。
+
+<CallBox kind="warn" label="常见坑">
+
+“Why did this render?” 显示 “Props changed: (onClick)”，不一定是问题。只有这个组件**很慢**时才值得处理。先看耗时，再看原因。
+
+</CallBox>
+
+## 工具二：在代码里测量：\<Profiler\>
+
+`<Profiler>` 是 React 内置的组件。它包裹一棵子树。子树每次提交后，React 调用 `onRender`。
+
+```jsx
+import { Profiler } from 'react';
+
+function onRender(id, phase, actualDuration, baseDuration, startTime, commitTime) {
+  // 把数据发到日志或统计服务
+}
+
+<Profiler id="Sidebar" onRender={onRender}>
+  <Sidebar />
+</Profiler>
+```
+
+| 参数 | 含义 |
+|---|---|
+| `id` | 你给这个 Profiler 起的名字。有多个 Profiler 时用来区分 |
+| `phase` | `"mount"`（第一次挂载）、`"update"`（重新渲染）或 `"nested-update"` |
+| `actualDuration` | 这次更新中，渲染这棵子树**实际**花的毫秒数 |
+| `baseDuration` | 估算值：不做任何记忆化时，重新渲染整棵子树要花的毫秒数。它是每个组件最近一次渲染耗时的总和 |
+| `startTime` / `commitTime` | 开始渲染和提交的时间戳 |
+
+比较这两个数字，就能判断记忆化有没有生效。先用下面的示例看它们怎样变化，再总结读法。
+
+下面的列表有 200 行，每行故意阻塞 0.2ms。点“无关计数”按钮，在控制台中看两个数字。
+
+```jsx play title="读懂 actualDuration 和 baseDuration"
+import { useState, memo, Profiler } from 'react';
+
+function SlowRow({ i }) {
+  const start = performance.now();
+  while (performance.now() - start < 0.2) {} // 每行阻塞 0.2ms
+  return <li>第 {i + 1} 行</li>;
+}
+
+function List() {
+  const rows = [];
+  for (let i = 0; i < 200; i++) rows.push(<SlowRow key={i} i={i} />);
+  return <ul style={{ height: 120, overflow: 'auto' }}>{rows}</ul>;
+}
+const MemoList = memo(List);
+
+// 不要在 onRender 里调用 set 函数：那会引起新的提交，形成循环
+function onRender(id, phase, actualDuration, baseDuration) {
+  console.log(id + ' ' + phase + '：actual ' + actualDuration.toFixed(1) +
+    'ms，base ' + baseDuration.toFixed(1) + 'ms');
+}
+
+function App() {
+  const [count, setCount] = useState(0);
+  const [useMemoList, setUseMemoList] = useState(false);
+  const TheList = useMemoList ? MemoList : List;
+  return (
+    <Profiler id="页面" onRender={onRender}>
+      <label>
+        <input type="checkbox" checked={useMemoList}
+          onChange={e => setUseMemoList(e.target.checked)} /> 用 memo 包裹列表
+      </label>
+      <p><button onClick={() => setCount(count + 1)}>无关计数：{count}</button></p>
+      <TheList />
+    </Profiler>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+**开发版本的耗时偏大**。React 开发版本会做很多额外检查，所以通常比生产版本慢好几倍。本课程的运行环境也是开发版本。所以：
+
+1. 在开发版本中，比较**修改前后的相对变化**。
+2. 要得到真实的数字，用生产版本测量。
+3. 生产版本默认关闭 Profiler。需要时，用带 profiling 的版本：把 `react-dom/client` 换成 `react-dom/profiling`（通常在打包工具中设置别名）。
+
+</CallBox>
+
+<CallBox kind="tip" label="要点">
+
+`<Profiler>` 本身也有 CPU 和内存成本。只包裹你要测量的部分，测量完就移除。
+
+</CallBox>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>工具三：浏览器的 Performance 面板<small>可以先跳过，需要时再展开</small></summary>
+
+React Profiler 只测量 React 的工作。但用户感到的“卡”还包括浏览器的工作：执行 JavaScript、计算样式、布局、绘制。Chrome DevTools 的 Performance 面板能显示全部。
+
+录制步骤：
+
+1. 打开 Performance 面板，把 CPU 设为 4x slowdown。
+2. 点录制按钮。
+3. 执行慢操作。
+4. 点停止。
+5. 在 Main 轨道中找**长任务**：超过 50ms 的任务，右上角有红色三角。
+6. 展开长任务。看时间花在脚本（JavaScript）、样式计算，还是布局。
+
+**React 19.2 起**，Performance 面板中多了 React 自己的轨道（Performance Tracks）：
+
+- **Scheduler 轨道**：按优先级显示 React 的工作。子轨道有 Blocking（同步更新，通常来自用户操作）、Transition（startTransition 中的更新）、Suspense 和 Idle。每次更新分为 Update、Render、Commit 等阶段。
+- **Components 轨道**：用火焰图显示组件的渲染和 effect 耗时。开发版本中还显示 “Changed props”。
+
+|  | 开发版本 | profiling 版本 | 生产版本 |
+|---|---|---|---|
+| Scheduler 轨道 | 有 | 有 | 无 |
+| Components 轨道 | 有 | 只显示 \<Profiler\> 包裹的子树（装了 React DevTools 则全部显示） | 无 |
+| 级联更新提示、Changed props | 有 | 无 | 无 |
+
+<CallBox kind="deep" label="深入一点">
+
+本课程运行在 React 18.3.1 上，所以看不到这些轨道。在你自己的 React 19.2+ 项目中，用开发版本录制一次 Performance，就能看到它们。前一课的 useTransition 演示，在 Scheduler 轨道中会显示在 Transition 子轨道里。
+
+</CallBox>
+
+</details>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>用户感受到的指标：Web Vitals<small>可以先跳过，需要时再展开</small></summary>
+
+最终目标不是“组件快”，而是“用户觉得快”。Google 用 Core Web Vitals 衡量用户体验。其中两个和 React 关系最大：
+
+| 指标 | 测量什么 | “良好”标准 | React 中的常见原因 |
+|---|---|---|---|
+| **INP**（Interaction to Next Paint） | 从用户点击、按键，到屏幕画出下一帧的时间 | ≤ 200ms | 操作触发的渲染和提交太慢；一次更新重新渲染了大片组件树；列表 DOM 太多 |
+| **LCP**（Largest Contentful Paint） | 页面上最大的内容（大图或大段文字）显示出来的时间 | ≤ 2.5s | JavaScript 包太大；主要内容要等客户端渲染完才出现；数据请求排成瀑布 |
+
+标准按真实用户的第 75 百分位计算。INP 的常用对策：减少一次更新渲染的组件（状态下移、memo）；把不紧急的更新放进 startTransition；用虚拟列表减少 DOM。LCP 的常用对策：代码分割（lazy）、服务端渲染、提前请求数据。
+
+</details>
+
+## 长列表：只渲染看得见的行
+
+一个列表有 5000 行。每行很简单，memo 也生效了。可是第一次显示仍然很慢。原因是 5000 个 DOM 节点本身：创建、计算样式、布局，都要时间。memo 不能减少 DOM。
+
+解决方法是**虚拟列表**（英文 virtualization）。虚拟列表只渲染可见区域里的行，其余位置用空白占位。它分四步：
+
+<CallBox kind="tip" label="虚拟列表的四步">
+
+1. 滚动容器有固定高度。
+2. 根据 scrollTop 算出哪些行在可见区域中。
+3. 只渲染这些行，再加上下几行备用（overscan），防止快速滚动时出现空白。
+4. 用占位高度保持滚动条的总长度。
+
+</CallBox>
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>上方占位</b><span>高度 = 起始下标 × 行高。<em>没有</em> DOM 行</span></div><div class=\"step\"><b>可见行 + overscan</b><span>只有这十几行是真实的 DOM</span></div><div class=\"step\"><b>下方占位</b><span>高度 = 剩余行数 × 行高。让滚动条长度不变</span></div></div><figcaption>虚拟列表：DOM 数量只和可见区域有关，和总行数无关</figcaption>"} />
+
+```jsx play title="虚拟列表前后对比"
+import { useState, useRef, useEffect, Profiler } from 'react';
+
+const ROW = 24, VIEW = 192, TOTAL = 5000, OVERSCAN = 3;
+
+function Row({ i }) {
+  return <div className="row" style={{ height: ROW, borderBottom: '1px solid #eee' }}>第 {i + 1} 行</div>;
+}
+
+function FullList() {
+  const rows = [];
+  for (let i = 0; i < TOTAL; i++) rows.push(<Row key={i} i={i} />);
+  return <div style={{ height: VIEW, overflow: 'auto' }}>{rows}</div>;
+}
+
+function WindowedList() {
+  const [scrollTop, setScrollTop] = useState(0);
+  const start = Math.max(0, Math.floor(scrollTop / ROW) - OVERSCAN);
+  const end = Math.min(TOTAL, Math.ceil((scrollTop + VIEW) / ROW) + OVERSCAN);
+  const rows = [];
+  for (let i = start; i < end; i++) rows.push(<Row key={i} i={i} />);
+  return (
+    <div style={{ height: VIEW, overflow: 'auto' }} onScroll={e => setScrollTop(e.currentTarget.scrollTop)}>
+      <div style={{ height: start * ROW }} />
+      {rows}
+      <div style={{ height: (TOTAL - end) * ROW }} />
+    </div>
+  );
+}
+
+function onRender(id, phase, actualDuration) {
+  console.log(id + ' ' + phase + '：' + actualDuration.toFixed(1) + 'ms');
+}
+
+function App() {
+  const [mode, setMode] = useState('full');
+  const box = useRef(null);
+  useEffect(() => {
+    console.log('DOM 中的行数：' + box.current.querySelectorAll('.row').length);
+  }, [mode]);
+  return (
+    <div>
+      <button onClick={() => setMode('full')}>全部渲染</button>{' '}
+      <button onClick={() => setMode('windowed')}>虚拟列表</button>
+      <p>当前：{mode === 'full' ? '全部渲染 5000 行' : '只渲染可见行'}</p>
+      <div ref={box}>
+        <Profiler id={mode} key={mode} onRender={onRender}>
+          {mode === 'full' ? <FullList /> : <WindowedList />}
+        </Profiler>
+      </div>
+    </div>
+  );
+}
+```
+
+真实项目中，不要自己写。用成熟的库，它们还处理了行高不固定、横向滚动、网格等情况：
+
+```jsx title="两个常用的虚拟列表库"
+// TanStack Virtual：只提供计算，DOM 结构由你决定
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+const parentRef = useRef(null);
+const virtualizer = useVirtualizer({
+  count: 10000,
+  getScrollElement: () => parentRef.current,
+  estimateSize: () => 35,
+});
+// 渲染 virtualizer.getVirtualItems()，外层高度用 virtualizer.getTotalSize()
+
+// react-window（2.x）：提供现成的 <List> 组件
+// <List rowComponent={Row} rowCount={10000} rowHeight={35} rowProps={{ items }} />
+```
+
+<CallBox kind="warn" label="常见坑">
+
+虚拟列表也有代价：浏览器的“页面内查找”（Ctrl+F）找不到没渲染的行；屏幕阅读器只读到可见的行。几百行以内的列表，通常不需要它。
+
+</CallBox>
+
+## 常见瓶颈清单
+
+| 在 Profiler 中看到 | 可能的原因 | 对策 |
+|---|---|---|
+| 所有读取某个 Context 的组件一起渲染 | Provider 的 value 每次都是新对象 | 用 useMemo 固定 value；或把 Context 拆小 |
+| 某个组件每次都是 mount，state 丢失 | 在组件内部定义了组件 | 把组件定义移到外面 |
+| 第一次显示很慢，Performance 中布局时间很长 | 列表 DOM 太多 | 虚拟列表、分页 |
+| 打字时一大片组件重新渲染 | state 放得太高 | 状态下移；或用 useDeferredValue |
+| 子组件 memo 了，仍然重新渲染 | props 中有新函数或新对象 | useCallback / useMemo，或 React Compiler |
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>React Compiler 改变了什么<small>可以先跳过，需要时再展开</small></summary>
+
+React Compiler 在编译时自动做记忆化。启用后，很多“不必要的重新渲染”自然消失。在 React DevTools 中，被编译器优化的组件旁边有 “Memo ✨” 标记。
+
+但测量仍然必要。编译器不能解决这些问题：
+
+1. DOM 太多。5000 行仍然是 5000 个节点。
+2. 输入真的变了。依赖变化时，昂贵的计算照样要重新执行。
+3. 网络和 JavaScript 包大小。这些影响 LCP，与记忆化无关。
+4. 编译器跳过的组件。违反 React 规则的代码不会被优化。
+
+<CallBox kind="deep" label="深入一点">
+
+有了编译器，Profiler 中的火焰图会出现更多灰色条（没有渲染）。这时剩下的黄色条，通常就是“真的慢”的部分：大列表、昂贵计算、或者一次更新本身影响了很多数据。
+
+</CallBox>
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

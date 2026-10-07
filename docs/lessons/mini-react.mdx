@@ -1,0 +1,178 @@
+---
+title: "原理：亲手实现迷你 React"
+---
+
+# 原理：亲手实现迷你 React
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+理解原理最好的方式就是自己造一个。这一课我们用纯 JavaScript 实现 React 最核心的几个部分。下面的代码都可以直接运行，结果打印在控制台。
+
+## 第一步：createElement
+
+第 2 课讲过：JSX 会被编译成 `createElement(type, props, ...children)`。它只返回一个描述对象：
+
+```jsx play title="元素就是一个普通对象"
+function createElement(type, props, ...children) {
+  return {
+    type,
+    props: {
+      ...props,
+      children: children.map(child =>
+        typeof child === 'object' ? child : { type: 'TEXT', props: { nodeValue: child, children: [] } }
+      ),
+    },
+  };
+}
+
+// <div id="app"><h1>你好</h1>世界</div> 会被编译成：
+const el = createElement('div', { id: 'app' },
+  createElement('h1', null, '你好'),
+  '世界'
+);
+
+console.log(JSON.stringify(el, null, 2));
+```
+
+## 第二步：render，把对象变成 DOM
+
+```jsx play title="一个 20 行的渲染器"
+function createElement(type, props, ...children) {
+  return { type, props: { ...props, children: children.flat().map(c => typeof c === 'object' ? c : { type: 'TEXT', props: { nodeValue: String(c), children: [] } }) } };
+}
+
+function render(element, container) {
+  // 函数组件：调用它得到元素，再递归渲染
+  if (typeof element.type === 'function') {
+    return render(element.type(element.props), container);
+  }
+  const dom = element.type === 'TEXT'
+    ? document.createTextNode('')
+    : document.createElement(element.type);
+
+  Object.keys(element.props).filter(k => k !== 'children').forEach(name => {
+    if (name.startsWith('on')) dom.addEventListener(name.slice(2).toLowerCase(), element.props[name]);
+    else dom[name] = element.props[name];
+  });
+
+  element.props.children.forEach(child => render(child, dom));
+  container.appendChild(dom);
+}
+
+// —— 试试我们的迷你 React ——
+function Greeting(props) {
+  return createElement('h2', { style: 'color: teal' }, '你好，', props.name);
+}
+
+const box = document.createElement('div');
+render(createElement('div', null,
+  createElement(Greeting, { name: '迷你 React' }),
+  createElement('button', { onClick: () => console.log('按钮能用！') }, '点我')
+), box);
+
+console.log(box.innerHTML);
+```
+
+<CallBox kind="deep" label="深入一点">
+
+这个迷你渲染器只会挂载：它每次都从零创建 DOM。真实 React 会保留上一次的树。类型相同，就复用 DOM 节点，只更新变化的属性。类型不同，才删除旧节点并重建。这就是第 19 课的协调。
+
+</CallBox>
+
+## 第三步：Hooks 的秘密
+
+React 是怎么知道 `useState` 调用对应哪个状态的？答案很简单。**每个组件有一个数组（实际是链表），按调用顺序存放 Hook 的 state**。React 再用一个游标记录“现在是第几个 Hook”。
+
+```jsx play title="20 行实现 useState"
+// —— 极简 Hooks 实现 ——
+let hooks = [];      // 存放当前组件所有 Hook 的状态
+let cursor = 0;      // 当前执行到第几个 Hook
+let Component;       // 当前组件
+
+function useState(initial) {
+  const i = cursor;                       // 记住自己的位置
+  if (hooks[i] === undefined) hooks[i] = initial;
+  const setState = (v) => {
+    hooks[i] = typeof v === 'function' ? v(hooks[i]) : v;
+    rerender();
+  };
+  cursor++;
+  return [hooks[i], setState];
+}
+
+function rerender() {
+  cursor = 0;                             // 每次渲染前把游标归零
+  const output = Component();
+  console.log('渲染结果：', output);
+  return output;
+}
+
+// —— 一个使用两个 useState 的“组件” ——
+let api;
+Component = function Counter() {
+  const [count, setCount] = useState(0);
+  const [name, setName] = useState('小明');
+  api = { setCount, setName };
+  return name + ' 点击了 ' + count + ' 次';
+};
+
+rerender();
+api.setCount(c => c + 1);
+api.setName('小红');
+api.setCount(c => c + 1);
+console.log('内部 hooks 数组：', JSON.stringify(hooks));
+```
+
+现在你知道为什么**不能在 if 里调用 Hook** 了。如果某次渲染跳过了第一个 useState，游标就会错位。结果 name 会读到 count 的值。
+
+上面的演示只有一个组件，所以只用一个全局 hooks 数组。真实 React 中，每个组件实例对应一个 Fiber，Hook 链表存在 Fiber 上。React 先按树中的位置找到 Fiber，再按调用顺序找到 Hook。这就是第 19 课“状态跟着位置走”的原因：
+
+1. 位置和类型不变，就是同一个 Fiber，state 保留。
+2. 类型或 key 变了，React 新建 Fiber，state 清空。
+
+## 第四步：Fiber 与可中断渲染
+
+上面的 render 是**递归**的，一旦开始就必须一口气做完。如果组件树很大，主线程会被长时间占用，用户的输入得不到响应。React 16 引入的 **Fiber** 架构为解决这个问题打下了基础。React 18 起，过渡更新等并发渲染才真正可以中断；紧急更新仍然一次做完：
+
+- 每个组件对应一个 **Fiber 节点**。节点用 child、sibling、return 指针连成一棵树。React 遍历这棵树时可以随时暂停。
+- 渲染被拆成一个个小的工作单元，每完成一个就检查：时间片用完了吗？有更高优先级的任务吗？如果有，就**让出主线程**，稍后从断点继续。
+- 渲染阶段只构建新的 Fiber 树（work-in-progress 树），**不修改 DOM**。所以 React 可以随时丢弃它并重来。
+- 所有单元完成后，进入**提交阶段**。React 一次性、同步地把所有变更应用到 DOM。用户不会看到“画了一半”的界面。
+
+```jsx title="React 实际使用自己的调度器 Scheduler，而非 requestIdleCallback"
+// Fiber 工作循环的核心思想（极简伪代码）
+let nextUnitOfWork = rootFiber;
+
+function workLoop(deadline) {
+  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork); // 处理一个 Fiber，返回下一个
+  }
+  if (!nextUnitOfWork && wipRoot) commitRoot();         // 全部完成，一次性提交
+  requestIdleCallback(workLoop);                        // 让出主线程，空闲时继续
+}
+requestIdleCallback(workLoop);
+
+// 遍历顺序：先 child，没有就 sibling，再没有就回到 return(父节点) 找它的 sibling
+```
+
+<CallBox kind="tip" label="要点">
+
+想深入学习，可以读两份材料：Rodrigo Pombo 的《Build your own React》；React 源码中的 `packages/react-reconciler`。理解了这一课，你就已经掌握了阅读源码的地图。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

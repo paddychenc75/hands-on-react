@@ -1,0 +1,151 @@
+---
+title: "渲染机制：React 到底做了什么"
+---
+
+# 渲染机制：React 到底做了什么
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+很多性能问题和奇怪的 bug 都有同一个根源。那就是没搞清楚 React 的渲染过程。这一课我们打开引擎盖看一看。
+
+## 三个阶段：触发 → 渲染 → 提交
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 触发 Trigger</b><span>首次挂载，或某个组件的 state 被更新</span></div><div class=\"step\"><b>② 渲染 Render</b><span>React 调用组件函数，得到新的 React 元素树，与上一次对比算出差异</span></div><div class=\"step\"><b>③ 提交 Commit</b><span>只把<em>差异</em>应用到真实 DOM，然后运行 effect</span></div></div><figcaption>在 React 里，“渲染”指的是调用你的组件函数，并不等于修改页面</figcaption>"} />
+
+<CallBox kind="like" label="打个比方">
+
+像餐厅点菜。顾客点单，这是触发。厨师在后厨做菜，这是渲染，只做计算，可以重做。服务员把菜端上桌，这是提交，真正改变外部世界。
+
+</CallBox>
+
+## 什么会触发重新渲染？
+
+- 组件自己的 **state 变化**
+- **父组件重新渲染**（默认情况下，所有子组件也会跟着重新渲染，不管 props 有没有变！）
+- 它读取的 **Context 值变化**
+
+还有两个细节：
+
+1. **自动批处理**：同一个事件中多次调用 set 函数，只触发一次渲染。React 18 起，setTimeout 和 Promise 回调中也是这样。
+2. **同值跳过**：新值与旧值用 `Object.is` 比较相等时，React 跳过这次更新。
+
+<CallBox kind="warn" label="常见坑">
+
+一个常见误解是“props 变了组件才会重新渲染”。实际上，**父组件渲染时，子组件默认一律重新渲染**。React 在渲染阶段算出差异，提交阶段只修改变化的 DOM。所以多数时候这并不会造成问题。只有当子组件非常“重”时，才需要用下一课的 memo 来优化。
+
+</CallBox>
+
+下面的演示会让每次渲染的组件**闪烁**一下。点击不同的按钮，观察哪些组件被重新渲染：
+
+```jsx play title="谁被重新渲染了？"
+import { useState, useRef, useEffect } from 'react';
+
+// 一个会在每次渲染后闪烁的小盒子
+function Box({ name, children }) {
+  const ref = useRef(null);
+  const count = useRef(0);
+  count.current++; // 仅用于演示计数：正式代码不要在渲染时读写 ref
+  useEffect(() => {
+    const el = ref.current;
+    el.animate([{ background: '#ffd36b' }, { background: 'transparent' }], { duration: 600 });
+  });
+  return (
+    <div ref={ref} style={{ border: '1px solid #8aa', borderRadius: 8, padding: 8, margin: 6 }}>
+      <b>{name}</b> <small>渲染 {count.current} 次</small>
+      {children}
+    </div>
+  );
+}
+
+function Child({ label }) {
+  return <Box name={'Child ' + label} />;
+}
+
+function Counter() {
+  const [n, setN] = useState(0);
+  return (
+    <Box name="Counter（自带 state）">
+      <button onClick={() => setN(n + 1)}>Counter 内部 +1：{n}</button>
+    </Box>
+  );
+}
+
+function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <Box name="App">
+      <button onClick={() => setCount(count + 1)}>App 的 state +1：{count}</button>
+      <Child label="A" />
+      <Child label={'B ' + count} />
+      <Counter />
+    </Box>
+  );
+}
+```
+
+## 虚拟 DOM 与协调（Reconciliation）
+
+组件返回的 React 元素树常被称为**虚拟 DOM**：它是用普通 JS 对象描述的界面结构。每次渲染后，React 对比新树和旧树，找出需要的改动，再修改真实 DOM。这个过程叫**协调**。
+
+完美地比较两棵树，复杂度是 O(n³)。n 是元素数量，n³ 意味着 1000 个元素要比较 10 亿次，太慢了。React 基于两个假设，把它降到了 O(n)，也就是 1000 个元素大约比较 1000 次：
+
+- **类型不同的元素会产生完全不同的树**。如果 `<div>` 变成了 `<section>`，或 `<Counter>` 变成了 `<Timer>`，React 会卸载整棵旧子树，丢弃其中所有 state。然后它挂载新的子树。
+- **通过 key 识别列表中的元素**。同一层级中，key 相同就认为是同一个元素。
+
+## 状态与位置绑定
+
+这两个假设决定了一件事：组件切换时，它的 state 是保留还是丢弃？先看演示，预测三种情况的结果。
+
+```jsx play title="状态跟着位置走"
+import { useState } from 'react';
+
+function Counter({ color }) {
+  const [n, setN] = useState(0);
+  return <button style={{ color }} onClick={() => setN(n + 1)}>{color} 计数：{n}</button>;
+}
+
+function App() {
+  const [red, setRed] = useState(false);
+  return (
+    <div>
+      <label><input type="checkbox" checked={red} onChange={e => setRed(e.target.checked)} /> 红色</label>
+      <h4>情况 1</h4>
+      {red ? <Counter color="red" /> : <Counter color="blue" />}
+      <h4>情况 2</h4>
+      {red ? <div><Counter color="red" /></div> : <section><Counter color="blue" /></section>}
+      <h4>情况 3</h4>
+      {red ? <Counter key="r" color="red" /> : <Counter key="b" color="blue" />}
+    </div>
+  );
+}
+```
+
+结论：**React 根据组件在树中的“位置”来保存它的 state**。同一位置渲染同一类型的组件，state 会被保留。位置、类型或 key 变了，state 就会丢失。
+
+<CallBox kind="warn" label="常见坑">
+
+**永远不要在组件内部定义组件**。例如在 App 函数体里写 `function Input() {...}`。每次 App 渲染，都会创建一个“新类型”的 Input。结果是每次输入后，Input 的 state 和焦点都会丢失。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+React 16 起使用名为 **Fiber** 的新架构来执行协调。它把渲染工作拆成一个个小单元，可以暂停、恢复、按优先级调度，这是并发特性的基础。第 30 课会再讲。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

@@ -1,0 +1,310 @@
+---
+title: "无障碍：让每个人都能用"
+---
+
+# 无障碍：让每个人都能用
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+有的用户看不见屏幕，用**读屏软件**听页面。有的用户不能用鼠标，只用键盘。有的用户怕晃动的动画。**无障碍**（accessibility，简称 a11y）就是让这些用户也能用你的界面。
+
+上一课说，好的公共组件要“难以误用”。不能用键盘操作的组件，对很多人来说根本不能用。很多地区还有法律要求，例如欧盟《无障碍法案》（2025 年 6 月起生效）。
+
+<CallBox kind="like" label="打个比方">
+
+读屏软件像一个通过电话帮你看网页的朋友。它看不到颜色和布局。它只能读出每个元素的**角色**（这是按钮）、**名字**（“保存”）和**状态**（已展开）。你的工作是把这三样信息写进 HTML。
+
+</CallBox>
+
+## 第一原则：先用语义化 HTML
+
+浏览器给原生元素内置了很多行为。`<button>` 能用 Tab 聚焦。按 Enter 或空格会触发 click。读屏软件会读出“按钮”。`<div onClick>` 一样都没有。
+
+下面有三个“按钮”。先用鼠标点一点。然后点一下页面空白处，只用 Tab 和 Enter 操作。
+
+```jsx play title="三个“按钮”"
+import { useState } from 'react';
+
+function App() {
+  const [a, setA] = useState(0);
+  const [b, setB] = useState(0);
+  const [c, setC] = useState(0);
+  const box = { display: 'inline-block', padding: '6px 12px', margin: 4, border: '1px solid #888', borderRadius: 6, cursor: 'pointer' };
+  return (
+    <div>
+      {/* ① 只有 onClick 的 div */}
+      <div style={box} onClick={() => setA(a + 1)}>① div：{a}</div>
+      {/* ② 加了 role 和 tabIndex 的 div */}
+      <div style={box} role="button" tabIndex={0} onClick={() => setB(b + 1)}>② div + role：{b}</div>
+      {/* ③ 真正的 button */}
+      <button style={box} onClick={() => setC(c + 1)}>③ button：{c}</button>
+      <p style={{ fontSize: 13 }}>提示：先点击这一行文字，再按 Tab。</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+“没有 ARIA 好过错误的 ARIA。”（WAI-ARIA 编写实践指南）写下 `role="button"`，就是承诺你会实现按钮的全部键盘行为。做不到，就不要写。先找合适的原生元素：`<button>`、`<a href>`、`<input>`、`<select>`、`<dialog>`、`<details>`。
+
+</CallBox>
+
+| 需求 | 用这个 | 不要用这个 |
+|---|---|---|
+| 执行一个操作 | `<button type="button">` | `<div onClick>`、`<a href="#">` |
+| 跳到另一个页面 | `<a href="/cart">`（或路由的 Link） | `<button onClick={() => navigate()}>` |
+| 页面结构 | `<header>` `<nav>` `<main>` `<h1>`…`<h6>` | 全部用 div，靠字号区分标题 |
+| 图片 | `<img alt="商品正面照">`；装饰图用 `alt=""` | 不写 alt |
+
+## 可访问名称：每个控件都要有名字
+
+读屏软件读到一个控件时，会读出它的**可访问名称**。名字的来源有优先顺序：
+
+- `aria-labelledby`：指向页面上另一个元素的 id，用那个元素的文字。
+- `aria-label`：直接写一段文字。只给读屏软件，页面上看不到。
+- `<label>`：表单字段的标签。
+- 元素自己的文字内容，例如 `<button>保存</button>`。
+
+只有图标的按钮最容易漏掉名字。例如 `<button aria-label="关闭">×</button>`。不加 aria-label，读屏软件只能读出“乘号，按钮”。
+
+## 表单：label、useId 与错误提示
+
+每个输入框都要有一个关联的 `<label>`。关联后，点击标签文字也能聚焦输入框。读屏软件进入输入框时会读出标签。
+
+关联方法：`<label htmlFor={id}>` 指向 `<input id={id}>`。id 要在整个页面唯一。组件可能被渲染多次，所以不要写死 id。用 `useId` 生成（在“DOM 逃生舱”一课学过）。
+
+```jsx play title="label、useId 与 aria-describedby"
+import { useState, useId } from 'react';
+
+function EmailField() {
+  const [value, setValue] = useState('');
+  const id = useId();
+  const invalid = value !== '' && !value.includes('@');
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label htmlFor={id}>邮箱</label>{' '}
+      <input
+        id={id}
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        aria-invalid={invalid}
+        aria-describedby={id + '-hint ' + id + '-err'}
+      />
+      <div id={id + '-hint'} style={{ fontSize: 13, color: '#666' }}>我们只用它发送收据。</div>
+      <div id={id + '-err'} style={{ fontSize: 13, color: '#c00' }}>
+        {invalid ? '邮箱需要包含 @' : ''}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <form>
+      <EmailField />
+      <EmailField />
+      <button type="button" onClick={e => {
+        e.currentTarget.form.querySelectorAll('input').forEach(i => console.log(i.id, '→', i.labels[0].textContent));
+      }}>打印 id</button>
+    </form>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+错误提示三件套：`aria-invalid` 标记“值不合法”；`aria-describedby` 关联错误文字；错误文字要写清楚怎样改。只用红色边框不够，色盲用户和读屏用户都看不到颜色。
+
+</CallBox>
+
+## 键盘与焦点顺序
+
+只用键盘的用户靠 Tab 在可聚焦元素之间移动。焦点的顺序就是 DOM 的顺序。
+
+- 保持 DOM 顺序和视觉顺序一致。不要用 CSS 把元素“搬”到别的位置。
+- 不要用正数 `tabIndex`（例如 tabIndex=\{3\}）。它会打乱顺序。只用 `0`（加入 Tab 顺序）和 `-1`（只能用代码聚焦）。
+- 不要删除焦点轮廓（`outline: none`）。要改样式，就用 `:focus-visible` 换一个同样明显的样式。
+- 用 `onClick` 而不是 `onMouseDown`。按钮的 onClick 也会响应键盘。
+
+## 焦点管理：打开和关闭弹窗
+
+界面大幅变化时，你要决定焦点去哪里。弹窗（对话框）是最常见的例子。WAI-ARIA 编写实践指南规定了四条规则：
+
+<CallBox kind="tip" label="四条规则">
+
+1. 打开时：把焦点移进弹窗。
+2. 打开期间：Tab 只在弹窗内循环。
+3. 按 Esc：关闭弹窗。
+4. 关闭后：把焦点还给打开它的按钮。
+
+</CallBox>
+
+原生 `<dialog>` 元素配合 `showModal()`，能替你完成大部分工作：
+
+- 打开时，把焦点移到弹窗里第一个可聚焦元素。
+- 背后的页面变成“惰性”（inert）：不能聚焦，也不能点击。所以 Tab 不会跑到背后的页面上。焦点可能跳到浏览器地址栏，这是允许的。
+- 按 Esc 关闭弹窗，并触发 close 事件。
+
+为了在所有浏览器中都可靠，我们在 close 事件里自己把焦点还给触发按钮。
+
+```jsx play title="弹窗的焦点管理"
+import { useRef, useState, useId } from 'react';
+
+function App() {
+  const dialogRef = useRef(null);
+  const triggerRef = useRef(null);
+  const titleId = useId();
+  const [result, setResult] = useState('（还没有操作）');
+
+  function open() {
+    dialogRef.current.showModal(); // 浏览器把焦点移到弹窗里第一个可聚焦元素
+  }
+  function close(answer) {
+    setResult(answer);
+    dialogRef.current.close(); // 会触发 close 事件
+  }
+  function handleClose() {
+    // 无论是按钮关闭还是按 Esc 关闭，都把焦点还给触发按钮
+    triggerRef.current.focus();
+    console.log('焦点现在在：', document.activeElement.textContent);
+  }
+
+  return (
+    <div>
+      <button ref={triggerRef} onClick={open}>删除文件…</button>
+      <p>结果：{result}</p>
+      <dialog ref={dialogRef} aria-labelledby={titleId} onClose={handleClose}
+        style={{ border: '1px solid #888', borderRadius: 8, padding: 16 }}>
+        <h3 id={titleId} style={{ marginTop: 0 }}>确定删除“报告.pdf”？</h3>
+        <p>删除后不能恢复。</p>
+        {/* 破坏性操作：把“取消”放在前面，让它先获得焦点 */}
+        <button onClick={() => close('已取消')}>取消</button>{' '}
+        <button onClick={() => close('已删除')}>删除</button>
+      </dialog>
+    </div>
+  );
+}
+```
+
+<CallBox kind="deep" label="深入一点">
+
+不能用 \<dialog\> 时（例如要兼容很旧的浏览器），就用 Portal 渲染一个 `role="dialog"` 加 `aria-modal="true"` 的 div。这时四条规则全要自己写：在 effect 中聚焦；监听 keydown 实现 Tab 循环和 Esc；打开前用 ref 记住 `document.activeElement`，关闭时还给它。这正是 Radix、React Aria 等无样式组件库替你做的事。
+
+</CallBox>
+
+## 异步消息：让读屏软件“听到”变化
+
+“已保存”这类消息出现时，焦点没有移动。读屏软件不会主动去读它。解决方法是**实时区域**（live region）：里面的内容一变化，读屏软件就会读出来。
+
+- `role="status"`（等于 `aria-live="polite"`）：等用户停下来再读。用于“已保存”“找到 12 条结果”。
+- `role="alert"`（等于 `aria-live="assertive"`）：立刻打断并读出。只用于错误和紧急消息。
+
+```jsx play title='用 role="status" 和 role="alert" 播报消息'
+import { useState } from 'react';
+
+function App() {
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+
+  function save(ok) {
+    setError('');
+    setStatus('保存中…');
+    setTimeout(() => {
+      if (ok) setStatus('已保存');
+      else { setStatus(''); setError('保存失败：网络已断开，请重试。'); }
+    }, 800);
+  }
+
+  return (
+    <div>
+      <button onClick={() => save(true)}>保存</button>{' '}
+      <button onClick={() => save(false)}>模拟失败</button>
+      {/* 两个实时区域一开始就在 DOM 中，只是内容为空 */}
+      <p role="status" style={{ minHeight: '1.5em' }}>{status}</p>
+      <p role="alert" style={{ minHeight: '1.5em', color: '#c00' }}>{error}</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+实时区域必须**先存在**于 DOM 中，再改变它的内容。`{saved && <p role="status">已保存</p>}` 这种写法会同时挂载区域和内容，很多读屏软件不会读。正确写法：区域一直渲染，只改里面的文字。
+
+</CallBox>
+
+## 展开与收起：aria-expanded 和 aria-controls
+
+折叠面板、下拉菜单、“显示更多”都属于“展开/收起”控件。WAI-ARIA 编写实践指南的“disclosure 模式”这样要求：
+
+| 要求 | 写法 |
+|---|---|
+| 触发器是按钮 | `<button>`。Enter 和空格自动可用 |
+| 告诉读屏软件当前状态 | `aria-expanded={open}`。收起时也要写，值为 false |
+| （可选）指出控制哪块内容 | `aria-controls={panelId}`，指向面板的 id |
+| 收起时隐藏内容 | `hidden` 属性，或者不渲染面板 |
+
+本课练习就是做一个这样的组件。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>尊重“减少动画”设置<small>可以先跳过，需要时再展开</small></summary>
+
+有些用户在系统设置中打开了“减少动态效果”。大幅移动和闪烁会让他们头晕。用 CSS 媒体查询读取这个设置：
+
+```jsx
+/* CSS：默认有动画；用户要求减少时关掉 */
+.drawer { transition: transform 300ms; }
+@media (prefers-reduced-motion: reduce) {
+  .drawer { transition: none; }
+}
+
+// JS：需要在组件里判断时
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+```
+
+</details>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>怎样检查<small>可以先跳过，需要时再展开</small></summary>
+
+无障碍不能只靠“看起来没问题”。按下面的顺序检查：
+
+<CallBox kind="tip" label="检查步骤">
+
+1. **只用键盘走一遍**：拔掉鼠标。用 Tab、Shift+Tab、Enter、空格、Esc 和方向键完成核心流程。每一步都要能看见焦点在哪里。
+2. **自动检查**：用 axe DevTools 浏览器插件或 Chrome Lighthouse 的“无障碍”评分。在编辑器里用 `eslint-plugin-jsx-a11y`。自动工具只能发现一部分问题。
+3. **用读屏软件听一遍**：macOS 用 VoiceOver（⌘+F5），Windows 用 NVDA 或“讲述人”。检查每个控件的角色、名字和状态。
+4. **写测试**：用 Testing Library 的 `getByRole`。
+
+</CallBox>
+
+第 4 步和“测试”一课直接相关。`getByRole('button', { name: '保存' })` 按**角色**和**可访问名称**查找元素，和读屏软件的方式一样。所以：
+
+- `<div onClick>` 没有 button 角色，`getByRole('button')` 找不到它。测试失败，正好暴露了无障碍问题。
+- 没有 label 的输入框，`getByRole('textbox', { name: '邮箱' })` 也找不到它。
+- 你可以断言状态：`expect(btn).toHaveAttribute('aria-expanded', 'true')`。
+
+<CallBox kind="tip" label="要点">
+
+一句话总结：先选对原生元素；每个控件都有名字；键盘能做鼠标能做的事；焦点不丢失；变化能被读出来。
+
+</CallBox>
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

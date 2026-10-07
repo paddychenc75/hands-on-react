@@ -1,0 +1,97 @@
+---
+title: "事件处理"
+---
+
+# 事件处理
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+在 React 中绑定事件，就是把一个**函数**传给元素的 `onXxx` 属性。属性名用驼峰命名：`onClick`、`onChange`、`onKeyDown`、`onSubmit`……
+
+```jsx play title="三种常见写法"
+function App() {
+  function handleClick() {
+    console.log('按钮被点击了');
+  }
+  return (
+    <div>
+      <button onClick={handleClick}>方式一：传函数名</button>
+      <button onClick={() => console.log('箭头函数')}>方式二：内联箭头函数</button>
+      <button onClick={() => greet('小明')}>方式三：需要传参时</button>
+    </div>
+  );
+}
+
+function greet(name) { console.log('你好，' + name); }
+```
+
+<CallBox kind="warn" label="常见坑">
+
+`onClick={handleClick()}` 是错的！加了括号，函数会**在渲染时立刻执行**。React 拿到的是它的返回值，通常是 undefined。要传的是**函数本身**：`onClick={handleClick}` 或 `onClick={() => handleClick(x)}`。
+
+</CallBox>
+
+## 事件对象
+
+处理函数会收到一个事件对象 `e`。React 包装了浏览器的原生事件，叫合成事件（SyntheticEvent）。它遵循 DOM 事件标准，并修复了一些浏览器差异。常用属性：
+
+- `e.target`：触发事件的元素，`e.target.value` 拿到输入框的值
+- `e.preventDefault()`：阻止默认行为，比如表单提交时刷新页面
+- `e.stopPropagation()`：阻止事件继续向父元素冒泡
+- `e.key`：键盘事件中按下的键
+
+```jsx play title="事件对象与冒泡"
+import { useState } from 'react';
+
+let nextId = 0; // 放在组件外：每条日志一个稳定的 id
+
+function App() {
+  const [log, setLog] = useState([]);
+  const add = (msg) => setLog(l => [{ id: nextId++, msg }, ...l].slice(0, 5));
+
+  return (
+    <div onClick={() => add('外层 div 收到点击')} style={{ padding: 12, background: '#eef6fa' }}>
+      <input placeholder="在这里按键" onKeyDown={e => add('按下了 ' + e.key)} />
+      <button onClick={e => { e.stopPropagation(); add('按钮 A 收到点击'); }}>按钮 A</button>
+      <button onClick={() => add('按钮 B 收到点击')}>按钮 B</button>
+      <ul>{log.map(m => <li key={m.id}>{m.msg}</li>)}</ul>
+    </div>
+  );
+}
+```
+
+## 把事件处理函数作为 prop 传递
+
+子组件经常需要通知父组件“发生了什么”。做法是父组件传入一个函数，子组件在合适的时候调用它。按惯例，这类 prop 以 `on` 开头命名。
+
+```jsx play title="子组件通知父组件"
+function LikeButton({ onLike }) {
+  return <button onClick={onLike}>👍 点赞</button>;
+}
+
+function App() {
+  return <LikeButton onLike={() => console.log('父组件知道你点赞了')} />;
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+命名约定：处理函数叫 `handleXxx`（如 `handleSubmit`），作为 prop 时叫 `onXxx`（如 `onSubmit`）。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

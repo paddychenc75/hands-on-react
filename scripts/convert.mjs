@@ -187,6 +187,44 @@ function inlineMd(html, { table = false, expectedPlain } = {}) {
 
 /* ---------- 4. 课文块 → MDX ---------- */
 const stats = { fallbacks: [] };
+// 含 <ol>/<ul> 的段落：拆成“文字段落 + Markdown 列表 + 文字段落”。列表项只能含行内标签；失败返回 null。
+function blocksWithLists(html) {
+  let nodes;
+  try { nodes = parseHtml(html); } catch (e) { if (e instanceof Fallback) return null; throw e; }
+  const segs = []; let cur = [];
+  const flush = () => { if (cur.length) segs.push({ nodes: cur }); cur = []; };
+  for (const n of nodes) {
+    if (n.tag === 'ol' || n.tag === 'ul') { flush(); segs.push({ list: n }); } else cur.push(n);
+  }
+  flush();
+  const out = [];
+  for (const sg of segs) {
+    if (sg.list) {
+      const L = sg.list;
+      const lis = L.children.filter((c) => c.text === undefined || c.text.trim());
+      if (!lis.length || !lis.every((c) => c.tag === 'li' && !c.attrs)) return null;
+      const items = [];
+      for (const li of lis) {
+        if (li.children.some((c) => c.tag === 'ol' || c.tag === 'ul' || c.tag === 'li')) return null;
+        const inner = inlineHtmlOf(li);
+        const md = inlineMd(inner);
+        if (md === null) return null;
+        items.push(md);
+      }
+      out.push(items.map((x, i) => (L.tag === 'ol' ? (i + 1) + '. ' : '- ') + x).join('\n'));
+    } else {
+      const text = sg.nodes.map(toHtml).join('');
+      if (!text.trim()) continue;
+      const md = inlineMd(text.trim());
+      if (md === null) return null;
+      out.push(md);
+    }
+  }
+  return out.length ? out : null;
+}
+const toHtml = (n) => n.text !== undefined ? n.text : n.tag === 'br' ? '<br>' : '<' + n.tag + (n.attrs ? ' ' + n.attrs : '') + '>' + n.children.map(toHtml).join('') + '</' + n.tag + '>';
+const inlineHtmlOf = (n) => n.children.map(toHtml).join('');
+
 const rawHtml = (html) => html.replace(/href="#([^"]*)"/g, (m, id) => { try { return 'href="' + hrefOf('#' + id) + '"'; } catch (e) { return m; } });
 const rawEl = (html, { tag = 'div', className } = {}) =>
   `<Raw${tag !== 'div' ? ` tag=${JSON.stringify(tag)}` : ''}${className ? ` className=${JSON.stringify(className)}` : ''} html={${JSON.stringify(rawHtml(html))}} />`;
@@ -216,6 +254,10 @@ function convertLesson(L) {
         break;
       }
       case 'p': {
+        if (/<(ol|ul)\b/.test(b.html) && !/<(div|table|figure|p|pre)\b/i.test(b.html)) {
+          const blocks = blocksWithLists(b.html);
+          if (blocks) { out.push(blocks.join('\n\n')); break; }
+        }
         if (/^\s*<(ol|ul|div|table|figure)\b/.test(b.html)) { out.push(rawEl(b.html, { className: 'p-block' })); break; }
         const md = inlineMd(b.html);
         // <p> 里不能放块级元素：浏览器解析服务端 HTML 时会提前关掉 <p>，造成水合不一致，所以含块级标签时用 div
@@ -228,7 +270,9 @@ function convertLesson(L) {
         break;
       }
       case 'call': {
-        const md = inlineMd(b.html);
+        let md = null;
+        if (/<(ol|ul)\b/.test(b.html) && !/<(div|table|figure|p|pre)\b/i.test(b.html)) { const bl = blocksWithLists(b.html); if (bl) md = bl.join('\n\n'); }
+        if (md === null) md = inlineMd(b.html);
         out.push(`<CallBox kind="${b.kind}" label="${b.label}">\n\n${md ?? rawEl(b.html, { tag: 'span' })}\n\n</CallBox>`);
         break;
       }
@@ -274,11 +318,29 @@ function convertLesson(L) {
 }
 
 /* ---------- 5. 写文件 ---------- */
+// 练习的 test 函数引用了旧文件里的外部辅助函数：把辅助函数一并写进数据文件，或从 engine/exec.js 导入。
+const HELPERS = {
+  'lists-keys': { imports: "import { prepare, compile } from '../engine/exec.js';" },
+  testing: { imports: "import { stripComments } from '../engine/exec.js';", from: ['lessons-6-ex-testing.js', '  // 检查程序自己的三个版本', '\n  LESSONS.find'] },
+  nextjs: { from: ['lessons-6-ex-nextjs.js', '  // 检查用的文件列表', "const sortObj = (o) => Object.keys(o || {}).sort().reduce((m, k) => { m[k] = o[k]; return m; }, {});"] },
+};
+function helperText(id) {
+  const h = HELPERS[id]; if (!h) return '';
+  let out = h.imports ? h.imports + '\n' : '';
+  if (h.from) {
+    const txt = fs.readFileSync(path.join(SRC, h.from[0]), 'utf8');
+    const i = txt.indexOf(h.from[1]); if (i < 0) throw new Error('找不到辅助函数起点 ' + id);
+    let j = txt.indexOf(h.from[2], i); if (j < 0) throw new Error('找不到辅助函数终点 ' + id);
+    if (h.from[2].startsWith('\n')) j = j; else j += h.from[2].length;
+    out += '\n' + txt.slice(i, j).replace(/^  /gm, '').trimEnd() + '\n';
+  }
+  return out;
+}
 function dataFile(L, plays) {
   const o = {};
   for (const k of ['id', 'stage', 'title', 'mins', 'summary', 'goals', 'keyPoints', 'quiz', 'exercise', 'checkOnly']) if (L[k] !== undefined) o[k] = L[k];
   o.plays = plays;
-  return HEADER + '// 非正文数据。课文在 docs/lessons/' + L.id + '.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。\n'
+  return HEADER + helperText(L.id) + '// 非正文数据。课文在 docs/lessons/' + L.id + '.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。\n'
     + 'export default ' + toJS(o) + ';\n';
 }
 const strip = (v) => JSON.stringify(v, (k, x) => (typeof x === 'function' ? x.toString() : x));

@@ -1,0 +1,127 @@
+---
+title: "组件设计模式"
+---
+
+# 组件设计模式
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+当你开始写给别人用的组件（组件库、团队公共组件）时，API 设计就和实现一样重要。好的组件 API 应该**灵活、直观、难以误用**。
+
+## 模式一：复合组件（Compound Components）
+
+一组组件协同工作，共享隐式的状态。就像 HTML 的 `<select>` 和 `<option>`。使用者可以自由组合结构，而不用传一大堆配置 props。
+
+```jsx play title="复合组件：Tabs"
+import { createContext, useContext, useState } from 'react';
+
+const TabsContext = createContext(null);
+
+function Tabs({ defaultValue, children }) {
+  const [active, setActive] = useState(defaultValue);
+  return <TabsContext.Provider value={{ active, setActive }}>{children}</TabsContext.Provider>;
+}
+
+function TabList({ children }) {
+  return <div role="tablist" style={{ display: 'flex', gap: 4, borderBottom: '2px solid #ddd' }}>{children}</div>;
+}
+
+function Tab({ value, children }) {
+  const { active, setActive } = useContext(TabsContext);
+  const selected = active === value;
+  return (
+    <button role="tab" aria-selected={selected} onClick={() => setActive(value)}
+      style={{ border: 0, padding: '6px 12px', background: selected ? '#087ea4' : 'transparent', color: selected ? '#fff' : 'inherit', borderRadius: '6px 6px 0 0' }}>
+      {children}
+    </button>
+  );
+}
+
+function TabPanel({ value, children }) {
+  const { active } = useContext(TabsContext);
+  return active === value ? <div role="tabpanel" style={{ padding: 10 }}>{children}</div> : null;
+}
+
+// 挂载为静态属性，使用时更有“一家人”的感觉
+Tabs.List = TabList; Tabs.Tab = Tab; Tabs.Panel = TabPanel;
+
+function App() {
+  return (
+    <Tabs defaultValue="intro">
+      <Tabs.List>
+        <Tabs.Tab value="intro">简介</Tabs.Tab>
+        <Tabs.Tab value="spec">规格</Tabs.Tab>
+        <Tabs.Tab value="review">评价 ⭐</Tabs.Tab>
+      </Tabs.List>
+      <Tabs.Panel value="intro">这是一款机械键盘。</Tabs.Panel>
+      <Tabs.Panel value="spec">87 键，热插拔，三模连接。</Tabs.Panel>
+      <Tabs.Panel value="review">“手感很好！”</Tabs.Panel>
+    </Tabs>
+  );
+}
+```
+
+## 模式二：受控与非受控双模式
+
+好的组件支持两种模式。非受控模式：组件自己管理 state，开箱即用。受控模式：父组件管理 state，可以完全定制。判断依据是：使用者是否传入了 `value`。
+
+```jsx title="原生 <input> 的 value / defaultValue 就是这种设计"
+function Toggle({ value, defaultValue = false, onChange }) {
+  const [inner, setInner] = useState(defaultValue);
+  const isControlled = value !== undefined;
+  const on = isControlled ? value : inner;
+
+  function toggle() {
+    if (!isControlled) setInner(!on);
+    onChange?.(!on);
+  }
+  return <button onClick={toggle}>{on ? '开' : '关'}</button>;
+}
+
+<Toggle defaultValue={true} />                 // 非受控：组件自己管
+<Toggle value={on} onChange={setOn} />        // 受控：父组件说了算
+```
+
+## 模式三：Render Props 与 HOC（了解历史）
+
+在 Hooks 出现之前（2019 年前），复用状态逻辑主要靠这两种模式。你仍会在老代码和一些库中看到它们：
+
+```jsx
+// Render Props：通过一个返回 JSX 的函数 prop 共享数据
+<MouseTracker render={({ x, y }) => <p>鼠标在 {x}, {y}</p>} />
+
+// 高阶组件 HOC：接收一个组件，返回增强后的新组件
+const UserProfileWithAuth = withAuth(UserProfile);
+
+// 今天，绝大多数情况用自定义 Hook 更简单：
+const { x, y } = useMouse();
+const user = useAuth();
+```
+
+<CallBox kind="tip" label="要点">
+
+Render Props 现在仍然有用。如果组件要让**使用者决定如何渲染内部数据**，就用它，例如虚拟列表的 `renderItem={(item) => ...}`。
+
+</CallBox>
+
+## 其他设计原则
+
+- **组合优于配置**：不要提供 `showIcon`、`iconPosition`、`iconColor` 这样一长串 props。让使用者传 children 或插槽。
+- **透传原生属性**：`function Button({ variant, ...rest }) { return <button {...rest} /> }`，让使用者能传 aria-\*、onClick、type 等。
+- **无障碍**：用正确的语义标签和 ARIA 角色，支持键盘操作。
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

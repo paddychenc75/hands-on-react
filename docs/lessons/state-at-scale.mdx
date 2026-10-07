@@ -1,0 +1,358 @@
+---
+title: "大型应用状态架构实战"
+---
+
+# 大型应用状态架构实战
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 27 课讲了怎样给 state 分类，以及外部 store 的原理。那一课的例子只有两三个字段。真实应用里，同一个用户出现在评论、通知、成员列表三个页面；一次点击要先更新界面，再等服务器确认；用户还要撤销。本课讲这种规模下的五个做法。
+
+## 一、规范化：每个实体只存一份
+
+接口常返回嵌套数据：每条评论里都带一份作者对象。直接存进 state，会出现三个问题：
+
+- **改一处要改多处**：作者改名，要遍历所有评论，漏一处就显示两个名字。
+- **引用全部变化**：遍历时为每条评论创建新对象，用 memo 的行组件全部重新渲染。
+- **存了副本就会过期**：把“当前选中的评论”存成对象副本，原评论更新后，副本还是旧的。
+
+**规范化**指：每种实体按 id 存一份，实体之间只存 id。结构通常是 `{ byId: { c1: {…} }, ids: ['c1', …] }`。`byId` 用来按 id 查找，`ids` 记录顺序。
+
+```jsx title="评论里只存 authorId。作者改名只改 users.byId.u1 一处"
+// 接口返回的嵌套数据
+[{ id: 'c1', text: '…', author: { id: 'u1', name: '小林' } }, …]
+
+// 规范化之后
+{
+  users:    { byId: { u1: { id: 'u1', name: '小林' } } },
+  comments: { byId: { c1: { id: 'c1', text: '…', authorId: 'u1' } }, ids: ['c1', …] },
+}
+```
+
+```jsx play title="存对象还是存 id"
+import { useState } from 'react';
+
+const INITIAL = [
+  { id: 'c1', text: '外壳要尽量小', likes: 4 },
+  { id: 'c2', text: '选择性水合真好用', likes: 1 },
+];
+
+function useComments() {
+  const [comments, setComments] = useState(INITIAL);
+  const like = (id) => setComments(cs => cs.map(c => (c.id === id ? { ...c, likes: c.likes + 1 } : c)));
+  return [comments, like];
+}
+
+// 写法 A：选中时存下评论对象
+function PanelA() {
+  const [comments, like] = useComments();
+  const [selected, setSelected] = useState(null);
+  return <Panel title="A：存对象" comments={comments} like={like} select={(c) => setSelected(c)} detail={selected} />;
+}
+
+// 写法 B：选中时只存 id，详情在渲染时查出来
+function PanelB() {
+  const [comments, like] = useComments();
+  const [selectedId, setSelectedId] = useState(null);
+  const detail = comments.find(c => c.id === selectedId) || null;
+  return <Panel title="B：存 id" comments={comments} like={like} select={(c) => setSelectedId(c.id)} detail={detail} />;
+}
+
+function Panel({ title, comments, like, select, detail }) {
+  return (
+    <section style={{ flex: '1 1 220px' }}>
+      <h4>{title}</h4>
+      {comments.map(c => (
+        <div key={c.id}>
+          {c.text}（{c.likes} 赞）{' '}
+          <button onClick={() => like(c.id)}>赞</button>{' '}
+          <button onClick={() => select(c)}>查看</button>
+        </div>
+      ))}
+      <p>详情：{detail ? detail.text + '，' + detail.likes + ' 赞' : '未选择'}</p>
+    </section>
+  );
+}
+
+function App() {
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}><PanelA /><PanelB /></div>;
+}
+```
+
+规范化之后，reducer 只替换“从根到被修改实体”这一条路径上的对象：`state` → `comments` → `byId` → `c1`。其他评论、整个 `users` 都保持原来的引用。这叫**结构共享**。memo 组件、选择器、撤销历史都依赖这一点。
+
+<CallBox kind="tip" label="要点">
+
+**什么时候不规范化**：数据只读、只在一个页面展示、实体之间没有共享时，嵌套结构更简单。另外，TanStack Query 按查询键缓存，不做规范化。同一个商品在列表查询和详情查询里是两份数据，修改后要让两个查询都失效（第 34 课）。Apollo、Relay、RTK Query 的实体适配器提供规范化缓存，代价是更多的配置。
+
+</CallBox>
+
+## 二、派生数据与记忆化选择器
+
+第 10 课讲过：能从 state 算出来的值，不要存进 state。规模大了以后，“算”本身会带来两个问题：
+
+1. 计算很贵，例如在 5000 条评论里筛选和排序。
+2. 每次计算都返回**新数组**。即使内容相同，memo 组件和 effect 依赖也会认为“变了”。第 27 课说过，作为 useSyncExternalStore 的快照，它还会导致无限渲染。
+
+**记忆化选择器**把计算分成两步。**输入选择器**从 state 里选出几块原始数据。**结果函数**用这几块数据计算。输入都没变（用 Object.is 比较），就直接返回上一次的结果。Reselect 和 Redux Toolkit 的 `createSelector` 都是这个思路。
+
+```jsx play title="普通函数 vs 记忆化选择器"
+import { useState, useReducer, memo } from 'react';
+
+function createSelector(inputs, compute) {
+  let lastInputs = null;
+  let lastResult;
+  return (...args) => {
+    const values = inputs.map(fn => fn(...args));
+    if (lastInputs && values.every((v, i) => Object.is(v, lastInputs[i]))) return lastResult;
+    lastInputs = values;
+    lastResult = compute(...values);
+    return lastResult;
+  };
+}
+
+const computed = { plain: 0, memo: 0 };
+const renders = { plain: 0, memo: 0 };
+
+// 普通函数：每次调用都重新计算，都返回新数组
+function selectPopularPlain(state) {
+  computed.plain++;
+  return state.ids.map(id => state.byId[id]).filter(c => c.likes >= 3);
+}
+
+// 记忆化：byId 和 ids 都没变，就返回上一次的数组
+const selectPopularMemo = createSelector(
+  [s => s.byId, s => s.ids],
+  (byId, ids) => {
+    computed.memo++;
+    return ids.map(id => byId[id]).filter(c => c.likes >= 3);
+  },
+);
+
+const List = memo(function List({ kind, items }) {
+  renders[kind]++;
+  return (
+    <ul>
+      {items.map(c => <li key={c.id}>{c.text}（{c.likes} 赞）</li>)}
+      <li><small>这个列表渲染了 {renders[kind]} 次</small></li>
+    </ul>
+  );
+});
+
+const INITIAL = {
+  byId: {
+    c1: { id: 'c1', text: '外壳要尽量小', likes: 4 },
+    c2: { id: 'c2', text: '选择性水合真好用', likes: 1 },
+    c3: { id: 'c3', text: 'getServerSnapshot 救了我', likes: 6 },
+  },
+  ids: ['c1', 'c2', 'c3'],
+};
+
+function reducer(state, action) {
+  if (action.type !== 'liked') return state;
+  const c = state.byId[action.id];
+  return { ...state, byId: { ...state.byId, [c.id]: { ...c, likes: c.likes + 1 } } };
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, INITIAL);
+  const [draft, setDraft] = useState('');
+  const plain = selectPopularPlain(state);
+  const memoized = selectPopularMemo(state);
+  return (
+    <div>
+      <input value={draft} onChange={e => setDraft(e.target.value)} placeholder="在这里打字（和评论无关）" />{' '}
+      <button onClick={() => dispatch({ type: 'liked', id: 'c2' })}>给 c2 点赞</button>
+      <h4>普通函数：已计算 {computed.plain} 次</h4>
+      <List kind="plain" items={plain} />
+      <h4>记忆化选择器：已计算 {computed.memo} 次</h4>
+      <List kind="memo" items={memoized} />
+    </div>
+  );
+}
+```
+
+记忆化选择器有三个常见的失效原因：
+
+- **输入选择器返回新对象**：例如 `s => s.ids.map(…)`。输入每次都“变了”，记忆化永远不命中。输入选择器只做取值，计算放进结果函数。
+- **输入选得太粗**：例如直接选整个 `state`。任何无关字段变化，都会让它重新计算。
+- **多个组件共用一个选择器，参数不同**：缓存只有一格，A 用“热门”、B 用“全部”，两边轮流把缓存挤掉。为每个组件实例创建自己的选择器：`const select = useMemo(() => makeSelectByFilter(), [])`。
+
+<CallBox kind="warn" label="常见坑">
+
+不要给便宜的计算加记忆化。比较输入、保存上一次的结果都有成本，还会让代码更难读。先确认它慢，或者确认引用稳定确实有用（传给 memo 组件、作为 effect 依赖、作为 store 快照）。
+
+</CallBox>
+
+## 三、乐观更新的并发问题
+
+第 34 课讲了乐观更新的四步：取消请求、保存快照、先改界面、失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
+
+```jsx play title="两个请求并发时的回滚"
+import { useState, useRef } from 'react';
+
+// 模拟服务器：第 1 个请求 1.5 秒后失败，第 2 个请求 0.5 秒后成功
+function fakeRequest(n) {
+  return new Promise((resolve, reject) => {
+    if (n === 1) setTimeout(() => reject(new Error('网络错误')), 1500);
+    else setTimeout(resolve, 500);
+  });
+}
+
+// 策略 A：发请求前保存快照，失败时恢复快照
+function SnapshotLikes() {
+  const [likes, setLikes] = useState(0);
+  const latest = useRef(0);
+  const set = (v) => { latest.current = v; setLikes(v); };
+  function like(n) {
+    const snapshot = latest.current;
+    set(snapshot + 1);
+    fakeRequest(n).then(
+      () => console.log('A：第 ' + n + ' 个赞，服务器已保存'),
+      () => { console.log('A：第 ' + n + ' 个赞失败，恢复快照 ' + snapshot); set(snapshot); },
+    );
+  }
+  return <Row title="A 快照回滚" value={likes} onTwice={() => { like(1); like(2); }} />;
+}
+
+// 策略 B：显示值 = 服务器已确认的值 + 仍在等待的操作数
+function QueueLikes() {
+  const [confirmed, setConfirmed] = useState(0);
+  const [pending, setPending] = useState([]);
+  function like(n) {
+    setPending(p => [...p, n]);
+    fakeRequest(n)
+      .then(() => setConfirmed(c => c + 1), () => console.log('B：第 ' + n + ' 个赞失败，丢掉这个操作'))
+      .then(() => setPending(p => p.filter(x => x !== n)));
+  }
+  return <Row title="B 待定队列" value={confirmed + pending.length} onTwice={() => { like(1); like(2); }} />;
+}
+
+function Row({ title, value, onTwice }) {
+  return <p>{title}：<b>{value}</b> 赞 <button onClick={onTwice}>连点两次赞</button></p>;
+}
+
+function App() {
+  return <div><SnapshotLikes /><QueueLikes /><p><small>服务器上的真实结果：1 赞</small></p></div>;
+}
+```
+
+B 的做法可以推广：`显示的 state = 待定操作.reduce(reducer, 已确认的 state)`。服务器每确认或拒绝一个操作，就更新已确认的 state 并从队列里删掉它，再重新计算。React 19 的 `useOptimistic` 就是这样工作的：过渡更新结束前，它把待定的乐观操作重新应用到最新的基础 state 上（只能阅读，本页是 React 18）。
+
+还有两点。请求的**返回顺序**不一定等于发出顺序，要以服务器返回的版本号或时间为准。多人编辑同一条数据时，服务器要检测冲突（例如比较版本号），并告诉客户端“你的修改基于旧版本”。
+
+## 四、撤销与重做
+
+有两种做法：
+
+|  | 快照 | 命令 |
+|---|---|---|
+| 保存什么 | 每一步之后的完整 state | 每一步的操作，以及它的反操作 |
+| 撤销 | 回到上一个快照 | 执行反操作 |
+| 内存 | 结构共享时很省：每个快照只多出被修改的那条路径 | 最省 |
+| 适合 | 大多数表单、看板、编辑器 | 协同编辑、大文档、需要把操作发给服务器 |
+
+快照做法的历史结构是 `{ past: [], present, future: [] }`。用一个高阶 reducer 包住原来的 reducer：它接收 reducer，返回一个管理历史的新 reducer。
+
+```jsx title="骨架。练习里你要补全它，并处理下面的三条规则"
+function undoable(reducer) {
+  return (history, action) => {
+    const { past, present, future } = history;
+    if (action.type === 'undo') {
+      // 把 present 放到 future 最前面，从 past 末尾取出上一个快照
+    }
+    if (action.type === 'redo') {
+      // 反过来
+    }
+    const next = reducer(present, action);
+    return { past: [...past, present], present: next, future: [] }; // 新操作清空 future
+  };
+}
+```
+
+- **新操作清空 future**：撤销两步后做了新修改，原来的“重做”就没有意义了。
+- **没改变数据的 action 不进历史**：reducer 返回原 state 时，直接返回原 history。否则用户按一次撤销，界面没有任何变化。
+- **历史要有上限**：只保留最近 N 步。连续输入的文字要合并成一步，不要每个字一步。
+- **界面状态不进历史**：筛选条件、展开状态、输入框里的草稿。撤销时用户期望的是数据回去，不是筛选条件回去。所以把它们放在局部 state 或 URL 里，不要和文档数据放在一起。
+
+## 五、状态机：替代一组布尔值
+
+结账流程常见这样的写法：`isValidating`、`isPaying`、`isError`、`isDone`。4 个布尔值有 16 种组合，合法的只有 5 种。只要某处忘了把 `isPaying` 设回 false，界面就同时显示“支付中”和“支付失败”。
+
+**状态机**用一个字段表示当前状态，再用一张**转移表**列出每个状态能响应哪些事件。表里没有的事件直接忽略。
+
+```jsx title="“不可能的状态”在这个结构里根本写不出来"
+const checkout = {
+  idle:       { SUBMIT: 'validating' },
+  validating: { VALID: 'paying', INVALID: 'idle' },
+  paying:     { PAID: 'done', DECLINED: 'failed' },
+  failed:     { RETRY: 'paying', EDIT: 'idle' },
+  done:       {},
+};
+
+function checkoutReducer(state, event) {
+  const next = checkout[state.status][event.type];
+  if (!next) return state;                       // 不合法的事件：忽略
+  return { status: next, error: event.type === 'DECLINED' ? event.message : null };
+}
+
+// 支付中再点一次“提交”：paying 没有 SUBMIT，状态不变，不会重复扣款
+```
+
+转移表还是一份文档：产品经理能读懂，测试可以逐行覆盖。流程更复杂时（并行状态、嵌套状态、超时），可以用 XState 这类库。
+
+## 六、状态放在哪里：决策表
+
+第 27 课按类型分类。下面换个角度：按顺序问这几个问题，第一个回答“是”的那一行就是答案。
+
+| 问题 | 放在哪里 | 放错的典型症状 |
+|---|---|---|
+| 刷新、分享链接、后退时要还原吗？ | URL 查询参数 | 同事打开链接看到的是另一个页面 |
+| 唯一数据源在服务器上吗？ | 服务端缓存（TanStack Query、框架的加载器） | 复制进全局 store 后，两份数据不同步 |
+| 要撤销、要跨很远的组件读写、服务器不关心？ | 全局 store（Zustand、Redux），按实体规范化 | 每个页面各存一份，改一处漏一处 |
+| 关闭浏览器后还要保留，只属于这台设备？ | localStorage（带版本号） | 把服务器数据存进去，下次打开显示过期的值 |
+| 只有一个组件或一小棵子树用？ | useState / useReducer | 提升到太高的位置，打一个字整页重新渲染（第 19 课） |
+
+同一个功能常常横跨几行。例如评论区：评论列表在服务端缓存；“只看热门”在 URL；正在写的草稿是局部 state；离开页面时草稿存进 localStorage。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>持久化与版本迁移<small>可以先跳过，需要时再展开</small></summary>
+
+存进 localStorage 的数据会比代码活得久。用户半年后打开页面，读到的是旧结构。所以要保存版本号，读取时逐级迁移：
+
+```jsx title="只持久化需要的字段：不要存加载状态、错误信息和服务器数据"
+const VERSION = 3;
+const migrations = {
+  2: (s) => ({ ...s, theme: s.darkMode ? 'dark' : 'light' }),  // v1 → v2
+  3: (s) => ({ ...s, comments: normalize(s.comments) }),        // v2 → v3：改成规范化结构
+};
+
+function load() {
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem('app')); } catch { return null; }
+  if (!saved || saved.version > VERSION) return null;  // 更新的版本写的：旧代码读不懂，放弃
+  let { version, state } = saved;
+  while (version < VERSION) state = migrations[++version](state);
+  return state;
+}
+```
+
+多个标签页同时打开时，一个标签页写入 localStorage，其他标签页会收到 `storage` 事件。用它（或 `BroadcastChannel`）同步状态。两个标签页同时修改时，通常按“最后写入的生效”处理。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

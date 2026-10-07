@@ -1,0 +1,164 @@
+---
+title: "并发特性：useTransition 与 useDeferredValue"
+---
+
+# 并发特性：useTransition 与 useDeferredValue
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 18 引入了**并发渲染**。核心思想是：并非所有更新都同样紧急。
+
+- **紧急更新**：打字、点击、按键。用户期望立刻有反馈，哪怕慢 100ms 都能感觉到卡顿。
+- **过渡更新（Transition）**：根据输入筛选一个大列表、切换标签页内容。稍微慢一点用户可以接受。
+
+以前，所有更新都是同步的，不能中断。一次耗时的渲染会“冻住”整个页面，连输入框都不能打字。并发渲染让 React 可以**中断**正在进行的低优先级渲染，先处理紧急的用户输入。
+
+<CallBox kind="like" label="打个比方">
+
+像医院急诊分诊：心脏骤停的病人（打字）必须立刻处理，而例行体检（渲染大列表）可以先等等，甚至做到一半被打断。
+
+</CallBox>
+
+## useDeferredValue：延迟一个值
+
+`useDeferredValue(value)` 返回一个“滞后”的版本。紧急渲染时它保持旧值。这次渲染提交后，React 立即在后台用新值再渲染一次。如果期间又有新输入，就丢弃这次后台渲染。
+
+```jsx play title="对比开启与关闭的输入体验"
+import { useState, useDeferredValue, memo } from 'react';
+
+// 一个故意很慢的列表：每项渲染都要耗费一点时间
+const SlowList = memo(function SlowList({ text }) {
+  const items = [];
+  for (let i = 0; i < 200; i++) items.push(<SlowItem key={i} text={text} />);
+  return <ul style={{ height: 160, overflow: 'auto' }}>{items}</ul>;
+});
+
+function SlowItem({ text }) {
+  const start = performance.now();
+  while (performance.now() - start < 1) {} // 每项阻塞 1ms
+  return <li>结果：{text}</li>;
+}
+
+function App() {
+  const [text, setText] = useState('');
+  const [useDeferred, setUseDeferred] = useState(true);
+  const deferredText = useDeferredValue(text);
+  const listText = useDeferred ? deferredText : text;
+
+  return (
+    <div>
+      <label><input type="checkbox" checked={useDeferred} onChange={e => setUseDeferred(e.target.checked)} /> 使用 useDeferredValue</label>
+      <p><input value={text} onChange={e => setText(e.target.value)} placeholder="快速打字，感受卡顿差异" /></p>
+      <div style={{ opacity: text !== listText ? 0.5 : 1 }}>
+        <SlowList text={listText} />
+      </div>
+    </div>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+注意 SlowList 用了 `memo`。这一点很关键。紧急渲染时，deferredText 还是旧值。memo 让列表跳过这次渲染，所以输入框能立即更新。
+
+</CallBox>
+
+## useTransition：标记一次状态更新为“不紧急”
+
+当你能控制 set 函数调用的位置时，用 `useTransition`。它返回 `isPending`（是否有过渡正在进行）和 `startTransition` 函数。
+
+```jsx title="切换标签页时不阻塞界面"
+const [isPending, startTransition] = useTransition();
+
+function selectTab(next) {
+  startTransition(() => {
+    setTab(next); // 这次更新可以被打断，旧界面保持可交互
+  });
+}
+
+return (
+  <>
+    <TabButtons onSelect={selectTab} />
+    {isPending && <Spinner />}
+    <TabContent tab={tab} />
+  </>
+);
+```
+
+```jsx play title="用 useTransition 切换标签页"
+import { useState, useTransition } from 'react';
+
+// 一个故意很慢的标签页：500 项，每项阻塞 1ms
+function SlowPosts() {
+  const items = [];
+  for (let i = 0; i < 500; i++) items.push(<SlowPost key={i} i={i} />);
+  return <ul style={{ height: 160, overflow: 'auto' }}>{items}</ul>;
+}
+
+function SlowPost({ i }) {
+  const start = performance.now();
+  while (performance.now() - start < 1) {}
+  return <li>文章 #{i + 1}</li>;
+}
+
+function App() {
+  const [tab, setTab] = useState('about');
+  const [useT, setUseT] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  function selectTab(next) {
+    if (useT) startTransition(() => setTab(next)); // 勾选时
+    else setTab(next);                             // 未勾选时
+  }
+
+  const btn = (id, label) => (
+    <button onClick={() => selectTab(id)} style={{ fontWeight: tab === id ? 'bold' : 'normal' }}>{label}</button>
+  );
+
+  return (
+    <div>
+      <label><input type="checkbox" checked={useT} onChange={e => setUseT(e.target.checked)} /> 使用 startTransition</label>
+      <p>{btn('about', '关于')} {btn('posts', '文章（很慢）')} {btn('contact', '联系')} {isPending && <small>加载中…</small>}</p>
+      <div style={{ opacity: isPending ? 0.5 : 1 }}>
+        {tab === 'about' && <p>这是关于页。</p>}
+        {tab === 'posts' && <SlowPosts />}
+        {tab === 'contact' && <p>邮箱：hi@example.com</p>}
+      </div>
+    </div>
+  );
+}
+```
+
+|  | useTransition | useDeferredValue |
+|---|---|---|
+| 包装的是 | 一次 set 函数调用 | 一个值 |
+| 适用场景 | 能拿到这个 state 的 set 函数 | 值来自 props 或第三方，拿不到 set 函数 |
+| 加载提示 | 提供 isPending | 比较 value !== deferredValue |
+
+<CallBox kind="warn" label="常见坑">
+
+不要把控制输入框的 state 放进 startTransition。输入框的 value 必须同步更新，否则会出现输入丢字。正确做法是用两个 state，或者用 useDeferredValue。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+并发特性和防抖（debounce）不同，它没有固定的延迟。设备快，更新几乎立刻发生。设备慢，更新自动推迟。后台渲染还可以被中断，不浪费计算。注意：并发特性不会减少计算量，它只让慢的渲染可以被打断。要真正减少计算，仍要靠 memo、虚拟列表，或减少渲染的内容。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

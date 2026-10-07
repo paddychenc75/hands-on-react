@@ -1,0 +1,118 @@
+---
+title: "组件与 Props"
+---
+
+# 组件与 Props
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+**组件就是一个返回 JSX 的函数**。组件名必须以**大写字母**开头。React 用这一点区分组件和 HTML 标签：`<div>` 是标签，`<Card>` 是组件。
+
+```jsx play title="定义一次，到处使用"
+function Avatar() {
+  return <span style={{ fontSize: 40 }}>🦊</span>;
+}
+
+function App() {
+  return (
+    <div>
+      <Avatar />
+      <Avatar />
+      <Avatar />
+    </div>
+  );
+}
+```
+
+## Props：组件的参数
+
+如果每个组件都只能显示一模一样的内容，用处就不大了。**props**（properties 的缩写）让父组件把数据传给子组件。这就像给函数传参数。
+
+```jsx play title="通过 props 传入数据"
+function UserCard({ name, role, emoji = '🙂' }) {
+  return (
+    <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 10, margin: 6 }}>
+      <b>{emoji} {name}</b>
+      <div style={{ color: 'gray' }}>{role}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <UserCard name="张三" role="前端工程师" emoji="👨‍💻" />
+      <UserCard name="李四" role="设计师" emoji="🎨" />
+      <UserCard name="王五" role="产品经理" />
+    </div>
+  );
+}
+```
+
+上面用到了 **解构**：`function UserCard({ name, role })` 等价于先接收一个 `props` 对象，再取出 `props.name`、`props.role`。`emoji = '🙂'` 是解构时的默认值。
+
+<CallBox kind="like" label="打个比方">
+
+组件像一个模具，props 像往模具里倒的材料。同一个“卡片模具”，倒入不同的名字和职位，就做出不同的卡片。
+
+</CallBox>
+
+## Props 是只读的
+
+<CallBox kind="warn" label="常见坑">
+
+组件**绝对不能修改自己的 props**。`props.name = '新名字'` 这样的代码是错误的。props 属于父组件，子组件只能读取。想要“可变化的数据”，要用下一课的 **state**。
+
+</CallBox>
+
+组件要像**纯函数**。同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。第 14 课会讲剩下的情况。
+
+## 特殊的 prop：children
+
+写在组件开闭标签之间的内容，会作为 `children` prop 传进去。这让你可以做出“容器”类组件，比如面板、弹窗、布局。
+
+```jsx play title="children 让组件可以“包裹”任意内容"
+function Panel({ title, children }) {
+  return (
+    <section style={{ border: '2px solid #087ea4', borderRadius: 10, padding: 12, margin: 8 }}>
+      <h3 style={{ margin: 0 }}>{title}</h3>
+      <div>{children}</div>
+    </section>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <Panel title="公告">
+        <p>本周五下午 3 点开会。</p>
+      </Panel>
+      <Panel title="待办">
+        <ul><li>写周报</li><li>修 bug</li></ul>
+      </Panel>
+    </>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+组件拆分的经验法则：一个组件只做一件事。如果一个组件越来越长，或者某块界面在多处重复出现，就是拆分的信号。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

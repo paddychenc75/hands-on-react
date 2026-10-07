@@ -1,0 +1,60 @@
+---
+title: "工程化、测试与持续成长"
+---
+
+# 工程化、测试与持续成长
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+这一课是阶段 4 的收尾，讲三件事：新项目用什么工具创建、项目怎样组织、哪些开发期工具能帮你提前发现 bug。
+
+<strong>它和第 32–36 课的分工：</strong>这里只给每个生态工具一句话定位。TypeScript、路由、数据请求、测试和 Next.js 分别在第 32、33、34、35、36 课动手学。
+
+## 创建项目
+
+Create React App 已于 2025 年 2 月被官方正式弃用。今天的主流选择是：
+
+| 场景 | 推荐 |
+|---|---|
+| 全栈应用、需要 SEO、需要 RSC | **Next.js**（App Router）或 **React Router** 框架模式（Remix v2 已并入） |
+| 纯客户端应用、后台管理系统、学习练手 | **Vite**：`npm create vite@latest my-app -- --template react-ts` |
+| 移动端 App | **React Native** + Expo |
+
+## TypeScript 与测试：先记住一句话
+
+- **TypeScript**：给 props 和 state 写上类型，组件 API 就自带文档，编辑器在你写代码时就标出错误。团队项目几乎都用它。详见第 32 课。
+- **测试**：React Testing Library 的原则是**测试用户看到和做的事，不测试实现细节**。按文字、角色、标签查找元素，模拟点击和输入，断言界面结果。不要断言 state 的值或组件内部方法。详见第 35 课。
+
+<CallBox kind="tip" label="要点">
+
+本应用的“检查答案”按钮思路相同：渲染组件，模拟点击和输入，再检查页面。为了简单，它用 id 查找元素。真实测试应优先按角色和文字查找。
+
+</CallBox>
+
+## 项目结构与好习惯
+
+- **按功能组织文件**，例如 features/cart、features/auth。不要按类型把文件全堆在 components/、hooks/ 里。
+- 开启 **StrictMode** 和 **ESLint**（包括 react-hooks 插件，v6 起使用 flat config，并包含 React Compiler 的规则）。它们在开发阶段就能发现很多 bug。
+- 考虑启用 **React Compiler**（2025 年 10 月发布 1.0 稳定版），让它自动做记忆化。
+- 组件保持**纯函数**：同样的 props 和 state，返回同样的 JSX。
+- 先让它工作，再用 Profiler 测量，最后才优化。
+
+## 你的下一站
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"roadmap\"><div><b>巩固</b><span>做 2～3 个完整项目：待办应用 → 带登录的博客 → 实时协作看板</span></div><div><b>生态</b><span>React Router、TanStack Query、Zustand、React Hook Form、Tailwind CSS</span></div><div><b>全栈</b><span>Next.js App Router、Server Functions、数据库与鉴权</span></div><div><b>深入</b><span>阅读 react.dev 全部文档、React 源码、参与开源组件库</span></div></div><figcaption>学习永远不会结束，但现在你已经知道遇到问题该从哪里想起</figcaption>"} />
+
+从“UI = f(state)”到 Fiber 和 Server Components，你已经深入理解了 React 本身。第五阶段介绍实际工作中常用的生态工具。第六阶段再回到 React 本身，讲调度、数据获取、状态架构和性能诊断这些更深的主题，最后用毕业设计把所有知识串起来。
+
+</LessonProse>
+
+<Quiz />
+
+<SelfExplain />
+
+<LessonFooter />

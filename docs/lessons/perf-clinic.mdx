@@ -1,0 +1,292 @@
+---
+title: "性能诊断实战"
+---
+
+# 性能诊断实战
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 20 课学了记忆化，第 24 课学了测量工具。它们都假设你知道代码哪里慢。真实工作常常相反：你接手一个陌生的页面，用户只说一句“搜索框打字很卡”。
+
+这一课把前面的工具组合成一套**诊断流程**，像医生看病例一样：先问症状，再做检查，然后提出诊断，治疗后复查。
+
+## 一、诊断流程：从症状到证据
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 复现</b><span>把“很卡”变成固定的操作步骤</span></div><div class=\"step\"><b>② 测量</b><span>记下基线：提交次数、耗时、谁渲染了</span></div><div class=\"step\"><b>③ 假设</b><span>写成可验证的预测</span></div><div class=\"step\"><b>④ 修改</b><span>只改假设指向的一处</span></div><div class=\"step\"><b>⑤ 再测量</b><span>和基线比。没变，就撤销修改</span></div></div><figcaption>诊断流程：每一步都留下数字</figcaption>"} />
+
+这五步看起来和第 24 课的四步相似。区别在第 ③ 步。面对陌生代码，你不知道该改哪里。所以先写下假设，再动手：
+
+- **坏的假设**：“可能是渲染太多了，加点 memo 试试。”它不能被证伪，改完也说不清是哪一处起了作用。
+- **好的假设**：“打字时 12 个 NavItem 都渲染了，它们的 props 没变。如果病因是 Context 的 value 每次都是新对象，那么固定 value 后，NavItem 的渲染次数会从 12 降到 0。”
+
+好的假设说清了三件事：观察到的现象、怀疑的原因、修改后数字会怎样变化。数字照预测变化，假设成立；没变，就撤销修改，换下一个假设。
+
+<CallBox kind="tip" label="要点">
+
+读陌生代码时，可以先搜几个“高危写法”：`value={{`（Context 的内联对象）、effect 里直接调用 set 函数、没有对应 remove 的 `addEventListener` 或 `subscribe`、组件函数里定义的组件。搜到的只是嫌疑，仍要用数字确认。
+
+</CallBox>
+
+## 二、六类常见病因和它们的特征
+
+每类病因在 Profiler 里都有可辨认的特征。下表的“验证实验”一栏，就是第 ③ 步要写的预测。
+
+| 病因 | Profiler 中的特征 | 验证实验 | 常见修法 |
+|---|---|---|---|
+| Context 的 value 每次新建 | 和操作无关的 Context 消费者全部渲染，原因是 “Context changed” | 临时固定 value，消费者的渲染次数应降到 0 | useMemo 固定 value；把常变和不常变的数据拆成两个 Context |
+| 内联对象或函数打破 memo | memo 组件仍然渲染，原因是 “Props changed: (style)” | 把这个 prop 移到组件外，渲染应消失 | 移到组件外；useMemo / useCallback；React Compiler |
+| 昂贵计算没有记忆化 | 某个组件自身耗时很长，而且和输入无关 | 在计算函数里计数，操作后次数应不变 | useMemo；或者移到组件外、移到服务端 |
+| 列表没有虚拟化 | 一次提交里大量行在挂载；Performance 面板中布局时间很长 | 把行数减到 50，耗时应大幅下降 | 虚拟列表、分页（第 24 课） |
+| effect 连锁更新 | 一次操作产生 2 次以上的提交 | 把派生值改成渲染时计算，提交应降到 1 次 | 渲染时计算；用 key 重置 state；在事件处理函数中一次更新 |
+| 监听器泄漏 | 操作越多越慢；同一个事件触发多次回调 | 重复操作 10 次，监听器数应保持不变 | effect 返回清理函数，移除同一个函数引用 |
+
+还有一类在第 24 课的表里：组件内定义的组件。它的特征是子树每次都显示为 “mount”，输入框丢失焦点。
+
+下面的示例复现第一类病因。20 个 Item 都用 memo 包着，它们的 label 从不改变。先预测，再运行。
+
+```jsx play title="memo 挡得住 Context 吗？"
+import { useState, useMemo, useEffect, createContext, useContext, memo } from 'react';
+
+const ThemeContext = createContext(null);
+let renders = 0; // 仅用于演示：统计这次提交里 Item 渲染了几次
+
+const Item = memo(function Item({ label }) {
+  renders++;
+  const { theme } = useContext(ThemeContext);
+  return <li style={{ color: theme === 'dark' ? '#2e86de' : 'inherit' }}>{label}</li>;
+});
+
+const LABELS = Array.from({ length: 20 }, (_, i) => '菜单 ' + (i + 1));
+
+export default function App() {
+  const [text, setText] = useState('');
+  const [theme, setTheme] = useState('light');
+  const [fixed, setFixed] = useState(false);
+
+  const inline = { theme, setTheme };
+  const stable = useMemo(() => ({ theme, setTheme }), [theme]);
+  const value = fixed ? stable : inline;
+
+  useEffect(() => {
+    console.log('这次提交，Item 渲染了 ' + renders + ' 次');
+    renders = 0;
+  });
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <label>
+        <input type="checkbox" checked={fixed} onChange={e => setFixed(e.target.checked)} />
+        {' '}用 useMemo 固定 value
+      </label>
+      <p><input value={text} onChange={e => setText(e.target.value)} placeholder="在这里打字" /></p>
+      <ul style={{ columns: 2 }}>
+        {LABELS.map(l => <Item key={l} label={l} />)}
+      </ul>
+    </ThemeContext.Provider>
+  );
+}
+```
+
+## 三、量化：用计数说话
+
+毫秒数受机器、浏览器扩展、开发版本影响，每次测都不一样。**计数**稳定得多：同样的操作，在任何机器上提交次数都一样。诊断时优先记录三种计数：
+
+- **提交次数**：用 `<Profiler onRender>` 包住根组件，每次回调计 1。一次按键应该只有 1 次提交。
+- **渲染次数**：在可疑组件里计数（只用于诊断，查完删掉）。和这次操作无关的组件应该是 0。
+- **监听器数量**：订阅集合的 size，或者在 Chrome 控制台运行 `getEventListeners(window)`。重复操作后数量应该不变。
+
+下面的示例复现 effect 连锁更新。切换分类后，列表要筛选，并默认选中第一件商品。先看控制台里每次点击产生几次提交，再勾选“渲染时计算”对比。
+
+```jsx play title="一次点击，几次提交？"
+import { useState, useEffect, useMemo, Profiler } from 'react';
+
+const PRODUCTS = Array.from({ length: 30 }, (_, i) => ({
+  id: i + 1, cat: ['图书', '电器', '服装'][i % 3],
+}));
+
+// 写法 A：两个 effect 接力
+function ChainedList({ cat }) {
+  const [items, setItems] = useState([]);
+  const [selected, setSelected] = useState(null);
+  useEffect(() => { setItems(PRODUCTS.filter(p => p.cat === cat)); }, [cat]);
+  useEffect(() => { if (items.length) setSelected(items[0].id); }, [items]);
+  return (
+    <p>
+      {cat}：{items.length} 件，选中 #{selected}{' '}
+      <button onClick={() => setSelected(selected + 3)}>下一件</button>
+    </p>
+  );
+}
+
+// 写法 B：渲染时计算；用 key 让选中项随分类重置
+function DerivedList({ cat }) {
+  const items = useMemo(() => PRODUCTS.filter(p => p.cat === cat), [cat]);
+  const [selected, setSelected] = useState(items[0].id);
+  return (
+    <p>
+      {cat}：{items.length} 件，选中 #{selected}{' '}
+      <button onClick={() => setSelected(selected + 3)}>下一件</button>
+    </p>
+  );
+}
+
+let commits = 0;
+function onRender(id, phase, actualDuration) {
+  commits++;
+  console.log('  提交 #' + commits + '（' + phase + '）');
+}
+
+export default function App() {
+  const [cat, setCat] = useState('图书');
+  const [derived, setDerived] = useState(false);
+  function choose(c) {
+    console.log('—— 点击：' + c);
+    setCat(c);
+  }
+  return (
+    <div>
+      <label>
+        <input type="checkbox" checked={derived} onChange={e => setDerived(e.target.checked)} />
+        {' '}渲染时计算（写法 B）
+      </label>
+      <p>
+        {['图书', '电器', '服装'].map(c => (
+          <button key={c} onClick={() => choose(c)} disabled={c === cat}>{c}</button>
+        ))}
+      </p>
+      <Profiler id="list" onRender={onRender}>
+        {derived ? <DerivedList key={cat} cat={cat} /> : <ChainedList cat={cat} />}
+      </Profiler>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+<strong>不要在 onRender 里调用 set 函数。</strong>那会引起新的提交，又触发 onRender，形成循环。把计数存在普通变量或 ref 里，用控制台输出。
+
+</CallBox>
+
+## 四、性能预算：什么叫“修好了”
+
+“快一点”不是目标。**性能预算**是团队事先约定的上限，超过就算缺陷。有了预算，才知道什么时候可以停手。下面是一组示例，具体数字按你的用户设备来定：
+
+| 预算项 | 示例上限 | 怎样检查 |
+|---|---|---|
+| 交互到下一帧（INP） | ≤ 200ms（Google 的“良好”线）；React 的渲染和提交部分 ≤ 100ms | 在 4 倍 CPU 节流下用 Performance 面板测；线上用真实用户数据 |
+| 每次按键的提交次数 | 1 次 | Profiler onRender 计数，可以写成自动测试 |
+| 与操作无关的组件渲染 | 0 次 | 渲染计数，或 React DevTools 的高亮 |
+| 长任务 | 交互期间没有超过 50ms 的任务 | Performance 面板中带红色三角的任务 |
+| 首屏 JS | 例如 ≤ 170KB（gzip 后） | 构建产物分析，CI 中自动比较 |
+
+把预算写进自动检查时，**优先用计数和体积**。CI 机器的速度时快时慢，毫秒阈值会随机失败，团队很快就会忽略它。毫秒数适合放在监控里看趋势：一次发布后 INP 的第 75 百分位变差了，就去查这次发布。
+
+## 五、监听器泄漏
+
+泄漏的特征是“越用越慢”：刚打开很流畅，操作一段时间后变卡，内存也越来越大。最常见的原因是订阅没有取消：
+
+```jsx play title="监听器会越积越多吗？"
+import { useState, useEffect } from 'react';
+
+const bus = {
+  listeners: new Set(),
+  on(fn) {
+    bus.listeners.add(fn);
+    return () => bus.listeners.delete(fn);
+  },
+};
+
+function Watcher({ filter, cleanup }) {
+  useEffect(() => {
+    const off = bus.on(msg => { if (msg.includes(filter)) console.log('匹配：' + msg); });
+    if (cleanup) return off;
+  }, [filter, cleanup]);
+  return null;
+}
+
+export default function App() {
+  const [filter, setFilter] = useState('');
+  const [cleanup, setCleanup] = useState(false);
+  useEffect(() => {
+    console.log('当前监听器数量：' + bus.listeners.size);
+  });
+  return (
+    <div>
+      <label>
+        <input type="checkbox" checked={cleanup} onChange={e => setCleanup(e.target.checked)} />
+        {' '}返回清理函数
+      </label>
+      <p><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="输入筛选词" /></p>
+      <Watcher filter={filter} cleanup={cleanup} />
+    </div>
+  );
+}
+```
+
+排查泄漏的步骤：
+
+1. 找一个可以重复的操作，例如打开再关闭弹窗。
+2. 重复 10 次，比较前后的监听器数量或订阅数量。
+3. 数量随次数增长，就检查对应 effect 的清理函数。常见错误：清理函数里写了一个新的箭头函数，移除的不是同一个引用。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>六、内存泄漏的排查<small>可以先跳过，需要时再展开</small></summary>
+
+监听器只是泄漏的一种。更一般的方法是用 Chrome DevTools 的 Memory 面板比较堆快照：
+
+1. 打开页面，点垃圾桶图标强制回收，拍第一张堆快照。
+2. 重复可疑操作 10 次，例如进入再离开某个页面。
+3. 再次强制回收，拍第二张快照。选择 “Comparison” 视图。
+4. 按 “\# Delta” 排序。数量增长了约 10 的倍数的对象，就是嫌疑。
+5. 在过滤框中输入 “Detached”，查找已经离开页面、却仍被引用的 DOM 节点。
+6. 选中一个对象，看下方的 Retainers：它沿着哪条引用链被保留。链上常见的是闭包、模块级的缓存 Map、未清除的定时器。
+
+模块级缓存要有上限。例如只保留最近 50 条，或者用 `WeakMap` 以对象为键，对象被回收后缓存项也随之释放。
+
+</details>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>七、包体积与代码分割<small>可以先跳过，需要时再展开</small></summary>
+
+前面的病因都发生在交互时。另一类慢发生在打开页面时：要下载、解析、执行的 JavaScript 太多，LCP 和首次交互都被拖慢。记忆化对此毫无帮助。
+
+```jsx title="三种代码分割的时机（需要打包工具，本课环境只能阅读）"
+// 1. 按路由分割：报表页的代码只在进入报表页时下载
+const Reports = lazy(() => import('./pages/Reports.jsx'));
+
+// 2. 按交互分割：很大的库只在用户点击时才加载
+async function exportExcel(rows) {
+  const XLSX = await import('xlsx');
+  // …使用 XLSX 生成文件
+}
+
+// 3. 用户可能马上要用的，提前开始下载
+<Link to="/reports" onMouseEnter={() => import('./pages/Reports.jsx')}>报表</Link>
+```
+
+- **先看清楚包里有什么**：Vite 项目可以用 rollup-plugin-visualizer，webpack 项目用 webpack-bundle-analyzer，也可以用 source-map-explorer 分析任意产物。常见的发现：整个图标库被打包进来、日期库带上了所有语言包、同一个库有两个版本。
+- **把体积预算放进 CI**：例如 size-limit 这类工具。每个 PR 显示包体积的变化，超过预算就失败。
+- **分割也有代价**：分得太碎，请求变多，用户点进页面时还要等一次下载。只分割“首屏用不到、而且足够大”的部分。
+
+</details>
+
+## 什么时候停手
+
+达到预算就停。剩下的“不必要的渲染”如果很便宜，就让它留着。每多一个 useMemo，代码就多一处要维护的依赖数组。启用 React Compiler 的项目，记忆化交给编译器，你把精力放在编译器解决不了的问题上：DOM 太多、effect 连锁、泄漏和包体积。
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

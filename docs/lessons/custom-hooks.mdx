@@ -1,0 +1,136 @@
+---
+title: "自定义 Hook：复用逻辑"
+---
+
+# 自定义 Hook：复用逻辑
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+## 先记住 Hooks 的两条规则
+
+- **只在最顶层调用 Hook**：不要在 if、for、嵌套函数中调用。
+- **只在 React 函数中调用 Hook**：即函数组件或自定义 Hook 中。
+
+<CallBox kind="deep" label="深入一点">
+
+为什么不能放在 if 里？因为 React **按调用顺序**识别每个 Hook。第 1 个 useState 是 1 号，第 2 个是 2 号，依此类推。React 用一个链表，按顺序保存每个 Hook 的 state。如果某次渲染跳过了一个 Hook，后面所有 Hook 的顺序都会错位，读到别人的状态。第 30 课会亲手实现这个机制。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：`Rendered more hooks than during the previous render.`（或 `Rendered fewer hooks than expected`）<br />原因：这次渲染调用的 Hook 数量和上次不同。<br />去看：有没有 Hook 写在 if、循环里，或者写在提前 return 之后。把它们移到组件最上面。
+
+</CallBox>
+
+## 什么是自定义 Hook
+
+自定义 Hook 就是一个**名字以 use 加大写字母开头、内部调用了其他 Hook 的普通函数**。当你发现几个组件里有相同的状态逻辑时，就可以把它抽出来。
+
+```jsx play title="三个实用的自定义 Hook"
+import { useState, useEffect } from 'react';
+
+// 自定义 Hook：追踪窗口宽度
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
+
+// 自定义 Hook：开关
+function useToggle(initial = false) {
+  const [on, setOn] = useState(initial);
+  const toggle = () => setOn(o => !o);
+  return [on, toggle];
+}
+
+// 自定义 Hook：与 localStorage 同步的 state
+function useLocalStorage(key, initial) {
+  const [value, setValue] = useState(() => {
+    try { const s = localStorage.getItem(key); return s !== null ? JSON.parse(s) : initial; }
+    catch { return initial; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
+
+function App() {
+  const width = useWindowWidth();
+  const [showDetail, toggleDetail] = useToggle();
+  const [note, setNote] = useLocalStorage('demo-note', '');
+
+  return (
+    <div>
+      <p>窗口宽度：{width}px（{width < 600 ? '手机' : '桌面'}布局）</p>
+      <button onClick={toggleDetail}>{showDetail ? '收起' : '展开'}详情</button>
+      {showDetail && <p>这里是详情内容……</p>}
+      <p><input value={note} onChange={e => setNote(e.target.value)} placeholder="输入后刷新页面，内容还在" /></p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+**自定义 Hook 共享的是逻辑，不是状态**。两个组件都调用 `useToggle()`，它们各自拥有独立的 on 状态，互不影响。就像两个人用同一份菜谱，做出的是两盘菜。
+
+</CallBox>
+
+## 一个更完整的例子：useFetch
+
+```jsx title="把请求逻辑封装成 Hook"
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    fetch(url)
+      .then(res => {
+        // fetch 遇到 404、500 不会报错，要自己检查
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(json => { if (!ignore) { setData(json); setError(null); } })
+      .catch(err => { if (!ignore) setError(err); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
+  }, [url]);
+
+  return { data, error, loading };
+}
+
+// 使用：组件变得极其简洁
+function UserList() {
+  const { data, loading, error } = useFetch('/api/users');
+  if (loading) return <p>加载中…</p>;
+  if (error) return <p>出错了</p>;
+  return <ul>{data.map(u => <li key={u.id}>{u.name}</li>)}</ul>;
+}
+```
+
+真实项目通常用 TanStack Query 或 SWR 请求数据。这些库本质上是功能完善的自定义 Hook。它们增加了缓存、重试和去重。
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

@@ -1,0 +1,110 @@
+---
+title: "表单与受控组件"
+---
+
+# 表单与受控组件
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+在 HTML 中，输入框自己保存着用户输入的值。在 React 中，通常由 **state 保存这个值**。输入框只做两件事：显示 state；值变化时通知我们。这就叫**受控组件**。
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"formula\"><span class=\"f-box\">state<small>value</small></span><span class=\"f-op\">→ 显示 →</span><span class=\"f-box\">&lt;input&gt;</span><span class=\"f-op\">→ onChange →</span><span class=\"f-box f-fn\">set 函数<small>更新</small></span></div><figcaption>数据形成一个闭环：state 是唯一数据源</figcaption>"} />
+
+```jsx play title="最基本的受控输入框"
+import { useState } from 'react';
+
+function App() {
+  const [text, setText] = useState('');
+  return (
+    <div>
+      <input value={text} onChange={e => setText(e.target.value)} placeholder="输入点什么" />
+      <p>你输入了：{text}</p>
+      <p>字数：{text.length}，大写：{text.toUpperCase()}</p>
+      <button onClick={() => setText('')}>清空</button>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+如果只写 `value={text}` 却没写 `onChange`，输入框会变成**只读**，怎么打字都没反应。因为每次渲染它都被强制设回 state 的值。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：`Warning: A component is changing an uncontrolled input to be controlled.`<br />原因：value 一开始是 undefined（例如写了 `useState()`），后来才变成字符串。React 认为输入框从“非受控”变成了“受控”。<br />去看：这个输入框对应的 useState。给它一个初始值，例如 `useState('')`。
+
+</CallBox>
+
+## 多个字段：用一个对象
+
+表单字段多时，用一个对象保存所有字段。再写一个通用的 `handleChange`。它根据输入框的 `name` 属性，判断要更新哪个字段。
+
+```jsx play title="一个完整的表单"
+import { useState } from 'react';
+
+function App() {
+  const [form, setForm] = useState({ name: '', city: '北京', agree: false });
+  const [submitted, setSubmitted] = useState(null);
+  const [error, setError] = useState('');
+
+  function handleChange(e) {
+    const { name, value, type, checked } = e.target;
+    setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault(); // 阻止页面刷新
+    if (!form.name.trim()) return setError('请填写姓名');
+    setError('');
+    setSubmitted(form);
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <p><input name="name" value={form.name} onChange={handleChange} placeholder="姓名" /></p>
+      <p>
+        <select name="city" value={form.city} onChange={handleChange}>
+          <option>北京</option><option>上海</option><option>深圳</option>
+        </select>
+      </p>
+      <p><label><input type="checkbox" name="agree" checked={form.agree} onChange={handleChange} /> 同意协议</label></p>
+      <button disabled={!form.agree}>提交</button>
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {submitted && <pre>{JSON.stringify(submitted, null, 2)}</pre>}
+    </form>
+  );
+}
+```
+
+注意这里的 `[name]: value` 是 JS 的**计算属性名**：用变量 name 的值作为对象的键。复选框用 `checked` 而不是 `value`。
+
+<CallBox kind="tip" label="要点">
+
+所有值都在 state 里，所以**实时校验**很简单。根据 state 计算错误信息，然后渲染它，例如 `{form.name.length > 10 && <span>名字太长</span>}`。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+另一种做法是**非受控组件**。它不绑定 value。需要值时，用 ref 或表单的 FormData 读取 DOM。它代码更少，适合简单表单和文件上传 `<input type="file">`。React 19 的表单 Actions 也鼓励这种方式，第 28 课会讲。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

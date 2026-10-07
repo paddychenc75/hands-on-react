@@ -1,0 +1,286 @@
+---
+title: "React 19 新特性"
+---
+
+# React 19 新特性
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 19（2024 年 12 月发布）带来了一批围绕**异步操作和表单**的新特性。**本课的 React 19 代码只能阅读**：本应用的运行环境是 React 18，运行不了 19 的 API。可运行的演示和练习用 React 18 模拟同样的思路。
+
+一次异步提交（例如“修改用户名”）要管理 4 件事。React 18 中，每一件都要自己写 state。React 19 为每一件提供了现成的 API：
+
+| 要管的事 | React 18 | React 19 |
+|---|---|---|
+| 提交中（pending） | `useState(false)`，提交前设为 true，结束后设回 false | 异步 `startTransition`、`useActionState`、`useFormStatus` |
+| 错误和结果 | 再加一个 `useState(null)`，在 try/catch 里设置 | `useActionState` 的返回值 |
+| 成功后重置表单 | 手动清空每个受控字段的 state | `<form action>` 自动重置非受控字段 |
+| 乐观值 | 再加一个临时 state，失败时手动回滚 | `useOptimistic` |
+
+## Actions：异步函数直接作为 transition
+
+React 19 允许在 `startTransition` 中使用**异步函数**。这类函数叫 **Action**。React 会自动追踪它的 pending 状态。
+
+<strong>它解决了 React 18 中的什么麻烦：</strong>每次提交都要成对地设置 isPending。中途 return 或抛错时，很容易忘了设回 false，按钮就一直显示“提交中”。
+
+```jsx
+// React 18：手动管理一切
+const [isPending, setIsPending] = useState(false);
+const [error, setError] = useState(null);
+async function handleSubmit() {
+  setIsPending(true);
+  const err = await updateName(name);
+  setIsPending(false);
+  if (err) setError(err); else redirect('/profile');
+}
+
+// React 19：异步 transition 自动处理 pending
+const [isPending, startTransition] = useTransition();
+function handleSubmit() {
+  startTransition(async () => {
+    const err = await updateName(name);
+    if (err) { setError(err); return; }
+    redirect('/profile');
+  });
+}
+```
+
+## \&lt;form action\&gt; 与 useActionState
+
+<strong>它解决了 React 18 中的什么麻烦：</strong>表单要写 onSubmit 和 `e.preventDefault()`，每个字段还要一个受控 state。结果和错误又各占一个 state。
+
+`<form>` 的 `action` 属性可以直接接收函数。提交时，React 调用它并传入 `FormData`，成功后自动重置非受控字段。`useActionState` 把 Action 的返回值和 pending 打包给你。Action 的第一个参数是上一次的 state：
+
+```jsx
+import { useActionState } from 'react';
+
+async function subscribe(prevState, formData) {
+  const email = formData.get('email');
+  if (!email.includes('@')) return { error: '邮箱格式不对' };
+  await api.subscribe(email);
+  return { ok: true };
+}
+
+function Newsletter() {
+  const [state, formAction, isPending] = useActionState(subscribe, {});
+  return (
+    <form action={formAction}>
+      <input name="email" />
+      <button disabled={isPending}>{isPending ? '提交中…' : '订阅'}</button>
+      {state.error && <p>{state.error}</p>}
+      {state.ok && <p>订阅成功 🎉</p>}
+    </form>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+深层的提交按钮可以调用 react-dom 的 `useFormStatus()`，读取所在表单的 pending。这样 isPending 就不用一层层传下去。注意：它必须在 form **内部**的子组件中调用。
+
+</CallBox>
+
+## useOptimistic：乐观更新
+
+点赞、发消息时，先**立刻**显示结果，再等服务器确认。失败时自动回滚。
+
+<strong>它解决了 React 18 中的什么麻烦：</strong>你要自己多存一个“临时值”，成功时替换，失败时回滚，连续点击时还要处理多个临时值。
+
+```jsx
+function Chat({ messages, sendMessage }) {
+  const [optimistic, addOptimistic] = useOptimistic(
+    messages,
+    (current, newText) => [...current, { id: 'tmp-' + Date.now(), text: newText, sending: true }]
+  );
+
+  async function action(formData) {
+    const text = formData.get('text');
+    addOptimistic(text);        // 立即显示（带“发送中”标记）
+    await sendMessage(text);    // 完成后 messages 更新，乐观值被真实值替换
+  }
+
+  return (
+    <>
+      {optimistic.map(m => <p key={m.id}>{m.text}{m.sending && ' (发送中…)'}</p>)}
+      {/* addOptimistic 必须在 Action 或 startTransition 中调用；form 的 action 本身就是 Action */}
+      <form action={action}><input name="text" /></form>
+    </>
+  );
+}
+```
+
+下面用 React 18 的 state **模拟它的效果**。演示后面是 useOptimistic 版本的逐行对照。
+
+```jsx play title="用 React 18 模拟乐观更新的效果"
+import { useState } from 'react';
+
+const fakeServer = (ok) => new Promise((res, rej) => setTimeout(() => ok ? res() : rej(new Error('网络错误')), 1200));
+
+function App() {
+  const [likes, setLikes] = useState(42);
+  const [pending, setPending] = useState(0);
+  const [msg, setMsg] = useState('');
+
+  async function like(shouldSucceed) {
+    setPending(p => p + 1);           // ①
+    setMsg('');
+    try {
+      await fakeServer(shouldSucceed);
+      setLikes(l => l + 1);           // ②
+    } catch (e) {
+      setMsg('点赞失败：' + e.message);
+    } finally {
+      setPending(p => p - 1);         // ③
+    }
+  }
+
+  return (
+    <div>
+      <h2>❤️ {likes + pending} {pending > 0 && <small>（同步中…）</small>}</h2>
+      <button onClick={() => like(true)}>点赞（会成功）</button>
+      <button onClick={() => like(false)}>点赞（会失败）</button>
+      <p style={{ color: 'crimson' }}>{msg}</p>
+    </div>
+  );
+}
+```
+
+```jsx title="await 之后的 set 函数调用不再属于这个 Action，所以 ② 要再包一层 startTransition"
+// 同样的点赞，用 React 19 的 useOptimistic 写（只读代码）
+import { useState, useOptimistic, startTransition } from 'react';
+
+function LikeButton() {
+  const [likes, setLikes] = useState(42);
+  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (current, n) => current + n);
+  const [msg, setMsg] = useState('');
+
+  function like(shouldSucceed) {
+    setMsg('');
+    startTransition(async () => {
+      addOptimistic(1);                              // 对应 ①
+      try {
+        await fakeServer(shouldSucceed);
+        startTransition(() => setLikes(l => l + 1)); // 对应 ②
+      } catch (e) {
+        setMsg('点赞失败：' + e.message);
+      }
+    }); // Action 结束时，乐观值自动丢弃：对应 ③，不用自己写
+  }
+
+  return (
+    <div>
+      <h2>❤️ {optimisticLikes}</h2>
+      <button onClick={() => like(true)}>点赞（会成功）</button>
+      <button onClick={() => like(false)}>点赞（会失败）</button>
+      <p>{msg}</p>
+    </div>
+  );
+}
+```
+
+## use()：在渲染中读取 Promise 和 Context
+
+<strong>它解决了 React 18 中的什么麻烦：</strong>读取一个 Promise，要写 useEffect 加三个 state（数据、加载中、错误）。Hook 又不能写在条件语句里，按条件读取 Context 很别扭。
+
+```jsx
+import { use, Suspense } from 'react';
+
+function Comments({ commentsPromise }) {
+  const comments = use(commentsPromise); // 未完成时会“暂停”，交给 Suspense
+  return comments.map(c => <p key={c.id}>{c.text}</p>);
+}
+
+// use 不是 Hook，而是 API：它可以写在条件语句里（但不能放在 try-catch 中）
+function Heading({ show }) {
+  if (show) {
+    const theme = use(ThemeContext);
+    return <h1 style={{ color: theme.color }}>标题</h1>;
+  }
+  return null;
+}
+```
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>其他实用改进<small>可以先跳过，需要时再展开</small></summary>
+
+- **ref 作为普通 prop**：函数组件可以直接接收 `ref`。React 18 中必须用 `forwardRef` 包一层。
+- **\<Context\> 直接作为 Provider**：写 `<ThemeContext value="dark">` 即可。React 18 中必须写 `.Provider`。
+- **ref 回调支持返回清理函数**。React 18 中，卸载时 ref 回调会以 null 再调用一次，你要自己判断参数是不是 null。
+- **文档元数据**：在组件里直接渲染 `<title>`、`<meta>`，React 会自动提升到 `<head>`。React 18 中要用 effect 修改 document.title，或引入第三方库。
+- **更好的水合错误提示**。水合是服务端渲染后，React 在浏览器里接管 HTML 的过程，第 29 课会详细讲。React 18 中出错时只说“不匹配”；19 会列出服务器和浏览器渲染结果的差异。
+
+</details>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>大型表单<small>可以先跳过，需要时再展开</small></summary>
+
+表单变大后，按这几条组织：
+
+1. 用 `FormData` 读取字段，例如 `formData.get('email')`。
+2. 校验两次。客户端校验给出即时反馈。服务器校验保证安全，不能省略。
+3. Action 返回每个字段的错误，例如 `{ errors: { email: '…' } }`。
+4. 让屏幕阅读器读到错误：出错的输入框加 `aria-invalid`，再用 `aria-describedby` 指向错误文字。
+
+```jsx title="useActionState 返回字段错误"
+async function signup(prevState, formData) {
+  const email = String(formData.get('email') ?? '');
+  if (!email.includes('@')) return { errors: { email: '邮箱格式不对' }, email };
+  await api.signup(email);
+  return { ok: true };
+}
+
+function Signup() {
+  const [state, formAction, isPending] = useActionState(signup, {});
+  const err = state.errors?.email;
+  return (
+    <form action={formAction}>
+      <label htmlFor="email">邮箱</label>
+      {/* 提交后表单会重置，用 defaultValue 填回用户的输入 */}
+      <input id="email" name="email" defaultValue={state.email}
+        aria-invalid={err ? true : undefined} aria-describedby={err ? 'email-error' : undefined} />
+      {err && <p id="email-error">{err}</p>}
+      <button disabled={isPending}>注册</button>
+    </form>
+  );
+}
+```
+
+<CallBox kind="tip" label="要点">
+
+字段很多、字段之间有联动校验、需要边输入边提示时，用 **React Hook Form + Zod**。用 Zod 写一份 schema，客户端和服务器共用同一套规则。
+
+</CallBox>
+
+</details>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>React 19.2 与 19.3 新增<small>可以先跳过，需要时再展开</small></summary>
+
+| 版本与 API | 作用 | 在 React 18 中的麻烦 |
+|---|---|---|
+| 19.2 `<Activity mode="hidden">` | 隐藏一部分界面，但保留它的 state。也可以在后台预渲染 | 条件渲染会卸载组件，state 全部丢失；用 CSS 隐藏，它的 effect 又一直在运行 |
+| 19.2 `useEffectEvent` | 从 effect 中提取事件逻辑。它总能读到最新值，不必写进依赖数组。见“闭包陷阱与 Effect 依赖”一课 | 想读最新值又不想重启 effect，只能手动用 ref 同步 |
+| 19.2 `cacheSignal` | 只用于服务端组件。`cache()` 的结果失效时发出信号，可以中止请求 | 渲染已经放弃了，发出的请求还在继续，浪费服务器资源 |
+| 19.2 Performance Tracks | Chrome DevTools 性能面板中新增 React 轨道，显示调度优先级、组件渲染和 effect | 性能面板只显示一堆 JS 函数，看不出是哪个组件、哪个优先级 |
+| 19.3 `<ViewTransition>`、`addTransitionType` | 用浏览器的 View Transition API，为元素的进入、离开、移动做动画 | 离开的元素已被卸载，要做退场动画只能引入动画库 |
+| 19.3 Fragment ref | 给 `<Fragment>` 传 ref，操作它的 DOM 子节点 | 要拿到一组子元素，只能多包一层 div，改变了 DOM 结构 |
+| 19.3 `use(browser())` | 让组件跳过服务端渲染，只在浏览器中渲染 | 要写 useEffect + “已挂载” state，先渲染占位再渲染真实内容 |
+| 19.3 Trusted Types | 支持浏览器的 Trusted Types API，防止基于 DOM 的 XSS | 开启 Trusted Types 的网站上，React 写入 HTML 的部分会被浏览器拦截 |
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

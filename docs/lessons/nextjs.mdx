@@ -1,0 +1,138 @@
+---
+title: "Next.js App Router"
+---
+
+# Next.js App Router
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+Next.js 是使用最广的 React 全栈框架。Server Components 主要就用在 Next.js 中。第 29 课讲了原理，这一课看它在真实项目里怎么组织。
+
+<CallBox kind="tip" label="要点">
+
+Next.js 需要 Node.js 服务器，本页的示例都是只读代码。创建项目只需一行：`npx create-next-app@latest my-app`，一路回车即可。
+
+</CallBox>
+
+## 文件夹就是路由
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"filetree\"><div><b>app/</b></div>\n<div class=\"i1\">layout.tsx <span>根布局：&lt;html&gt;、导航栏，所有页面共享</span></div>\n<div class=\"i1\">page.tsx <span>→ <code>/</code></span></div>\n<div class=\"i1\"><b>blog/</b></div>\n<div class=\"i2\">page.tsx <span>→ <code>/blog</code></span></div>\n<div class=\"i2\">loading.tsx <span>加载中界面（自动包一层 Suspense）</span></div>\n<div class=\"i2\">error.tsx <span>出错界面（自动包一层错误边界）</span></div>\n<div class=\"i2\"><b>[slug]/</b></div>\n<div class=\"i3\">page.tsx <span>→ <code>/blog/hello-world</code>，动态参数 slug</span></div>\n<div class=\"i1\"><b>api/</b><b>hello/</b></div>\n<div class=\"i2\">route.ts <span>→ API 接口 <code>GET /api/hello</code></span></div></div><figcaption>特殊文件名：page、layout、loading、error、not-found、route</figcaption>"} />
+
+注意 `loading.tsx` 和 `error.tsx`：它们就是第 22 课学的 Suspense 和错误边界。框架按约定自动帮你加上。
+
+## 页面：在服务端直接取数据
+
+```jsx title="没有 useEffect，没有 loading state，没有 API 层"
+// app/blog/[slug]/page.tsx  —— 默认是服务端组件
+import { notFound } from 'next/navigation';
+import { db } from '@/lib/db';
+import LikeButton from './LikeButton';   // 'use client' 的交互组件
+
+export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const post = await db.post.findUnique({ where: { slug } });
+  if (!post) notFound();                 // 渲染 not-found.tsx
+
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <div>{post.content}</div>
+      <LikeButton postId={post.id} initialLikes={post.likes} />
+    </article>
+  );
+}
+
+// 为 SEO 生成 <title> 和 <meta>
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const post = await db.post.findUnique({ where: { slug } });
+  return { title: post?.title ?? '文章不存在' };
+}
+```
+
+## 表单：Server Action + 重新验证
+
+```jsx
+// app/blog/[slug]/actions.ts
+'use server';
+import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+
+export async function addComment(postId: number, formData: FormData) {
+  const session = await auth();
+  if (!session) throw new Error('请先登录');           // 永远在服务端校验权限
+  const text = String(formData.get('text') ?? '').trim();
+  if (!text) return;                                   // 直接给 form 的 action，返回值会被丢弃
+  await db.comment.create({ data: { postId, text, userId: session.user.id } });
+  revalidatePath('/blog/[slug]', 'page');             // 让页面数据刷新
+}
+// 要把错误信息显示给用户：在客户端组件里用 useActionState，
+// 此时函数签名改为 (prevState, formData)
+
+// 在页面里使用（服务端组件中即可，不需要 'use client'）
+<form action={addComment.bind(null, post.id)}>
+  <textarea name="text" />
+  <button>发表</button>
+</form>
+```
+
+## 数据从哪里来？
+
+| 我要做 | 用 |
+|---|---|
+| 页面的初始数据 | 服务端组件里直接查库或调用数据层函数 |
+| 提交表单、修改数据 | Server Function（`'use server'`） |
+| 给第三方或移动端提供接口 | Route Handler（`route.ts`） |
+| 客户端高频交互（轮询、无限滚动） | TanStack Query |
+
+<CallBox kind="warn" label="常见坑">
+
+三条安全规则：
+
+1. 服务端组件不要 `fetch` 自己的 API 路由。直接调用数据层函数，少一次网络往返。
+2. 只能在服务端用的模块，加上 `import 'server-only'`。`NEXT_PUBLIC_` 开头的变量会发到浏览器，不要放密钥。
+3. Server Function 收到的 formData 是不可信输入。先用 Zod 等工具校验，再写库。
+
+</CallBox>
+
+缓存提示：从 Next.js 15 起，`fetch` 默认**不缓存**。需要缓存时要明确写出来。
+
+## 渲染策略
+
+| 策略 | 何时生成 HTML | 适合 |
+|---|---|---|
+| 静态（默认尽量静态） | 构建时 | 文档、博客、营销页 |
+| 动态 | 每次请求时（读取了 cookies、headers、searchParams 等） | 个性化页面、仪表盘 |
+| 增量更新 | 静态生成，过期或 revalidate 后重新生成 | 商品页、新闻 |
+| 流式渲染 | 先发外壳，慢的部分通过 Suspense 稍后流入 | 有慢查询的页面 |
+
+上表是 Next.js 的传统模型。Next.js 16 开启 `cacheComponents` 后，同一页面可以混合三种内容：静态内容、用 `'use cache'` 缓存的内容、在 Suspense 中按请求流式返回的内容。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
+
+<CallBox kind="warn" label="常见坑">
+
+最常见的错误是把整个页面都标成 `'use client'`。这样等于退回传统 SPA，服务端组件的好处全部失去。正确做法：页面和布局保持为服务端组件。只把需要交互的小部件拆成客户端组件，例如按钮、表单、下拉菜单。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+你也可以选择其他框架。例如 React Router（框架模式）和 TanStack Start。它们的核心概念相同：**按路由组织代码；在服务端或路由层加载数据；用 action 提交表单**。学会一个，迁移到另一个很快。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

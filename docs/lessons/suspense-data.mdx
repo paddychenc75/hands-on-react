@@ -1,0 +1,453 @@
+---
+title: "Suspense 数据获取与资源模式"
+---
+
+# Suspense 数据获取与资源模式
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+第 22 课用 lazy 体验了 Suspense：代码没到，就显示 fallback。那一课只用一条提示说“Suspense 也能用于数据”。这一课把这条提示展开，亲手写出一个能配合 Suspense 的小数据层。
+
+TanStack Query 的 `useSuspenseQuery`、Relay、Next.js 的服务端组件，底层都是这几个模式。你会用库之后，也能判断库在背后做了什么、哪里会出问题。
+
+## 一、Suspense 怎样知道“还没准备好”
+
+React 18 中，配合 Suspense 的数据源都遵守同一个约定：
+
+1. 组件在**渲染时**读取数据。
+2. 数据已经到了，就直接返回。
+3. 数据还没到，就**抛出一个 Promise**（准确地说，一个有 then 方法的对象）。
+4. React 接住它，向上找最近的 Suspense，显示 fallback，并在 Promise 上登记一个回调。
+5. Promise 完成后，React 重新渲染这个边界里的内容。这一次读取直接拿到数据。
+
+所以组件函数至少执行两次：一次挂起，一次成功。挂起的那次渲染结果会被**全部丢弃**。如果这个组件是第一次挂载，它还没有被提交过，React 也不会保留它的 state、ref 和 useMemo 的结果。
+
+这引出第一条规则：**资源缓存要放在组件外**。下面用一个 10 行的 `createResource` 演示。先预测，再运行。
+
+```jsx play title="资源在哪里创建？"
+import { Suspense, useState, useEffect, useMemo } from 'react';
+
+let requests = 0;
+function fetchQuote() {
+  requests++;
+  return new Promise(resolve => setTimeout(() => resolve('今天也要认真写代码。'), 800));
+}
+
+// 把 Promise 包装成“可以在渲染时读取”的资源
+function createResource(promise) {
+  let status = 'pending', value;
+  promise.then(
+    v => { status = 'done'; value = v; },
+    e => { status = 'error'; value = e; }
+  );
+  return {
+    read() {
+      if (status === 'pending') throw promise; // 还没到：交给 Suspense
+      if (status === 'error') throw value;     // 失败了：交给错误边界
+      return value;
+    },
+  };
+}
+
+let outside = null;
+
+// 写法 A：资源在组件外创建（点击按钮时）
+function QuoteA() {
+  return <blockquote>{outside.read()}</blockquote>;
+}
+
+// 写法 B：资源在组件里用 useMemo 创建
+function QuoteB() {
+  const resource = useMemo(() => createResource(fetchQuote()), []);
+  return <blockquote>{resource.read()}</blockquote>;
+}
+
+function RequestCount() {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 200);
+    return () => clearInterval(id);
+  }, []);
+  return <p>已发出请求：<b>{requests}</b> 次</p>;
+}
+
+function App() {
+  const [mode, setMode] = useState(null);
+  const [run, setRun] = useState(0);
+
+  function show(m) {
+    requests = 0;
+    if (m === 'A') outside = createResource(fetchQuote());
+    setMode(m);
+    setRun(r => r + 1);
+  }
+
+  return (
+    <div>
+      <button onClick={() => show('A')}>写法 A：组件外创建</button>{' '}
+      <button onClick={() => show('B')}>写法 B：组件里 useMemo</button>
+      <RequestCount />
+      {mode && (
+        <Suspense key={run} fallback={<p>加载中…</p>}>
+          {mode === 'A' ? <QuoteA /> : <QuoteB />}
+        </Suspense>
+      )}
+    </div>
+  );
+}
+```
+
+React 18 没有公开“抛出 Promise”这个 API。它是 Relay、SWR、TanStack Query 等库与 React 之间的约定，官方只建议通过这些库或框架使用。React 19 增加了正式的 `use`，见第七节。
+
+## 二、资源缓存：同一个 key 只请求一次
+
+真实应用需要按参数读取不同的数据。把 createResource 换成一个以 key 为索引的缓存，每条记录保存三种状态之一：
+
+```jsx title="一个最小的 Suspense 缓存"
+const cache = new Map(); // 模块级：不随组件挂载、卸载而消失
+
+function read(key, load) {
+  let record = cache.get(key);
+  if (!record) {
+    record = { status: 'pending', value: undefined };
+    record.promise = load().then(
+      v => { record.status = 'done'; record.value = v; },
+      e => { record.status = 'error'; record.value = e; }
+    );
+    cache.set(key, record);           // 先存再抛：重试时能找到同一条记录
+  }
+  if (record.status === 'pending') throw record.promise;
+  if (record.status === 'error') throw record.value;
+  return record.value;
+}
+
+// 用法：key 要包含所有影响结果的参数
+const user = read('user:' + userId, () => api.fetchUser(userId));
+```
+
+这 15 行代码有三个设计决定：
+
+1. <strong>key 包含所有参数。</strong>漏掉一个参数，不同的请求就会共用一条记录，显示错误的数据。
+2. <strong>失败也要缓存。</strong>否则每次重试都会发新请求，错误边界永远等不到错误。重试时再明确地删掉这条记录（第五节）。
+3. <strong>先存，再抛。</strong>React 重试时会再次调用 read，必须找到同一条记录。
+
+<CallBox kind="warn" label="常见坑">
+
+这个缓存只增不减，也从不过期。真实的数据层还要处理：过期后重新请求、修改数据后让相关的 key 失效、长时间不用的记录要回收。这些正是第 34 课 TanStack Query 的 staleTime、gcTime 和 invalidateQueries 做的事。自己写的缓存适合学习和小工具；生产环境用成熟的库。
+
+</CallBox>
+
+## 三、瀑布流与 render-as-you-fetch
+
+**请求瀑布**指本来可以同时发出的请求，被迫一个接一个地发出。最常见的原因是组件的嵌套：
+
+```jsx title="Posts 是挂起组件的子组件：串行"
+function ProfilePage({ userId }) {
+  const user = read('user:' + userId, ...);   // 400ms
+  return (
+    <>
+      <h2>{user.name}</h2>
+      <Posts userId={userId} />                 // 用户到了才会渲染，才开始请求文章
+    </>
+  );
+}
+```
+
+ProfilePage 挂起时，React 根本不会渲染它的子组件。Posts 要等用户信息到了才第一次渲染，才发出请求。Suspense 让代码看起来像同步的，但它**不会**自动并行。
+
+获取数据有三种时机：
+
+| 模式 | 什么时候发请求 | 问题 |
+|---|---|---|
+| fetch-on-render（effect 里请求） | 组件提交之后 | 每一层都要等上一层显示出来，最容易形成瀑布 |
+| fetch-then-render | 先等全部数据到齐，再渲染 | 没有瀑布，但最快的数据也要等最慢的 |
+| render-as-you-fetch | 在点击、路由切换时立刻发出所有请求，再开始渲染 | 数据一到就显示；需要提前知道页面要哪些数据 |
+
+下面对比同一个页面的两种做法：用户信息 400ms，文章 800ms。“并行”只多了一步：点击时先调用 `preload`，把两个请求都发出去。组件结构完全不变。
+
+```jsx play title="请求时间线：瀑布与并行"
+import { Suspense, useState, useEffect } from 'react';
+
+const cache = new Map();
+function read(key, load) {
+  let r = cache.get(key);
+  if (!r) {
+    r = { status: 'pending' };
+    r.promise = load().then(v => { r.status = 'done'; r.value = v; });
+    cache.set(key, r);
+  }
+  if (r.status === 'pending') throw r.promise;
+  return r.value;
+}
+
+// 模拟接口，并把每个请求的开始和结束时间记到时间线上
+let timeline = [], t0 = 0;
+function fakeFetch(label, ms, value) {
+  const item = { label, start: performance.now() - t0, end: null };
+  timeline.push(item);
+  return new Promise(resolve => setTimeout(() => {
+    item.end = performance.now() - t0;
+    resolve(value);
+  }, ms));
+}
+const loadUser = () => fakeFetch('用户信息', 400, '小林');
+const loadPosts = () => fakeFetch('文章列表', 800, ['第一篇', '第二篇']);
+
+// 只把请求放进缓存，不读取（所以接住 read 抛出的 Promise）
+function preload(run) {
+  try { read('user' + run, loadUser); } catch (e) {}
+  try { read('posts' + run, loadPosts); } catch (e) {}
+}
+
+function Profile({ run }) {
+  const name = read('user' + run, loadUser);
+  return (
+    <div>
+      <b>{name}</b>
+      <Posts run={run} />
+    </div>
+  );
+}
+
+function Posts({ run }) {
+  const posts = read('posts' + run, loadPosts);
+  return <small>{posts.join('、')}</small>;
+}
+
+function Timeline() {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick(n => n + 1), 50);
+    return () => clearInterval(id);
+  }, []);
+  const scale = (ms) => (ms / 1400 * 100) + '%';
+  return (
+    <div style={{ marginTop: 8 }}>
+      {timeline.map((it, i) => (
+        <div key={i} style={{ position: 'relative', height: 24, margin: '4px 0', background: 'rgba(127,127,127,.12)', borderRadius: 4 }}>
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, left: scale(it.start),
+            width: scale((it.end ?? performance.now() - t0) - it.start),
+            background: it.end ? '#3b82f6' : '#93c5fd', borderRadius: 4,
+          }} />
+          <span style={{ position: 'relative', fontSize: 12, paddingLeft: 6 }}>
+            {it.label}：{Math.round(it.start)} → {it.end ? Math.round(it.end) + ' ms' : '…'}
+          </span>
+        </div>
+      ))}
+      <small>横轴总长 1400ms</small>
+    </div>
+  );
+}
+
+function App() {
+  const [run, setRun] = useState(0);
+
+  function start(withPreload) {
+    timeline = [];
+    t0 = performance.now();
+    const next = run + 1;
+    if (withPreload) preload(next); // 先发请求，再渲染
+    setRun(next);
+  }
+
+  return (
+    <div>
+      <button onClick={() => start(false)}>瀑布：边渲染边请求</button>{' '}
+      <button onClick={() => start(true)}>并行：点击时先 preload</button>
+      {run > 0 && (
+        <Suspense key={run} fallback={<p>加载中…</p>}>
+          <Profile run={run} />
+        </Suspense>
+      )}
+      <Timeline />
+    </div>
+  );
+}
+```
+
+还有一个 React 18 的细节：同一个 Suspense 里的**兄弟**组件，即使前一个挂起了，React 仍会继续渲染后面的兄弟，所以兄弟之间的请求是并行的。只有父子关系才会串行。React 19 调整过挂起后渲染兄弟组件的时机。不要依赖这个细节：在事件处理函数或路由层预取，在任何版本里都可靠。
+
+<CallBox kind="tip" label="要点">
+
+路由库的 loader（第 33 课）和 Next.js 的服务端组件，本质上都是 render-as-you-fetch：在导航开始时就知道下一页要哪些数据，并立刻请求。
+
+</CallBox>
+
+## 四、切换时保留旧界面：过渡更新
+
+页面已经显示了用户 1。用户点“下一位”，用户 2 的数据还没到。默认情况下，已经显示内容的 Suspense 边界会**换回 fallback**。用户看到内容消失、加载提示闪一下、再出现新内容。
+
+把这次 set 函数调用放进 `startTransition`，行为就变了：React 在后台尝试渲染新界面；遇到挂起，不提交，继续显示旧界面；数据到齐后，一次性切换。期间 `isPending` 为 true，你可以把旧内容调暗，或者显示一个小提示。
+
+```jsx play title="切换时：闪回 fallback，还是保留旧界面"
+import { Suspense, useState, useTransition } from 'react';
+
+const NAMES = ['阿青', '小林', '老周', '美玲', '大伟'];
+const cache = new Map();
+function read(key, load) {
+  let r = cache.get(key);
+  if (!r) {
+    r = { status: 'pending' };
+    r.promise = load().then(v => { r.status = 'done'; r.value = v; });
+    cache.set(key, r);
+  }
+  if (r.status === 'pending') throw r.promise;
+  return r.value;
+}
+const fetchUser = (id) => new Promise(resolve =>
+  setTimeout(() => resolve({ name: NAMES[id % NAMES.length], bio: '这是第 ' + id + ' 位用户的简介。' }), 1000));
+
+function UserCard({ id }) {
+  const user = read('user:' + id, () => fetchUser(id));
+  return (
+    <div style={{ border: '1px solid #ccc', borderRadius: 8, padding: 10 }}>
+      <b>{user.name}</b>
+      <p style={{ margin: '6px 0 0' }}>{user.bio}</p>
+    </div>
+  );
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  const [useT, setUseT] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  function next() {
+    if (useT) startTransition(() => setId(id + 1));
+    else setId(id + 1);
+  }
+
+  return (
+    <div>
+      <label><input type="checkbox" checked={useT} onChange={e => setUseT(e.target.checked)} /> 用 startTransition 切换</label>
+      <p><button onClick={next}>下一位用户</button> {isPending && <small>切换中…</small>}</p>
+      <div style={{ opacity: isPending ? 0.5 : 1 }}>
+        <Suspense fallback={<p>加载用户…</p>}>
+          <UserCard id={id} />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+```
+
+使用过渡更新时，注意三条边界：
+
+1. <strong>只对已经显示过内容的边界有效。</strong>这次渲染中新挂载的 Suspense 边界，照常显示 fallback。
+2. <strong>key 会制造“新边界”。</strong>如果在边界外层写了 `key={userId}`，切换时旧边界被卸载，新边界是第一次挂载，startTransition 也挡不住 fallback。
+3. <strong>要给反馈。</strong>旧界面保留期间，用户可能以为点击没生效。用 isPending 显示提示；按钮的选中状态这类“立刻反馈”放在紧急的 state 里。
+
+<CallBox kind="deep" label="深入一点">
+
+React 18 还有一个节流：一个 fallback 显示后，后续“内容就绪”的提交至少间隔约 500ms，避免界面连续跳动。所以有时数据 400ms 就到了，内容却在 500ms 左右才出现。这是内部实现，版本之间可能不同。
+
+</CallBox>
+
+## 五、出错与重试
+
+请求失败时，缓存记录变成 error，read 抛出这个错误。错误沿组件树向上，交给最近的**错误边界**（第 22 课）。
+
+“重试”按钮要做两件事，缺一不可：
+
+1. <strong>从缓存中删掉失败的记录。</strong>不删，重新渲染时 read 找到同一条记录，立刻再抛出同一个错误。
+2. <strong>重置错误边界的 state。</strong>让它重新渲染 children。这时 read 发现没有记录，发出新请求并挂起，Suspense 显示 fallback。
+
+```jsx title="带 resetKeys 和 onRetry 的错误边界"
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+
+  componentDidUpdate(prev) {
+    // resetKeys 变了（例如切换到另一个用户），自动清除错误
+    const changed = (prev.resetKeys || []).some((k, i) => !Object.is(k, this.props.resetKeys[i]));
+    if (this.state.error && changed) this.setState({ error: null });
+  }
+
+  retry = () => {
+    this.props.onRetry?.();          // 第 1 步：调用方清掉失败的缓存
+    this.setState({ error: null });  // 第 2 步：重新渲染 children
+  };
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <p>加载失败 <button onClick={this.retry}>重试</button></p>;
+  }
+}
+
+<ErrorBoundary resetKeys={[userId]} onRetry={() => cache.delete('posts:' + userId)}>
+  <Suspense fallback={<Spinner />}>
+    <Posts userId={userId} />
+  </Suspense>
+</ErrorBoundary>
+```
+
+`resetKeys` 解决另一个问题：文章区出错后，用户切换到别的用户，错误边界还停在“出错”状态。把 userId 放进 resetKeys，它一变，边界就自动恢复。react-error-boundary 库提供了同名的 `resetKeys` 和 `onReset`。
+
+<CallBox kind="warn" label="常见坑">
+
+错误边界只能接住渲染期间抛出的错误。在 effect 或事件处理函数里 `await fetch()` 失败，错误边界接不到。这也是“在渲染中读取缓存”这个模式的好处：失败和加载一样，都能用声明式的边界处理。
+
+</CallBox>
+
+## 六、边界放在哪里
+
+Suspense 和错误边界的位置，决定了“等待”和“失败”影响的范围。通常把它们成对放置，错误边界在外，Suspense 在内。
+
+| 放置方式 | 效果 | 适合 |
+|---|---|---|
+| 整页一个边界 | 全部数据到齐才显示；任何一处失败，整页都换成错误提示 | 数据量小、彼此依赖的页面 |
+| 每个独立区块一个边界 | 各区块独立显示、独立失败、独立重试 | 仪表盘、个人主页这类由几块互不依赖的内容组成的页面 |
+| 每个小组件一个边界 | 十几个加载提示此起彼伏，布局不停跳动 | 几乎不适合 |
+
+判断标准是：<strong>用户能不能单独使用这一块？</strong>文章列表没到时，用户信息照样有用，就各包一个边界。评论的作者头像和评论文字缺一不可，就放在同一个边界里。fallback 的尺寸尽量接近真实内容，减少内容出现时的布局跳动。
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>七、React 19 的 use<small>可以先跳过，需要时再展开</small></summary>
+
+React 19 增加了 `use(promise)`：在渲染中读取一个 Promise，没完成就挂起。它是官方 API，替代了“自己抛出 Promise”的约定。下面的代码只能阅读，本课程的运行环境是 React 18.3.1。
+
+```jsx title="React 19：use 读取缓存的 Promise（只读）"
+import { use, Suspense } from 'react';
+
+// 同一个 userId 返回同一个 Promise：缓存仍然要你（或框架）提供
+const postsCache = new Map();
+function getPosts(userId) {
+  if (!postsCache.has(userId)) postsCache.set(userId, api.fetchPosts(userId));
+  return postsCache.get(userId);
+}
+
+function Posts({ postsPromise }) {
+  const posts = use(postsPromise);      // 可以写在 if 里，这一点和其他 Hook 不同
+  return <ul>{posts.map(p => <li key={p.id}>{p.title}</li>)}</ul>;
+}
+
+function ProfilePage({ userId }) {
+  const postsPromise = getPosts(userId); // 尽早拿到 Promise，再往下传
+  return (
+    <Suspense fallback={<Spinner />}>
+      <Posts postsPromise={postsPromise} />
+    </Suspense>
+  );
+}
+```
+
+use 没有改变本课的任何规则：Promise 仍然不能在渲染时新建（React 19 会对没有缓存的 Promise 给出警告），瀑布仍然要靠提前发请求来消除，失败仍然交给错误边界。在服务端组件里，Promise 通常由服务端组件创建，再作为 props 传给客户端组件；第 39 课会讲流式渲染怎样利用这些 Suspense 边界。
+
+</details>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />
