@@ -113,6 +113,16 @@ function App() {
   );
 }`,
     test: async t => {
+      const r = t.exports.reducer;
+      t.assert(typeof r === 'function', '没有找到 reducer');
+      for (const type of ['increment', 'decrement', 'reset']) {
+        const s0 = { count: 1 };
+        r(s0, { type });
+        t.assert(
+          s0.count === 1,
+          `reducer 修改了原来的 state（${type}）。请返回新对象：return { count: state.count + 1 }。返回同一个对象时 React 会认为没变，界面不更新`,
+        );
+      }
       const c = () => t.text('#count');
       const add = t.byText('button', '加'),
         sub = t.byText('button', '减'),
@@ -125,12 +135,9 @@ function App() {
       t.assert(c() === '2', '减 1 次后应为 2');
       await t.click(rst);
       t.assert(c() === '0', '重置后应为 0');
-      const r = t.exports.reducer;
-      t.assert(typeof r === 'function', '没有找到 reducer');
       for (const type of ['increment', 'decrement', 'reset']) {
         const s0 = { count: 1 };
-        const s1 = r(s0, { type });
-        t.assert(s1 && s1 !== s0 && s0.count === 1, `reducer 修改了原来的 state（${type}）。请返回新对象：return { count: state.count + 1 }`);
+        t.assert(r(s0, { type }) !== s0, `${type} 应返回新对象，不要返回原来的 state`);
       }
       t.assert(r({ count: 1 }, { type: 'increment' }).count === 2, 'increment 应返回 count 加 1 的新对象');
     },

@@ -74,12 +74,7 @@ Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js�
 
 ## 边界包在哪一层
 
-Suspense 边界的位置，决定了页面怎样分批出现。两条规则：
-
-1. **同一个 Suspense 里的内容一起出现**，等最慢的那个。
-2. 组件挂起时，**只有离它最近的 Suspense 显示 fallback**，外层不受影响。
-
-下面的示例有两个组件，分别要 1 秒和 3 秒加载。勾选后，它们各包一个 Suspense：
+Suspense 边界的位置，决定了页面怎样分批出现。下面的示例有两个组件，分别要 1 秒和 3 秒加载。勾选后，它们各包一个 Suspense。先预测，再对比两种情况：
 
 ```jsx play title="一个边界还是两个边界"
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react';
@@ -130,6 +125,11 @@ function App() {
   );
 }
 ```
+
+从示例可以总结出两条规则：
+
+1. **同一个 Suspense 里的内容一起出现**，等最慢的那个。
+2. 组件挂起时，**只有离它最近的 Suspense 显示 fallback**，外层不受影响。
 
 怎样选边界：
 

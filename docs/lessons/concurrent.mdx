@@ -149,12 +149,13 @@ function App() {
 
 <CallBox kind="deep" label="React 19 的变化（只能阅读）">
 
-本课的两个 Hook 在 React 19 里都有变化。实验台运行 React 18.3.1，下面的代码只能阅读。
+`useDeferredValue` 还能和 Suspense 配合：新值的内容挂起时，用户看到的是旧内容，而不是 fallback（React 18 和 19 都是如此，与版本无关）。这是它在真实项目里最常见的用法。
+
+本课的两个 Hook 在 React 19 里有三处变化。实验台运行 React 18.3.1，下面的代码只能阅读。
 
 1. `startTransition` 可以接收 async 函数。`isPending` 在整个异步过程中都是 true。React 18 只能传同步函数。
 2. `await` 之后的 set 函数调用不再属于这次过渡。要再包一层 `startTransition`。这是最常见的坑。
 3. `useDeferredValue` 多了第二个参数，用于首次渲染。
-4. 配合 Suspense 时：新值的内容挂起，用户看到的是旧内容，而不是 fallback。
 
 ```jsx
 // React 19：startTransition 可以接收 async 函数。isPending 在整个过程中为 true

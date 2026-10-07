@@ -69,7 +69,7 @@ function App() {
 
 组件**绝对不能修改自己的 props**。`props.name = '新名字'` 这样的代码是错误的。props 属于父组件，子组件只能读取。想要“可变化的数据”，要用下一课的 **state**。
 
-开发环境中，React 会冻结 props 对象。在真实项目（ES 模块，严格模式）里，改 props 的那行代码会直接抛出 TypeError。在本站实验台里，它会静默失败，什么都不发生。
+开发环境中，React 会冻结 props 对象：在真实项目（ES 模块，严格模式）里，改 props 的那行代码会直接抛出 TypeError；在本站实验台里会静默失败。生产构建不冻结，赋值会“成功”，但 React 不知道，界面不会更新。无论哪种情况，这都不是修改数据的办法。
 
 </CallBox>
 
@@ -106,7 +106,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-在组件函数里 `guest++`、`list.push(x)`、`document.title = …`，在严格模式下都会出现“多做一次”的现象。把这类代码移进事件处理函数或 effect。
+在组件函数里 `guest++`、`list.push(x)`、`document.title = …`，都是渲染时的副作用。前两个在严格模式下会出现“多做一次”的现象；改 DOM 的那种即使看不出来，也该移走。把这类代码移进事件处理函数或 effect。
 
 </CallBox>
 

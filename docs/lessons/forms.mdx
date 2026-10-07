@@ -48,18 +48,6 @@ function App() {
 }
 ```
 
-<CallBox kind="warn" label="常见坑">
-
-你可能看到的报错：``Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.``<br />原因：输入框的 `value` 来自 state，却没有 `onChange` 去更新 state。每次渲染它都被强制设回 state 的值。<br />去看：这个输入框。加上 `onChange`；如果确实只读，写 `readOnly`；如果只想要初始值，用 `defaultValue`。
-
-</CallBox>
-
-<CallBox kind="warn" label="常见坑">
-
-你可能看到的报错：`Warning: A component is changing an uncontrolled input to be controlled.`<br />原因：value 一开始是 undefined（例如写了 `useState()`），后来才变成字符串。React 认为输入框从“非受控”变成了“受控”。<br />去看：这个输入框对应的 useState。给它一个初始值，例如 `useState('')`。
-
-</CallBox>
-
 ## 多个字段：用一个对象
 
 表单字段多时，用一个对象保存所有字段。再写一个通用的 `handleChange`。它根据输入框的 `name` 属性，判断要更新哪个字段。
@@ -104,6 +92,18 @@ function App() {
 注意这里的 `[name]: value` 是 JS 的**计算属性名**：用变量 name 的值作为对象的键。复选框用 `checked` 而不是 `value`：复选框的 `value` 是一个固定的字符串（默认是 "on"），和勾没勾选无关。勾选状态在 `checked` 里。所以要绑定 `checked={…}`，读取 `e.target.checked`。
 
 `<textarea>` 和 `<select>` 也用 `value` + `onChange`，写法和文本框相同。在 HTML 里，它们分别用标签内容和 `selected` 属性。单选框和复选框一样用 `checked`。
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：`Warning: A component is changing an uncontrolled input to be controlled.`<br />原因：value 一开始是 undefined（例如写了 `useState()`），后来才变成字符串。React 认为输入框从“非受控”变成了“受控”。<br />去看：这个输入框对应的 useState。给它一个初始值，例如 `useState('')`。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：``Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.``<br />原因：输入框的 `value` 来自 state，却没有 `onChange` 去更新 state。每次渲染它都被强制设回 state 的值。<br />去看：上面《只有 value，没有 onChange》里的输入框。加上 `onChange`；如果确实只读，写 `readOnly`；如果只想要初始值，用 `defaultValue`。
+
+</CallBox>
 
 <CallBox kind="tip" label="要点">
 

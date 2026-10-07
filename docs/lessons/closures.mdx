@@ -130,7 +130,7 @@ useEffect(() => {
 }, []); // 依赖为空，但能读到最新值
 ```
 
-用同样的办法改写上面的聊天室。切换房间会重连，切换主题不会重连，但每秒的消息总是用当前主题：
+用同样的办法改写上面的聊天室。先看代码里两个 effect 的依赖数组，再预测：
 
 ```jsx play title="聊天室：读到最新主题"
 import { useState, useEffect, useRef } from 'react';
