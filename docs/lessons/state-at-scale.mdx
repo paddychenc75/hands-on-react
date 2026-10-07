@@ -35,6 +35,24 @@ title: "大型应用状态架构实战"
 }
 ```
 
+<CallBox kind="tip" label="TS 写法">
+
+规范化的结构很适合用泛型描述：一个 `Entity<T>` 写一次，每种实体复用。`Record<string, T>` 表示“任意字符串键，值是 T”。
+
+```tsx title="规范化 state 的类型（只读）"
+interface Entity<T> {
+  byId: Record<string, T>;
+  ids: string[];
+}
+interface User { id: string; name: string }
+interface Comment { id: string; text: string; authorId: string }
+interface State { users: Entity<User>; comments: Entity<Comment> }
+```
+
+按 id 取值时，编辑器会提示 `authorId` 必须是字符串，拼错字段名会立刻标红。默认情况下，`byId[id]` 的类型是 `T`，不含 `undefined`；想让 TypeScript 强迫你处理“查不到”，在 `tsconfig` 里打开 `noUncheckedIndexedAccess`。
+
+</CallBox>
+
 ```jsx play title="存对象还是存 id"
 import { useState } from 'react';
 

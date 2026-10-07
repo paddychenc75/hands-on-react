@@ -2,7 +2,7 @@
 // 课文渲染、实验台、预测、React 警告、练习、进度存储和侧栏标记、首页、复习页、术语表、阶段测验页、
 // 客户端路由、键盘翻课、阅读位置、手机宽度、站内搜索。
 // 用法：npm run build && node tests/e2e/smoke.mjs
-import { launch, openSite, lessonData, lessonUrl, checker, KEY } from './_site.mjs';
+import { launch, openSite, lessonData, lessonOrder, lessonUrl, checker, KEY } from './_site.mjs';
 
 const OLD_KEY = 'react-zero-to-expert-v1';
 const LESSONS = ['what-is-react', 'state', 'lists-keys'];
@@ -365,6 +365,26 @@ for (const id of LESSONS) {
   await page.waitForTimeout(500);
   const due = await page.evaluate(() => document.querySelector('a[data-hoc-due]')?.getAttribute('data-hoc-due'));
   ok(due === '3', 'j. 侧栏“今日复习”带到期数量角标', String(due));
+
+  // 侧栏的课程顺序和阶段归属：和 course/order.ts、每课数据文件的 stage 一致。
+  // 第 5 阶段以《项目搭建与交付》（engineering）开头、以综合项目（project-weather）结尾，每阶段的课数和“已完成 x/y”的 y 对得上。
+  const order = await lessonOrder();
+  const stageOf = await Promise.all(order.map(async id => (await data(id)).stage));
+  const perStage = [0, 1, 2, 3, 4, 5].map(si => order.filter((_, i) => stageOf[i] === si));
+  const side = await page.evaluate(() => ({
+    lessons: [...new Set([...document.querySelectorAll('.rp-doc-layout__sidebar a')].map(a => a.getAttribute('href')))]
+      .filter(h => /\/lessons\//.test(h))
+      .map(h => h.replace(/^.*\/lessons\/|\.html$/g, '')),
+    cnt: [...document.querySelectorAll('.rp-sidebar-section-header[data-hoc-cnt]')].map(h => h.getAttribute('data-hoc-cnt')),
+  }));
+  ok(
+    JSON.stringify(side.lessons) === JSON.stringify(order) &&
+      perStage[4][0] === 'engineering' &&
+      perStage[4].at(-1) === 'project-weather' &&
+      side.cnt.every((c, i) => c.endsWith('/' + perStage[i].length)),
+    'j. 侧栏：课按 order.ts 排列；第 5 阶段以 engineering 开头、以 project-weather 结尾；每阶段课数与“已完成 x/y”的 y 一致',
+    JSON.stringify({ n: side.lessons.length, cnt: side.cnt, stage5: perStage[4] }),
+  );
 }
 
 /* k. 复习页：到期的题逐题出现，答完显示“下一题”和“回看这一课”；点链接走客户端路由（页面不整页刷新） */

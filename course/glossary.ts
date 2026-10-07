@@ -69,6 +69,12 @@ export const GLOSSARY: GlossaryEntry[] = [
     avoid: '销毁',
   },
   {
+    term: '严格模式',
+    en: 'Strict Mode',
+    def: '只在开发环境生效的检查工具，用 StrictMode 包住组件树打开。它把组件函数、初始化函数和更新函数多调用一次，并让 effect 多做一轮“挂载、卸载、再挂载”，帮你发现不纯的渲染和缺少清理的 effect。生产环境没有这些额外调用。',
+    avoid: '严谨模式、严格检查模式；不说“严格模式在生产环境也生效”',
+  },
+  {
     term: '事件处理函数',
     en: 'event handler',
     def: '响应用户操作的函数，例如传给 onClick 的函数。',
