@@ -12,21 +12,853 @@ title: "实战四：城市天气应用"
 
 <LessonProse>
 
-【待写】正文用普通 Markdown：段落、列表、表格、围栏代码块。每个新概念第一次出现时给一句定义。
+前三个实战都在前 18 课，只用到入门和进阶的知识。这一课把第 5 阶段学的工具接在一起：**项目搭建（第 31 课）、TypeScript（第 32 课）、React Router（第 33 课）、TanStack Query（第 34 课）和测试（第 35 课）**，做一个小而完整的应用：搜索城市，查看天气，收藏城市。
 
-## 【待写】小节标题
+<CallBox kind="warn" label="这一课的时间">
 
-```jsx play title="第一个示例"
+本站上的阅读、3 个示例、测验和练习约 40 分钟。**本机项目另需约 2–3 小时**，要在你自己的电脑上完成，站内没有自动检查。每个里程碑都给出了“应该看到”，请对照自查。
+
+</CallBox>
+
+怎样学：先读“需求说明”和“每一份状态放在哪里”，再到本机按里程碑动手。本课末尾的站内练习练的是这个项目最关键的判断（把服务器状态和界面状态分开），可以在动手前后任何时候做。
+
+## 需求说明
+
+| 编号 | 需求 | 验收时看什么 |
+|---|---|---|
+| 1 | 搜索页 `/`：输入至少两个字的城市名，点“搜索”，搜索词写进网址的 `?q=` | 刷新页面、复制网址到新标签页，搜索词和结果都还在 |
+| 2 | 搜索结果有四种状态：加载中、出错（可以重试）、没有找到、结果列表 | 断网时看到错误和“重试”按钮；搜“zzzz”看到“没有找到” |
+| 3 | 点结果进入详情页 `/city/:id`，显示现在的温度、天气、风速和未来 5 天 | 直接打开详情页网址也能显示 |
+| 4 | 详情页可以收藏、取消收藏。收藏的城市显示在搜索页上方 | 刷新后收藏还在；收藏时没有任何新请求 |
+| 5 | 全部用 TypeScript 写 | `npm run typecheck` 通过 |
+| 6 | 至少 4 个测试，覆盖搜索结果、空结果、错误和收藏 | `npm test` 全绿；故意改坏一处，至少一个测试变红 |
+
+成品大致是这样：
+
+```text title="搜索页和详情页"
+城市天气                          ← 返回搜索
+[ 上海        ] [搜索]            上海   [★ 已收藏]
+收藏                              现在 16°C，晴，风速 5.4 km/h
+ · 上海                           2026-10-08：多云，14.7° ~ 25°
+上海  上海市，中国                 2026-10-09：多云，16.8° ~ 23.6°
+上海  Shanghai ……                 ……（共 5 天）
+```
+
+## 数据来源
+
+天气和城市数据来自 **Open-Meteo**（open-meteo.com）。它**不需要注册，也不需要密钥**，浏览器可以直接请求。我在写这一课时核对过：下面三个请求都能返回数据，响应头允许跨域（`access-control-allow-origin: *`）。
+
+| 用途 | 请求 | 返回 |
+|---|---|---|
+| 按名字搜索城市 | `https://geocoding-api.open-meteo.com/v1/search?name=上海&count=8&language=zh` | `{ results: [{ id, name, latitude, longitude, country, admin1 … }] }` |
+| 按 id 取一个城市 | `https://geocoding-api.open-meteo.com/v1/get?id=1796236&language=zh` | 一个城市对象 |
+| 取天气 | `https://api.open-meteo.com/v1/forecast?latitude=31.22&longitude=121.46&current=temperature_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5` | `{ current: {…}, daily: { time: […], … } }` |
+
+三点注意：
+
+1. **没有匹配时，搜索接口不返回 `results` 字段**，而不是返回空数组。要在 API 层统一成空数组。
+2. 搜索词太短（一个字）通常查不到，所以需求里要求至少两个字。
+3. 免费接口只用于**非商业**用途，需要署名（CC BY 4.0），并有调用次数限制（每天不到一万次）。做学习项目够用。条款以 [open-meteo.com/en/terms](https://open-meteo.com/en/terms) 为准。
+
+<CallBox kind="tip" label="备选方案">
+
+接口暂时连不上，或者你想离线开发：在 `public/mock/` 里放三个 JSON 文件，内容照上表的返回格式写，再把 `weather.ts` 里的三个网址常量改成 `/mock/search.json`、`/mock/city.json`、`/mock/forecast.json`。Vite 会原样提供 `public/` 里的文件。另一个同样不需要密钥的公开接口是 PokéAPI（pokeapi.co），想换题目也可以用它。接口的地址和限制随时可能变，以官方文档为准。
+
+</CallBox>
+
+## 每一份状态放在哪里
+
+动手前先做第 27 课的练习：**给每一份数据归类，再选放的地方**。
+
+| 数据 | 属于哪一类 | 放在哪里 | 为什么 |
+|---|---|---|---|
+| 搜索词 `q` | URL 状态 | `useSearchParams` | 刷新、分享、后退都能还原 |
+| 输入框里还没提交的文字 | 界面状态 | `SearchForm` 里的 `useState` | 只和这个表单有关 |
+| 搜索结果、城市资料、天气 | 服务器状态 | `useQuery` | 缓存、去重、重试、加载和错误都由库管理 |
+| 收藏的城市 | 浏览器里的客户端状态 | `localStorage`，用 `useSyncExternalStore` 读取 | 不属于服务器；多个组件共享；刷新后还在 |
+| 加载中、出错 | 派生数据 | `useQuery` 返回的 `isPending`、`isError` | 不要自己再存一份 |
+
+**同一份数据只放一处**。最常见的错误是把两类状态混在一起，例如往服务器返回的城市对象上加一个 `fav` 字段。下面的示例演示另一个常见的混淆：把搜索词存在自己的 state 里，又同时存在 URL 里。
+
+```jsx play title="URL 才是搜索词的唯一数据源"
+import { useState } from 'react';
+
+// 用一个对象模拟浏览器的历史记录和网址（实验台里不能真的改网址）
 function App() {
-  return <p>【待写】可运行的示例</p>;
+  const [history, setHistory] = useState(['?q=上海']);
+  const [index, setIndex] = useState(0);
+  const url = history[index];
+  const q = new URLSearchParams(url).get('q') || '';
+
+  function search(next) {
+    setHistory([...history.slice(0, index + 1), '?q=' + next]);
+    setIndex(index + 1);
+  }
+
+  return (
+    <div>
+      <p>网址：<code>{url}</code></p>
+      <button onClick={() => search('北京')}>搜索“北京”</button>{' '}
+      <button disabled={index === 0} onClick={() => setIndex(index - 1)}>后退</button>
+      <SearchBox initial={q} />
+      <p>结果列表显示：{q} 的天气</p>
+    </div>
+  );
+}
+
+function SearchBox({ initial }) {
+  const [text, setText] = useState(initial); // 用网址里的 q 当初始值
+  return <p>输入框：<input value={text} onChange={e => setText(e.target.value)} /></p>;
 }
 ```
 
-<CallBox kind="tip" label="要点">
+示例里的“结果列表”直接读网址，所以永远是对的。输入框把网址里的 `q` 复制进了自己的 state，之后两者就各管各的。本机项目里的做法是给 `SearchForm` 加 `key={q}`：`q` 一变，表单重新挂载，草稿重新从网址初始化。这就是第 7 课讲过的“用 key 重置 state”。代价是提交后输入框会重新挂载，焦点会丢，这个小项目可以接受。
 
-【待写】提示框内容。kind 有 tip 要点 / warn 常见坑 / like 打个比方 / deep 深入一点。
+## 里程碑 0：搭建项目
+
+**在本机终端里做。**具体命令、目录和说明见第 31 课。
+
+```bash title="在本机终端里做"
+npm create vite@latest weather-app -- --template react-compiler-ts --eslint
+cd weather-app
+npm install
+npm install react-router @tanstack/react-query
+npm install -D vitest jsdom @testing-library/react @testing-library/user-event @testing-library/jest-dom
+```
+
+然后：
+
+1. 删掉模板自带的 `src/App.css`、`src/assets/` 和 `App.tsx` 里的示例内容。
+2. 在 `package.json` 的 `scripts` 里加两条：`"typecheck": "tsc -b"`、`"test": "vitest run"`。
+3. 在 `vite.config.ts` 里把 `defineConfig` 改成从 `vitest/config` 导入，并加上测试配置。`react-compiler-ts` 模板已经启用了 React Compiler（第 31 课），`plugins` 保持原样：
+
+```ts title="在本机项目里：vite.config.ts"
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
+import { defineConfig } from 'vitest/config';
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
+});
+```
+
+4. 在入口里包上两层：数据请求的 Provider 和路由。
+
+```tsx title="在本机项目里：src/main.tsx"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router';
+import App from './App.tsx';
+import './index.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+});
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);
+```
+
+`retry: 1` 让失败的请求只重试一次，错误提示不会等太久。
+
+**应该看到：**`npm run dev` 打开的页面没有报错；`npm run typecheck` 通过。
+
+## 里程碑 1：类型和接口层
+
+所有请求集中写在一个文件里，组件不直接调用 `fetch`。这样换数据来源、写测试都只改一处。注意三件事：`fetch` 不会因为 404 或 500 抛错，要自己检查 `res.ok`；把“没有 `results` 字段”统一成空数组；把接口的字段名转换成界面用的名字。
+
+```ts title="在本机项目里：src/api/weather.ts"
+export interface City {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  country?: string;
+  admin1?: string;
+}
+
+export interface DayForecast {
+  date: string;
+  weatherCode: number;
+  max: number;
+  min: number;
+}
+
+export interface Forecast {
+  current: { temperature: number; weatherCode: number; windSpeed: number };
+  daily: DayForecast[];
+}
+
+const GEO_URL = 'https://geocoding-api.open-meteo.com/v1';
+const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+
+async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`请求失败（${res.status}）`);
+  return (await res.json()) as T;
+}
+
+export async function searchCities(name: string, signal?: AbortSignal): Promise<City[]> {
+  const params = new URLSearchParams({ name, count: '8', language: 'zh', format: 'json' });
+  const data = await getJson<{ results?: City[] }>(`${GEO_URL}/search?${params}`, signal);
+  return data.results ?? []; // 没有匹配时，接口不返回 results 字段
+}
+
+export async function getCity(id: number, signal?: AbortSignal): Promise<City> {
+  const city = await getJson<City | { generationtime_ms: number }>(`${GEO_URL}/get?id=${id}&language=zh`, signal);
+  if (!('id' in city)) throw new Error('找不到这个城市');
+  return city;
+}
+
+interface ForecastResponse {
+  current: { temperature_2m: number; weather_code: number; wind_speed_10m: number };
+  daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[] };
+}
+
+export async function getForecast(city: Pick<City, 'latitude' | 'longitude'>, signal?: AbortSignal): Promise<Forecast> {
+  const params = new URLSearchParams({
+    latitude: String(city.latitude),
+    longitude: String(city.longitude),
+    current: 'temperature_2m,weather_code,wind_speed_10m',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+    timezone: 'auto',
+    forecast_days: '5',
+  });
+  const data = await getJson<ForecastResponse>(`${FORECAST_URL}?${params}`, signal);
+  return {
+    current: { temperature: data.current.temperature_2m, weatherCode: data.current.weather_code, windSpeed: data.current.wind_speed_10m },
+    daily: data.daily.time.map((date, i) => ({
+      date,
+      weatherCode: data.daily.weather_code[i],
+      max: data.daily.temperature_2m_max[i],
+      min: data.daily.temperature_2m_min[i],
+    })),
+  };
+}
+
+// WMO 天气代码 → 中文。只列常用分组，其余显示“未知”。
+export function weatherLabel(code: number): string {
+  if (code === 0) return '晴';
+  if (code <= 3) return '多云';
+  if (code === 45 || code === 48) return '雾';
+  if (code >= 51 && code <= 57) return '毛毛雨';
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return '雨';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return '雪';
+  if (code >= 95) return '雷暴';
+  return '未知';
+}
+```
+
+**应该看到：**`npm run typecheck` 通过。在浏览器控制台或临时代码里调用 `searchCities('上海')`，得到一个数组，第一项的 `name` 是“上海”。
+
+## 里程碑 2：搜索页（URL、useQuery 和四种状态）
+
+先写三个查询 Hook。**`queryKey` 里要写全所有影响结果的参数**：搜索词变了，就是另一份缓存。`signal` 让 Query 在组件卸载或参数变化时取消过期的请求。
+
+```ts title="在本机项目里：src/api/queries.ts"
+import { useQuery } from '@tanstack/react-query';
+import { getCity, getForecast, searchCities, type City } from './weather.ts';
+
+// queryKey 里写全所有影响结果的参数：搜索词变了，就是另一份缓存。
+export function useCitySearch(q: string) {
+  return useQuery({
+    queryKey: ['cities', q],
+    queryFn: ({ signal }) => searchCities(q, signal),
+  });
+}
+
+export function useCity(id: number) {
+  return useQuery({
+    queryKey: ['city', id],
+    queryFn: ({ signal }) => getCity(id, signal),
+  });
+}
+
+// 依赖查询：要等城市数据到了，才有经纬度可以请求。
+export function useForecast(city: City | undefined) {
+  return useQuery({
+    queryKey: ['forecast', city?.id],
+    queryFn: ({ signal }) => getForecast(city as City, signal),
+    enabled: city !== undefined,
+    staleTime: 5 * 60_000,
+  });
+}
+```
+
+再写结果列表。每一种状态都要处理，而且**顺序有讲究**：先判断 `isPending`，再判断 `isError`，最后才能读 `data`。
+
+```tsx title="在本机项目里：src/components/CityResults.tsx"
+import { Link } from 'react-router';
+import { useCitySearch } from '../api/queries.ts';
+import QueryError from './QueryError.tsx';
+
+export default function CityResults({ q }: { q: string }) {
+  const search = useCitySearch(q);
+
+  if (search.isPending) return <p role="status">加载中…</p>;
+  if (search.isError) return <QueryError error={search.error} onRetry={() => search.refetch()} />;
+  if (search.data.length === 0) return <p>没有找到“{q}”</p>;
+
+  return (
+    <ul>
+      {search.data.map((city) => (
+        <li key={city.id}>
+          <Link to={`/city/${city.id}`}>{city.name}</Link>
+          <span>
+            {' '}
+            {[city.admin1, city.country].filter(Boolean).join('，')}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+```tsx title="在本机项目里：src/components/QueryError.tsx"
+export default function QueryError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <div role="alert">
+      <p>出错了：{error.message}</p>
+      <button type="button" onClick={onRetry}>
+        重试
+      </button>
+    </div>
+  );
+}
+```
+
+搜索表单只管草稿，提交时把搜索词交给父组件：
+
+```tsx title="在本机项目里：src/components/SearchForm.tsx"
+import { useState } from 'react';
+
+export default function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: string) => void }) {
+  const [text, setText] = useState(initial); // 还没提交的草稿：只是界面状态
+
+  function submit(e: React.SubmitEvent<HTMLFormElement>) {
+    e.preventDefault();
+    onSearch(text.trim());
+  }
+
+  return (
+    <form role="search" onSubmit={submit}>
+      <label>
+        城市名
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="例如：上海" />
+      </label>
+      <button type="submit">搜索</button>
+    </form>
+  );
+}
+```
+
+搜索页把 URL 里的 `q` 读出来，交给表单和结果列表：
+
+```tsx title="在本机项目里：src/pages/SearchPage.tsx"
+import { Link, useSearchParams } from 'react-router';
+import CityResults from '../components/CityResults.tsx';
+import SearchForm from '../components/SearchForm.tsx';
+import { useFavorites } from '../hooks/useFavorites.ts';
+
+export default function SearchPage() {
+  const [params, setParams] = useSearchParams();
+  const q = params.get('q')?.trim() ?? ''; // 搜索词的唯一数据源是 URL
+  const { favorites } = useFavorites();
+
+  return (
+    <main>
+      <h1>城市天气</h1>
+      {/* key={q}：URL 里的搜索词变了（例如点了后退），输入框重新挂载，草稿跟着变 */}
+      <SearchForm key={q} initial={q} onSearch={(next) => setParams(next ? { q: next } : {})} />
+
+      {favorites.length > 0 && (
+        <section aria-label="收藏的城市">
+          <h2>收藏</h2>
+          <ul>
+            {favorites.map((f) => (
+              <li key={f.id}>
+                <Link to={`/city/${f.id}`}>{f.name}</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {q.length < 2 ? <p>输入至少两个字的城市名，例如“上海”。</p> : <CityResults q={q} />}
+    </main>
+  );
+}
+```
+
+最后在 `App.tsx` 里登记路由：
+
+```tsx title="在本机项目里：src/App.tsx"
+import { Route, Routes } from 'react-router';
+import CityPage from './pages/CityPage.tsx';
+import SearchPage from './pages/SearchPage.tsx';
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<SearchPage />} />
+      <Route path="/city/:id" element={<CityPage />} />
+      <Route path="*" element={<p>没有这个页面</p>} />
+    </Routes>
+  );
+}
+```
+
+下面的示例用我们学过的东西，写出这四种状态的渲染逻辑。重点看 `status` 的判断顺序，以及“没有找到”和“出错”是两件不同的事。
+
+```jsx play title="加载、出错、没有找到、成功：四种状态"
+import { useState, useEffect } from 'react';
+
+const CITIES = ['上海', '上饶', '北京'];
+
+// 模拟接口：搜“火星”没有结果（返回空数组），搜“错误”失败，其余按名字过滤
+function searchCities(q) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (q === '错误') reject(new Error('请求失败（500）'));
+      else resolve(CITIES.filter(c => c.startsWith(q)));
+    }, 600);
+  });
+}
+
+function useCitySearch(q) {
+  const [state, setState] = useState({ status: 'pending', data: undefined, error: undefined });
+  const [tick, setTick] = useState(0); // 点“重试”时加 1，让 effect 再运行一次
+  useEffect(() => {
+    let ignore = false;
+    setState({ status: 'pending', data: undefined, error: undefined });
+    searchCities(q).then(
+      data => { if (!ignore) setState({ status: 'success', data, error: undefined }); },
+      error => { if (!ignore) setState({ status: 'error', data: undefined, error }); }
+    );
+    return () => { ignore = true; };
+  }, [q, tick]);
+  return { ...state, retry: () => setTick(t => t + 1) };
+}
+
+function Results({ q }) {
+  const search = useCitySearch(q);
+  if (search.status === 'pending') return <p role="status">加载中…</p>;
+  if (search.status === 'error')
+    return (
+      <div role="alert">
+        <p>出错了：{search.error.message}</p>
+        <button onClick={search.retry}>重试</button>
+      </div>
+    );
+  if (search.data.length === 0) return <p>没有找到“{q}”</p>;
+  return <ul>{search.data.map(c => <li key={c}>{c}</li>)}</ul>;
+}
+
+function App() {
+  const [q, setQ] = useState('上');
+  return (
+    <div>
+      {['上', '火星', '错误'].map(w => (
+        <button key={w} onClick={() => setQ(w)} style={{ marginRight: 6 }}>搜“{w}”</button>
+      ))}
+      <p>当前搜索词：<b>{q}</b></p>
+      <Results q={q} />
+    </div>
+  );
+}
+```
+
+在本机项目里，这些状态不用自己写，`useQuery` 返回的 `isPending`、`isError` 和 `data` 就是它们。但**判断顺序和“空不是错”的原则**是你要自己写对的。
+
+**应该看到：**
+
+| 操作 | 应该看到 |
+|---|---|
+| 输入“上海”，点搜索 | 先出现“加载中…”，然后是结果列表；网址变成 `/?q=上海` |
+| 刷新页面 | 搜索词和结果都还在，输入框里也是“上海” |
+| 搜索“zzzz” | “没有找到“zzzz”” |
+| 在开发者工具的 Network 面板选 Offline，再搜一个新词 | “出错了”和“重试”按钮；恢复网络后点重试，列表出现 |
+| 点浏览器的后退 | 搜索词、结果和输入框一起回到上一次 |
+
+## 里程碑 3：详情页（路由参数和依赖查询）
+
+详情页要两个请求：先按 id 取城市，再用城市的经纬度取天气。第二个请求**依赖**第一个的结果，所以用 `enabled` 控制：城市数据没到之前不发请求（`queries.ts` 里的 `useForecast` 已经写了）。
+
+```tsx title="在本机项目里：src/pages/CityPage.tsx"
+import { Link, useParams } from 'react-router';
+import { useCity, useForecast } from '../api/queries.ts';
+import { weatherLabel } from '../api/weather.ts';
+import QueryError from '../components/QueryError.tsx';
+import { useFavorites } from '../hooks/useFavorites.ts';
+
+export default function CityPage() {
+  const { id } = useParams();
+  const city = useCity(Number(id));
+  const forecast = useForecast(city.data);
+  const { isFavorite, toggle } = useFavorites();
+
+  if (city.isPending) return <p role="status">加载中…</p>;
+  if (city.isError) return <QueryError error={city.error} onRetry={() => city.refetch()} />;
+
+  const fav = isFavorite(city.data.id);
+
+  return (
+    <main>
+      <p>
+        <Link to="/">← 返回搜索</Link>
+      </p>
+      <h1>{city.data.name}</h1>
+      <button type="button" aria-pressed={fav} onClick={() => toggle({ id: city.data.id, name: city.data.name })}>
+        {fav ? '★ 已收藏' : '☆ 收藏'}
+      </button>
+
+      {forecast.isPending && <p role="status">正在获取天气…</p>}
+      {forecast.isError && <QueryError error={forecast.error} onRetry={() => forecast.refetch()} />}
+      {forecast.data && (
+        <>
+          <p>
+            现在 {forecast.data.current.temperature}°C，{weatherLabel(forecast.data.current.weatherCode)}，风速 {forecast.data.current.windSpeed} km/h
+          </p>
+          <ul aria-label="未来五天">
+            {forecast.data.daily.map((d) => (
+              <li key={d.date}>
+                {d.date}：{weatherLabel(d.weatherCode)}，{d.min}° ~ {d.max}°
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </main>
+  );
+}
+```
+
+**应该看到：**
+
+| 操作 | 应该看到 |
+|---|---|
+| 从搜索结果点进“上海” | 先显示加载，再显示城市名，再显示天气。网络面板里是两个请求，天气请求在城市请求之后 |
+| 直接在新标签页打开 `/city/1796236` | 同样的页面 |
+| 点“返回搜索”，再点进同一个城市 | 立刻显示，网络面板里没有新请求（`staleTime` 内用缓存） |
+| 打开 `/city/abc` | 出错提示和“重试”按钮，不是白屏 |
+
+## 里程碑 4：收藏（客户端状态）
+
+收藏只存在用户的浏览器里，不是服务器的数据，所以**不放进 React Query**。多个组件（详情页的按钮、搜索页的列表）要共享它，刷新后还要在，所以用 `localStorage` 保存，用 `useSyncExternalStore`（第 27 课）读取。
+
+```ts title="在本机项目里：src/hooks/useFavorites.ts"
+import { useSyncExternalStore } from 'react';
+
+export interface Favorite {
+  id: number;
+  name: string;
+}
+
+const KEY = 'weather-favorites';
+const listeners = new Set<() => void>();
+
+// getSnapshot 每次都要返回同一个对象（除非数据真的变了），所以按原始字符串缓存解析结果。
+let lastRaw: string | null = null;
+let lastValue: Favorite[] = [];
+
+function getSnapshot(): Favorite[] {
+  const raw = localStorage.getItem(KEY);
+  if (raw !== lastRaw) {
+    lastRaw = raw;
+    try {
+      lastValue = raw ? (JSON.parse(raw) as Favorite[]) : [];
+    } catch {
+      lastValue = [];
+    }
+  }
+  return lastValue;
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  window.addEventListener('storage', listener); // 别的标签页改了收藏
+  return () => {
+    listeners.delete(listener);
+    window.removeEventListener('storage', listener);
+  };
+}
+
+function save(next: Favorite[]) {
+  localStorage.setItem(KEY, JSON.stringify(next));
+  listeners.forEach((l) => l());
+}
+
+// 收藏是浏览器里的数据，不是服务器数据：不放进 React Query。
+export function useFavorites() {
+  const favorites = useSyncExternalStore(subscribe, getSnapshot);
+  const isFavorite = (id: number) => favorites.some((f) => f.id === id);
+  const toggle = (fav: Favorite) => save(isFavorite(fav.id) ? favorites.filter((f) => f.id !== fav.id) : [...favorites, fav]);
+  return { favorites, isFavorite, toggle };
+}
+```
+
+两个细节：`getSnapshot` 每次必须返回**同一个对象**（除非数据真的变了），所以按原始字符串缓存解析结果；订阅里同时监听 `storage` 事件，别的标签页改了收藏，这里也会更新。
+
+下面的示例演示“服务器状态”和“界面状态”分开以后的行为：切换城市不会重复请求，收藏不会触发请求。
+
+```jsx play title="服务器缓存与收藏：互不干扰"
+import { useState, useEffect } from 'react';
+
+const DB = { 1: { id: 1, name: '上海', temp: 16 }, 2: { id: 2, name: '北京', temp: 11 } };
+const log = [];   // 记录每一次真正发出的“请求”
+const cache = new Map();
+
+function loadCity(id) {
+  log.push('请求 ' + DB[id].name);
+  return new Promise(resolve => setTimeout(() => resolve(DB[id]), 300)).then(c => (cache.set(id, c), c));
+}
+
+function useCity(id) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (cache.has(id)) return;
+    let ignore = false;
+    loadCity(id).then(() => { if (!ignore) force(n => n + 1); });
+    return () => { ignore = true; };
+  }, [id]);
+  return cache.get(id);
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  const [favs, setFavs] = useState([]);   // 界面状态：只放收藏的 id
+  const city = useCity(id);
+  const isFav = favs.includes(id);
+
+  return (
+    <div>
+      <button onClick={() => setId(1)}>上海</button>{' '}
+      <button onClick={() => setId(2)}>北京</button>{' '}
+      <button onClick={() => setFavs(isFav ? favs.filter(f => f !== id) : [...favs, id])}>
+        {isFav ? '★ 已收藏' : '☆ 收藏'}
+      </button>
+      <p>{city ? city.name + '：' + city.temp + '°C' : '加载中…'}</p>
+      <p>已收藏的 id：{favs.join('、') || '（无）'}</p>
+      <p>请求记录：{log.join('，') || '（无）'}</p>
+    </div>
+  );
+}
+```
+
+**应该看到：**
+
+| 操作 | 应该看到 |
+|---|---|
+| 在详情页点“☆ 收藏” | 按钮变成“★ 已收藏”；网络面板里没有新请求 |
+| 回到搜索页 | 上方出现“收藏”列表 |
+| 刷新页面 | 收藏还在 |
+| 在另一个标签页取消收藏 | 这个标签页的列表跟着更新（`storage` 事件） |
+
+## 里程碑 5：测试
+
+测试用户看到的，不测实现细节（第 35 课）。三件基础设施先写好：`setup.ts` 每个测试后清理；`mockFetch` 用假的 `fetch` 代替网络；`renderApp` 每次用**新的** `QueryClient`，并且**关掉重试**。
+
+```ts title="在本机项目里：src/test/setup.ts"
+import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  vi.unstubAllGlobals();
+});
+```
+
+```tsx title="在本机项目里：src/test/utils.tsx"
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { vi } from 'vitest';
+import App from '../App.tsx';
+
+// 用一个假的 fetch 代替真实网络：按网址片段返回准备好的数据。
+export function mockFetch(routes: Record<string, unknown | Response>) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const key = Object.keys(routes).find((k) => url.includes(k));
+    if (!key) throw new Error(`没有准备这个请求的假数据：${url}`);
+    const body = routes[key];
+    return body instanceof Response ? body : new Response(JSON.stringify(body), { status: 200 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+export function renderApp(path: string) {
+  // 每个测试用新的 QueryClient，缓存不会串；测试里关掉重试，失败立刻显示。
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+测试里不关重试，“请求失败”的测试会失败。`useQuery` 默认失败后重试 3 次，间隔 1 秒起；而 `findBy…` 默认只等 1 秒，等不到错误提示就超时。我在这个项目里实测过：去掉 `retry: false`，错误测试在约 1 秒后报“找不到 role="alert"”。
 
 </CallBox>
+
+搜索页的测试覆盖四种状态和“URL 驱动”：
+
+```tsx title="在本机项目里：src/pages/SearchPage.test.tsx"
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { mockFetch, renderApp } from '../test/utils.tsx';
+
+const shanghai = { id: 1796236, name: '上海', latitude: 31.22, longitude: 121.46, country: '中国', admin1: '上海市' };
+
+describe('搜索页', () => {
+  it('URL 里有搜索词时，显示结果并链接到详情页', async () => {
+    mockFetch({ '/v1/search': { results: [shanghai] } });
+    renderApp('/?q=上海');
+
+    const link = await screen.findByRole('link', { name: '上海' });
+    expect(link).toHaveAttribute('href', '/city/1796236');
+  });
+
+  it('没有结果时显示“没有找到”', async () => {
+    mockFetch({ '/v1/search': { generationtime_ms: 0.1 } }); // 接口没有匹配时不返回 results
+    renderApp('/?q=不存在的城');
+
+    expect(await screen.findByText('没有找到“不存在的城”')).toBeInTheDocument();
+  });
+
+  it('请求失败时显示错误和重试按钮', async () => {
+    mockFetch({ '/v1/search': new Response('boom', { status: 500 }) });
+    renderApp('/?q=上海');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('请求失败（500）');
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
+  });
+
+  it('输入城市名并提交后，请求带上搜索词，结果显示出来', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch({ '/v1/search': { results: [shanghai] } });
+    renderApp('/');
+
+    await user.type(screen.getByLabelText('城市名'), '上海');
+    await user.click(screen.getByRole('button', { name: '搜索' }));
+
+    expect(await screen.findByRole('link', { name: '上海' })).toBeInTheDocument();
+    expect(String(fetchMock.mock.calls[0][0])).toContain('name=%E4%B8%8A%E6%B5%B7');
+  });
+
+  it('搜索词少于两个字时不发请求', () => {
+    const fetchMock = mockFetch({});
+    renderApp('/?q=上');
+
+    expect(screen.getByText(/至少两个字/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+```
+
+详情页的测试覆盖“先取城市再取天气”和收藏：
+
+```tsx title="在本机项目里：src/pages/CityPage.test.tsx"
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { mockFetch, renderApp } from '../test/utils.tsx';
+
+const shanghai = { id: 1796236, name: '上海', latitude: 31.22, longitude: 121.46 };
+const forecast = {
+  current: { temperature_2m: 16, weather_code: 0, wind_speed_10m: 5.4 },
+  daily: { time: ['2026-10-08', '2026-10-09'], weather_code: [3, 63], temperature_2m_max: [25, 23], temperature_2m_min: [15, 17] },
+};
+
+describe('详情页', () => {
+  it('先取城市，再用经纬度取天气', async () => {
+    const fetchMock = mockFetch({ '/v1/get': shanghai, '/v1/forecast': forecast });
+    renderApp('/city/1796236');
+
+    expect(await screen.findByRole('heading', { name: '上海' })).toBeInTheDocument();
+    expect(await screen.findByText(/现在 16°C，晴/)).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    const urls = fetchMock.mock.calls.map(([u]) => String(u));
+    expect(urls[1]).toContain('latitude=31.22');
+  });
+
+  it('点收藏后写进 localStorage，再点取消', async () => {
+    const user = userEvent.setup();
+    mockFetch({ '/v1/get': shanghai, '/v1/forecast': forecast });
+    renderApp('/city/1796236');
+
+    await user.click(await screen.findByRole('button', { name: '☆ 收藏' }));
+    expect(screen.getByRole('button', { name: '★ 已收藏' })).toHaveAttribute('aria-pressed', 'true');
+    expect(JSON.parse(localStorage.getItem('weather-favorites') ?? '[]')).toEqual([{ id: 1796236, name: '上海' }]);
+
+    await user.click(screen.getByRole('button', { name: '★ 已收藏' }));
+    expect(JSON.parse(localStorage.getItem('weather-favorites') ?? '[]')).toEqual([]);
+  });
+});
+```
+
+**应该看到：**`npm test` 全绿。然后故意改坏一处：例如在 `CityResults.tsx` 里删掉 `isError` 那一行，重新运行，至少一个测试变红；改回后全绿。
+
+## 里程碑 6：收尾
+
+1. `npm run typecheck`、`npm run lint`、`npm test`、`npm run build` 全部通过。
+2. 加上第 31 课的 `.github/workflows/ci.yml`，推送到 GitHub，看到绿色对勾。
+3. （可选）部署到 Vercel，并添加 `vercel.json` 的路由回退，直接打开 `/city/1796236` 也能显示。
+4. 在 README 里写下：每份状态放在哪里，为什么。
+
+## 常见坑
+
+| 现象 | 原因 | 修法 |
+|---|---|---|
+| 后退后输入框里是旧文字，结果列表是新的 | 草稿用 `useState(q)` 初始化，之后和 URL 脱节 | 给 `SearchForm` 加 `key={q}` |
+| 错误时页面崩溃，报 `Cannot read properties of undefined` | 先读了 `data.length`，再判断 `isError` | 顺序：`isPending`、`isError`、再读 `data` |
+| 切换城市后，先短暂看到上一个城市的天气 | `queryKey` 里漏了城市 id | 把 id 写进 `queryKey` |
+| `localStorage.getItem is not a function`（运行测试时） | Node 25 这类非 LTS 版本里，Node 自带的 `localStorage` 盖住了 jsdom 的 | 换 LTS 版本（例如 24），或运行前设置 `NODE_OPTIONS=--no-experimental-webstorage` |
+| 收藏一点就报“getSnapshot 应该被缓存” | `getSnapshot` 每次返回新数组 | 按原始字符串缓存解析结果 |
+| 刷新详情页得到 404 | 静态托管没有路由回退 | 见第 31 课的 `vercel.json` |
+
+## 验收清单
+
+| 类别 | 怎样操作 | 应该看到 |
+|---|---|---|
+| 功能 | 按需求表逐条操作；打开控制台 | 每条都能完成；没有红色报错，也没有 key 警告 |
+| 状态 | 打开 React DevTools，逐个看 state | 没有重复存放的数据：搜索词只在 URL 里，加载和错误没有单独的 state |
+| URL | 复制带 `?q=` 的网址到新标签页 | 同样的结果 |
+| 缓存 | 来回切换两个城市 | 第二次进入同一个城市，网络面板里没有新请求 |
+| 出错 | 开 Offline，搜索新词，再打开新城市 | 都有错误提示和重试按钮 |
+| 质量 | `npm run typecheck`、`npm run lint`、`npm test`、`npm run build` | 全部通过 |
+| 测试 | 故意改坏一处再运行测试 | 至少一个变红 |
+
+## 扩展方向
+
+1. 搜索时加防抖，并用 `placeholderData: keepPreviousData` 避免换词时列表闪回“加载中”（第 34 课）。
+2. 把收藏同步到服务器：用 `useMutation` 加乐观更新（第 34 课）。
+3. 用路由的 `loader` 在进入详情页前取数据（第 33 课），对比它和 `useQuery` 的分工。
+4. 加一个“摄氏度/华氏度”开关，想想它属于哪一类状态。
+5. 加一个端到端测试（Playwright），在真实浏览器里走一遍“搜索、进详情、收藏”。
 
 </LessonProse>
 
