@@ -40,6 +40,8 @@ describe('Counter', () => {
 
 <CallBox kind="tip" label="要点">
 
+先安装依赖：`npm i -D vitest jsdom @testing-library/react @testing-library/dom @testing-library/user-event @testing-library/jest-dom msw`。Testing Library 的 React 版要求你自己装 `@testing-library/dom`，漏装是最常见的第一个报错。
+
 这个文件需要两项配置才能运行：
 
 1. 在 vitest.config 中设置 `environment: 'jsdom'` 和 `globals: true`。否则 Testing Library 不会在每个测试后自动清理 DOM。
@@ -66,13 +68,13 @@ describe('Counter', () => {
 
 <CallBox kind="warn" label="常见坑">
 
-不要测试实现细节。例如：state 里的 count 是不是 1；某个函数被调用了几次。这样的测试在重构时会大面积报错，哪怕功能完全正常。只测试用户能看到的结果。
+不要测试实现细节。例如：state 里的 count 是不是 1；组件内部的某个函数或 set 函数被调用了几次。（作为 props 传进来的回调是组件的对外接口，断言 `onSubmit` 收到了什么参数是可以的。）这样的测试在重构时会大面积报错，哪怕功能完全正常。只测试用户能看到的结果。
 
 </CallBox>
 
 ## 自己动手：一个迷你测试运行器
 
-本页不能运行 Vitest。下面的代码用 30 行实现了 `render`、`getByText`、`getByRole` 和 `test`。我们用它测试一个真实组件。试着把 Counter 改出 bug（比如把 +1 改成 +2），再运行，看测试变红。
+本页不能运行 Vitest。下面的代码用 30 行实现了 `render`、`getByText`、`getByRole` 和 `test`。我们用它测试一个真实组件。试着让 Counter 出一个 bug，再运行，看哪些测试变红。
 
 ```jsx play title="在浏览器里跑测试"
 import { useState } from 'react';
@@ -179,7 +181,7 @@ it('useToggle 可以切换', () => {
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
-// 1. MSW 2：在网络层模拟接口。组件里的 fetch 不用改
+// 1. MSW（2.x 和 3.x 写法相同）：在网络层模拟接口。组件里的 fetch 不用改
 const server = setupServer(
   http.get('/api/users/1', () => HttpResponse.json({ name: '张三' })),
 );

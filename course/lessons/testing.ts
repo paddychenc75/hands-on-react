@@ -33,7 +33,7 @@ export default {
   id: 'testing',
   stage: 4,
   title: '测试：Vitest + Testing Library',
-  mins: 25,
+  mins: 27,
   summary: '像用户一样测试组件：按文字和角色找元素，模拟交互，断言结果。',
   goals: [
     '能判断一条断言测的是“用户看到的行为”还是“实现细节”',
@@ -506,8 +506,10 @@ export function defineTests(Component) {
       t.assert(typeof defineTests === 'function', '找不到函数 defineTests。不要改它的名字');
       t.assert(typeof runTests === 'function', '找不到函数 runTests。不要修改迷你测试库');
       const src = stripComments(String(defineTests));
+      // 禁用写法只查代码，不查字符串里的字：测试名写成 'ShoppingList 可以添加物品' 是合理的
+      const code = src.replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1/g, '""');
       t.assert(
-        !/querySelector|getElementsBy|getElementById|getByTestId|data-testid|classList|className|\bcontainer\b/.test(src),
+        !/querySelector|getElementsBy|getElementById|getByTestId|data-testid|classList|className|\bcontainer\b/.test(code),
         '测试里不要用 querySelector、class、test id 或 container。像用户一样，按角色和文字找元素（步骤 5）',
       );
       t.assert(/screen\s*\.\s*getByRole\s*\(/.test(src), '至少用一次 screen.getByRole 找按钮或输入框（步骤 5）');
@@ -515,7 +517,7 @@ export function defineTests(Component) {
         /user\s*\.\s*click\s*\(/.test(src) && /user\s*\.\s*type\s*\(/.test(src),
         '用 user.type 输入文字，用 user.click 点按钮，模拟真实的用户操作（步骤 3）',
       );
-      t.assert(!/\bShoppingList\b/.test(src), '测试里要渲染参数 Component，不要直接写 ShoppingList。否则换成 bug 版本也测不出来（步骤 2）');
+      t.assert(!/\bShoppingList\b/.test(code), '测试里要渲染参数 Component，不要直接写 ShoppingList。否则换成 bug 版本也测不出来（步骤 2）');
 
       const run = async C => {
         const r = await runTests(C);
@@ -572,10 +574,34 @@ expect(screen.getByText('3 条结果')).toBeInTheDocument();</code></pre></div>`
       explain:
         'userEvent v14 的所有操作都是异步的。没有 await，点击还没发生，就执行了断言，页面上仍是“计数：0”，测试失败。修复：测试函数写成 <code>async</code>，并写 <code>await user.click(…)</code>。“通过”是 fireEvent 的经验：fireEvent 是同步的，但它不模拟完整的用户操作。',
     },
+    {
+      q: `下面的测试在检查什么？它算“测试实现细节”吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const onSubmit = vi.fn();
+render(&lt;LoginForm onSubmit={onSubmit} /&gt;);
+await user.type(screen.getByLabelText('邮箱'), 'a@b.com');
+await user.click(screen.getByRole('button', { name: '登录' }));
+expect(onSubmit).toHaveBeenCalledWith({ email: 'a@b.com' });</code></pre></div>`,
+      options: [
+        '算：断言了函数被调用，这是实现细节',
+        '不算：onSubmit 是作为 props 传进来的回调，是组件对外的接口，它收到什么参数就是可观察的行为',
+        '算：应该改成检查组件内部 state 里的 email',
+        '不算，因为 vi.fn() 总是通过',
+      ],
+      answer: 1,
+      explain:
+        '要避免的是断言组件内部的东西：自己的 state 值、内部函数或 set 函数被调用了几次。作为 props 传进来的回调是组件和外界的约定，断言它收到了什么参数，检查的是组件对外的行为。“算实现细节”有迷惑性：它只对组件内部的函数成立。',
+    },
   ],
   plays: {
     在浏览器里跑测试: {
-      note: '测试结果在下方控制台。',
+      pkey: 'testing|在浏览器里跑测试',
+      predict: {
+        q: '运行一次后，把 Counter 里的 <code>n + 1</code> 改成 <code>n + 2</code>，再运行。3 个测试里有几个变红？',
+        options: ['0 个', '1 个', '2 个', '3 个'],
+        answer: 1,
+        explain:
+          '只有“点击 +1 两次后显示 2”会失败（实际得到 4）。“重置后回到 0”仍然通过，因为它只断言了重置后的结果，没有断言中间值；“初始显示 0”没有点击，也不受影响。这说明：测试只抓得住它断言过的东西，要断言确切的结果。',
+      },
+      note: '测试结果在下方控制台。<br>迷你版和真库的差别：1. 真库的 <code>getBy…</code> 找到多个匹配会报错，迷你版取第一个。2. 真库的 <code>screen</code> 查整个页面，所以每个测试后要清理；迷你版每次 <code>render</code> 用一个新容器。3. 真库的 <code>user.type</code> 逐字输入，迷你版一次写入。',
     },
   },
 } satisfies Lesson;

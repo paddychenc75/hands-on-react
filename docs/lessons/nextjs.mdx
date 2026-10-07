@@ -16,15 +16,30 @@ Next.js 是使用最广的 React 全栈框架。Server Components 主要就用�
 
 <CallBox kind="tip" label="要点">
 
-Next.js 需要 Node.js 服务器，本页的示例都是只读代码。创建项目只需一行：`npx create-next-app@latest my-app`，一路回车即可。
+Next.js 需要 Node.js 服务器，本页的示例都是只读代码。创建项目只需一行：`npx create-next-app@latest my-app`，选“使用推荐的默认设置”即可（需要 Node.js 20.9 以上）。
 
 </CallBox>
 
 ## 文件夹就是路由
 
-<Raw tag="figure" className="fig wide" html={"<div class=\"filetree\"><div><b>app/</b></div>\n<div class=\"i1\">layout.tsx <span>根布局：&lt;html&gt;、导航栏，所有页面共享</span></div>\n<div class=\"i1\">page.tsx <span>→ <code>/</code></span></div>\n<div class=\"i1\"><b>blog/</b></div>\n<div class=\"i2\">page.tsx <span>→ <code>/blog</code></span></div>\n<div class=\"i2\">loading.tsx <span>加载中界面（自动包一层 Suspense）</span></div>\n<div class=\"i2\">error.tsx <span>出错界面（自动包一层错误边界）</span></div>\n<div class=\"i2\"><b>[slug]/</b></div>\n<div class=\"i3\">page.tsx <span>→ <code>/blog/hello-world</code>，动态参数 slug</span></div>\n<div class=\"i1\"><b>api/</b><b>hello/</b></div>\n<div class=\"i2\">route.ts <span>→ API 接口 <code>GET /api/hello</code></span></div></div><figcaption>特殊文件名：page、layout、loading、error、not-found、route</figcaption>"} />
+<Raw tag="figure" className="fig wide" html={"<div class=\"filetree\"><div><b>app/</b></div>\n<div class=\"i1\">layout.tsx <span>根布局：&lt;html&gt;、导航栏，所有页面共享</span></div>\n<div class=\"i1\">page.tsx <span>→ <code>/</code></span></div>\n<div class=\"i1\"><b>blog/</b></div>\n<div class=\"i2\">page.tsx <span>→ <code>/blog</code></span></div>\n<div class=\"i2\">loading.tsx <span>加载中界面（自动包一层 Suspense）</span></div>\n<div class=\"i2\">error.tsx <span>出错界面（自动包一层错误边界；必须是客户端组件）</span></div>\n<div class=\"i2\"><b>[slug]/</b></div>\n<div class=\"i3\">page.tsx <span>→ <code>/blog/hello-world</code>，动态参数 slug</span></div>\n<div class=\"i1\"><b>api/</b><b>hello/</b></div>\n<div class=\"i2\">route.ts <span>→ API 接口 <code>GET /api/hello</code></span></div></div><figcaption>特殊文件名：page、layout、loading、error、not-found、route</figcaption>"} />
 
 注意 `loading.tsx` 和 `error.tsx`：它们就是第 22 课学的 Suspense 和错误边界。框架按约定自动帮你加上。
+
+## 在页面之间跳转
+
+```jsx
+import Link from 'next/link';
+
+<Link href="/blog/hello-world">阅读文章</Link>
+
+// 客户端组件里用代码跳转：
+// import { useRouter } from 'next/navigation';   const router = useRouter();   router.push('/blog')
+// 服务端组件或 Server Function 里：
+// import { redirect } from 'next/navigation';    redirect('/login')
+```
+
+它和第 33 课的 `<Link to>` 作用相同，属性名是 `href`。链接进入视口时，Next.js 会预取目标页面，点击后几乎立即切换。用普通的 `<a>` 会整页刷新。
 
 ## 页面：在服务端直接取数据
 
@@ -52,11 +67,14 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const post = await db.post.findUnique({ where: { slug } });
+  // 页面和这里各查一次。用 React 的 cache() 包住查询函数，同一次请求只查一次
   return { title: post?.title ?? '文章不存在' };
 }
 ```
 
-## 表单：Server Action + 重新验证
+## 表单：Server Function + 重新验证
+
+用作表单 action 时，Next.js 文档也叫它 Server Action。
 
 ```jsx
 // app/blog/[slug]/actions.ts
@@ -94,7 +112,7 @@ export async function addComment(postId: number, formData: FormData) {
 
 <CallBox kind="warn" label="常见坑">
 
-三条安全规则：
+三条规则（后两条关系到安全）：
 
 1. 服务端组件不要 `fetch` 自己的 API 路由。直接调用数据层函数，少一次网络往返。
 2. 只能在服务端用的模块，加上 `import 'server-only'`。`NEXT_PUBLIC_` 开头的变量会发到浏览器，不要放密钥。
@@ -102,9 +120,27 @@ export async function addComment(postId: number, formData: FormData) {
 
 </CallBox>
 
-缓存提示：从 Next.js 15 起，`fetch` 默认**不缓存**。需要缓存时要明确写出来。
+**登录与重定向**：会话放在 httpOnly cookie 里，在服务端校验，不要只在客户端判断。Next.js 16 起，原来的 `middleware.ts` 改名为 `proxy.ts`（导出函数 `proxy`），适合做“未登录就重定向”这类粗粒度拦截。但它只是第一道门：Proxy 的 matcher 漏掉某个路径时，该路径上的 Server Function 调用也会被跳过，所以权限仍要在每个 Server Function 里检查。登录本身建议用成熟的库，不要自己写。
 
-## 渲染策略
+缓存提示：在旧模型里，从 Next.js 15 起 `fetch` 默认**不缓存**，需要缓存时要明确写出来。新模型见下一节。
+
+## 渲染策略：两种模型
+
+Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目默认使用 **Cache Components**（`next.config.ts` 里的 `cacheComponents: true` 和 `partialPrefetching: true`）。Next.js 17 会把它变成唯一默认。没开这个开关的老项目用后面的“旧模型”表。
+
+### 新模型：Cache Components
+
+同一页面可以混合三种内容：
+
+| 内容 | 怎样处理 |
+|---|---|
+| 不依赖请求的内容 | 自动预渲染进静态外壳 |
+| 用 `'use cache'` 缓存的内容（配合 `cacheLife('hours')`、`cacheTag('posts')`） | 缓存后进静态外壳 |
+| 没缓存的数据，或 `cookies()`、`headers()`、`searchParams` 这类运行时数据 | 必须包在 `<Suspense>` 里，请求时流式返回 |
+
+在新模型里，数据默认不缓存。在 Suspense 之外读取没缓存的数据，开发时会报错。`loading.tsx` 就是一层 Suspense。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
+
+### 旧模型（没有开启 Cache Components 的项目）
 
 | 策略 | 何时生成 HTML | 适合 |
 |---|---|---|
@@ -112,8 +148,6 @@ export async function addComment(postId: number, formData: FormData) {
 | 动态 | 每次请求时（读取了 cookies、headers、searchParams 等） | 个性化页面、仪表盘 |
 | 增量更新 | 静态生成，过期或 revalidate 后重新生成 | 商品页、新闻 |
 | 流式渲染 | 先发外壳，慢的部分通过 Suspense 稍后流入 | 有慢查询的页面 |
-
-上表是 Next.js 的传统模型。Next.js 16 开启 `cacheComponents` 后，同一页面可以混合三种内容：静态内容、用 `'use cache'` 缓存的内容、在 Suspense 中按请求流式返回的内容。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
 
 <CallBox kind="warn" label="常见坑">
 
