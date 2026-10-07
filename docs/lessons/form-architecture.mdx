@@ -375,7 +375,7 @@ Actions 没有替你做的事：错误什么时候显示（它只在提交后返
 <details className="optional">
 <summary><span className="opt-tag">选读</span>React Hook Form 为什么快<small>可以先跳过，需要时再展开</small></summary>
 
-React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 41 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
+React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 42 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
 
 需要显示的东西（某个字段的错误、是否提交中）通过订阅读取。`formState` 是一个 Proxy：组件读了 `formState.errors`，才会在错误变化时重新渲染；没读 `isDirty`，它变化就不渲染。注意粒度是“哪一种状态”，不是“哪一个字段”：任何字段的错误变化，读了 `errors` 的组件都会渲染，而且渲染的是调用 `useForm` 的那个组件。想让一个字段的错误只重新渲染这个字段，把它拆成子组件，在里面用 `useFormState({ control, name: 'email' })`。拆出去的子组件所在的父组件自己不要再读 `formState`，否则父组件一渲染，子组件照样跟着渲染。校验交给 resolver，传入 Zod schema 即可：`useForm({ resolver: zodResolver(schema), mode: 'onTouched' })`。`mode: 'onTouched'` 就是本课第三节推荐的“离开时显示，显示后输入时更新”。
 

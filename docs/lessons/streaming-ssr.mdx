@@ -313,7 +313,7 @@ export default function Page() {
 
 <strong>2. Promise 也可以跨边界。</strong>服务端组件不 await，直接把 Promise 传下去。客户端组件用 React 19 的 `use()` 读取，外面包 Suspense。页面外壳不用等这份数据。
 
-<strong>3. 小心服务端的数据瀑布。</strong>父组件 `await` 用户信息后才渲染子组件，子组件再 `await` 订单。两个请求串行了。修法与第 38 课相同：在父组件里同时发起请求（`Promise.all`，或先创建 Promise 再分别传下去）。
+<strong>3. 小心服务端的数据瀑布。</strong>父组件 `await` 用户信息后才渲染子组件，子组件再 `await` 订单。两个请求串行了。修法与第 39 课相同：在父组件里同时发起请求（`Promise.all`，或先创建 Promise 再分别传下去）。
 
 ## 六、缓存与重新验证
 

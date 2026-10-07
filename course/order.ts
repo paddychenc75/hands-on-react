@@ -39,6 +39,7 @@ export const LESSON_ORDER: string[] = [
   'tanstack-query',
   'testing',
   'nextjs',
+  'project-weather',
   'scheduler',
   'suspense-data',
   'streaming-ssr',

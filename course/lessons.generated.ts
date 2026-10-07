@@ -28,6 +28,7 @@ import l_profiling from './lessons/profiling.ts';
 import l_project_kanban from './lessons/project-kanban.ts';
 import l_project_search from './lessons/project-search.ts';
 import l_project_todo from './lessons/project-todo.ts';
+import l_project_weather from './lessons/project-weather.ts';
 import l_react_19 from './lessons/react-19.ts';
 import l_rendering from './lessons/rendering.ts';
 import l_router from './lessons/router.ts';
@@ -75,6 +76,7 @@ export const LESSON_MODULES: Record<string, Lesson> = {
   'project-kanban': l_project_kanban,
   'project-search': l_project_search,
   'project-todo': l_project_todo,
+  'project-weather': l_project_weather,
   'react-19': l_react_19,
   'rendering': l_rendering,
   'router': l_router,

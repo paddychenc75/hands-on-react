@@ -2,7 +2,7 @@ import { doneCount } from '../../course/engine/index.ts';
 import { TOTAL_LESSONS } from '../../course/registry.ts';
 import { useProgress } from '../lib/useProgress';
 
-/** 顶栏右侧的总进度：已完成 n/45（旧版 #prog-text / #prog-bar） */
+/** 顶栏右侧的总进度：已完成 n/46（旧版 #prog-text / #prog-bar） */
 export default function TopProgress() {
   const mounted = useProgress();
   const n = mounted ? doneCount() : 0;

@@ -51,7 +51,7 @@ for (const id of LESSONS) {
     `a. ${id}：标题、正文、测验(${r.quiz}/${L.quiz.length})、目标、自我解释都渲染`,
     JSON.stringify(r),
   );
-  if (id === 'state') ok(r.side >= 45 + 6 + 2, 'a. 侧栏列出 45 课、6 个阶段测验、复习和术语表', String(r.side));
+  if (id === 'state') ok(r.side >= 46 + 6 + 2, 'a. 侧栏列出 46 课、6 个阶段测验、复习和术语表', String(r.side));
 }
 
 /* b. 每个实验台滚动到可见后运行出结果，没有 .pv-err */
@@ -231,7 +231,7 @@ for (const id of LESSONS) {
   ok(mark.length === 1 && /what-is-react/.test(mark[0]), 'f. 本课完成后侧栏里这一课有标记', JSON.stringify(mark));
 }
 
-/* g. 390px 宽度下没有横向滚动：首页、复习页、术语表和全部 45 课（实验台都运行之后再量） */
+/* g. 390px 宽度下没有横向滚动：首页、复习页、术语表和全部 46 课（实验台都运行之后再量） */
 {
   const { lessonOrder } = await import('./_site.mjs');
   const pages = ['', 'review.html', 'glossary.html', ...(await lessonOrder()).map(l => 'lessons/' + l + '.html')];
@@ -259,7 +259,7 @@ for (const id of LESSONS) {
       await m.close();
     }),
   );
-  ok(!wide.length, 'g. 390px 宽：首页、复习、术语表和 45 课运行实验台之后 scrollWidth <= innerWidth', wide.join(', '));
+  ok(!wide.length, 'g. 390px 宽：首页、复习、术语表和 46 课运行实验台之后 scrollWidth <= innerWidth', wide.join(', '));
 }
 
 /* h. 站内搜索：中文词 */
@@ -298,7 +298,7 @@ for (const id of LESSONS) {
       r.prereq &&
       r.tree === 7 &&
       /开始第一课/.test(r.cta) &&
-      r.stats[0] === '45' &&
+      r.stats[0] === '46' &&
       r.names[5] === '深入',
     'i. 首页：hero、前置知识、六个阶段（第 6 阶段叫“深入”）、组件树、开始第一课',
     JSON.stringify(r),
@@ -328,8 +328,8 @@ for (const id of LESSONS) {
     meter: document.querySelector('.home .stage .meter span')?.textContent,
   }));
   ok(
-    /继续学习：/.test(r2.cta) && r2.done === 1 && r2.stat === '1/45' && r2.meter === '1/9',
-    'i. 学完一课后：首页出现“继续学习”，阶段进度 1/9，总数 1/45',
+    /继续学习：/.test(r2.cta) && r2.done === 1 && r2.stat === '1/46' && r2.meter === '1/9',
+    'i. 学完一课后：首页出现“继续学习”，阶段进度 1/9，总数 1/46',
     JSON.stringify(r2),
   );
 }
@@ -346,8 +346,8 @@ for (const id of LESSONS) {
     due: document.querySelector('a[data-hoc-due]')?.getAttribute('data-hoc-due'),
   }));
   ok(
-    r.cnt[0] === '1/9' && r.cnt.length === 6 && r.done.length === 1 && /已完成 1\/45/.test(r.top) && !r.due,
-    'j. 侧栏每阶段“已完成 x/y”、已完成课标记、顶栏“已完成 1/45”，没有到期题时无角标',
+    r.cnt[0] === '1/9' && r.cnt.length === 6 && r.done.length === 1 && /已完成 1\/46/.test(r.top) && !r.due,
+    'j. 侧栏每阶段“已完成 x/y”、已完成课标记、顶栏“已完成 1/46”，没有到期题时无角标',
     JSON.stringify(r),
   );
   // 造 3 张已到期的复习卡
@@ -401,7 +401,7 @@ for (const id of LESSONS) {
   );
 }
 
-/* l. 术语表：45 条，课文里术语有虚线标注，点击显示释义 */
+/* l. 术语表，课文里术语有虚线标注，点击显示释义 */
 {
   await page.goto(site + 'glossary.html');
   await page.waitForSelector('.tbl table');

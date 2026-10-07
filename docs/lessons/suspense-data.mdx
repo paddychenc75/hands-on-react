@@ -438,7 +438,7 @@ function ProfilePage({ userId }) {
 }
 ```
 
-use 没有改变本课的任何规则：Promise 仍然不能在渲染时新建（React 19 会对没有缓存的 Promise 给出警告），瀑布仍然要靠提前发请求来消除，失败仍然交给错误边界。在服务端组件里，Promise 通常由服务端组件创建，再作为 props 传给客户端组件；第 39 课会讲流式渲染怎样利用这些 Suspense 边界。
+use 没有改变本课的任何规则：Promise 仍然不能在渲染时新建（React 19 会对没有缓存的 Promise 给出警告），瀑布仍然要靠提前发请求来消除，失败仍然交给错误边界。在服务端组件里，Promise 通常由服务端组件创建，再作为 props 传给客户端组件；第 40 课会讲流式渲染怎样利用这些 Suspense 边界。
 
 </details>
 
