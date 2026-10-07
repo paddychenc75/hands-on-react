@@ -4,7 +4,7 @@ export default {
   id: 'mini-react',
   stage: 3,
   title: '原理：亲手实现迷你 React',
-  mins: 28,
+  mins: 33,
   summary: '从 createElement 到 Hooks 链表，揭开 React 的魔法。',
   goals: [
     '能写出 createElement，并解释 React 元素只是普通对象',
@@ -24,7 +24,7 @@ export default {
       options: ['"小红"', 'count 的值', 'undefined', '报错'],
       answer: 1,
       explain:
-        '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。也不会报错，这正是这类 bug 难发现的原因。',
+        '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。迷你实现不会报错，只会悄悄读错。真实的 React 多做了一层保护：它发现这次渲染调用的 Hook 数量和上次不同，就抛出 `Rendered fewer hooks than expected`；数量相同但顺序变了时，开发模式会警告 Hook 的顺序发生了变化（第 15 课见过这些报错）。',
     },
     {
       q: '一棵 3000 个组件的树正在渲染一次过渡更新，渲染到一半时用户按下了键盘。在 Fiber 架构下会怎样？',
@@ -36,7 +36,7 @@ export default {
       ],
       answer: 1,
       explain:
-        'Fiber 把渲染拆成小单元，每做完一个就检查有没有更紧急的任务。渲染阶段不改 DOM，所以可以随时暂停或丢弃。第三项是常见误解：React 从不提交“一半”的结果，提交阶段总是一次性完成。',
+        'Fiber 把渲染拆成小单元，每做完一个就检查时间片有没有用完，用完就让出主线程，浏览器才有机会处理按键。渲染阶段不改 DOM，所以可以随时暂停或丢弃。第三项是常见误解：React 从不提交“一半”的结果，提交阶段总是一次性完成。',
     },
     {
       q: '为什么提交阶段必须同步一次完成，而渲染阶段可以中断？',
@@ -299,6 +299,17 @@ render(app, box);</code></pre></div>`,
   plays: {
     元素就是一个普通对象: {},
     '一个 20 行的渲染器': {},
+    '用循环遍历 Fiber 树': {
+      note: '第一轮处理 App、Header、Logo 三个节点，然后让出主线程。遍历顺序是先 child，没有 child 就走 sibling，再没有就回到父节点找它的 sibling。递归做不到“停在 Logo 之后”，因为进度藏在调用栈里；这里的进度只是变量 next，所以能停、能继续、也能整棵丢掉。',
+      predict: {
+        q: '工作循环每一轮最多处理 3 个节点。第一轮处理了哪三个节点？',
+        options: ['App、Header、Main', 'Header、Logo、Nav', 'App、Header、Logo', 'App、Header、Footer'],
+        answer: 2,
+        explain:
+          '遍历先走 child：App 的 child 是 Header，Header 的 child 是 Logo。三个单元用完，时间片就结束了。选“App、Header、Main”的人按层逐行遍历（广度优先）；Fiber 是先深入 child，没有 child 才走 sibling。',
+      },
+      pkey: 'mini-react|用循环遍历 Fiber 树',
+    },
     '20 行实现 useState': {
       predict: {
         q: '代码最后打印的 hooks 数组是什么？',

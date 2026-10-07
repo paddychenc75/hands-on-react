@@ -14,19 +14,52 @@ title: "状态管理架构"
 
 “该用 Redux 还是 Zustand 还是 Context？”这个问题的答案，取决于你先把状态**分类**。
 
-| 状态类型 | 例子 | 推荐方案 |
-|---|---|---|
-| 局部 UI 状态 | 弹窗开关、输入框内容 | useState / useReducer |
-| 服务端状态（远程数据的缓存） | 用户列表、商品详情 | **TanStack Query**、SWR、框架自带的数据加载 |
-| 全局客户端状态 | 主题、购物车、编辑器状态 | Context（低频）、**Zustand**、Redux Toolkit、Jotai |
-| URL 状态 | 搜索词、页码、筛选条件 | 路由的查询参数（可分享、可刷新） |
-| 表单状态 | 复杂多步表单 | React Hook Form 等 |
+## 先分类，再选工具
+
+对每一份 state，先问三个问题：
+
+1. **这份数据从哪来？** 浏览器里用户操作产生的，还是服务器上本来就有的？
+2. **谁会改它？** 只有一个组件，还是很多组件，还是服务器上的别人也会改？
+3. **刷新页面后，要不要还在？要不要能分享给别人？**
+
+根据答案，分成五类：
+
+| 状态类型 | 例子 | 三问的答案 | 推荐方案 |
+|---|---|---|---|
+| 局部 UI 状态 | 弹窗开关、输入框内容 | 用户操作产生；一个组件用；刷新后可以丢 | useState / useReducer |
+| 服务端状态（远程数据的缓存） | 用户列表、商品详情 | 服务器上本来就有；别人也可能改；刷新后重新取 | **TanStack Query**、SWR、框架自带的数据加载 |
+| 全局客户端状态 | 主题、购物车、编辑器状态 | 用户操作产生；很多组件用；有时要保留 | Context（低频）、**Zustand**、Redux Toolkit、Jotai |
+| URL 状态 | 搜索词、页码、筛选条件 | 用户操作产生；页面和地址栏共用；刷新后要还在，要能分享 | 路由的查询参数 |
+| 表单状态 | 复杂多步表单 | 用户填写产生；表单内的组件用；提交前不必进入全局 | React Hook Form 等 |
 
 <CallBox kind="tip" label="要点">
 
 一个重要的认知转变：大多数“全局状态”其实是**服务端数据的缓存**。把这些数据交给 TanStack Query 这类库管理。这类库自带缓存、重新验证、去重和乐观更新。之后，真正需要全局管理的客户端 state 通常很少。
 
 </CallBox>
+
+试着自己归类。下面 6 份 state 各属于哪一类？
+
+- 商品列表页的“只看有货”开关，要能发链接给同事
+- 当前登录用户的信息（来自 `/api/me`）
+- 一个下拉菜单是否展开
+- 购物车里的商品，所有页面的顶栏都要显示数量
+- 评论区的评论列表
+- 三步注册向导里，用户填到一半的内容
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>对照答案<small>先自己想，再展开</small></summary>
+
+- “只看有货”：URL 状态。要分享，就要放进查询参数。
+- 登录用户信息：服务端状态。数据来自服务器，交给 TanStack Query 这类库。
+- 下拉菜单展开：局部 UI 状态。
+- 购物车数量：全局客户端状态。很多组件读它。如果购物车存在服务器上，它就是服务端状态。
+- 评论列表：服务端状态。
+- 注册向导的草稿：表单状态。
+
+同一份数据只放在一类里。把服务端数据复制一份进全局 store，就多了一个要手动同步的副本。
+
+</details>
 
 ## 外部 Store 的原理
 
@@ -35,7 +68,8 @@ Redux、Zustand 这类库把状态存在 React **外部**的一个普通 JS 对�
 ```jsx
 const value = useSyncExternalStore(
   subscribe,   // (callback) => unsubscribe：store 变化时调用 callback
-  getSnapshot  // () => 当前值：必须在没变化时返回相同的引用
+  getSnapshot, // () => 当前值：必须在没变化时返回相同的引用
+  getServerSnapshot // 可选：服务端渲染和水合时用的快照。用到服务端渲染就必须提供（第 29 课）
 );
 ```
 
@@ -94,7 +128,7 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-`getSnapshot` 必须在 store 没变化时返回**同一个引用**。如果 selector 每次都返回新对象（如 `s => ({ a: s.a, b: s.b })`），React 会认为值一直在变。结果是无限渲染。Zustand 为此提供了 `useShallow`。
+`getSnapshot` 必须在 store 没变化时返回**同一个引用**。如果 selector 每次都返回新对象（如 `s => ({ a: s.a, b: s.b })`），React 会认为值一直在变。在本课的迷你实现和 Zustand v5 中，结果是无限渲染（Zustand v4 只是多渲染几次，行为不同）。Zustand 为此提供了 `useShallow`。
 
 </CallBox>
 

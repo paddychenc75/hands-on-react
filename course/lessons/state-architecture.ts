@@ -4,7 +4,7 @@ export default {
   id: 'state-architecture',
   stage: 3,
   title: '状态管理架构',
-  mins: 22,
+  mins: 28,
   summary: '区分服务端状态与客户端状态，理解外部 store 的原理并亲手实现一个。',
   goals: [
     '能把一个 state 归类（局部、服务端、全局客户端、URL、表单），并选出合适的工具',
@@ -309,6 +309,13 @@ const store = {
       answer: 3,
       explain:
         'Context 的 value 一变，所有读取它的组件都会重新渲染，不管它们用到哪个字段。mousePos 一直在变，所以 useMemo 也拦不住：它的依赖里有 mousePos。memo 也没用：memo 只比较 props，Context 变化会绕过它。把变化频繁的数据拆出去，只订阅它的组件才更新。useMemo 是最有迷惑性的选项，它只在“value 内容没变、对象却是新的”时有用。',
+    },
+    {
+      q: '一个电商应用有下面四份 state。哪一份最适合交给 TanStack Query 这类库管理，而不是自己放进全局 store？',
+      options: ['用户选的深色或浅色主题', '商品列表页当前在第几页（要能分享链接）', '从 /api/products 取回的商品列表', '“加入购物车”弹窗是否打开'],
+      answer: 2,
+      explain:
+        '商品列表来自服务器，别人也可能改它，它是服务端状态：缓存、去重、失效和重新获取都该交给查询库。页码要能分享，应该放进 URL。弹窗开关是局部 UI 状态，一个组件的 useState 就够。主题是全局客户端状态，最有迷惑性：它确实要跨组件共享，但它不是从服务器取回的数据，查询库帮不上忙。',
     },
   ],
   plays: {

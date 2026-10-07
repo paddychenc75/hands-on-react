@@ -67,6 +67,12 @@ function App() {
 }
 ```
 
+<CallBox kind="warn" label="常见坑">
+
+如果项目用了服务端组件（第 29 课），要小心 `Tabs.List` 这种静态属性写法。`Tabs` 用了 `useState`，必须是客户端组件。在**服务端组件**里写 `<Tabs.List>` 会报错，因为服务端拿到的只是客户端模块的引用，不能再取它的属性。这时改成具名导出：`export { Tabs, TabList, Tab, TabPanel }`。Radix 的 `Tabs.Root`、`Tabs.List` 是整个模块的命名空间导入，不是组件上的静态属性，所以不受影响。
+
+</CallBox>
+
 ## 模式二：受控与非受控双模式
 
 好的组件支持两种模式。非受控模式：组件自己管理 state，开箱即用。受控模式：父组件管理 state，可以完全定制。判断依据是：使用者是否传入了 `value`。
@@ -92,17 +98,76 @@ function Toggle({ value, defaultValue = false, onChange }) {
 
 在 Hooks 出现之前（2019 年前），复用状态逻辑主要靠这两种模式。你仍会在老代码和一些库中看到它们：
 
-```jsx
-// Render Props：通过一个返回 JSX 的函数 prop 共享数据
-<MouseTracker render={({ x, y }) => <p>鼠标在 {x}, {y}</p>} />
+- **Render Props**：组件接收一个返回 JSX 的函数 prop，自己管 state，把数据交给这个函数去渲染。
+- **高阶组件（HOC）**：一个函数，接收一个组件，返回包着 state 的新组件，用 props 把数据注入给原组件。
 
-// 高阶组件 HOC：接收一个组件，返回增强后的新组件
-const UserProfileWithAuth = withAuth(UserProfile);
+下面用同一段逻辑（跟踪鼠标位置）写三遍。先看懂前两种的实现，再看自定义 Hook 怎样把它们简化。
 
-// 今天，绝大多数情况用自定义 Hook 更简单：
-const { x, y } = useMouse();
-const user = useAuth();
+```jsx play title="同一段逻辑的三种写法"
+import { useState } from 'react';
+
+const area = { border: '1px solid #bbb', padding: 8, marginBottom: 8 };
+
+// 写法一：HOC。接收组件，返回包着 state 的新组件，用 props 注入 pos
+function withMouse(Component) {
+  return function WithMouse(props) {
+    const [p, setP] = useState({ x: 0, y: 0 });
+    return (
+      <div style={area} onMouseMove={e => setP({ x: e.clientX, y: e.clientY })}>
+        <Component {...props} pos={p.x + ',' + p.y} />
+      </div>
+    );
+  };
+}
+// 另一个 HOC，也注入名为 pos 的 prop
+function withOrigin(Component) {
+  return function WithOrigin(props) {
+    return <Component {...props} pos="原点" />;
+  };
+}
+function ShowPos({ pos }) {
+  return <p>HOC：{pos}</p>;
+}
+const HocDemo = withMouse(withOrigin(ShowPos));
+
+// 写法二：Render Props。组件管 state，把数据交给 render 函数
+function Mouse({ render }) {
+  const [p, setP] = useState({ x: 0, y: 0 });
+  return (
+    <div style={area} onMouseMove={e => setP({ x: e.clientX, y: e.clientY })}>
+      {render(p)}
+    </div>
+  );
+}
+
+// 写法三：自定义 Hook。直接返回值，名字由调用者决定
+function useMouse() {
+  const [p, setP] = useState({ x: 0, y: 0 });
+  const bind = { onMouseMove: e => setP({ x: e.clientX, y: e.clientY }) };
+  return { x: p.x, y: p.y, bind };
+}
+function HookDemo() {
+  const { x, y, bind } = useMouse();
+  return (
+    <div style={area} {...bind}>
+      <p>Hook：{x},{y}</p>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <p>把鼠标移到下面的框里：</p>
+      <HocDemo />
+      <Mouse render={({ x, y }) => <p>Render Props：{x},{y}</p>} />
+      <HookDemo />
+    </div>
+  );
+}
 ```
+
+HOC 有一个固有的毛病：被包的组件看不出 `pos` 是哪个 HOC 注入的。两个 HOC 注入同名 prop 时，只有一个能留下来，另一个悄悄丢失，没有任何警告。Render Props 没有这个问题，但嵌套多了就是一层套一层的回调。自定义 Hook 两个毛病都没有。
 
 <CallBox kind="tip" label="要点">
 

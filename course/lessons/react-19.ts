@@ -4,7 +4,7 @@ export default {
   id: 'react-19',
   stage: 3,
   title: 'React 19 新特性',
-  mins: 25,
+  mins: 34,
   summary: 'Actions、useActionState、useOptimistic、use()、ref 作为 prop 等新能力。',
   goals: [
     '能说出一次异步提交要管理的 4 件事，以及 React 19 用哪个 API 接管每一件',
@@ -48,7 +48,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>补全 <code>useActionState(action, initialState)</code>，返回 <code>[state, dispatch, isPending]</code>。<code>dispatch(payload)</code> 调用 <code>action(上一次的 state, payload)</code>，把返回值存成新的 state。</li><li>等待 action 时，isPending 为 true。action 完成或抛错后，都要设回 false。</li><li>补全 <code>subscribeAction(prevState, formData)</code>：tries 加 1；邮箱不含 @，返回“邮箱格式不对”；服务器返回 false，返回“这个邮箱已经订阅过了”；成功时返回 <code>{ ok: true, tries }</code>。</li><li>不要修改 App。写完后，你的 subscribeAction 不用改，就能交给 React 19 真正的 useActionState。</li></ol>',
+    task: '<ol class="task-steps"><li>补全 <code>useActionState(action, initialState)</code>，返回 <code>[state, dispatch, isPending]</code>。<code>dispatch(payload)</code> 调用 <code>action(上一次的 state, payload)</code>，把返回值存成新的 state。</li><li>等待 action 时，isPending 为 true。action 完成或抛错后，都要设回 false。</li><li>补全 <code>subscribeAction(prevState, formData)</code>：tries 加 1；邮箱不含 @，返回“邮箱格式不对”；服务器返回 false，返回“这个邮箱已经订阅过了”；成功时返回 <code>{ ok: true, tries }</code>。</li><li>不要修改 App。写完后，你的 subscribeAction 不用改，就能交给 React 19 真正的 useActionState。</li></ol><p>迷你版和真正的 <code>useActionState</code> 有三处不同：① 真 Hook 的 action 抛错时，错误会交给最近的错误边界，不会“保持旧 state 继续用”。所以预期内的失败要用<b>返回值</b>表达（例如 <code>{ error }</code>），不要 throw。② 真 Hook 连续多次调用会<b>排队</b>依次执行，每次拿到上一次的结果；迷你版直接读闭包里的 state，快速连点会读到旧值。③ 真的 <code>formAction</code> 在 <code>&lt;form action&gt;</code> 之外调用时，必须包在 <code>startTransition</code> 里。</p>',
     starter: `import { useState } from 'react';
 
 // 模拟服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
