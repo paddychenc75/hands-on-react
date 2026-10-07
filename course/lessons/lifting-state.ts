@@ -23,14 +23,14 @@ export default {
     {
       q: '两个兄弟组件要显示同一份数据，并且都能修改它。最常见的做法是？',
       options: [
-        '各存一份 state，再用 effect 互相同步',
+        '两个组件各存一份 state，在各自的 onChange 里顺便改对方的那一份',
         '把 state 提升到共同父组件，再通过 props 传入',
-        '把 state 放在其中一个组件里，另一个用 ref 去读',
+        '把 state 放在其中一个组件里，另一个用 document.querySelector 去读',
         '放进模块顶层的变量，两个组件直接读写',
       ],
       answer: 1,
       explain:
-        '状态提升让数据只有一个来源。最迷惑的是第一项：两份 state 靠 effect 同步，中间总有一次渲染是不一致的，还会多渲染一次。模块变量被修改时，React 不知道，不会重新渲染。',
+        '状态提升让数据只有一个来源。最迷惑的是第一项：兄弟组件拿不到对方的 set 函数；即使想办法拿到，两份数据也要处处同时更新，漏一处就对不上。模块变量被修改时，React 不知道，不会重新渲染。',
     },
     {
       q: 'TempInput 通过 props 收到 <code>value</code> 和 <code>onChange</code>。用户在输入框里打字时，TempInput 应该怎么做？',
@@ -172,7 +172,7 @@ function App() {
       t.assert(panel, '找不到渲染 <section> 的组件。请保留 Panel 组件');
       t.assert(
         !hasState(panel),
-        'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上（用 effect 同步也会慢一拍）。请删掉 Panel 的 useState，只通过 props 接收 isActive',
+        'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上。请删掉 Panel 的 useState，只通过 props 接收 isActive',
       );
       let owner = panel.return;
       while (owner && !(isComp(owner) && hasState(owner))) owner = owner.return;

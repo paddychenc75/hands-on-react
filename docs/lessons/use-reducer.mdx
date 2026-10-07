@@ -108,11 +108,13 @@ function App() {
 
 reducer 必须是**纯函数**。同样的输入必须得到同样的输出。reducer 不发请求，不修改原来的 state，不使用随机数或 Date.now()。所以上例在 dispatch 之前生成 id，再放进 action。
 
+`default` 分支可以返回原 state，也可以抛出错误。抛出错误能尽早发现拼错的 `type`，本课示例用这种写法。
+
 </CallBox>
 
 <CallBox kind="deep" label="深入一点">
 
-useReducer 和下一课的 Context 可以组合使用，学完 Context 可以回来看这一段。把 state 和 dispatch 分别放进两个 Context。这样，任何深层组件都能读取 state 和派发 action。这正是 Redux 的核心思想，只不过用的是 React 内置能力。
+useReducer 可以和下一课的 Context 组合：把 `dispatch` 放进 Context，深层组件就能直接派发 action。第 18 课的看板项目会把 reducer 和 Context 组合起来。
 
 </CallBox>
 

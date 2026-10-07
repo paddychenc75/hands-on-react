@@ -89,6 +89,7 @@ function App() {
   );
 }`,
     hint: '用 <code>switch (action.type)</code>，每个分支返回一个新对象，例如 <code>return { count: state.count + 1 }</code>。',
+    exports: ['reducer'],
     faded: `import { useReducer } from 'react';
 
 function reducer(state, action) {
@@ -124,6 +125,14 @@ function App() {
       t.assert(c() === '2', '减 1 次后应为 2');
       await t.click(rst);
       t.assert(c() === '0', '重置后应为 0');
+      const r = t.exports.reducer;
+      t.assert(typeof r === 'function', '没有找到 reducer');
+      for (const type of ['increment', 'decrement', 'reset']) {
+        const s0 = { count: 1 };
+        const s1 = r(s0, { type });
+        t.assert(s1 && s1 !== s0 && s0.count === 1, `reducer 修改了原来的 state（${type}）。请返回新对象：return { count: state.count + 1 }`);
+      }
+      t.assert(r({ count: 1 }, { type: 'increment' }).count === 2, 'increment 应返回 count 加 1 的新对象');
     },
   },
   checkOnly: [

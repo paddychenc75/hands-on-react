@@ -16,11 +16,25 @@ React 推荐声明式写法：用 state 描述界面。但有些事无法用 pro
 
 本课的 5 个 API 就是为这些情况准备的“逃生舱”。逃生舱很有用，但只在需要时打开。每一节最后都会说明**什么时候不要用**。
 
-## 一、把 ref 传给自己的组件：forwardRef
+## 一、把 ref 传给自己的组件
 
-在 React 18 中，`ref` 不是普通 prop。你写 `<FancyInput ref={r} />` 时，函数组件**收不到**这个 ref。
+你写 `<FancyInput ref={r} />`，想让父组件拿到子组件里的 input。能不能做到，取决于 React 版本。
 
-解决方法是用 `forwardRef` 包装组件。包装后，组件函数会收到第二个参数：父组件传来的 ref。
+| | React 19 | React 18 |
+|---|---|---|
+| `ref` 是不是普通 prop | 是，函数组件直接从 props 里取 | 不是，函数组件**收不到** |
+| 怎样接收 | `function FancyInput({ ref, ...props })` | 用 `forwardRef` 包装，ref 是第二个参数 |
+| `forwardRef` | 不再需要，将来会被废弃 | 必须用 |
+
+React 19 的写法最短（只能阅读，实验台是 React 18）：
+
+```jsx title="React 19：ref 是普通 prop（只能阅读）"
+function FancyInput({ ref, ...props }) {
+  return <input ref={ref} {...props} />;
+}
+```
+
+本课的实验台运行 React 18.3.1，所以下面的示例用 React 18 的写法。读到旧项目里的 `forwardRef` 时，把它看成“让函数组件收到 ref 的包装”即可。
 
 ```jsx title="React 18：用 forwardRef 接收 ref"
 import { forwardRef } from 'react';
@@ -31,7 +45,7 @@ const FancyInput = forwardRef(function FancyInput(props, ref) {
 });
 ```
 
-这样写，父组件拿到的是**整个 input DOM 节点**。父组件可以改它的样式、内容，甚至删除它。这暴露得太多了。
+两种写法下，父组件拿到的都是**整个 input DOM 节点**。父组件可以改它的样式、内容，甚至删除它。这暴露得太多了。
 
 ## 二、只暴露几个方法：useImperativeHandle
 
@@ -87,9 +101,9 @@ useImperativeHandle 像自动售货机。机器外面只有几个按钮：选商
 
 </CallBox>
 
-<CallBox kind="deep" label="深入一点">
+<CallBox kind="tip" label="要点">
 
-React 19 起，`ref` 可以像普通 prop 一样传递：`function MyInput({ ref }) { … }`。不再需要 `forwardRef`，它将来会被废弃。本课的运行环境是 React 18.3，所以示例用 forwardRef。`useImperativeHandle` 在两个版本中用法相同。
+`useImperativeHandle` 在 React 18 和 19 中用法相同。区别只在第一个参数 ref 从哪里来：18 来自 `forwardRef` 的第二个参数，19 来自 props。
 
 </CallBox>
 
@@ -101,7 +115,7 @@ React 19 起，`ref` 可以像普通 prop 一样传递：`function MyInput({ ref
 
 ## 三、先测量，再绘制：useLayoutEffect
 
-一次更新分为几步。注意 3 和 5 的位置：
+一次更新分为几步。“渲染”和“提交”会在第 19 课细讲，这里先记住顺序。注意 3 和 5 的位置：
 
 1. **渲染**：React 调用组件函数。
 2. **提交**：React 修改真实 DOM。
