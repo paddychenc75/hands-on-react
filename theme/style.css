@@ -257,3 +257,89 @@ details.optional[open] { padding-bottom: 8px; }
 /* 侧栏：已学完的课（进度由 ProgressMarks 写入 data-hoc-done） */
 .rp-doc-layout__sidebar a[data-hoc-done] .rp-sidebar-item__right::after { content: "✓"; color: var(--good); font-weight: 700; margin-left: 6px; }
 .rp-prev-next-page { display: none; } /* 用自己的上一课/下一课（LessonFooter），避免重复 */
+
+/* ---------- 首页、复习页、阶段测验页（取自旧 style.css） ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 32px; align-items: center; padding-block: 12px 28px; }
+.eyebrow { font-size: 12px; letter-spacing: .16em; color: var(--accent); font-weight: 600; }
+.hero h1 { font-family: var(--f-display); font-weight: 900; font-size: clamp(34px, 5.4vw, 54px); line-height: 1.12; margin: 10px 0 14px; text-wrap: balance; letter-spacing: .01em; }
+.hero h1 em { font-style: normal; color: var(--accent); white-space: nowrap; }
+.hero p { color: var(--ink-2); font-size: 16px; max-width: 34em; margin: 0 0 20px; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; }
+.tree-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 14px 10px; box-shadow: var(--shadow); }
+.tree-card .cap { font-size: 12.5px; color: var(--ink-2); margin: 4px 4px 0; line-height: 1.6; }
+.tree-card svg { width: 100%; height: auto; display: block; }
+.tnode { cursor: pointer; }
+.tnode rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; transition: fill .2s; }
+.tnode text { fill: var(--ink); font: 600 12px var(--f-mono); text-anchor: middle; }
+.tnode .rc { fill: var(--ink-3); font: 400 10px var(--f-mono); }
+.tnode:hover rect { stroke: var(--accent); }
+.tnode.flash rect { animation: flash .8s ease; }
+@keyframes flash { 0% { fill: #ffd36b; stroke: #e0a520; } 100% { fill: var(--bg); } }
+.tedge { stroke: var(--line); stroke-width: 1.5; fill: none; }
+.stats { display: flex; gap: 28px; flex-wrap: wrap; margin: 6px 0 34px; padding: 16px 0; border-block: 1px solid var(--line); }
+.stats div { display: flex; flex-direction: column; }
+.stats b { font: 700 26px/1.1 var(--f-display); font-variant-numeric: tabular-nums; }
+.stats span { font-size: 13px; color: var(--ink-2); }
+.section-title { font-family: var(--f-display); font-size: 24px; margin: 0 0 6px; }
+.section-sub { color: var(--ink-2); margin: 0 0 18px; }
+.stages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stage-head { display: flex; align-items: baseline; gap: 10px; }
+.stage-no { font: 700 13px var(--f-mono); color: var(--accent); }
+.stage h3 { margin: 0; font-family: var(--f-display); font-size: 20px; }
+.stage .desc { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.65; }
+.stage ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.stage li a { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 6px; text-decoration: none; color: var(--ink); font-size: 14px; }
+.stage li a:hover { background: var(--accent-wash); }
+.stage li .dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ink-3); flex: none; }
+.stage li.done .dot { background: var(--good); border-color: var(--good); }
+.stage .meter { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; margin-top: auto; }
+.stage .meter .bar { flex: 1; width: auto; }
+.stage:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.stage-cta { display: flex; flex-direction: column; margin-top: 16px; padding: 14px 18px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); text-decoration: none; }
+.stage-cta span { font-size: 13.5px; opacity: .85; }
+.rv-progress { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--ink-2); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.rv-progress .bar { flex: 1; }
+.done-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.done-card.pass { border-color: var(--good); background: var(--good-wash); }
+.done-card b { font-family: var(--f-display); font-size: 19px; }
+.done-card span { color: var(--ink-2); }
+.wrong-list a { margin-right: 4px; }
+.methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 12px; }
+.methods div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.methods b { font-family: var(--f-display); font-size: 16px; }
+.methods i { font-style: normal; font-size: 12px; color: var(--violet); font-weight: 600; letter-spacing: .04em; }
+.methods p { margin: 4px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.65; }
+.mastered { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--good); }
+.check-link { font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.due { margin-left: auto; background: var(--sun); color: #fff; font: 600 11px/1 var(--f-mono); padding: 3px 7px; border-radius: 99px; }
+.hero p.prereq { font-size: 14px; color: var(--ink-2); background: var(--sun-wash); border-left: 3px solid var(--sun); border-radius: 0 8px 8px 0; padding: 8px 12px; }
+.hero p.prereq b { color: var(--ink); }
+.check-rule { font-size: 13.5px; color: var(--ink-3); margin: 0 0 4px; }
+@media (max-width: 880px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .stages, .methods { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 外壳：顶栏总进度、阅读进度条、侧栏动态标记 ---------- */
+.top-progress { margin-left: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.read-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 1000; background: var(--accent); transform-origin: 0 50%; transform: scaleX(0); pointer-events: none; }
+.rp-doc-layout__sidebar a[data-hoc-due]::after { content: attr(data-hoc-due); margin-left: auto; background: var(--sun); color: #fff; font: 600 11px/1 var(--f-mono); padding: 3px 7px; border-radius: 99px; }
+.rp-doc-layout__sidebar [data-hoc-cnt]::after { content: attr(data-hoc-cnt); margin-left: 8px; font: 500 11px var(--f-mono); color: var(--ink-3); }
+.stage-cta { display: flex; flex-direction: column; margin-top: 16px; padding: 14px 18px; border-radius: 12px; background: var(--accent); color: var(--accent-ink) !important; text-decoration: none; }
+.stage-cta span { font-size: 13.5px; opacity: .9; }
+.home { max-width: 1040px; margin: 0 auto; padding: 36px 24px 80px; }
+.home .hero h1 { margin-top: 10px; }
+@media (max-width: 480px) { .top-progress .bar { display: none; } .top-progress { margin-left: 6px; } }
+
+/* ---------- 版面：加宽课文区，实验台按自己的宽度决定左右还是上下排 ---------- */
+html:root { --rp-sidebar-width: 280px; --rp-outline-width: 190px; --rp-content-padding-x: 32px; --rp-content-max-width: 1120px; }
+.hoc-slot, .hoc-slot-pg { container-type: inline-size; container-name: pg; }
+/* 实验台宽度不足 900px 时，编辑器在上，预览和控制台在下，保证 60 字符的代码行不折行 */
+@container pg (max-width: 900px) {
+  .pg-body { grid-template-columns: minmax(0, 1fr); }
+  .preview-wrap { border-left: 0; border-top: 1px solid var(--line); }
+}
+.editor pre, .editor textarea { white-space: pre-wrap; }
+.rp-doc-footer, .rp-prev-next-page { display: none !important; } /* 自己的上一课/下一课在 LessonFooter */
+html.dark .btn.sun, html.dark .rp-doc .btn.sun, html.dark a[data-hoc-due]::after { color: #1b1204; }

@@ -1,3 +1,5 @@
 [
-  { "text": "课程", "link": "/lessons/what-is-react", "activeMatch": "^/lessons/" }
+  { "text": "课程", "link": "/lessons/what-is-react", "activeMatch": "^/lessons/" },
+  { "text": "今日复习", "link": "/review", "activeMatch": "^/review" },
+  { "text": "术语表", "link": "/glossary", "activeMatch": "^/glossary" }
 ]

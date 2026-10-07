@@ -13,5 +13,5 @@ function fixLinks(html: string) {
 
 export default function Raw({ html, tag = 'div', className }: { html: string; tag?: string; className?: string }) {
   const Tag = tag as any;
-  return <Tag className={className ? 'hoc ' + className : 'hoc'} dangerouslySetInnerHTML={{ __html: fixLinks(html) }} />;
+  return <Tag className={(className ? 'hoc ' + className : 'hoc') + (/\btbl\b/.test(className || '') ? ' rp-not-doc' : '')} dangerouslySetInnerHTML={{ __html: fixLinks(html) }} />;
 }
