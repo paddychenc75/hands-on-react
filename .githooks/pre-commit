@@ -1,0 +1,5 @@
+#!/bin/sh
+# 提交前检查（几秒）：Biome（格式 + lint）和内容校验。
+# 由 npm install 的 prepare 脚本启用（git config core.hooksPath .githooks）。
+# 临时跳过：git commit --no-verify
+npm run --silent lint && npm run --silent check:content

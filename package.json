@@ -11,11 +11,16 @@
     "preview": "rspress preview",
     "gen": "node scripts/gen-registry.mjs",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node tests/e2e/run.mjs",
-    "screenshots": "node tests/e2e/screenshots.mjs",
-    "test:unit": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write .",
     "check:content": "node --disable-warning=ExperimentalWarning scripts/check-content.mjs",
-    "new-lesson": "node --disable-warning=ExperimentalWarning scripts/new-lesson.mjs"
+    "test:unit": "vitest run",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "check": "npm run typecheck && npm run lint && npm run check:content && npm run test:unit",
+    "test": "npm run check && npm run build && npm run test:e2e",
+    "new-lesson": "node --disable-warning=ExperimentalWarning scripts/new-lesson.mjs",
+    "screenshots": "node tests/e2e/screenshots.mjs",
+    "prepare": "node scripts/setup-hooks.mjs"
   },
   "engines": {
     "node": ">=24"
