@@ -4,7 +4,7 @@ export default {
   id: 'error-handling',
   stage: 5,
   title: '错误处理与监控',
-  mins: 40,
+  mins: 41,
   summary: '错误边界只是起点。学会把异步错误交给边界、让边界可以重置、决定边界放在哪一层，再把错误连同上下文送到监控服务。',
   goals: [
     '能判断一个错误会到达错误边界、window 的 error 事件，还是 unhandledrejection 事件',
@@ -45,7 +45,7 @@ export default {
         'key 变化时，React 把它当成另一个组件：卸载旧的整棵子树，挂载新的。不管有没有出错，都会这样。resetKeys 只在边界处于出错状态时才起作用，平时子树正常更新，局部 state 保留。“没有区别”的误解在于把 key 当成了“出错时的开关”。',
     },
     {
-      q: '在开发环境中测试全局上报：一个组件渲染出错，被错误边界接住。监控后台收到了两条报告，一条来自边界的 onError，一条来自 window 的 error 事件。最可能的原因是？',
+      q: '在开发环境中测试全局上报：一个组件渲染出错，被错误边界接住。监控后台除了边界 onError 的报告，还收到了来自 window 的 error 事件的报告。最可能的原因是？',
       options: [
         '边界没有写好，错误漏到了外面',
         'componentDidCatch 被 React 调用了两次',
@@ -57,7 +57,7 @@ export default {
         'React 18 开发版本在组件出错后，用一个模拟事件重放这次渲染，让调试器停在出错位置。所以 window 的 error 事件也会收到这个错误，即使边界已经接住了它。生产版本没有这个重放。最迷惑的是“边界没有写好”：如果边界真的漏了，页面会显示上层的备用界面或白屏，而不是本边界的备用界面。',
     },
     {
-      q: '在 React 18.3.1 中，哪种情况会调用 createRoot 的 <code>onRecoverableError</code>？',
+      q: '在 React 18.3.1 中，哪种情况会调用根的 <code>onRecoverableError</code>（createRoot 或 hydrateRoot 的选项）？',
       options: [
         '子组件渲染出错，被错误边界接住，显示了备用界面',
         '水合时服务端 HTML 和客户端不一致，React 改为在客户端重新渲染',
@@ -82,7 +82,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>完成 <code>ErrorBoundary</code>。它接收三个 props：<code>fallbackRender</code>（必填，调用时传入 <code>{ error, reset }</code>）、<code>onError</code>（可选，在 componentDidCatch 中调用，传入 error 和 info）、<code>resetKeys</code>（可选的数组）。</li><li>reset 清除错误，重新渲染子组件。resetKeys 中的某一项变化时，边界也自动重置。要求：一次故障只调用一次 onError；父组件传入新数组但值没变时，不能重置。</li><li>完成 <code>useAsyncError()</code>：返回一个函数。把错误传给它，最近的错误边界就显示备用界面。</li><li>Weather 的“刷新”按钮请求失败时，现在错误无人处理。用 useAsyncError 把它交给边界。</li><li>在 App 中放置边界：个人资料和天气各用一个，备用界面用现成的 <code>WidgetFallback</code>，用 <code>report</code> 上报。选好每个边界的 resetKeys：切换用户或城市后，出错的面板自动恢复。一个面板出错时，另一个面板和“备忘”输入框都不受影响。</li><li>试一试：选“用户 3”（坏数据）；点“模拟故障”再点“刷新”。看控制台的上报。</li></ol>',
+    task: '<ol class="task-steps"><li>完成 <code>ErrorBoundary</code>。它接收三个 props：<code>fallbackRender</code>（必填，调用时传入 <code>{ error, reset }</code>）、<code>onError</code>（可选，在 componentDidCatch 中调用，传入 error 和 info）、<code>resetKeys</code>（可选的数组）。</li><li>reset 清除错误，重新渲染子组件。resetKeys 中的某一项变化时，边界也自动重置。要求：一次故障只调用一次 onError；父组件传入新数组但值没变时，不能重置。</li><li>完成 <code>useAsyncError()</code>：返回一个函数。把错误传给它，最近的错误边界就显示备用界面。</li><li>Weather 的“刷新”按钮请求失败时，现在错误无人处理。用 useAsyncError 把它交给边界。为了突出错误处理，这里没有处理竞态；真实代码要像第 42 课那样丢弃旧请求的结果和错误。</li><li>在 App 中放置边界：个人资料和天气各用一个，备用界面用现成的 <code>WidgetFallback</code>，用 <code>report</code> 上报。选好每个边界的 resetKeys：切换用户或城市后，出错的面板自动恢复。一个面板出错时，另一个面板和“备忘”输入框都不受影响。</li><li>试一试：选“用户 3”（坏数据）；点“模拟故障”再点“刷新”。看控制台的上报。</li></ol>',
     starter: `import { Component, useState, useEffect, useCallback } from 'react';
 
 // 模拟接口：failures 大于 0 时，请求失败

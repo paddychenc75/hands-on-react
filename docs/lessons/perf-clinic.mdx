@@ -20,6 +20,8 @@ title: "性能诊断实战"
 
 <Raw tag="figure" className="fig wide" html={"<div class=\"steps\"><div class=\"step\"><b>① 复现</b><span>把“很卡”变成固定的操作步骤</span></div><div class=\"step\"><b>② 测量</b><span>记下基线：提交次数、耗时、谁渲染了</span></div><div class=\"step\"><b>③ 假设</b><span>写成可验证的预测</span></div><div class=\"step\"><b>④ 修改</b><span>只改假设指向的一处</span></div><div class=\"step\"><b>⑤ 再测量</b><span>和基线比。没变，就撤销修改</span></div></div><figcaption>诊断流程：每一步都留下数字</figcaption>"} />
 
+<strong>先分诊。</strong>测量的第一件事是分清慢在哪一段。在 Performance 面板（4 倍 CPU 节流）录一次操作，看这次交互的三段：输入延迟（事件发生时主线程正忙）、处理耗时（事件处理函数加上 React 的渲染和提交）、呈现延迟（样式、布局、绘制）。只有第二段长，而且时间落在 React 的 Scheduler 轨道里（第 24 课），才继续用下面的 React 计数。第一段长，去找长任务（第三方脚本、同步的 localStorage 读写）；第三段长，去查 DOM 数量和布局。
+
 这五步看起来和第 24 课的四步相似。区别在第 ③ 步。面对陌生代码，你不知道该改哪里。所以先写下假设，再动手：
 
 - **坏的假设**：“可能是渲染太多了，加点 memo 试试。”它不能被证伪，改完也说不清是哪一处起了作用。
@@ -101,6 +103,8 @@ export default function App() {
 - **渲染次数**：在可疑组件里计数（只用于诊断，查完删掉）。和这次操作无关的组件应该是 0。
 - **监听器数量**：订阅集合的 size，或者在 Chrome 控制台运行 `getEventListeners(window)`。重复操作后数量应该不变。
 
+两点注意：开发环境开了 StrictMode 时，组件函数会执行两次，渲染计数翻倍，比较时看“是不是 0”和“倍数关系”；过渡更新可能渲染了却被打断，所以预算优先用提交次数。
+
 下面的示例复现 effect 连锁更新。切换分类后，列表要筛选，并默认选中第一件商品。先看控制台里每次点击产生几次提交，再勾选“渲染时计算”对比。
 
 ```jsx play title="一次点击，几次提交？"
@@ -180,7 +184,7 @@ export default function App() {
 
 | 预算项 | 示例上限 | 怎样检查 |
 |---|---|---|
-| 交互到下一帧（INP） | ≤ 200ms（Google 的“良好”线）；React 的渲染和提交部分 ≤ 100ms | 在 4 倍 CPU 节流下用 Performance 面板测；线上用真实用户数据 |
+| 交互到下一次绘制（INP） | ≤ 200ms（Google 的“良好”线；INP 是一次访问里最慢的那次交互，线上按第 75 百分位看）；React 的渲染和提交部分 ≤ 100ms | 在 4 倍 CPU 节流下用 Performance 面板测；线上用真实用户数据 |
 | 每次按键的提交次数 | 1 次 | Profiler onRender 计数，可以写成自动测试 |
 | 与操作无关的组件渲染 | 0 次 | 渲染计数，或 React DevTools 的高亮 |
 | 长任务 | 交互期间没有超过 50ms 的任务 | Performance 面板中带红色三角的任务 |

@@ -83,7 +83,7 @@ function App() {
 | 适合 | 输入时就要格式化、字段之间联动、实时预览 | 字段多、只在提交时用值 |
 | 难点 | 大表单的性能 | 联动和“边输入边校验”要另外处理 |
 
-两者可以混用：大部分字段非受控，少数需要联动的字段受控。React Hook Form 的思路更进一步：字段默认非受控，用 ref 注册；校验结果和错误按字段订阅，只有出错的那个字段重新渲染（见本课最后的选读）。
+两者可以混用：大部分字段非受控，少数需要联动的字段受控。React Hook Form 的思路更进一步：字段默认非受控，用 ref 注册；打字不触发 React 渲染；错误、是否提交中这类表单状态要读取了才订阅，没读的状态变化不会引起渲染（见本课最后的选读）。
 
 ## 二、一份规则，两端共用：schema
 
@@ -152,7 +152,13 @@ function App() {
 }
 ```
 
-真实的 Zod 还会做两件迷你版没做的事：把数据转换成目标类型（例如把字符串 "18" 变成数字 18），以及从 schema 推导 TypeScript 类型（`z.infer<typeof schema>`），表单的类型就不用再写一遍。
+真实的 Zod 4 里，邮箱这类格式写成顶层函数 `z.email()`。它还会做两件迷你版没做的事：把数据转换成目标类型（例如把字符串 "18" 变成数字 18），以及从 schema 推导 TypeScript 类型（`z.infer<typeof schema>`），表单的类型就不用再写一遍。
+
+<CallBox kind="tip" label="TS 写法">
+
+用 TypeScript 时，表单值的类型从 schema 推导，不手写第二遍：`type SignupValues = z.infer<typeof signupSchema>`。改了 schema，类型自动跟着变，表单代码里用错字段名会在编辑器里报错。
+
+</CallBox>
 
 <CallBox kind="warn" label="常见坑">
 
@@ -168,7 +174,7 @@ function App() {
 - **dirty**（已修改）：当前值和初始值不同。
 - **submitted**（已提交过）：用户点过一次提交。
 
-| 显示时机 | 效果 | 问题 |
+| 显示时机 | 效果 | 评价 |
 |---|---|---|
 | 输入时（onChange） | 反馈最快 | 用户刚打第一个字就看到“邮箱格式不正确”，像在被批评 |
 | 离开时（touched） | 用户写完再提醒 | 最常用的默认值 |
@@ -291,7 +297,7 @@ function AccountStep({ saved, dispatch }) {
 
 提交期间要做三件事：按钮禁用并显示“提交中…”；防止重复提交；结束后无论成功失败都恢复。前两件看起来是一件事，其实不是。
 
-按钮的 `disabled` 来自 state，它要等重新渲染后才生效。在同一个事件循环里触发的第二次提交（例如代码连续调用两次 `requestSubmit()`，或者处理函数先 `await` 了一个检查，再设置 submitting），读到的还是旧快照里的 `submitting === false`。
+按钮的 `disabled` 来自 state，它要等重新渲染后才生效。在 React 重新渲染之前触发的第二次提交（例如代码连续调用两次 `requestSubmit()`，或者处理函数先 `await` 了一个检查，再设置 submitting），读到的还是旧快照里的 `submitting === false`。用户真的连点两次时，两次点击之间 React 通常已经渲染完，按钮已经禁用。
 
 ```jsx title="ref 挡住重复调用，state 负责显示"
 const submittingRef = useRef(false);
@@ -319,13 +325,13 @@ async function handleSubmit(e) {
 
 ## 七、React 19 的表单 Actions（只能阅读）
 
-第 28 课讲过 `useActionState` 和 `useFormStatus`。它们正好接管了本课的几件事：Action 收到 FormData；返回值就是字段错误；isPending 就是提交中。下面的代码需要 React 19，本页的运行环境是 18.3.1，只能阅读。
+第 28 课讲过 `useActionState` 和 `useFormStatus`。它们正好接管了本课的几件事：Action 收到 FormData；返回值就是字段错误；isPending 就是提交中。下面的代码需要 React 19 和支持 Server Functions 的框架（这里以 Next.js 为例，`redirect` 来自 `next/navigation`），本页的运行环境是 18.3.1，只能阅读。
 
-```jsx title="React 19：同一份 schema，客户端组件 + Server Function"
+```tsx title="React 19：同一份 schema，客户端组件 + Server Function"
 // schema.js：客户端和服务器共用
 export const signupSchema = z.object({
   username: z.string().min(3, '用户名至少 3 个字符'),
-  email: z.string().email('邮箱格式不正确'),
+  email: z.email('邮箱格式不正确'),
 });
 
 // actions.js
@@ -333,7 +339,7 @@ export const signupSchema = z.object({
 export async function signup(prevState, formData) {
   const values = Object.fromEntries(formData);
   const result = signupSchema.safeParse(values);       // 服务器再校验一次
-  if (!result.success) return { values, errors: result.error.flatten().fieldErrors };
+  if (!result.success) return { values, errors: z.flattenError(result.error).fieldErrors };
   if (await db.user.exists(values.username)) {          // 只有服务器能判断唯一
     return { values, errors: { username: ['用户名已被占用'] } };
   }
@@ -362,6 +368,8 @@ export function SignupForm() {
 }
 ```
 
+Action 结束后，React 会重置表单里的非受控字段。所以校验失败时要把 values 一起返回，再用 `defaultValue` 填回去，否则用户要重填。
+
 Actions 没有替你做的事：错误什么时候显示（它只在提交后返回错误）、异步检查的竞态、多步表单。同一个 useActionState 的多次提交会**排队依次执行**，不会自动去重，所以按钮仍然要禁用。
 
 <details className="optional">
@@ -369,7 +377,7 @@ Actions 没有替你做的事：错误什么时候显示（它只在提交后返
 
 React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 41 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
 
-需要显示的东西（某个字段的错误、是否提交中）通过订阅读取。`formState.errors.email` 只有在 email 的错误变化时才让组件重新渲染。校验交给 resolver，传入 Zod schema 即可：`useForm({ resolver: zodResolver(schema), mode: 'onTouched' })`。`mode: 'onTouched'` 就是本课第三节推荐的“离开时显示，显示后输入时更新”。
+需要显示的东西（某个字段的错误、是否提交中）通过订阅读取。`formState` 是一个 Proxy：组件读了 `formState.errors`，才会在错误变化时重新渲染；没读 `isDirty`，它变化就不渲染。注意粒度是“哪一种状态”，不是“哪一个字段”：任何字段的错误变化，读了 `errors` 的组件都会渲染，而且渲染的是调用 `useForm` 的那个组件。想让一个字段的错误只重新渲染这个字段，把它拆成子组件，在里面用 `useFormState({ control, name: 'email' })`。拆出去的子组件所在的父组件自己不要再读 `formState`，否则父组件一渲染，子组件照样跟着渲染。校验交给 resolver，传入 Zod schema 即可：`useForm({ resolver: zodResolver(schema), mode: 'onTouched' })`。`mode: 'onTouched'` 就是本课第三节推荐的“离开时显示，显示后输入时更新”。
 
 </details>
 

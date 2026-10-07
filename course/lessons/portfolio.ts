@@ -4,8 +4,8 @@ export default {
   id: 'portfolio',
   stage: 5,
   title: '毕业设计：从练习到作品集',
-  mins: 15,
-  summary: '在自己的电脑上做三个真正的项目，把这门课学到的一切用起来。本课约 15 分钟读完；三个项目在课外完成，合计约 50–80 小时。',
+  mins: 18,
+  summary: '在自己的电脑上做三个真正的项目，把这门课学到的一切用起来。本课约 18 分钟读完；三个项目在课外完成，合计约 50–80 小时。',
   goals: [
     '能用 Vite 在本地创建并运行一个 React + TypeScript 项目',
     '能说出三个项目的每条需求要用到哪一课的知识',
@@ -59,7 +59,7 @@ export default {
   ],
   checkOnly: [
     {
-      q: `记账本这样读取本地数据。这行代码有什么问题？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [items, setItems] = useState(
+      q: `记账本这样读取本地数据。先不考虑类型，这行代码有什么问题？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [items, setItems] = useState(
   JSON.parse(localStorage.getItem('items')) ?? []
 );</code></pre></div>`,
       options: [
@@ -73,13 +73,13 @@ export default {
         'useState 的参数只在第一次渲染时使用，但表达式每次渲染都会执行。数据多时会浪费时间。传入函数 <code>useState(() =&gt; …)</code>，React 只在第一次调用它。另外，<code>JSON.parse(null)</code> 返回 null，不会报错，所以 <code>?? []</code> 能正常兜底。',
     },
     {
-      q: `记账本（Vite + TypeScript）里，item 的类型是 <code>Item</code>，id 是 number。这行删除代码会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;button onClick={() =&gt;
+      q: `记账本（Vite + TypeScript）里，item 的类型是 <code>Item</code>，id 是 number。编辑器和 <code>tsc --noEmit</code> 会对这行删除代码怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;button onClick={() =&gt;
   setItems(items.filter(i =&gt; i !== item.id))
 }&gt;删除&lt;/button&gt;</code></pre></div>`,
       options: ['正常删除这一项', 'TypeScript 编译报错', '把所有记录都删掉', '编译通过，运行时什么都没删，也没有提示'],
       answer: 1,
       explain:
-        '<code>i</code> 是 Item 对象，<code>item.id</code> 是数字，两者永远不相等，filter 会保留所有记录。TypeScript 能发现这种比较：类型完全没有重叠时，它报错“This comparison appears to be unintentional”。正确写法：<code>i.id !== item.id</code>。“运行时什么都没删”是纯 JavaScript 项目里会发生的事；用了 TypeScript，这个 bug 在编译时就被拦下了。',
+        '<code>i</code> 是 Item 对象，<code>item.id</code> 是数字，两者永远不相等，filter 会保留所有记录。TypeScript 能发现这种比较：类型完全没有重叠时，它报错“This comparison appears to be unintentional”。正确写法：<code>i.id !== item.id</code>。“运行时什么都没删”是纯 JavaScript 项目里会发生的事；用了 TypeScript，这个 bug 在编译时就被拦下了。注意 Vite 的开发服务器不做类型检查，页面照样能跑、什么都删不掉，所以要让编辑器和 CI 运行 tsc。',
     },
   ],
   plays: {},

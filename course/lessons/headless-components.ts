@@ -78,7 +78,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>实现 <code>useListbox({ options, value, defaultValue, onChange })</code>。<code>options</code> 是 <code>{ value, label }</code> 数组。返回 <code>{ selectedValue, activeIndex, getListboxProps, getOptionProps }</code>。</li><li>受控与非受控：传了 <code>value</code>（包括 <code>null</code>）就是受控，只调用 <code>onChange(选项的 value)</code>。没传就用内部 state，初始值为 <code>defaultValue</code>，选中时也调用 onChange。</li><li>高亮（activeIndex）和选中分开。初始高亮已选中的项，没有选中项时高亮第 0 项。</li><li><code>getListboxProps(props)</code> 返回使用者的 props，再加上：<code>role="listbox"</code>、<code>tabIndex: 0</code>、指向高亮项 id 的 <code>aria-activedescendant</code>、<code>onKeyDown</code>。使用者传的 onKeyDown 也要调用。</li><li>键盘：ArrowDown / ArrowUp 移动高亮，到头停住（不循环）；Home / End 到第一项 / 最后一项；这四个键要调用 <code>preventDefault()</code>。Enter 选中高亮的项。</li><li><code>getOptionProps(index, props)</code> 返回使用者的 props，再加上：唯一且稳定的 <code>id</code>（用 useId）、<code>role="option"</code>、<code>aria-selected</code>（选中项为 true，其他为 false）、<code>onClick</code>（选中并高亮这一项，同时调用使用者的 onClick）。</li><li>不要修改 Listbox 和 App。检查程序会用你的 useListbox 另外渲染几个组件来测试。</li></ol>',
+    task: '<ol class="task-steps"><li>实现 <code>useListbox({ options, value, defaultValue, onChange })</code>。<code>options</code> 是 <code>{ value, label }</code> 数组。返回 <code>{ selectedValue, activeIndex, getListboxProps, getOptionProps }</code>。</li><li>受控与非受控：传了 <code>value</code>（包括 <code>null</code>）就是受控，只调用 <code>onChange(选项的 value)</code>。没传就用内部 state，初始值为 <code>defaultValue</code>，选中时也调用 onChange。</li><li>高亮（activeIndex）和选中分开。初始高亮已选中的项，没有选中项时高亮第 0 项。父组件之后改 value 时，高亮不必跟着移动，本练习不检查。</li><li><code>getListboxProps(props)</code> 返回使用者的 props，再加上：<code>role="listbox"</code>、<code>tabIndex: 0</code>、指向高亮项 id 的 <code>aria-activedescendant</code>、<code>onKeyDown</code>。使用者传的 onKeyDown 也要调用。</li><li>键盘：ArrowDown / ArrowUp 移动高亮，到头停住（不循环）；Home / End 到第一项 / 最后一项；这四个键要调用 <code>preventDefault()</code>。Enter 或空格选中高亮的项（空格也要 <code>preventDefault()</code>，否则页面会滚动）。</li><li><code>getOptionProps(index, props)</code> 返回使用者的 props，再加上：唯一且稳定的 <code>id</code>（用 useId）、<code>role="option"</code>、<code>aria-selected</code>（选中项为 true，其他为 false）、<code>onClick</code>（选中并高亮这一项，同时调用使用者的 onClick）。</li><li>不要修改 Listbox 和 App。检查程序会用你的 useListbox 另外渲染几个组件来测试。</li></ol>',
     starter: `import { useState, useId } from 'react';
 
 function useListbox({ options, value, defaultValue = null, onChange }) {
@@ -161,7 +161,7 @@ function useListbox({ options, value, defaultValue = null, onChange }) {
     else if (e.key === 'ArrowUp') next = Math.max(active - 1, 0);
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = last;
-    else if (e.key === 'Enter') { e.preventDefault(); select(active); return; }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(active); return; }
     else return;
     e.preventDefault();
     setActive(next);
@@ -174,7 +174,7 @@ function useListbox({ options, value, defaultValue = null, onChange }) {
       ...props,
       role: 'listbox',
       tabIndex: 0,
-      'aria-activedescendant': optionId(active),
+      'aria-activedescendant': options.length ? optionId(active) : undefined,
       onKeyDown: (e) => {
         if (props.onKeyDown) props.onKeyDown(e);
         handleKeyDown(e);
@@ -264,7 +264,7 @@ function useListbox({ options, value, defaultValue = null, onChange }) {
     else if (e.key === 'ArrowUp') next = Math.max(active - 1, 0);
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = last;
-    else if (e.key === 'Enter') { e.preventDefault(); select(active); return; }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(active); return; }
     else return;
     e.preventDefault();
     setActive(next);
@@ -459,7 +459,7 @@ function App() {
         t.assert(log.keys === 1, '使用者传给 getListboxProps 的 onKeyDown 没有被调用。getter 返回的 onKeyDown 要先调用使用者的，再处理自己的按键（步骤 4）');
         t.assert(active() === '丙', '按 ArrowDown 后，高亮应从“乙”移到“丙”，aria-activedescendant 实际指向：' + (active() || '找不到的元素') + '（步骤 5）');
         t.assert(ev.defaultPrevented, '方向键要调用 e.preventDefault()，否则页面会跟着滚动（步骤 5）');
-        t.assert(selected().join() === '乙', '方向键只移动高亮，不改变选中项。按 Enter 才选中。现在选中的是：' + selText() + '（步骤 3、5）');
+        t.assert(selected().join() === '乙', '方向键只移动高亮，不改变选中项。按 Enter 或空格才选中。现在选中的是：' + selText() + '（步骤 3、5）');
         t.assert(
           lis()
             .map(li => li.id)
@@ -480,6 +480,10 @@ function App() {
         await press('ArrowUp');
         await press('Enter');
         t.assert(selected().join() === '丙', '高亮“丙”时按 Enter，应只有“丙”被选中，实际为：' + selText() + '（步骤 2、5）');
+        await press('ArrowDown');
+        ev = await press(' ');
+        t.assert(selected().join() === '丁', '高亮“丁”时按空格，也应选中“丁”，实际为：' + selText() + '（步骤 2、5）');
+        t.assert(ev.defaultPrevented, '空格也要调用 e.preventDefault()，否则页面会跟着滚动（步骤 5）');
 
         lis()[3].click();
         await t.wait(30);
