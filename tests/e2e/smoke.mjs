@@ -231,6 +231,29 @@ for (const id of LESSONS) {
   ok(mark.length === 1 && /what-is-react/.test(mark[0]), 'f. 本课完成后侧栏里这一课有标记', JSON.stringify(mark));
 }
 
+/* b2. 预览区的站点默认样式是零优先级：作者写的单类选择器能覆盖它（回归：.preview button 曾盖住学习者的 .x { background }） */
+{
+  await openLesson('components-props');
+  const pg = page.locator('.pg', { hasText: '用 className 和 variant 加样式' });
+  await pg.scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => [...document.querySelectorAll('.pg')].some(p => p._ran && p.querySelector('.preview button.button-primary')), null, {
+    timeout: 30000,
+  });
+  const c = await pg.evaluate(p => {
+    const b = p.querySelector('.preview button.button-primary');
+    const cs = getComputedStyle(b);
+    // 再在同一预览区注入最小例子：<button class="x"> + .x { background }
+    const pv = p.querySelector('.preview');
+    pv.insertAdjacentHTML('beforeend', '<style>.x{background: rgb(1, 2, 3)}</style><button class="x">x</button><button class="y">y</button>');
+    return { bg: cs.backgroundColor, fg: cs.color, x: getComputedStyle(pv.querySelector('button.x')).backgroundColor };
+  });
+  ok(
+    c.bg === 'rgb(8, 126, 164)' && c.fg === 'rgb(255, 255, 255)' && c.x === 'rgb(1, 2, 3)',
+    'b2. 预览区里单类选择器的作者样式盖过站点默认样式',
+    JSON.stringify(c),
+  );
+}
+
 /* g. 390px 宽度下没有横向滚动：首页、复习页、术语表和全部 46 课（实验台都运行之后再量） */
 {
   const { lessonOrder } = await import('./_site.mjs');

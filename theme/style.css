@@ -25,7 +25,7 @@ html.dark {
 .hoc, .hoc * { box-sizing: border-box; }
 .hoc { color: var(--ink); }
 .hoc :not(pre) > code { font-family: var(--f-mono); font-size: .88em; background: var(--accent-wash); color: var(--ink); padding: .1em .38em; border-radius: 4px; }
-.hoc button { font: inherit; color: inherit; }
+:where(.hoc button) { font: inherit; color: inherit; }
 .hoc-slot:empty { min-height: 40px; }
 .hoc-slot-pg:empty { min-height: 260px; }
 
@@ -115,13 +115,14 @@ html.dark {
 .preview-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
 .preview-bar span { margin-left: 6px; font-family: var(--f-mono); }
 .preview { flex: 1; background: var(--pv-bg); color: var(--pv-ink); padding: 14px; overflow: auto; font: 14px/1.5 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; color-scheme: light; min-height: 140px; }
-.preview button { font: inherit; padding: 4px 10px; margin: 2px; border: 1px solid #b7c4ca; border-radius: 6px; background: #f4f7f8; color: #15232a; cursor: pointer; }
-.preview button:hover { background: #e7eef1; }
-.preview button:disabled { opacity: .5; cursor: default; }
-.preview input:not([type=checkbox]), .preview select { font: inherit; padding: 4px 8px; border: 1px solid #b7c4ca; border-radius: 6px; background: #fff; color: #15232a; margin: 2px; }
-.preview h1, .preview h2, .preview h3, .preview h4 { margin: .3em 0; }
-.preview p { margin: .4em 0; }
-.preview pre { font: 12px/1.5 var(--f-mono); background: #f2f5f6; padding: 8px; border-radius: 6px; overflow: auto; }
+/* 预览区里裸元素的默认外观：必须是零优先级（:where），任何作者样式都能覆盖；不要给这些规则加 class 或 id */
+:where(.preview button) { font: inherit; padding: 4px 10px; margin: 2px; border: 1px solid #b7c4ca; border-radius: 6px; background: #f4f7f8; color: #15232a; cursor: pointer; }
+:where(.preview button:hover) { background: #e7eef1; }
+:where(.preview button:disabled) { opacity: .5; cursor: default; }
+:where(.preview input:not([type=checkbox]), .preview select) { font: inherit; padding: 4px 8px; border: 1px solid #b7c4ca; border-radius: 6px; background: #fff; color: #15232a; margin: 2px; }
+:where(.preview h1, .preview h2, .preview h3, .preview h4) { margin: .3em 0; }
+:where(.preview p) { margin: .4em 0; }
+:where(.preview pre) { font: 12px/1.5 var(--f-mono); background: #f2f5f6; padding: 8px; border-radius: 6px; overflow: auto; }
 .preview .pv-empty { color: #7d8f98; font-size: 13px; }
 .preview .pv-err { color: #b3261e; background: #fdecea; border-radius: 8px; padding: 10px 12px; font: 12.5px/1.6 var(--f-mono); white-space: pre-wrap; }
 .console { border-top: 1px solid var(--line); background: var(--bg); font: 12px/1.6 var(--f-mono); max-height: 170px; overflow: auto; }

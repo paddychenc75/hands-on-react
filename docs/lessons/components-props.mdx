@@ -142,13 +142,13 @@ function App() {
 
 用 `className` 指定 CSS 类名，样式写在 CSS 文件里。`className` 接收一个字符串。常见做法是让组件的 prop 决定类名：
 
-- `variant` 这样的 prop 对应一个类名，例如 `className={'btn btn-' + variant}`。
+- `variant` 这样的 prop 对应一个类名，例如 `className={'button button-' + variant}`。
 - 条件类名：用模板字符串，或者把类名放进数组再 `filter(Boolean).join(' ')`。
 - 内联 `style` 只用于随数据变化的数值，例如进度条的宽度。固定样式放进 CSS。
 
 ```jsx play title="用 className 和 variant 加样式"
 function Button({ variant = 'primary', disabled, children }) {
-  const cls = ['btn', 'btn-' + variant, disabled && 'btn-disabled'].filter(Boolean).join(' ');
+  const cls = ['button', 'button-' + variant, disabled && 'button-disabled'].filter(Boolean).join(' ');
   return <button className={cls} disabled={disabled}>{children}</button>;
 }
 
@@ -156,10 +156,10 @@ function App() {
   return (
     <div>
       <style>{`
-        .preview button.btn { padding: 6px 14px; margin: 4px; border: 0; border-radius: 6px; color: white; }
-        .preview button.btn-primary, .preview button.btn-primary:hover { background: #087ea4; }
-        .preview button.btn-danger, .preview button.btn-danger:hover { background: crimson; }
-        .preview button.btn-disabled { opacity: 0.4; }
+        .button { padding: 6px 14px; margin: 4px; border: 0; border-radius: 6px; color: white; }
+        .button-primary { background: #087ea4; }
+        .button-danger { background: crimson; }
+        .button-disabled { opacity: 0.4; }
       `}</style>
       <Button>保存</Button>
       <Button variant="danger">删除</Button>
@@ -169,7 +169,7 @@ function App() {
 }
 ```
 
-真实项目里，样式写在 `.css` 文件中，用 `import './app.css'` 引入。本站实验台没有文件，所以这里把 CSS 放进 `<style>` 标签（选择器前面的 `.preview button` 是为了盖过本站预览区对按钮的默认样式，真实项目里直接写 `.btn` 就行）。
+真实项目里，样式写在 `.css` 文件中，用 `import './app.css'` 引入。本站实验台没有文件，所以这里把 CSS 放进 `<style>` 标签。
 
 <CallBox kind="tip" label="要点">
 

@@ -136,7 +136,7 @@ function App() {
       pkey: 'components-props|渲染时修改外部变量',
     },
     '用 className 和 variant 加样式': {
-      note: '同一个 Button，variant 不同就对应不同的类名，外观随之变化。disabled 为 true 时才加上 btn-disabled。',
+      note: '同一个 Button，variant 不同就对应不同的类名，外观随之变化。disabled 为 true 时才加上 button-disabled。',
     },
   },
 } satisfies Lesson;
