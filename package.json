@@ -12,7 +12,8 @@
     "gen": "node scripts/gen-registry.mjs",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node tests/e2e/run.mjs",
-    "screenshots": "node tests/e2e/screenshots.mjs"
+    "screenshots": "node tests/e2e/screenshots.mjs",
+    "test:unit": "vitest run"
   },
   "engines": {
     "node": ">=24"
