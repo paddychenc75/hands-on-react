@@ -251,7 +251,7 @@ function App() {
       const fn = t.exports.resolveRoute;
       t.assert(typeof fn === 'function', '找不到函数 resolveRoute。不要改它的名字');
       for (const [url, want, why] of CASES) {
-        let got;
+        let got: any;
         try { got = fn(url, FILES2.slice()); } catch (e) { t.assert(false, 'resolveRoute(\'' + url + '\') 报错：' + e.message); }
         const show = JSON.stringify(got);
         if (want === null) {

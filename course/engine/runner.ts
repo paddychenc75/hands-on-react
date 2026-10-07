@@ -15,7 +15,7 @@ function formatArg(a: any): string {
   if (a instanceof Error) return a.name + ': ' + a.message;
   if (typeof a === 'function') return 'ƒ ' + (a.name || 'anonymous') + '()';
   if (a && a.nodeType) return '<' + (a.nodeName || 'node').toLowerCase() + '>';
-  try { return JSON.stringify(a, (_k, v) => (v && v.$$typeof ? '[React 元素]' : v), 2); } catch (e) { return String(a); }
+  try { return JSON.stringify(a, (_k, v) => (v && v.$$typeof ? '[React 元素]' : v), 2); } catch { return String(a); }
 }
 
 function makeBoundary(onError: (err: Error) => void) {
@@ -57,7 +57,7 @@ export class Runner {
   unmount() {
     this.gen++;
     this.clearTimers();
-    if (this.root) { try { this.root.unmount(); } catch (e) {} this.root = null; }
+    if (this.root) { try { this.root.unmount(); } catch {} this.root = null; }
     this.mount.innerHTML = '';
   }
   run(source: string, exportNames?: string[]): { error?: any; App?: any; exports?: Record<string, any> } {
@@ -71,7 +71,7 @@ export class Runner {
       table: (...a: any[]) => self.log('log', a), clear: () => { self.consoleEl.innerHTML = ''; },
     };
     const wrapTimer = (fn: (...args: any[]) => any) => (cb: (...args: any[]) => void, ms?: number, ...rest: any[]) => {
-      const id = fn(function (this: any) { if (gen === self.gen) { try { cb.apply(this, arguments as any); } catch (e) { self.log('error', ['运行时错误：' + explainError(e)]); } } }, ms, ...rest);
+      const id = fn(function (this: any, ...args: any[]) { if (gen === self.gen) { try { cb.apply(this, args); } catch (e) { self.log('error', ['运行时错误：' + explainError(e)]); } } }, ms, ...rest);
       self.timers.add(id); return id;
     };
     const sandbox = {

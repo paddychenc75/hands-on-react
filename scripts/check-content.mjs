@@ -221,10 +221,10 @@ if (!snap) {
   else fail(rel(SNAPSHOT), '快照文件不存在', '运行 npm run check:content -- --update 生成，并提交它');
 } else {
   const snapProblems = [];
-  const tail = (id, kind) => (kind === 'c' ? 'checkOnly' : 'quiz');
+  const tail = (kind) => (kind === 'c' ? 'checkOnly' : 'quiz');
   for (const [key, fp] of Object.entries(snap.cards)) {
-    const [id, qi] = key.split('#');
-    const field = tail(id, qi[0] === 'c' ? 'c' : 'q');
+    const [, qi] = key.split('#');
+    const field = tail(qi[0]);
     if (!(key in currentCards)) {
       snapProblems.push(`${key} 消失了（${id} 的 ${field} 里没有这一题了）。学习者记录里的这张卡片会对不上。恢复这道题，不要删中间的题；要停用就留在原位。`);
     } else if (currentCards[key] !== fp) {

@@ -14,6 +14,7 @@ export function useSlot<N extends HTMLElement = HTMLElement>(
 ) {
   const lesson = useLesson();
   const ref = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 依赖是课 id 加调用方给的 deps；build、cleanup 每次渲染都是新函数，放进依赖会让 DOM 反复重建
   useEffect(() => {
     const host = ref.current;
     if (!host || !lesson) return;
@@ -34,7 +35,6 @@ export function useSlot<N extends HTMLElement = HTMLElement>(
       dead = true;
       if (node) { cleanup?.(node); node.remove(); }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.id, ...deps]);
   return { ref, lesson };
 }

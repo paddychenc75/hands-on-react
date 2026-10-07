@@ -8,8 +8,7 @@ export function markTerms(root: HTMLElement): void {
   terms.forEach(g => {
     const re = /^[A-Za-z]/.test(g.term) ? new RegExp('(?<![A-Za-z])' + g.term + '(?![A-Za-z])') : new RegExp(g.term);
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    let n: Text;
-    while ((n = walker.nextNode() as Text)) {
+    for (let n = walker.nextNode() as Text; n; n = walker.nextNode() as Text) {
       if (skip(n)) continue;
       const m = n.nodeValue.match(re);
       if (!m) continue;

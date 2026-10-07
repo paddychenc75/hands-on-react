@@ -4,7 +4,7 @@ export const HOOK_NAMES = ['useState', 'useEffect', 'useLayoutEffect', 'useRef',
 export function prepare(source: string, exportNames?: string[]): string {
   const imported = new Set<string>();
   const fromDom = new Set<string>();
-  let code = source.replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm, (_m: string, what: string, from: string) => {
+  const code = source.replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm, (_m: string, what: string, from: string) => {
     if (from === 'react' || from === 'react-dom' || from === 'react-dom/client') {
       const braces = what.match(/\{([\s\S]*)\}/);
       if (braces) braces[1].split(',').map(s => s.trim()).filter(Boolean).forEach(s => {

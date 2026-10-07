@@ -37,7 +37,7 @@ export function makeEditor(initial: string, onChange?: (value: string) => void):
     } else if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.isComposing) {
       const line = v.slice(lineStart, s);
       let indent = line.match(/^\s*/)[0];
-      const opens = /[{(\[]\s*$/.test(line) || /<[A-Za-z][^>]*[^/]>\s*$/.test(line);
+      const opens = /[{([]\s*$/.test(line) || /<[A-Za-z][^>]*[^/]>\s*$/.test(line);
       if (opens) indent += '  ';
       e.preventDefault();
       // 光标在一对括号或标签之间：闭合部分放到下一行
@@ -68,7 +68,7 @@ export function makeEditor(initial: string, onChange?: (value: string) => void):
     // execCommand 会进入浏览器的撤销栈，Ctrl/⌘ + Z 可以撤销；不支持时退回 setRangeText
     ta.focus();
     let ok = false;
-    try { ok = document.execCommand('insertText', false, text); } catch (err) { ok = false; }
+    try { ok = document.execCommand('insertText', false, text); } catch { ok = false; }
     if (!ok) {
       ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end');
       ta.dispatchEvent(new Event('input'));

@@ -18,13 +18,16 @@ export function makeCheck(si: number): HTMLDivElement {
   const area = el('div', { class: 'quiz' });
   const run = () => {
     area.innerHTML = '';
-    const st0 = (progress.__stage = progress.__stage || {});
-    let rec0: StageRecord = st0[si] = st0[si] || {};
+    progress.__stage = progress.__stage || {};
+    const st0 = progress.__stage;
+    st0[si] = st0[si] || {};
+    let rec0: StageRecord = st0[si];
     let notice = '';
     if (rec0.pending) {
       // 上次答到一半就离开：按已答的题计分，未答的算错
       const pd = rec0.pending;
-      rec0 = st0[si] = settlePending(rec0);
+      st0[si] = settlePending(rec0);
+      rec0 = st0[si];
       save(); emitProgress();
       notice = `上次测验答了 ${pd.answered}/${pd.n} 题就离开了，按“未通过”记录（没答的题算错）。`;
     }
@@ -42,13 +45,13 @@ export function makeCheck(si: number): HTMLDivElement {
     area.appendChild(el('p', { class: 'check-rule' }, '交卷模式：每题选一次，全部答完后统一显示对错和解析。中途离开按未通过记录。'));
     // 一半是课内见过的题，一半是只在阶段测验出现的新题，检验能否迁移
     const pool: Card[] = [], fresh: Card[] = [];
-    ls.forEach(l => (l.quiz || []).forEach((item, qi) => pool.push(cardOf(l.id + '#' + qi))));
-    ls.forEach(l => (l.checkOnly || []).forEach((item, qi) => fresh.push(cardOf(l.id + '#c' + qi))));
+    ls.forEach(l => (l.quiz || []).forEach((_item, qi) => pool.push(cardOf(l.id + '#' + qi))));
+    ls.forEach(l => (l.checkOnly || []).forEach((_item, qi) => fresh.push(cardOf(l.id + '#c' + qi))));
     const picks = pickStageQuestions(pool, fresh, srsAll());
     let answered = 0, right = 0; const wrong = new Set<Lesson>(), wrongQ: number[] = [], qels: QuestionElement[] = [];
     picks.forEach((c, i) => { const qel = makeQuestion(c.item, String(i + 1), {
       shuffle: true, footer: srcLine(c), defer: true,
-      onAnswer: (oi, ok) => {
+      onAnswer: (_oi, ok) => {
         answered++; if (ok) right++; else { wrong.add(c.l); wrongQ.push(i); }
         srsRecord(c.key, ok);
         if (answered === picks.length) { finish(); return; }
@@ -58,7 +61,8 @@ export function makeCheck(si: number): HTMLDivElement {
     function finish() {
       qels.forEach(q => q._reveal());
       const pct = percent(right, picks.length);
-      const st = (progress.__stage = progress.__stage || {});
+      progress.__stage = progress.__stage || {};
+      const st = progress.__stage;
       const rec = settleResult(st[si] || {}, pct, [...wrong].map(l => l.id), Date.now());
       st[si] = rec; save(); emitProgress();
       const pass = isPass(pct);

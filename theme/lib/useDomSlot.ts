@@ -9,7 +9,7 @@ export function useDomSlot(build: () => Element | null, deps: unknown[] = []) {
     const node = build();
     if (node) host.appendChild(node);
     return () => { node?.remove(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // biome-ignore lint/correctness/useExhaustiveDependencies: deps 由调用方决定何时重建 DOM；build 每次渲染都是新函数，不能放进依赖
   }, deps);
   return ref;
 }

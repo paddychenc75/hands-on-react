@@ -134,7 +134,7 @@ export default {
       const changed = t.rawSource.replace(/(title:\s*['"]喝水['"]\s*,\s*done:\s*)true/, '$1false');
       t.assert(changed !== t.rawSource, '请保留起始代码里的 todos 数据（包括“喝水”那一项）。检查程序会改动它，看列表会不会跟着变');
       if (typeof prepare === 'function' && typeof compile === 'function') {
-        let App2;
+        let App2: any;
         try { App2 = compile(['React', 'ReactDOM'], prepare(changed, []))(React, ReactDOM).App; } catch (e) {}
         if (typeof App2 === 'function') {
           const box = document.createElement('div');

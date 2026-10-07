@@ -1,0 +1,75 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": true,
+    // 不检查：构建产物、依赖、评审报告、截图、快照/生成文件、锁文件。MDX 不在 Biome 的支持范围内。
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!doc_build",
+      "!review",
+      "!tests/screenshots",
+      "!course/card-keys.snapshot.json",
+      "!course/lessons.generated.ts",
+      "!package-lock.json",
+      "!**/*.mdx",
+      "!theme/style.css"
+    ]
+  },
+  // 风格贴着现有代码：2 空格、单引号、分号、尾逗号；行宽放宽到 160，引擎里有很多一行写完的长语句，不拆开可以少改很多行。
+  // 课程数据文件里的示例代码和 HTML 都在字符串里，格式化不会改变任何字符串内容。
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 160 },
+  "javascript": {
+    "formatter": { "quoteStyle": "single", "semicolons": "always", "trailingCommas": "all", "arrowParentheses": "asNeeded" }
+  },
+  "css": { "formatter": { "enabled": false }, "linter": { "enabled": false } },
+  // 不自动整理 import 顺序：模块的执行顺序跟 import 顺序有关，格式化不应该碰它
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      // 以下几条是风格类规则，旧代码里大量存在，改写不抓任何真问题，所以关掉：
+      "style": {
+        "useTemplate": "off" // 字符串拼接和模板字符串都可以，课程数据和引擎里有几百处拼接
+      },
+      "complexity": {
+        "useOptionalChain": "off" // `a && a.b` 改成 `a?.b` 会改变返回值（false/0/'' 变成 undefined），不是纯风格修改
+      },
+      "suspicious": {
+        "useIterableCallbackReturn": "off", // forEach 的箭头函数简写体返回了值（例如 els.forEach(b => b.click())）无害
+        "noExplicitAny": "off" // 浏览器全局（React/Babel UMD）、实验台沙箱和练习检查工具 t.q 在边界上有意用 any；类型由 tsc 把关
+      }
+    }
+  },
+  "overrides": [
+    {
+      // 课程数据里每课的 exercise.test 和示例是从旧代码原样搬来的"检查脚本"，会在浏览器里当字符串之外的真函数运行。
+      // 改它们的写法有改变检查行为的风险，所以对这个目录只保留结构性检查（类型由 tsc 负责），关掉风格和未使用变量类规则。
+      "includes": ["course/lessons/**"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUnusedVariables": "off", "noUnusedFunctionParameters": "off", "useHookAtTopLevel": "off" },
+          "suspicious": { "noExplicitAny": "off", "noGlobalIsNan": "off", "noAssignInExpressions": "off" },
+          "complexity": { "noArguments": "off" }
+        }
+      }
+    },
+    {
+      // theme/ 里的组件渲染的是自己写的课程内容（不是用户输入）；列表是静态数据，下标不会变。
+      "includes": ["theme/**"],
+      "linter": {
+        "rules": {
+          "security": { "noDangerouslySetInnerHtml": "off" },
+          "suspicious": { "noArrayIndexKey": "off" }
+        }
+      }
+    },
+    {
+      // e2e 测试用独立的 { … } 块把各个检查项隔开，块里重名的变量不会冲突
+      "includes": ["tests/e2e/**"],
+      "linter": { "rules": { "complexity": { "noUselessLoneBlockStatements": "off" } } }
+    }
+  ]
+}

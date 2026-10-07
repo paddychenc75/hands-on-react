@@ -21,6 +21,6 @@ export function makeWarmup(lesson: Lesson): HTMLElement | null {
   const box = el('section', { class: 'warmup wide' });
   box.innerHTML = '<div class="wu-head"><b>课前热身</b><span>先别往下读。凭记忆回答这两道前面学过的题，回忆的过程本身就在加固记忆。</span></div>';
   // 只有到期的题答对才拉长复习间隔；没到期的题答错照样重置
-  picks.forEach((c, i) => box.appendChild(makeQuestion(c.item, '回忆 ' + (i + 1), { shuffle: true, onAnswer: (oi, ok) => { if (shouldRecordWarmup(ok, srs[c.key], Date.now())) srsRecord(c.key, ok); }, footer: srcLine(c) })));
+  picks.forEach((c, i) => box.appendChild(makeQuestion(c.item, '回忆 ' + (i + 1), { shuffle: true, onAnswer: (_oi, ok) => { if (shouldRecordWarmup(ok, srs[c.key], Date.now())) srsRecord(c.key, ok); }, footer: srcLine(c) })));
   return box;
 }

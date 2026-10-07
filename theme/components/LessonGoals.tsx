@@ -9,6 +9,7 @@ const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? '
 export default function LessonGoals() {
   const lesson = useLesson();
   const [ok, setOk] = useState<Record<string, boolean>>({});
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 依赖是课 id：同一课里 lesson 不变，进度变化靠 PROGRESS_EVENT 触发
   useEffect(() => {
     if (!lesson) return;
     const calc = () => {

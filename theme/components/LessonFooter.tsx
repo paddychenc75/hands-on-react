@@ -8,6 +8,7 @@ import { useLesson } from '../lib/useLesson';
 /** 掌握标准 + 上一课 / 下一课（只保留这一套，Rspress 自带的上下页已隐藏）+ 阶段测验入口 */
 export default function LessonFooter() {
   const lesson = useLesson();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在换课时重画；lesson 对象在同一课里不变，用 id 比较更稳
   useEffect(() => { if (lesson) paintFinish(lesson); }, [lesson?.id]);
   if (!lesson) return null;
   const i = LESSONS.findIndex((l: any) => l.id === lesson.id);

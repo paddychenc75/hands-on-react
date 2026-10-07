@@ -205,7 +205,7 @@ console.log('hooks：', JSON.stringify(hooks));`,
     test: async (t) => {
       const { mount, useState, useRef } = t.exports;
       t.assert([mount, useState, useRef].every(f => typeof f === 'function'), '没有找到 mount、useState 和 useRef');
-      let last, api, refs = [];
+      let last: any, api: any, refs = [];
       mount(function Probe() {
         const [count, setCount] = useState(0);
         const [name, setName] = useState('小明');
@@ -228,7 +228,7 @@ console.log('hooks：', JSON.stringify(hooks));`,
       const before = refs.length;
       api.r.current = 100;
       t.assert(refs.length === before, '修改 ref.current 不应触发重新渲染');
-      let flag = true, seen, setB;
+      let flag = true, seen: any, setB: any;
       mount(function Conditional() {
         if (flag) { useState('A'); }
         const [b, sb] = useState('B');

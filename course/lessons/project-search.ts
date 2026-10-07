@@ -148,7 +148,7 @@ function App() {
       t.assert(/\buseUserSearch\s*\(/.test(appSrc), 'App 里应调用 useUserSearch(query)，用它的返回值渲染结果（步骤 4）');
       t.assert(!/\bsearchUsers\s*\(|\buse(?:Layout)?Effect\s*\(/.test(appSrc),
         'App 里还在直接请求：调用了 searchUsers 或 useEffect。请把 effect、ignore 和结果 state 都搬进 useUserSearch，App 只调用 Hook（步骤 4）');
-      let got;
+      let got: any;
       const Probe = () => { got = useUserSearch('张'); return null; };
       const box = document.createElement('div');
       const root = ReactDOM.createRoot(box);

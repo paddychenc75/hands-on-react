@@ -102,7 +102,7 @@ function App() {
 }`,
     test: async (t) => {
       // 本课程的运行环境不做类型检查，所以这里读语法树，检查类型本身写得对不对
-      let ast;
+      let ast: any;
       try {
         ast = Babel.transform(t.source, { filename: 'App.tsx', ast: true, code: false, configFile: false, babelrc: false, parserOpts: { plugins: ['typescript', 'jsx'] } }).ast;
       } catch (e) { t.assert(false, '代码无法解析：' + e.message); }

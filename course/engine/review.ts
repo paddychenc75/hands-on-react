@@ -25,7 +25,7 @@ export function makeReview(): HTMLDivElement {
       const nextBtn = el('button', { class: 'btn primary', type: 'button' }, i + 1 < queue.length ? '下一题 →' : '查看结果');
       nextBtn.hidden = true;
       nextBtn.addEventListener('click', () => { i++; step(); });
-      stageArea.appendChild(makeQuestion(c.item, '复习', { shuffle: true, footer: srcLine(c), onAnswer: (oi, ok) => { if (ok) right++; srsRecord(c.key, ok); nextBtn.hidden = false; nextBtn.focus(); } }));
+      stageArea.appendChild(makeQuestion(c.item, '复习', { shuffle: true, footer: srcLine(c), onAnswer: (_oi, ok) => { if (ok) right++; srsRecord(c.key, ok); nextBtn.hidden = false; nextBtn.focus(); } }));
       stageArea.appendChild(nextBtn);
     };
     step();

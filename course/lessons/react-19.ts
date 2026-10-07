@@ -223,7 +223,7 @@ function App() {
       const r = await subscribeAction({ tries: 41 }, fd);
       t.assert(r && r.error === '邮箱格式不对' && r.tries === 42, `subscribeAction({ tries: 41 }, 邮箱 xyz) 应返回 { error: '邮箱格式不对', tries: 42 }，实际是 ${JSON.stringify(r)}。tries 要从第一个参数 prevState 算出来，不要读组件外的变量`);
       // 单独测试 Hook：传上一次的 state；action 抛错时 isPending 也要恢复
-      let probe;
+      let probe: any;
       function Probe() {
         const [st, dispatch, pending] = useActionState(async (prev, x) => { await null; if (x === 'boom') throw new Error('boom'); return prev + x; }, 0);
         probe = { st, dispatch, pending };

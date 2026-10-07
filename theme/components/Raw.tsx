@@ -1,4 +1,3 @@
-import { useNavigate } from '@rspress/core/runtime';
 import { BASE, lessonHref, pageHref } from '../../course/site.ts';
 
 /** 带自定义 class 的 HTML 原样输出（转换脚本对 <ol class=…>、fig、复杂表格等块使用）。

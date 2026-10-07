@@ -35,7 +35,8 @@ export function makePlayground({ src, title, note, badge = 'LIVE', exercise, les
   const resetBtn = el('button', { class: 'btn small', type: 'button' }, '重置');
   head.append(resetBtn, runBtn);
 
-  const preds = progress.__pred = progress.__pred || {};
+  progress.__pred = progress.__pred || {};
+  const preds = progress.__pred;
   let revealed = !predict || preds[predictKey] !== undefined;
 
   const body = el('div', { class: 'pg-body' });
@@ -124,9 +125,14 @@ export function makePlayground({ src, title, note, badge = 'LIVE', exercise, les
 }
 // 实验台进入视野附近才第一次运行，长课打开更快（观察器在浏览器里第一次用到时才创建）
 let pgObserver: IntersectionObserver | null | undefined;
-const getObserver = () => pgObserver !== undefined ? pgObserver : (pgObserver = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((entries) => {
-  entries.forEach(en => { if (en.isIntersecting) { pgObserver.unobserve(en.target); if (!(en.target as PlaygroundBox)._ran) (en.target as PlaygroundBox)._run(); } });
-}, { rootMargin: '400px 0px' }) : null);
+const getObserver = () => {
+  if (pgObserver === undefined) {
+    pgObserver = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((entries) => {
+      entries.forEach(en => { if (en.isIntersecting) { pgObserver.unobserve(en.target); if (!(en.target as PlaygroundBox)._ran) (en.target as PlaygroundBox)._run(); } });
+    }, { rootMargin: '400px 0px' }) : null;
+  }
+  return pgObserver;
+};
 /* 组件卸载时调用：对应原来换页时的 disposePlaygrounds，只是按单个实验台清理 */
 export function disposePlayground(box: PlaygroundBox): void {
   if (pgObserver) pgObserver.unobserve(box);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY, SRS_DAYS, WARMUP_COOLDOWN, dueKeys, isDue, nextCard, nextDueAfter, pickWarmup, shouldRecordWarmup, warmupPool } from '../../course/engine/logic/srs.ts';
+import type { SrsCard } from '../../course/types.ts';
 import { HOUR, NOW, card, lesson, seq, srsCard } from './fixtures.ts';
 
 describe('间隔序列', () => {
@@ -9,7 +10,7 @@ describe('间隔序列', () => {
   });
 
   it('新卡片连续答对：间隔依次是 1、3、7、16、35 天，盒子到顶后不再增加', () => {
-    let c = undefined;
+    let c: SrsCard | undefined;
     const days: number[] = [];
     for (let i = 0; i < 7; i++) {
       c = nextCard(c, true, NOW);

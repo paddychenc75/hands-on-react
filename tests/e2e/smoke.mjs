@@ -263,8 +263,6 @@ for (const id of LESSONS) {
 {
   await openLesson('lists-keys');
   ok(await page.locator('.stage-cta').count() === 0, 'm. 不是阶段最后一课，没有阶段测验入口');
-  const { LESSON_ORDER } = await import('../../course/registry.ts');
-  const lastOf = (si) => null;
   await openLesson('project-todo');
   const cta = page.locator('.stage-cta');
   ok(await cta.count() === 1 && /入门 阶段测验|入门阶段测验/.test(await cta.innerText()), 'm. 第 1 阶段最后一课末尾有阶段测验入口');
@@ -275,7 +273,6 @@ for (const id of LESSONS) {
   await page.waitForSelector('.done-card');
   const res = await page.evaluate(() => ({ card: document.querySelector('.done-card').textContent.slice(0, 40), rights: document.querySelectorAll('.opt.right').length }));
   ok(res.rights >= 1 && /答对 \d+\/12/.test(res.card), 'm. 交卷后显示成绩和对错解析', JSON.stringify(res));
-  void LESSON_ORDER; void lastOf;
 }
 
 /* n. 键盘 ← → 翻课（客户端路由），在输入框里不翻 */

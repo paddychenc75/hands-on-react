@@ -14,7 +14,7 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<
   return e;
 }
 export function highlight(src: string): string {
-  try { return window.Prism.highlight(src, window.Prism.languages.jsx, 'jsx'); } catch (e) { return esc(src); }
+  try { return window.Prism.highlight(src, window.Prism.languages.jsx, 'jsx'); } catch { return esc(src); }
 }
 let toastTimer: ReturnType<typeof setTimeout>;
 // 提示条。可以带一个操作按钮，例如“撤销”。#toast 元素第一次用到时才创建
