@@ -18,7 +18,7 @@ def build(base, out, standalone=None):
     js = '\n'.join(read(f) for f in files if os.path.exists(os.path.join(D, f)))
     assert '</script' not in js
     scripts = '\n'.join(f'<script src="{base}{l}"></script>' for l in LIBS)
-    html = f'''<title>React 从零到专家</title>
+    html = f'''<title>动手学 React</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@700;900&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -27,7 +27,7 @@ def build(base, out, standalone=None):
 </style>
 <header class="topbar">
   <button class="menu-btn" id="menu-btn" type="button" aria-label="打开课程目录">☰</button>
-  <a class="brand" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="1.6"><ellipse cx="16" cy="16" rx="14" ry="5.4" style="stroke:var(--accent)"/><ellipse cx="16" cy="16" rx="14" ry="5.4" transform="rotate(60 16 16)" style="stroke:var(--accent)"/><ellipse cx="16" cy="16" rx="14" ry="5.4" transform="rotate(120 16 16)" style="stroke:var(--accent)"/></g><circle cx="16" cy="16" r="2.6" style="fill:var(--accent)"/></svg><span>React 从零到专家</span></a>
+  <a class="brand" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke-width="1.6"><ellipse cx="16" cy="16" rx="14" ry="5.4" style="stroke:var(--accent)"/><ellipse cx="16" cy="16" rx="14" ry="5.4" transform="rotate(60 16 16)" style="stroke:var(--accent)"/><ellipse cx="16" cy="16" rx="14" ry="5.4" transform="rotate(120 16 16)" style="stroke:var(--accent)"/></g><circle cx="16" cy="16" r="2.6" style="fill:var(--accent)"/></svg><span>动手学 React</span></a>
   <div class="top-progress"><div class="bar"><i id="prog-bar"></i></div><span id="prog-text">已完成 0/0</span></div>
 </header>
 <div class="shell">

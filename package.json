@@ -1,8 +1,8 @@
 {
-  "name": "react-zero-to-expert",
+  "name": "hands-on-react",
   "private": true,
   "type": "module",
-  "description": "中文交互式 React 课程“React 从零到专家”：单文件网页，45 课 6 阶段",
+  "description": "中文交互式 React 课程“动手学 React”：单文件网页，45 课 6 阶段",
   "scripts": {
     "build": "python3 src/build.py",
     "test": "npm run build && node tests/lessons.mjs && node tests/mechanics.mjs",

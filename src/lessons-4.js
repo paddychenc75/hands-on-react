@@ -1522,8 +1522,8 @@ lesson({
     h('项目结构与好习惯'),
     ul(['<b>按功能组织文件</b>，例如 features/cart、features/auth。不要按类型把文件全堆在 components/、hooks/ 里。', '开启 <b>StrictMode</b> 和 <b>ESLint</b>（包括 react-hooks 插件，v6 起使用 flat config，并包含 React Compiler 的规则）。它们在开发阶段就能发现很多 bug。', '考虑启用 <b>React Compiler</b>（2025 年 10 月发布 1.0 稳定版），让它自动做记忆化。', '组件保持<b>纯函数</b>：同样的 props 和 state，返回同样的 JSX。', '先让它工作，再用 Profiler 测量，最后才优化。']),
     h('你的下一站'),
-    fig(`<div class="roadmap"><div><b>巩固</b><span>做 2～3 个完整项目：待办应用 → 带登录的博客 → 实时协作看板</span></div><div><b>生态</b><span>React Router、TanStack Query、Zustand、React Hook Form、Tailwind CSS</span></div><div><b>全栈</b><span>Next.js App Router、Server Functions、数据库与鉴权</span></div><div><b>深入</b><span>阅读 react.dev 全部文档、React 源码、参与开源组件库</span></div></div>`, '学习永远不会结束，但现在你已经有了专家的思维方式'),
-    p('从“UI = f(state)”到 Fiber 和 Server Components，你已经深入理解了 React 本身。第五阶段介绍实际工作中常用的生态工具。第六阶段再回到 React 本身，讲调度、数据获取、状态架构和性能诊断这些专家级主题，最后用毕业设计把所有知识串起来。'),
+    fig(`<div class="roadmap"><div><b>巩固</b><span>做 2～3 个完整项目：待办应用 → 带登录的博客 → 实时协作看板</span></div><div><b>生态</b><span>React Router、TanStack Query、Zustand、React Hook Form、Tailwind CSS</span></div><div><b>全栈</b><span>Next.js App Router、Server Functions、数据库与鉴权</span></div><div><b>深入</b><span>阅读 react.dev 全部文档、React 源码、参与开源组件库</span></div></div>`, '学习永远不会结束，但现在你已经知道遇到问题该从哪里想起'),
+    p('从“UI = f(state)”到 Fiber 和 Server Components，你已经深入理解了 React 本身。第五阶段介绍实际工作中常用的生态工具。第六阶段再回到 React 本身，讲调度、数据获取、状态架构和性能诊断这些更深的主题，最后用毕业设计把所有知识串起来。'),
   ],
   // 阶段测验专用的读代码题（格式同 lessons-6-checks.js）
   checkOnly: (() => {

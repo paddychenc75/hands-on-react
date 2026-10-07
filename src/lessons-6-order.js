@@ -8,11 +8,11 @@ const LESSON_ORDER = [
   'lifting-state', 'use-reducer', 'context', 'use-ref', 'use-effect', 'custom-hooks', 'escape-hatches', 'project-search', 'project-kanban',
   // 03 高级
   'rendering', 'performance', 'closures', 'suspense', 'concurrent', 'profiling',
-  // 04 专家
+  // 04 原理与架构
   'patterns', 'accessibility', 'state-architecture', 'react-19', 'server-components', 'mini-react', 'engineering',
   // 05 生态与实战
   'typescript', 'router', 'tanstack-query', 'testing', 'nextjs',
-  // 06 专家（lessons-7-*.js）
+  // 06 深入（lessons-7-*.js）
   'scheduler', 'suspense-data', 'streaming-ssr', 'state-at-scale', 'headless-components', 'form-architecture', 'error-handling', 'perf-clinic',
   'portfolio',
 ];

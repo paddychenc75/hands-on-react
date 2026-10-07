@@ -5,7 +5,7 @@ const STAGES = [
   { no: '03', name: '高级', en: 'Under the hood', desc: '渲染机制、性能优化、闭包陷阱、Suspense、并发特性与性能测量，知其然更知其所以然。' },
   { no: '04', name: '原理与架构', en: 'Architecture', desc: '设计模式、无障碍、状态架构、React 19、Server Components 与安全，并亲手实现迷你 React。' },
   { no: '05', name: '生态与实战', en: 'Ecosystem & projects', desc: 'TypeScript、React Router、TanStack Query、测试与 Next.js：把 React 放进真实项目的工具链。' },
-  { no: '06', name: '专家', en: 'Expert', desc: '调度与并发内核、Suspense 数据获取、流式渲染与水合、大型状态架构、组件库 API、表单架构、错误监控与性能诊断，最后用毕业设计做出自己的作品集。' },
+  { no: '06', name: '深入', en: 'In depth', desc: '调度与并发内核、Suspense 数据获取、流式渲染与水合、大型状态架构、组件库 API、表单架构、错误监控与性能诊断，最后用毕业设计做出自己的作品集。' },
 ];
 const HOOK_NAMES = ['useState', 'useEffect', 'useLayoutEffect', 'useRef', 'useMemo', 'useCallback', 'useContext', 'useReducer', 'useId', 'useTransition', 'useDeferredValue', 'useSyncExternalStore', 'useImperativeHandle', 'useInsertionEffect', 'useDebugValue', 'createContext', 'createElement', 'memo', 'lazy', 'Suspense', 'Component', 'PureComponent', 'Fragment', 'forwardRef', 'startTransition', 'createRef', 'Children', 'cloneElement', 'isValidElement', 'StrictMode', 'Profiler'];
 
@@ -945,7 +945,7 @@ function renderHome() {
   const hero = el('section', { class: 'hero' });
   hero.appendChild(el('div', {}, `
     <div class="eyebrow">按学习科学设计的 React 课程 · 中文</div>
-    <h1>从零开始，<br>一路学到<em>React 专家</em></h1>
+    <h1>从零开始，<br>边做边学<em>React</em></h1>
     <p>这里不只是读教程。你会先预测代码的结果再运行验证，每节课开头回忆旧知识，按遗忘规律复习，每个阶段通过测验才算掌握。</p>
     <p class="prereq"><b>开始前你需要会：</b>JavaScript 基础（变量、函数、箭头函数、数组的 map 和 filter、对象和数组的解构与展开、模块的 import/export、Promise 与 async/await），以及基本的 HTML 和 CSS。还不熟的话，先花一两周补 JavaScript，再回来学会轻松很多。</p>
     <div class="cta">
@@ -1085,19 +1085,19 @@ function route() {
   if (lesson) {
     main.appendChild(renderLesson(lesson));
     paintFinish(lesson);
-    document.title = lesson.title + ' · React 从零到专家';
+    document.title = lesson.title + ' · 动手学 React';
   } else if (id === 'glossary') {
     main.appendChild(renderGlossary());
-    document.title = '术语表 · React 从零到专家';
+    document.title = '术语表 · 动手学 React';
   } else if (id === 'review') {
     main.appendChild(renderReview());
-    document.title = '今日复习 · React 从零到专家';
+    document.title = '今日复习 · 动手学 React';
   } else if (check && STAGES[+check[1]]) {
     main.appendChild(renderCheck(+check[1]));
-    document.title = STAGES[+check[1]].name + '阶段测验 · React 从零到专家';
+    document.title = STAGES[+check[1]].name + '阶段测验 · 动手学 React';
   } else {
     main.appendChild(renderHome());
-    document.title = 'React 从零到专家';
+    document.title = '动手学 React';
   }
   if (!pgObserver) livePlaygrounds.forEach(b => b._run());
   refreshChrome();

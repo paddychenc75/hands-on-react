@@ -1,4 +1,4 @@
-/* ========== 第 40 课：大型应用状态架构实战（阶段 6 专家） ========== */
+/* ========== 第 40 课：大型应用状态架构实战（阶段 6 深入） ========== */
 (() => {
 const pre = (src) => '<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">'
   + src.replace(/^\n/, '').replace(/\n\s*$/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

@@ -418,7 +418,7 @@ const [isPending, startTransition] = useTransition();
     },
   ],
 
-  /* ---------- 04 专家 ---------- */
+  /* ---------- 04 原理与架构 ---------- */
   'patterns': [
     {
       q: '有人在 <code>&lt;Tabs&gt;</code> 外面单独渲染了 <code>&lt;Tab id="a" /&gt;</code>。会怎样？' + CHECK_PRE(`
@@ -1046,7 +1046,7 @@ const [isPending, startTransition] = useTransition();
     },
   ],
 
-  /* 04 专家 */
+  /* 04 原理与架构 */
   'patterns': [
     {
       q: 'Tabs 用 cloneElement 给每个 Tab 传 selected。使用者这样写，哪个 Tab 会高亮？' + CHECK_PRE(`

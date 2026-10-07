@@ -1,4 +1,4 @@
-# CLAUDE.md：维护“React 从零到专家”课程
+# CLAUDE.md：维护“动手学 React”课程
 
 这是一套中文交互式 React 课程：45 课，6 个阶段，构建成**一个 HTML 文件**。没有打包器，没有框架工程。课程数据和引擎都是普通的浏览器 JS，由 `src/build.py` 拼进一个页面。
 
@@ -28,14 +28,14 @@ node tests/lessons.mjs dist/react-course.html scheduler perf-clinic   # 只测�
 | `src/app.js` | 引擎：路由、侧栏、渲染课文、实验台（Babel 现场编译）、预测题、测验、练习检查、提示阶梯、自我解释、热身复习、阶段测验、进度存储（localStorage）。`STAGES` 数组定义 6 个阶段。 |
 | `src/lessons-1.js` … `lessons-5.js` | 第 1–5 组课程。`lessons-1.js` 开头定义 `LESSONS` 和块函数。 |
 | `src/lessons-6*.js` | 后加的课（escape、profiling、a11y、生态练习等）。 |
-| `src/lessons-7-*.js` | 专家阶段第 37–44 课，每课一个文件。build.py 自动按文件名排序加载 `lessons-7-*.js`。 |
+| `src/lessons-7-*.js` | 第 6 阶段第 37–44 课，每课一个文件。build.py 自动按文件名排序加载 `lessons-7-*.js`。 |
 | `src/lessons-6-order.js` | `LESSON_ORDER`（课程顺序）和 `STAGE_OF`（课 → 阶段）。**课号 = 在 LESSON_ORDER 中的位置**。 |
 | `src/lessons-predict.js` | 预测题表 `PREDICTIONS`，键是 `'课id|示例标题'`。 |
 | `src/lessons-6-checks.js` | 阶段测验专用读代码题 `CHECK_ONLY` + `CHECK_MORE`，合并进各课的 `checkOnly`。 |
 | `src/glossary.js` | 术语表（45 条）。课文里第一次出现的术语会自动加注。 |
 | `src/style.css` | 全部样式。 |
 | `tests/` | Playwright 测试：`lessons.mjs`（逐课）、`mechanics.mjs`（学习机制和手机宽度）。 |
-| `review/` | 历次专家评估报告。`edu-summary.md` 末尾有修改记录；`depth.md` 是深度评估。只读参考，不是代码。 |
+| `review/` | 历次评审报告。`edu-summary.md` 末尾有修改记录；`depth.md` 是深度评估。只读参考，不是代码。 |
 
 运行时是 **React 18.3.1 开发版 UMD**（全局 `React`、`ReactDOM`）+ Babel standalone 7.25.6。React 19 API 和服务端内容在实验台里跑不了，只能用 `code` 块展示，并在文字里说明“只能阅读”。
 
@@ -75,7 +75,7 @@ lesson({
 
 1. 新建 `src/lessons-7-<id>.js`（或放进已有文件）。
 2. 在 `src/lessons-6-order.js` 的 `LESSON_ORDER` 里放到正确位置，并在 `STAGE_OF` 里登记阶段（0–5）。
-3. **课号是位置**：插入或移动课程后，全文搜索“第 N 课”并重新编号（`grep -n "第 [0-9]* 课" src/*.js`）。毕业设计（portfolio，第 45 课）的验收表和“专家加分项”表引用了很多课号。
+3. **课号是位置**：插入或移动课程后，全文搜索“第 N 课”并重新编号（`grep -n "第 [0-9]* 课" src/*.js`）。毕业设计（portfolio，第 45 课）的验收表和“加分项”表引用了很多课号。
 4. 新阶段要同时改 app.js 的 `STAGES`。
 5. 估算 `mins`：正文每 300 字约 1 分钟，可运行示例 +2，练习 +10~20，测验每题 +1。
 
