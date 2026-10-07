@@ -1,0 +1,120 @@
+---
+title: "列表渲染与 key"
+---
+
+# 列表渲染与 key
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+要渲染一组数据，就用数组的 `.map()` 方法把每一项数据“映射”成一个 JSX 元素。React 可以直接渲染一个元素数组。
+
+```jsx play title="map + filter"
+function App() {
+  const fruits = [
+    { id: 1, name: '苹果', price: 5 },
+    { id: 2, name: '香蕉', price: 3 },
+    { id: 3, name: '樱桃', price: 30 },
+  ];
+  const cheap = fruits.filter(f => f.price < 10);
+
+  return (
+    <div>
+      <h4>全部水果</h4>
+      <ul>
+        {fruits.map(f => (
+          <li key={f.id}>{f.name} - ¥{f.price}</li>
+        ))}
+      </ul>
+      <h4>10 元以下</h4>
+      <ul>
+        {cheap.map(f => <li key={f.id}>{f.name}</li>)}
+      </ul>
+    </div>
+  );
+}
+```
+
+## key 是什么？为什么需要它？
+
+列表会插入、删除和重新排序。这时，React 需要知道哪个旧元素对应哪个新元素。**key 是每一项的身份证**。React 根据 key 复用、移动或删除元素和它的 state。
+
+下面两列渲染同一份数据，只有 key 不同：左列用下标 index，右列用 id。操作步骤如下。
+
+<Raw className="p-block" html={"<ol class=\"task-steps\"><li>在每个输入框里输入任意内容。</li><li>点“在顶部插入”。</li></ol>"} />
+
+```jsx play title="两列只差 key"
+import { useState } from 'react';
+
+// 不要用 items.length 生成 id：删除后会重复。
+let nextId = 3;
+
+function App() {
+  const [items, setItems] = useState([{ id: 1, name: 'A' }, { id: 2, name: 'B' }]);
+  const addTop = () => {
+    const id = nextId++;
+    setItems([{ id, name: String.fromCharCode(64 + id) }, ...items]);
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 24 }}>
+      <div>
+        <b>左列 key=index</b>
+        {items.map((it, i) => <div key={i}>{it.name} <input size="6" /></div>)}
+      </div>
+      <div>
+        <b>右列 key=id</b>
+        {items.map(it => <div key={it.id}>{it.name} <input size="6" /></div>)}
+      </div>
+      <button onClick={addTop}>在顶部插入</button>
+    </div>
+  );
+}
+```
+
+<CallBox kind="like" label="打个比方">
+
+想象老师点名。如果按“座位号”点名（用 index 当 key），一旦有同学换座位，老师就会把人认错。按“学号”点名（用唯一 id 当 key），不管怎么换座位都不会认错。
+
+</CallBox>
+
+## key 的规则
+
+- 在**兄弟元素之间唯一**即可，不需要全局唯一
+- 要**稳定**：同一项数据每次渲染的 key 应该相同。不要用 `Math.random()`
+- 优先使用数据自带的 id（数据库 id、uuid 等）
+- 只有当列表**永远不会重排、插入、删除**时，用 index 才是安全的
+- key 要写在 map 直接返回的那个元素上，而不是它的子元素上
+
+<CallBox kind="tip" label="要点">
+
+key 不会作为 prop 传给组件。如果子组件也需要这个 id，要另外传一次：`<Item key={x.id} id={x.id} />`。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：`Warning: Each child in a list should have a unique "key" prop.`<br />原因：map 返回的元素没有 key，或者 key 重复了。<br />去看：`.map()` 回调返回的最外层元素。在它上面写 `key={item.id}`。如果它是一个组件，就写在组件上：`<TodoItem key={t.id} … />`。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+key 还有一个高级用法：**改变 key 可以强制重置组件**。当 key 变化时，React 会卸载旧组件、创建一个全新的组件（状态全部清空）。例如 `<Profile key={userId} />` 在切换用户时自动清空表单。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

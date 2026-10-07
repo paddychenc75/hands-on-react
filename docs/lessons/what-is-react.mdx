@@ -1,0 +1,85 @@
+---
+title: "React 是什么"
+---
+
+# React 是什么
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+React 是一个**构建用户界面的 JavaScript 库**。它由 Meta（原 Facebook）开源。它只关心一件事：**根据数据，把界面画出来**；数据变了，就自动把界面更新成新的样子。
+
+## 先看看没有 React 时怎么写
+
+假设页面上有一个计数器按钮。用原生 JavaScript 时，你要自己完成每一步：
+
+<Raw className="p-block" html={"<ol class=\"task-steps\"><li>找到元素。</li><li>监听点击。</li><li>修改变量。</li><li>把新数字写回页面。</li></ol>"} />
+
+```jsx title="原生 JS：数据和界面要你自己保持同步"
+// 命令式：一步一步告诉浏览器“怎么做”
+let count = 0;
+const btn = document.querySelector('#btn');
+const label = document.querySelector('#label');
+btn.addEventListener('click', () => {
+  count = count + 1;
+  label.textContent = '点击了 ' + count + ' 次'; // 别忘了手动更新界面！
+});
+```
+
+界面变复杂后，需要同步更新的地方会越来越多。漏掉一处，数据和界面就对不上，这就是 bug。
+
+## React 的做法：声明式
+
+在 React 里，你只需要**描述“在某个数据下，界面应该长什么样”**。至于怎么从旧界面变到新界面，交给 React 去算。
+
+```jsx play title="你的第一个 React 组件"
+import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      点击了 {count} 次
+    </button>
+  );
+}
+```
+
+<CallBox kind="like" label="打个比方">
+
+命令式像给司机逐条指路：“直走 200 米，左转，再右转……”。声明式像打车时直接说目的地：“去火车站”。路线由司机（React）负责规划。
+
+</CallBox>
+
+## 核心公式：UI = f(state)
+
+这是理解 React 最重要的一句话。**state（状态）**是会变化的数据，**f** 是你写的组件函数，**UI** 是它返回的界面。数据一变，React 就重新调用这个函数，得到新界面，再把**差异**高效地更新到页面上。
+
+<Raw tag="figure" className="fig wide" html={"<div class=\"formula\"><span class=\"f-box\">state<small>数据</small></span><span class=\"f-op\">→</span><span class=\"f-box f-fn\">组件函数 f<small>你写的代码</small></span><span class=\"f-op\">→</span><span class=\"f-box\">UI<small>界面</small></span></div><figcaption>你只负责写 f，“状态变化后更新界面”这件事交给 React</figcaption>"} />
+
+## React 的三个关键词
+
+- **组件（Component）**：可复用的界面积木，例如按钮、导航栏、商品卡片。
+- **声明式（Declarative）**：描述结果，而不是步骤。
+- **单向数据流**：数据从父组件流向子组件，变化的来源清晰可追踪。
+
+<CallBox kind="tip" label="要点">
+
+本应用的所有“运行”框都是真实的 React 18 环境。代码里的 `import` 语句会被自动处理。你只需要定义一个名为 `App` 的组件。它会显示在右侧预览区。课程里标注“React 19”的示例只能阅读，不能运行。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

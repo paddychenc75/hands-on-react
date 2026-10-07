@@ -1,0 +1,156 @@
+---
+title: "State：让组件“记住”东西"
+---
+
+# State：让组件“记住”东西
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+组件经常需要“记住”一些会变的信息：输入框里的文字、购物车数量、弹窗是否打开。这种数据叫 **state（状态）**。
+
+## 为什么普通变量不行？
+
+```jsx play title="失败的计数器"
+function App() {
+  let count = 0; // 普通变量
+
+  function handleClick() {
+    count = count + 1;
+    console.log('count 现在是', count);
+  }
+
+  return <button onClick={handleClick}>点击了 {count} 次</button>;
+}
+```
+
+有两个原因：
+
+<Raw className="p-block" html={"<ol class=\"task-steps\"><li>修改普通变量<b>不会通知 React</b> 重新渲染。</li><li>就算重新渲染了，函数重新执行时 <code>let count = 0</code> 又会把它重置为 0。</li></ol>"} />
+
+## useState 登场
+
+`useState` 解决这两个问题。第一，React 替你**保存**这个值，重新渲染后值还在。第二，你得到一个 **set 函数**。调用 set 函数，React 就会重新渲染。
+
+```jsx play title="正确的计数器"
+import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+  //     当前值   set 函数          初始值
+
+  return (
+    <div>
+      <p>当前计数：{count}</p>
+      <button onClick={() => setCount(count + 1)}>+1</button>
+      <button onClick={() => setCount(0)}>归零</button>
+    </div>
+  );
+}
+```
+
+<CallBox kind="like" label="打个比方">
+
+state 像组件的“记忆”。每次调用 setCount，就像对 React 说：“这个记忆更新了，请按新记忆重新画一遍。”
+
+</CallBox>
+
+## 一次渲染 = 一张快照
+
+新手最容易在这里困惑。下面有两个“+3”按钮。写法 A 连续调用三次 `setCount(count + 1)`；写法 B 连续调用三次 `setCount(c => c + 1)`。
+
+```jsx play title="快照 vs 函数式更新"
+import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  // 写法 A
+  function addThreeA() {
+    setCount(count + 1);
+    setCount(count + 1);
+    setCount(count + 1);
+    console.log('点击时的 count =', count);
+  }
+
+  // 写法 B
+  function addThreeB() {
+    setCount(c => c + 1);
+    setCount(c => c + 1);
+    setCount(c => c + 1);
+  }
+
+  return (
+    <div>
+      <p>count: {count}</p>
+      <button onClick={addThreeA}>+3（写法 A）</button>
+      <button onClick={addThreeB}>+3（写法 B）</button>
+    </div>
+  );
+}
+```
+
+原因：**调用 set 函数不会立刻改变本次渲染中的 count**。在一次渲染中，state 的值是固定的，就像一张照片。写法 A 的三次调用读到的都是同一个 count。
+
+<CallBox kind="tip" label="要点">
+
+当新状态依赖旧状态时，优先使用**函数式更新** `setX(prev => ...)`。React 会把这些函数排成队列，依次用最新值计算。
+
+</CallBox>
+
+## 状态是对象或数组时
+
+React 通过 `Object.is` 比较新旧值来判断是否需要更新。如果你直接修改对象再传回去，引用没变，React 会认为“什么都没变”。所以**必须创建一个新对象**。
+
+```jsx play title="不可变更新"
+import { useState } from 'react';
+
+function App() {
+  const [user, setUser] = useState({ name: '小明', age: 18 });
+  const [tags, setTags] = useState(['React']);
+
+  return (
+    <div>
+      <p>{user.name}，{user.age} 岁</p>
+      {/* ✅ 展开旧对象，覆盖要改的字段 */}
+      <button onClick={() => setUser({ ...user, age: user.age + 1 })}>长大一岁</button>
+      <p>标签：{tags.join('、')}</p>
+      {/* ✅ 创建新数组 */}
+      <button onClick={() => setTags([...tags, 'Hooks'])}>添加标签</button>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+`user.age++; setUser(user);` 是错误写法：对象引用没变，界面不会更新。数组也一样，不要用 `push`、`splice`、`sort` 直接改原数组，用 `[...arr, x]`、`filter`、`map` 生成新数组。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+`useState` 要写在组件函数的最上面。不要放在 if 或循环里。也不要放在提前 return 之后。原因在第 15 课讲。
+
+</CallBox>
+
+<CallBox kind="warn" label="常见坑">
+
+你可能看到的报错：`Too many re-renders. React limits the number of renders to prevent an infinite loop.`<br />原因：渲染时直接调用了 set 函数。set 函数触发渲染，渲染又调用它，形成死循环。<br />去看：常见的是 `onClick={setCount(count + 1)}`。改成传一个函数：`onClick={() => setCount(count + 1)}`。
+
+</CallBox>
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

@@ -108,3 +108,7 @@ lesson({
 - 网页本身就是 `dist/react-course.html`：任何静态托管（GitHub Pages、Netlify、本地双击）都能打开。
 - 原版发布在 claude.ai Artifact（https://claude.ai/artifact/B2em8mXwQEf2XVwfWjfHNE），用的是 `index.html`（没有 doctype，平台发布时会补）。
 - 学习进度存在浏览器 localStorage，不同网址的进度不互通。
+
+## Rspress 站点（迁移中，rspress 分支）
+
+新的站点架构在 `docs/`、`course/`、`theme/`、`plugins/`、`scripts/convert.mjs`、`tests-site/`，与上面的单文件版并存。说明、命令和第二阶段的坑见 `MIGRATION.md`。第一阶段不改 `src/`、`tests/`、`build.py`。
