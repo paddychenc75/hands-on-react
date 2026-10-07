@@ -4,7 +4,7 @@ export default {
   id: 'accessibility',
   stage: 3,
   title: '无障碍：让每个人都能用',
-  mins: 30,
+  mins: 40,
   summary: '先用语义化 HTML，再按需补 ARIA。做到能用键盘操作、焦点不丢、异步消息能被读出。',
   goals: [
     '能说出 &lt;button&gt; 比 &lt;div onClick&gt; 多做的三件事：能聚焦、Enter 和空格能触发、读屏软件读出“按钮”',

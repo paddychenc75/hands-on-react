@@ -37,7 +37,7 @@ React 正在从“浏览器里的 UI 库”演进为**全栈架构**。理解这
 
 <CallBox kind="like" label="打个比方">
 
-SSR 像餐厅先给你端上一盘看起来做好的菜（HTML），但要等厨师到你桌边“通电”（水合）之后才能吃。RSC 则是有些菜在后厨就完全做好了，根本不需要厨师来你桌边。
+SSR 像样板房：你一进门就能看到完整的房间（HTML），但水电还没通，开关按了没反应。水合就是通水通电。服务端组件则是出厂时就固定好的墙和地板，不需要通电。
 
 </CallBox>
 
@@ -85,7 +85,7 @@ export default function AddToCart({ productId }) {
 | async/await 直接取数据 | ✅ | ❌（用 use() 读取服务端传来的 Promise，或用 TanStack Query 等库） |
 | 访问数据库、密钥、文件系统 | ✅ 安全 | ❌ 会暴露 |
 | 代码是否发送到浏览器 | 否 | 是 |
-| 可以导入对方吗 | 可以导入并渲染客户端组件 | 不能导入服务端组件，但可以通过 **children** 接收 |
+| 可以导入对方吗 | 可以导入并渲染客户端组件 | 导入后，那个组件就变成客户端组件。想让它留在服务器，用 **children** 传入 |
 
 <CallBox kind="warn" label="常见坑">
 
@@ -102,7 +102,11 @@ export default function AddToCart({ productId }) {
 'use server';
 
 export async function addComment(formData) {
+  // 下一节解释为什么下面两步不能省
+  const user = await getCurrentUser();
+  if (!user) throw new Error('请先登录');
   const text = formData.get('text');
+  if (typeof text !== 'string' || !text.trim()) return;
   await db.comment.create({ data: { text } }); // 在服务器执行
   revalidatePath('/post');                     // 刷新相关页面的数据
 }
@@ -131,7 +135,8 @@ RSC 的传输格式不是 HTML。它是一种特殊的序列化格式，叫 RSC 
 - **每个 Server Function 都是一个公开的接口**。任何人都能直接发请求调用它，不必经过你的界面。所以在函数内部：1. 检查登录和权限。2. 验证每个输入。
 - **不要把密钥放进 props**。传给客户端组件的 props 会发送到浏览器。在 Next.js 等框架中，只能在服务器用的模块顶部写 `import 'server-only'`。客户端组件导入它时，构建会报错。
 - **带公开前缀的环境变量会进入浏览器**，例如 Next.js 的 `NEXT_PUBLIC_`、Vite 的 `VITE_`。密钥不要用这些前缀。
-- **及时升级 React 和框架**。2025 年 12 月，React 公布了多个 RSC 漏洞：一个可远程执行代码（CVE-2025-55182），还有拒绝服务和源码泄露。修复版本是 19.0.4、19.1.5、19.2.4 或更新的版本。没有服务器的纯客户端应用不受影响。
+- **只把需要的字段传给客户端**。传给客户端组件的 props 和 Server Function 的返回值，都会发送到浏览器。不要传整条数据库记录，例如写 `<Profile name={user.name} />`，而不是 `<Profile user={user} />`，否则密码哈希之类的字段也跟着走了。
+- **及时升级 React 和框架，并关注安全公告。** 2025 年 12 月，React 公布了一个无需登录即可利用的 RSC 远程代码执行漏洞（CVE-2025-55182）。此后到 2026 年 7 月，React 又陆续修复了多个 Server Function 拒绝服务和源码泄露漏洞，公告发布在 react.dev 博客和 React 仓库的 GitHub Security Advisories。截至 2026 年 10 月，各版本线的安全版本是 19.0.8、19.1.9、19.2.8，以及 19.3.0 及之后的版本。具体版本号会继续变化：以 `npm audit` 的结果和上述公告为准，并同时升级框架（Next.js 等自带 React 的 RSC 实现）。没有服务器的纯客户端应用不受影响。
 
 ```jsx title="不要假设调用者一定来自你的界面"
 'use server';
@@ -161,9 +166,9 @@ export async function deletePost(postId) {
 <details className="optional">
 <summary><span className="opt-tag">选读</span>在本地动手试<small>可以先跳过，需要时再展开</small></summary>
 
-需要 Node.js 18 或更新的版本。按下面的步骤，亲眼看看代码在哪里运行：
+需要 Node.js 20.9 或更新的版本（Next.js 16 的要求，运行 `node -v` 查看）。按下面的步骤，亲眼看看代码在哪里运行：
 
-1. 运行 `npx create-next-app@latest rsc-demo`，按默认选项创建项目，再运行 `npm run dev`。
+1. 运行 `npx create-next-app@latest rsc-demo`，在提示“是否使用推荐的默认设置”时选第一项（Yes, use recommended defaults），再进入项目目录运行 `npm run dev`。
 2. 在 `app/page.tsx` 的组件里加一行 `console.log('在哪里打印？')`，刷新页面。这句话打印在运行 npm 的终端里：它在服务器上运行。开发模式下，浏览器控制台也会转发一份，前面带“Server”标记。
 3. 新建 `app/LikeButton.tsx`，顶部写 `'use client'`，用 useState 做一个点赞按钮，在 onClick 里 console.log 一句话。在 page.tsx 里渲染它。点击按钮，这句话只出现在浏览器控制台里。
 4. 把 `'use client'` 删掉再刷新。框架会报错：服务端组件不能使用 useState。

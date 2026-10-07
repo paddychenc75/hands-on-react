@@ -12,7 +12,7 @@ title: "原理：亲手实现迷你 React"
 
 <LessonProse>
 
-理解原理最好的方式就是自己造一个。这一课我们用纯 JavaScript 实现 React 最核心的几个部分。下面的代码都可以直接运行，结果打印在控制台。
+理解原理最好的方式就是自己造一个。这一课我们用纯 JavaScript 实现 React 最核心的几个部分。前三步的代码都可以直接运行，结果打印在控制台。第四步用一个可运行的小例子演示 Fiber 的遍历方式。
 
 ## 第一步：createElement
 
@@ -77,6 +77,7 @@ render(createElement('div', null,
 ), box);
 
 console.log(box.innerHTML);
+box.querySelector('button').click(); // 模拟点击：事件处理函数真的绑上了
 ```
 
 <CallBox kind="deep" label="深入一点">
@@ -129,41 +130,76 @@ api.setCount(c => c + 1);
 console.log('内部 hooks 数组：', JSON.stringify(hooks));
 ```
 
-现在你知道为什么**不能在 if 里调用 Hook** 了。如果某次渲染跳过了第一个 useState，游标就会错位。结果 name 会读到 count 的值。
+现在你知道为什么**不能在 if 里调用 Hook** 了。如果某次渲染跳过了第一个 useState，游标就会错位。结果 name 会读到 count 的值。我们的迷你实现会悄悄读错。真实 React 会记下上一次渲染的 Hook 链表，数量对不上时直接报错（第 15 课见过 `Rendered fewer hooks than expected`）。
 
 上面的演示只有一个组件，所以只用一个全局 hooks 数组。真实 React 中，每个组件实例对应一个 Fiber，Hook 链表存在 Fiber 上。React 先按树中的位置找到 Fiber，再按调用顺序找到 Hook。这就是第 19 课“状态跟着位置走”的原因：
 
 1. 位置和类型不变，就是同一个 Fiber，state 保留。
 2. 类型或 key 变了，React 新建 Fiber，state 清空。
 
+下表对比了本课的迷你实现和真实 React。读完再往下走，避免把迷你版的行为当成真实 React 的行为：
+
+| | 本课的迷你实现 | 真实 React |
+|---|---|---|
+| Hook 存在哪里 | 一个全局数组 | 每个 Fiber 上的链表 |
+| set 函数 | 立刻改值，立刻同步重新渲染 | 把更新放进队列，批处理，下一次渲染时才算出新值 |
+| Hook 数量变了 | 悄悄读错 | 抛出 `Rendered fewer/more hooks…` |
+| 更新界面 | 每次从零创建 DOM | 比较新旧两棵树，只改变化的节点 |
+| 事件 | 直接绑在元素上 | 在根容器上统一监听（事件委托） |
+| 渲染过程 | 递归，不能停 | 循环处理 Fiber，过渡更新可以暂停、丢弃 |
+| 其他 | 没有 effect，没有 key | 都有 |
+
 ## 第四步：Fiber 与可中断渲染
 
 上面的 render 是**递归**的，一旦开始就必须一口气做完。如果组件树很大，主线程会被长时间占用，用户的输入得不到响应。React 16 引入的 **Fiber** 架构为解决这个问题打下了基础。React 18 起，过渡更新等并发渲染才真正可以中断；紧急更新仍然一次做完：
 
 - 每个组件对应一个 **Fiber 节点**。节点用 child、sibling、return 指针连成一棵树。React 遍历这棵树时可以随时暂停。
-- 渲染被拆成一个个小的工作单元，每完成一个就检查：时间片用完了吗？有更高优先级的任务吗？如果有，就**让出主线程**，稍后从断点继续。
+- 渲染被拆成一个个小的工作单元，每完成一个就检查一件事：这一小段时间（约 5 毫秒）用完了吗？用完就**让出主线程**，稍后从断点继续。浏览器趁这个空当处理按键、绘制画面。如果期间来了更紧急的更新，React 回来后先做紧急的，再继续或重做刚才的渲染。
 - 渲染阶段只构建新的 Fiber 树（work-in-progress 树），**不修改 DOM**。所以 React 可以随时丢弃它并重来。
 - 所有单元完成后，进入**提交阶段**。React 一次性、同步地把所有变更应用到 DOM。用户不会看到“画了一半”的界面。
 
-```jsx title="React 实际使用自己的调度器 Scheduler，而非 requestIdleCallback"
-// Fiber 工作循环的核心思想（极简伪代码）
-let nextUnitOfWork = rootFiber;
+下面用一个可运行的小例子演示：用**循环**遍历 Fiber 树，每轮只处理固定数量的节点。
 
-function workLoop(deadline) {
-  while (nextUnitOfWork && deadline.timeRemaining() > 1) {
-    nextUnitOfWork = performUnitOfWork(nextUnitOfWork); // 处理一个 Fiber，返回下一个
-  }
-  if (!nextUnitOfWork && wipRoot) commitRoot();         // 全部完成，一次性提交
-  requestIdleCallback(workLoop);                        // 让出主线程，空闲时继续
+```jsx play title="用循环遍历 Fiber 树"
+const el = (type, ...children) => ({ type, children });
+const tree = el('App', el('Header', el('Logo'), el('Nav')), el('Main', el('List')), el('Footer'));
+
+function toFiber(element, parent) {
+  const fiber = { type: element.type, return: parent, child: null, sibling: null };
+  let prev = null;
+  element.children.forEach(c => {
+    const f = toFiber(c, fiber);
+    if (prev) prev.sibling = f; else fiber.child = f;
+    prev = f;
+  });
+  return fiber;
 }
-requestIdleCallback(workLoop);
 
-// 遍历顺序：先 child，没有就 sibling，再没有就回到 return(父节点) 找它的 sibling
+function performUnitOfWork(fiber) {
+  console.log('处理', fiber.type);
+  if (fiber.child) return fiber.child;            // 1. 先走 child
+  let f = fiber;
+  while (f) {
+    if (f.sibling) return f.sibling;              // 2. 没有 child 就走 sibling
+    f = f.return;                                 // 3. 都没有就回到父节点，找父节点的 sibling
+  }
+  return null;
+}
+
+let next = toFiber(tree, null);
+function workLoop(budget) {                       // budget：这一轮最多做几个单元（模拟时间片）
+  while (next && budget-- > 0) next = performUnitOfWork(next);
+  if (next) { console.log('—— 时间片用完，让出主线程 ——'); setTimeout(() => workLoop(3)); }
+  else console.log('全部完成，可以提交');
+}
+workLoop(3);
 ```
+
+递归做不到“停在 Logo 之后”，因为进度藏在调用栈里。Fiber 把进度存成一个普通变量 `next`，所以能停、能继续、也能整棵丢掉。真实的 React 用自己的调度器 Scheduler 决定什么时候让出主线程，原理相同。
 
 <CallBox kind="tip" label="要点">
 
-想深入学习，可以读两份材料：Rodrigo Pombo 的《Build your own React》；React 源码中的 `packages/react-reconciler`。理解了这一课，你就已经掌握了阅读源码的地图。
+想深入学习，可以读两份材料：Rodrigo Pombo 的《Build your own React》；React 源码中的 `packages/react-reconciler`。理解了这一课，你就已经掌握了阅读源码的地图。第 37 课《调度、优先级与撕裂》会详细讲 React 怎样安排渲染的先后顺序。
 
 </CallBox>
 

@@ -4,7 +4,7 @@ export default {
   id: 'patterns',
   stage: 3,
   title: '组件设计模式',
-  mins: 20,
+  mins: 24,
   summary: '复合组件、render props、受控/非受控双模式：写出别人爱用的组件 API。',
   goals: [
     '能用 Context 写出一组复合组件',
@@ -182,7 +182,18 @@ function Tab({ id }) {
   ],
   plays: {
     '复合组件：Tabs': {
-      note: 'Radix UI、Headless UI、shadcn/ui 等流行组件库大量使用这种模式。',
+      note: '这个 Tabs 只演示怎样用 Context 共享状态。它写了 role="tab"，却还没实现方向键切换，也没有把 tab 和面板关联起来。下一课会解释为什么这样不够。真实项目请用 Radix、React Aria 这类已经做好键盘行为的组件。Radix UI、Headless UI、shadcn/ui 等流行组件库大量使用复合组件模式。',
+    },
+    同一段逻辑的三种写法: {
+      note: '运行后只有一个 HOC 注入的 pos 留了下来：里层的 withOrigin 在展开 props 之后才写 pos，所以覆盖了外层 withMouse 注入的值，鼠标怎么动都不变。被包的组件看不出 pos 是谁给的，这就是 HOC 的固有毛病。自定义 Hook 的返回值由调用者命名，不会有这个问题。',
+      predict: {
+        q: '鼠标一直不动。页面上 “HOC：” 后面显示什么？',
+        options: ['0,0', 'undefined', '原点', '报错：同一个 prop 不能注入两次'],
+        answer: 2,
+        explain:
+          '两个 HOC 都注入了 pos。里层的 withOrigin 在展开 props 之后才写 pos=“原点”，所以覆盖了外层传下来的值。React 不会对同名 prop 报错或警告。选 “0,0” 的人以为外层的 withMouse 优先；选“报错”的人以为 React 会检查冲突。',
+      },
+      pkey: 'patterns|同一段逻辑的三种写法',
     },
   },
 } satisfies Lesson;

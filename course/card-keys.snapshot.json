@@ -142,6 +142,7 @@
     "state-architecture#c0": "018657f6",
     "state-architecture#c1": "6b0a169e",
     "state-architecture#c2": "21f78777",
+    "state-architecture#c3": "921534f9",
     "react-19#0": "f8592b11",
     "react-19#1": "55c785c7",
     "react-19#2": "2b0eb600",
@@ -316,6 +317,8 @@
     "error-handling|边界能接住哪一个？",
     "error-handling|一次故障，上报几次？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？"
+    "perf-clinic|memo 挡得住 Context 吗？",
+    "patterns|同一段逻辑的三种写法",
+    "mini-react|用循环遍历 Fiber 树"
   ]
 }

@@ -132,6 +132,7 @@ function App() {
 - 不要用正数 `tabIndex`（例如 tabIndex=\{3\}）。它会打乱顺序。只用 `0`（加入 Tab 顺序）和 `-1`（只能用代码聚焦）。
 - 不要删除焦点轮廓（`outline: none`）。要改样式，就用 `:focus-visible` 换一个同样明显的样式。
 - 用 `onClick` 而不是 `onMouseDown`。按钮的 onClick 也会响应键盘。
+- 文字和背景的**对比度**至少 4.5:1（大号文字 3:1）。对比度太低的文字，弱视用户和强光下的用户都看不清。浏览器开发者工具的取色器会直接显示这个比值。
 
 ## 焦点管理：打开和关闭弹窗
 
@@ -196,6 +197,12 @@ function App() {
 <CallBox kind="deep" label="深入一点">
 
 不能用 \<dialog\> 时（例如要兼容很旧的浏览器），就用 Portal 渲染一个 `role="dialog"` 加 `aria-modal="true"` 的 div。这时四条规则全要自己写：在 effect 中聚焦；监听 keydown 实现 Tab 循环和 Esc；打开前用 ref 记住 `document.activeElement`，关闭时还给它。这正是 Radix、React Aria 等无样式组件库替你做的事。
+
+</CallBox>
+
+<CallBox kind="deep" label="深入一点">
+
+单页应用切换路由时，浏览器不会刷新页面。焦点留在原地，读屏软件也不会播报新页面。用户听不到页面已经换了。做法：路由变化后更新 `document.title`，并把焦点移到新页面的 `<h1 tabIndex={-1}>` 或主内容区。不同的路由库和框架处理程度不同，使用前查一下它的文档。没有内置处理时，就自己加上这一步。
 
 </CallBox>
 
