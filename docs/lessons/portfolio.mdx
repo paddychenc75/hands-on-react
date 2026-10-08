@@ -44,6 +44,8 @@ npm run lint         # ESLint 由项目自带，不依赖编辑器插件
 
 `--eslint` 让模板用 ESLint 并配好 `eslint-plugin-react-hooks`。不加这个参数，目前的模板改用 Oxlint，`npm run lint` 跑的是另一个工具。[城市天气应用](/lessons/project-weather)用的是同一条命令，只是模板换成带 React Compiler 的 `react-compiler-ts`；毕业设计想启用 React Compiler，也可以换成它。编辑器用 VS Code 这类能显示 TypeScript 报错的即可。
 
+模板的 `package.json` 里只有 `dev`、`build`、`lint`、`preview` 四条命令。验收清单用到的 `npm run typecheck` 和 `npm test` 要自己加：在 `scripts` 里写 `"typecheck": "tsc -b"`、`"test": "vitest run"`（Vitest 的安装见[城市天气应用](/lessons/project-weather)的里程碑 0；项目三用 Next.js，类型检查写成 `"typecheck": "tsc --noEmit"`）。
+
 ## 项目一：个人记账本（Vite + TypeScript）
 
 预计工时：约 8–12 小时。
