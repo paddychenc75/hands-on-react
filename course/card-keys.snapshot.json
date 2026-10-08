@@ -362,6 +362,9 @@
     "error-handling|边界能接住哪一个？",
     "error-handling|一次故障，上报几次？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？"
+    "perf-clinic|memo 挡得住 Context 吗？",
+    "react-19|useFormStatus：按钮写在哪里",
+    "react-19|use() 读取 Promise，配合 Suspense",
+    "react-19|Activity：隐藏界面，保留 state"
   ]
 }

@@ -12,7 +12,7 @@ title: "React 19 新特性"
 
 <LessonProse>
 
-React 19（2024 年 12 月发布）带来了一批围绕**异步操作和表单**的新特性。**本课的 React 19 代码只能阅读**：本应用的运行环境是 React 18，运行不了 19 的 API。可运行的演示和练习用 React 18 模拟同样的思路。想亲手运行 React 19 的代码，请在本机建一个项目，步骤见[项目搭建与交付](/lessons/engineering)：用 Vite 创建的新项目默认就是 React 19。
+React 19（2024 年 12 月发布）带来了一批围绕**异步操作和表单**的新特性。**这一课的实验台运行 React 19.3.0 开发版**（实验台标题栏的标记会显示版本）：本课的示例都是真正的 React 19 代码，可以直接改着试。其他课的实验台仍然运行 React 18.3.1。依赖真实服务端的内容（例如服务端组件把 Promise 传给 `use()`、Server Function 的 `'use server'`）实验台跑不了，课文里只用只读片段说明；示例里的 `api`、`save` 等都是模拟的异步函数。
 
 一次异步提交（例如“修改用户名”）要管理 4 件事。React 18 中，每一件都要自己写 state。React 19 为每一件提供了现成的 API：
 
@@ -55,30 +55,41 @@ function handleSubmit() {
 
 <strong>它解决了 React 18 中的什么麻烦：</strong>表单要写 onSubmit 和 `e.preventDefault()`，每个字段还要一个受控 state。结果和错误又各占一个 state。
 
-`<form>` 的 `action` 属性可以直接接收函数。提交时，React 调用它并传入 `FormData`，成功后自动重置非受控字段。`useActionState` 把 Action 的返回值和 pending 打包给你。Action 的第一个参数是上一次的 state：
+`<form>` 的 `action` 属性可以直接接收函数。提交时，React 调用它并传入 `FormData`。`useActionState` 把 Action 的返回值和 pending 打包给你。Action 的第一个参数是上一次的 state。
 
-```jsx
+下面的 `api.subscribe` 是模拟的异步函数（0.8 秒后返回），不是真的服务器。输入 `taken@example.com` 会得到“已订阅过”。
+
+```jsx play title="useActionState 与 form action"
 import { useActionState } from 'react';
 
+// 模拟的服务器：0.8 秒后返回。taken@example.com 已经订阅过
+const api = {
+  subscribe: email => new Promise(resolve => setTimeout(() => resolve(email !== 'taken@example.com'), 800)),
+};
+
+// Action：(上一次的 state, formData) => 新的 state
 async function subscribe(prevState, formData) {
-  const email = formData.get('email');
+  const email = String(formData.get('email') ?? '').trim();
   if (!email.includes('@')) return { error: '邮箱格式不对' };
-  await api.subscribe(email);
+  const ok = await api.subscribe(email);
+  if (!ok) return { error: '这个邮箱已经订阅过了' };
   return { ok: true };
 }
 
-function Newsletter() {
+function App() {
   const [state, formAction, isPending] = useActionState(subscribe, {});
   return (
     <form action={formAction}>
-      <input name="email" />
+      <input name="email" placeholder="邮箱" />
       <button disabled={isPending}>{isPending ? '提交中…' : '订阅'}</button>
-      {state.error && <p>{state.error}</p>}
+      {state.error && <p style={{ color: 'crimson' }}>{state.error}</p>}
       {state.ok && <p>订阅成功 🎉</p>}
     </form>
   );
 }
 ```
+
+注意：Action 结束后，React 会重置表单里的非受控字段。出错返回时也一样，输入框会被清空。要保留用户的输入，见下面选读“大型表单”里的 `defaultValue` 写法。
 
 <CallBox kind="tip" label="要点">
 
@@ -86,17 +97,28 @@ function Newsletter() {
 
 </CallBox>
 
-```jsx title="useFormStatus 要放在 form 里面的子组件（只能阅读）"
+下面的 `save` 是模拟的异步函数（1.5 秒后完成）。
+
+```jsx play title="useFormStatus：按钮写在哪里"
 import { useFormStatus } from 'react-dom';
 
-function SubmitButton() {              // ✅ 它被渲染在 <form> 里面
+const save = () => new Promise(resolve => setTimeout(resolve, 1500));
+
+// 按钮 B 在子组件 SubmitB 里
+function SubmitB() {
   const { pending } = useFormStatus();
-  return <button disabled={pending}>{pending ? '提交中…' : '订阅'}</button>;
+  return <button disabled={pending}>{pending ? 'B：提交中…' : 'B：提交'}</button>;
 }
 
-function Newsletter() {
-  // ❌ 如果在这里调用 useFormStatus()：Newsletter 的上层没有 form，pending 永远是 false
-  return <form action={subscribe}><input name="email" /><SubmitButton /></form>;
+function App() {
+  // 按钮 A 直接写在 App 里
+  const { pending } = useFormStatus();
+  return (
+    <form action={save}>
+      <button disabled={pending}>{pending ? 'A：提交中…' : 'A：提交'}</button>
+      <SubmitB />
+    </form>
+  );
 }
 ```
 
@@ -129,34 +151,34 @@ function Chat({ messages, sendMessage }) {
 }
 ```
 
-下面用 React 18 的 state **模拟它的效果**。演示后面是 useOptimistic 版本的逐行对照。
+下面是真正的 `useOptimistic`。`fakeServer` 是模拟的网络请求（1.2 秒）。
 
-```jsx play title="用 React 18 模拟乐观更新的效果"
-import { useState } from 'react';
+```jsx play title="useOptimistic：先显示，失败再回滚"
+import { useState, useOptimistic, startTransition } from 'react';
 
-const fakeServer = (ok) => new Promise((res, rej) => setTimeout(() => ok ? res() : rej(new Error('网络错误')), 1200));
+const fakeServer = ok => new Promise((res, rej) => setTimeout(() => (ok ? res() : rej(new Error('网络错误'))), 1200));
 
 function App() {
   const [likes, setLikes] = useState(42);
-  const [pending, setPending] = useState(0);
+  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (current, n) => current + n);
   const [msg, setMsg] = useState('');
 
-  async function like(shouldSucceed) {
-    setPending(p => p + 1);           // ①
+  function like(shouldSucceed) {
     setMsg('');
-    try {
-      await fakeServer(shouldSucceed);
-      setLikes(l => l + 1);           // ②
-    } catch (e) {
-      setMsg('点赞失败：' + e.message);
-    } finally {
-      setPending(p => p - 1);         // ③
-    }
+    startTransition(async () => {
+      addOptimistic(1); // ①
+      try {
+        await fakeServer(shouldSucceed);
+        startTransition(() => setLikes(l => l + 1)); // ②
+      } catch (e) {
+        setMsg('点赞失败：' + e.message);
+      }
+    }); // Action 结束时，乐观值自动丢弃
   }
 
   return (
     <div>
-      <h2>❤️ {likes + pending} {pending > 0 && <small>（同步中…）</small>}</h2>
+      <h2>❤️ {optimisticLikes}</h2>
       <button onClick={() => like(true)}>点赞（会成功）</button>
       <button onClick={() => like(false)}>点赞（会失败）</button>
       <p style={{ color: 'crimson' }}>{msg}</p>
@@ -165,36 +187,27 @@ function App() {
 }
 ```
 
-```jsx title="await 之后的 set 函数调用不再属于这个 Action，所以 ② 要再包一层 startTransition"
-// 同样的点赞，用 React 19 的 useOptimistic 写（只读代码）
-import { useState, useOptimistic, startTransition } from 'react';
+`await` 之后的 set 函数调用不再属于这个 Action，所以 ② 要再包一层 `startTransition`。作为对照，下面是 React 18 的写法：自己多存一个 `pending` 数字，成功和失败后都要手动收尾。
 
+```jsx title="React 18 的对照写法（只读）"
 function LikeButton() {
   const [likes, setLikes] = useState(42);
-  const [optimisticLikes, addOptimistic] = useOptimistic(likes, (current, n) => current + n);
+  const [pending, setPending] = useState(0);
   const [msg, setMsg] = useState('');
 
-  function like(shouldSucceed) {
+  async function like(shouldSucceed) {
+    setPending(p => p + 1);           // 对应 ①：乐观值
     setMsg('');
-    startTransition(async () => {
-      addOptimistic(1);                              // 对应 ①
-      try {
-        await fakeServer(shouldSucceed);
-        startTransition(() => setLikes(l => l + 1)); // 对应 ②
-      } catch (e) {
-        setMsg('点赞失败：' + e.message);
-      }
-    }); // Action 结束时，乐观值自动丢弃：对应 ③，不用自己写
+    try {
+      await fakeServer(shouldSucceed);
+      setLikes(l => l + 1);           // 对应 ②
+    } catch (e) {
+      setMsg('点赞失败：' + e.message);
+    } finally {
+      setPending(p => p - 1);         // 对应 Action 结束：自己撤销乐观值
+    }
   }
-
-  return (
-    <div>
-      <h2>❤️ {optimisticLikes}</h2>
-      <button onClick={() => like(true)}>点赞（会成功）</button>
-      <button onClick={() => like(false)}>点赞（会失败）</button>
-      <p>{msg}</p>
-    </div>
-  );
+  return <h2>❤️ {likes + pending}</h2>; // 省略按钮
 }
 ```
 
@@ -202,15 +215,41 @@ function LikeButton() {
 
 <strong>它解决了 React 18 中的什么麻烦：</strong>读取一个 Promise，要写 useEffect 加三个 state（数据、加载中、错误）。Hook 又不能写在条件语句里，按条件读取 Context 很别扭。
 
-```jsx
-import { use, Suspense } from 'react';
+```jsx play title="use() 读取 Promise，配合 Suspense"
+import { use, Suspense, useState } from 'react';
 
-function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise); // 未完成时会“暂停”，交给 Suspense
-  return comments.map(c => <p key={c.id}>{c.text}</p>);
+// 模拟请求。同一个 id 只请求一次：Promise 缓存在组件外面
+const cache = new Map();
+function fetchUser(id) {
+  if (!cache.has(id)) {
+    const names = { 1: 'Alice', 2: 'Bob' };
+    cache.set(id, new Promise(resolve => setTimeout(() => resolve({ name: names[id] }), 1000)));
+  }
+  return cache.get(id);
 }
 
-// use 不是 Hook，而是 API：它可以写在条件语句里（但不能放在 try-catch 中）
+function Profile({ userPromise }) {
+  const user = use(userPromise); // 未完成时“暂停”这个组件，交给最近的 Suspense
+  return <h3>用户：{user.name}</h3>;
+}
+
+function App() {
+  const [userPromise, setUserPromise] = useState(() => fetchUser(1));
+  return (
+    <div>
+      <button onClick={() => setUserPromise(fetchUser(1))}>看 Alice</button>
+      <button onClick={() => setUserPromise(fetchUser(2))}>看 Bob</button>
+      <Suspense fallback={<h3>加载中…</h3>}>
+        <Profile userPromise={userPromise} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+`use` 不是 Hook，而是 API：它可以写在条件语句里（但不能放在 try-catch 中），还可以读取 Context：
+
+```jsx title="use() 按条件读取 Context（只读片段）"
 function Heading({ show }) {
   if (show) {
     const theme = use(ThemeContext);
@@ -232,15 +271,32 @@ function Heading({ show }) {
 
 React 19.2 新增 `<Activity>`。它解决的是“切换标签页或返回上一页时，不想丢掉另一部分界面的 state”。
 
-```jsx title="Activity（只能阅读）"
-import { Activity } from 'react';
+```jsx play title="Activity：隐藏界面，保留 state"
+import { Activity, useState, useEffect } from 'react';
 
-function Tabs({ tab }) {
+function Draft({ name }) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    console.log(name + ' 的 effect 运行');
+    return () => console.log(name + ' 的 effect 被清理');
+  }, [name]);
+  return <input value={text} onChange={e => setText(e.target.value)} placeholder={name + ' 的输入框'} />;
+}
+
+function App() {
+  const [tab, setTab] = useState('a');
   return (
-    <>
-      <Activity mode={tab === 'a' ? 'visible' : 'hidden'}><PageA /></Activity>
-      <Activity mode={tab === 'b' ? 'visible' : 'hidden'}><PageB /></Activity>
-    </>
+    <div>
+      <button onClick={() => setTab('a')}>标签 A</button>
+      <button onClick={() => setTab('b')}>标签 B</button>
+      <div>
+        {/* 标签 A 用条件渲染，标签 B 用 Activity */}
+        {tab === 'a' && <Draft name="A" />}
+        <Activity mode={tab === 'b' ? 'visible' : 'hidden'}>
+          <Draft name="B" />
+        </Activity>
+      </div>
+    </div>
   );
 }
 ```
@@ -253,10 +309,132 @@ function Tabs({ tab }) {
 | CSS `display: none` | 保留 | 一直在运行 | 照常重新渲染 |
 | `<Activity mode="hidden">` | 保留 | 被清理 | 低优先级，空闲时才处理 |
 
+## ref 和 Context 的两处简化
+
+函数组件现在可以直接把 `ref` 当 prop 接收，通常不再需要 `forwardRef`。ref 回调还可以返回一个清理函数：卸载时 React 调用它。React 18 中，卸载时 ref 回调会以 `null` 再调用一次，你要自己判断参数是不是 null。
+
+```jsx play title="ref 作为普通 prop"
+import { useRef, useState, useCallback } from 'react';
+
+// 函数组件直接接收 ref，不需要 forwardRef
+function FancyInput({ ref, label }) {
+  return (
+    <label>
+      {label}：<input ref={ref} />
+    </label>
+  );
+}
+
+function Box() {
+  const attach = useCallback(node => {
+    console.log('ref 回调：挂上 <' + node.tagName.toLowerCase() + '>');
+    return () => console.log('ref 回调：返回的清理函数运行了');
+  }, []);
+  return <div ref={attach}>我是一个方框</div>;
+}
+
+function App() {
+  const inputRef = useRef(null);
+  const [show, setShow] = useState(true);
+  return (
+    <div>
+      <FancyInput ref={inputRef} label="姓名" />
+      <button onClick={() => inputRef.current.focus()}>聚焦输入框</button>
+      <button onClick={() => setShow(s => !s)}>{show ? '卸载方框' : '挂上方框'}</button>
+      {show && <Box />}
+    </div>
+  );
+}
+```
+
+Context 对象本身可以直接当 Provider 用。React 18 中必须写 `.Provider`。
+
+```jsx play title="Context 直接当 Provider"
+import { createContext, useContext, useState } from 'react';
+
+const ThemeContext = createContext('light');
+
+function Panel() {
+  const theme = useContext(ThemeContext);
+  const dark = theme === 'dark';
+  return (
+    <p style={{ padding: 12, borderRadius: 6, background: dark ? '#222' : '#eee', color: dark ? '#eee' : '#222' }}>
+      当前主题：{theme}
+    </p>
+  );
+}
+
+function App() {
+  const [theme, setTheme] = useState('light');
+  return (
+    // React 18 要写 <ThemeContext.Provider value={theme}>
+    <ThemeContext value={theme}>
+      <button onClick={() => setTheme(t => (t === 'light' ? 'dark' : 'light'))}>切换主题</button>
+      <Panel />
+    </ThemeContext>
+  );
+}
+```
+
+## useEffectEvent 与 ViewTransition
+
+`useEffectEvent`（19.2 起稳定）从 effect 中提取事件逻辑：它总能读到最新的 props 和 state，又不必写进依赖数组。下面切换主题不会重新连接，只有换房间才会。
+
+```jsx play title="useEffectEvent：读最新值但不重启 effect"
+import { useState, useEffect, useEffectEvent } from 'react';
+
+function ChatRoom({ roomId, theme }) {
+  const onConnected = useEffectEvent(() => {
+    console.log('已连接到 ' + roomId + '，当前主题：' + theme);
+  });
+  useEffect(() => {
+    console.log('连接到 ' + roomId + ' …');
+    const id = setTimeout(() => onConnected(), 600);
+    return () => {
+      clearTimeout(id);
+      console.log('断开 ' + roomId);
+    };
+  }, [roomId]); // 不用写 theme，也不用写 onConnected
+  return <p>房间：{roomId}，主题：{theme}</p>;
+}
+
+function App() {
+  const [roomId, setRoomId] = useState('general');
+  const [theme, setTheme] = useState('light');
+  return (
+    <div>
+      <button onClick={() => setRoomId(r => (r === 'general' ? 'travel' : 'general'))}>换房间</button>
+      <button onClick={() => setTheme(t => (t === 'light' ? 'dark' : 'light'))}>换主题</button>
+      <ChatRoom roomId={roomId} theme={theme} />
+    </div>
+  );
+}
+```
+
+`<ViewTransition>`（19.3 起稳定）用浏览器的 View Transition API，为元素的进入、离开、更新做动画。只有放在 `startTransition`（或 Suspense 展开、`useDeferredValue`）里的更新才会触发动画，紧急更新会立即生效。
+
+```jsx play title="ViewTransition：进入和离开的动画"
+import { ViewTransition, startTransition, useState } from 'react';
+
+function App() {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <button onClick={() => startTransition(() => setShow(s => !s))}>{show ? '收起' : '展开'}</button>
+      {show && (
+        <ViewTransition>
+          <p style={{ padding: 12, background: '#cfe8f3', color: '#0f1d24', borderRadius: 6 }}>我是一张会淡入淡出的卡片</p>
+        </ViewTransition>
+      )}
+    </div>
+  );
+}
+```
+
 <details className="optional">
 <summary><span className="opt-tag">选读</span>从 React 18 升级<small>可以先跳过，需要时再展开</small></summary>
 
-本课的实验台运行的正是 React 18.3.1。官方推荐的升级路线是三步：
+本课的实验台已经是 React 19。你从 React 18 的项目升级时，官方推荐的升级路线是三步：
 
 1. 先升到 **React 18.3.1**。它和 18.2 行为相同，但会对 19 将移除的 API 打印弃用警告。把这些警告清掉。
 2. 运行官方 codemod：`npx codemod@latest react/19/migration-recipe`。它会自动改写其中大部分写法。
@@ -280,9 +458,7 @@ React 19 移除了下面这些 API：
 <details className="optional">
 <summary><span className="opt-tag">选读</span>其他实用改进<small>可以先跳过，需要时再展开</small></summary>
 
-- **ref 作为普通 prop**：函数组件可以直接接收 `ref`。React 18 中必须用 `forwardRef` 包一层。
-- **\<Context\> 直接作为 Provider**：写 `<ThemeContext value="dark">` 即可。React 18 中必须写 `.Provider`。
-- **ref 回调支持返回清理函数**。React 18 中，卸载时 ref 回调会以 null 再调用一次，你要自己判断参数是不是 null。
+- **ref 和 Context 的简化**：见上面“ref 和 Context 的两处简化”。
 - **文档元数据**：在组件里直接渲染 `<title>`、`<meta>`，React 会自动提升到 `<head>`。React 18 中要用 effect 修改 document.title，或引入第三方库。
 - **样式表和脚本写在组件里**：在组件里渲染 `<link rel="stylesheet" href="…" precedence="default">` 或 `<script async src="…">`，React 会按 `precedence` 排好样式表的顺序，并自动去重：多个组件写同一个地址，只加载一次。
 - **预加载 API**：`react-dom` 提供 `preload`、`preinit`、`preconnect`、`prefetchDNS`，让浏览器提前加载资源。例如 `preload('/font.woff2', { as: 'font' })`。
@@ -341,10 +517,10 @@ function Signup() {
 | 19.1 `useId` 格式 | 格式从 `:r1:` 改为 `«r1»`；19.2 又改为 `_r_1_`。不要依赖 id 的具体格式 | 旧格式含冒号，不能直接当 CSS 选择器用 |
 | 19.2 Partial Pre-rendering：`prerender`、`resume` | 先预渲染页面的静态部分，之后再恢复渲染动态部分 | 要么整页静态生成，要么整页服务端渲染 |
 | 19.2 `eslint-plugin-react-hooks` v6 | `recommended` 预设默认使用 flat config；基于 React Compiler 的新规则需要自己开启 | 旧的 `extends` 写法在新的 ESLint 配置里不能直接用 |
-| 19.2 `useEffectEvent` | 从 effect 中提取事件逻辑。它总能读到最新值，不必写进依赖数组。见“闭包陷阱与 Effect 依赖”一课 | 想读最新值又不想重启 effect，只能手动用 ref 同步 |
+| 19.2 `useEffectEvent` | 从 effect 中提取事件逻辑。它总能读到最新值，不必写进依赖数组。上面有可运行的示例；见“闭包陷阱与 Effect 依赖”一课 | 想读最新值又不想重启 effect，只能手动用 ref 同步 |
 | 19.2 `cacheSignal` | 只用于服务端组件。`cache()` 的结果失效时发出信号，可以中止请求 | 渲染已经放弃了，发出的请求还在继续，浪费服务器资源 |
 | 19.2 Performance Tracks | Chrome DevTools 性能面板中新增 React 轨道，显示调度优先级、组件渲染和 effect | 性能面板只显示一堆 JS 函数，看不出是哪个组件、哪个优先级 |
-| 19.3 `<ViewTransition>`、`addTransitionType` | 用浏览器的 View Transition API，为元素的进入、离开、移动做动画 | 离开的元素已被卸载，要做退场动画只能引入动画库 |
+| 19.3 `<ViewTransition>`、`addTransitionType` | 上面有 `<ViewTransition>` 的可运行示例。用浏览器的 View Transition API，为元素的进入、离开、移动做动画 | 离开的元素已被卸载，要做退场动画只能引入动画库 |
 | 19.3 Fragment ref | 给 `<Fragment>` 传 ref，操作它的 DOM 子节点 | 要拿到一组子元素，只能多包一层 div，改变了 DOM 结构 |
 | 19.3 `use(browser())` | 让组件跳过服务端渲染，只在浏览器中渲染 | 要写 useEffect + “已挂载” state，先渲染占位再渲染真实内容 |
 | 19.3 服务端组件直接渲染 Context | 服务端组件可以直接渲染从 `'use client'` 模块导入的 Context，不用再包一层客户端 Provider 组件 | 要多写一个只为包 Provider 的客户端组件 |

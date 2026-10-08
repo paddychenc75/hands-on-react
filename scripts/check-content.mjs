@@ -218,6 +218,7 @@ for (const [id, l] of Object.entries(lessons)) {
   (l.checkOnly || []).forEach((q, i) => checkQuestion(where, `checkOnly[${i}]`, q));
   for (const [k, meta] of Object.entries(l.plays || {})) if (meta?.predict) checkQuestion(where, `plays["${k}"].predict`, meta.predict);
   for (const f of ['title', 'summary']) if (typeof l[f] !== 'string' || !l[f].trim()) fail(where, `${f} 是空的`);
+  if (l.runtime !== undefined && l.runtime !== 18 && l.runtime !== 19) fail(where, `runtime 是 ${JSON.stringify(l.runtime)}，只能是 18 或 19（不写就是 18）`);
   if (!Number.isInteger(l.mins) || l.mins <= 0) fail(where, `mins 是 ${JSON.stringify(l.mins)}，必须是正整数`);
   for (const f of ['goals', 'keyPoints']) if (!Array.isArray(l[f]) || !l[f].length) fail(where, `${f} 是空的`);
   if (l.exercise) {

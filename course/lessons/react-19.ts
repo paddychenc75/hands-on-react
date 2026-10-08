@@ -5,7 +5,7 @@ export default {
   runtime: 19,
   stage: 3,
   title: 'React 19 新特性',
-  mins: 34,
+  mins: 53,
   summary: 'Actions、useActionState、useOptimistic、use()、ref 作为 prop 等新能力。',
   goals: [
     '能说出一次异步提交要管理的 4 件事，以及 React 19 用哪个 API 接管每一件',
@@ -49,25 +49,15 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>补全 <code>useActionState(action, initialState)</code>，返回 <code>[state, dispatch, isPending]</code>。<code>dispatch(payload)</code> 调用 <code>action(上一次的 state, payload)</code>，把返回值存成新的 state。</li><li>等待 action 时，isPending 为 true。action 完成或抛错后，都要设回 false。</li><li>补全 <code>subscribeAction(prevState, formData)</code>：tries 加 1；邮箱不含 @，返回“邮箱格式不对”；服务器返回 false，返回“这个邮箱已经订阅过了”；成功时返回 <code>{ ok: true, tries }</code>。</li><li>不要修改 App。写完后，你的 subscribeAction 不用改，就能交给 React 19 真正的 useActionState。</li></ol><p>迷你版和真正的 <code>useActionState</code> 有三处不同：① 真 Hook 的 action 抛错时，错误会交给最近的错误边界，不会“保持旧 state 继续用”。所以预期内的失败要用<b>返回值</b>表达（例如 <code>{ error }</code>），不要 throw。② 真 Hook 连续多次调用会<b>排队</b>依次执行，每次拿到上一次的结果；迷你版直接读闭包里的 state，快速连点会读到旧值。③ 真的 <code>formAction</code> 在 <code>&lt;form action&gt;</code> 之外调用时，必须包在 <code>startTransition</code> 里。</p>',
-    starter: `import { useState } from 'react';
+    task: "<ol class=\"task-steps\"><li>补全 <code>subscribeAction(prevState, formData)</code>（第 1 部分）：tries 在 prevState 的基础上加 1；邮箱不含 @，返回 <code>{ error: '邮箱格式不对', tries }</code>；<code>api.subscribe</code> 返回 false，返回 <code>{ error: '这个邮箱已经订阅过了', tries }</code>；成功返回 <code>{ ok: true, tries }</code>。</li><li>在 <code>App</code> 里（第 2 部分）用 React 19 的 <code>useActionState(subscribeAction, { tries: 0 })</code> 取出 <code>[state, formAction, isPending]</code>，替换掉占位的三行。表单已经写成 <code>&lt;form action={formAction}&gt;</code>。</li><li>不要用 <code>useState</code> 自己管 pending、错误和结果，也不要写 <code>onSubmit</code>：这些都交给 React 19。</li></ol><p>三个提醒：① Action 的第一个参数是上一次的 state，第二个才是 formData。② 预期内的失败用<b>返回值</b>表达，不要 throw：Action 抛错时，错误会交给最近的错误边界。③ 不要修改 <code>prevState</code>，返回一个新对象。</p>",
+    starter: `import { useActionState } from 'react';
 
-// 模拟服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
+// 模拟的服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
 const api = {
   subscribe: (email) => new Promise(resolve => setTimeout(() => resolve(email !== 'taken@example.com'), 300)),
 };
 
-// —— 第 1 部分：用 React 18 写一个迷你 useActionState ——
-// 返回 [state, dispatch, isPending]
-function useActionState(action, initialState) {
-  // 1. 用 state 保存 Action 的结果和 isPending
-  // 2. dispatch(payload)：先把 isPending 设为 true，
-  //    再调用 action(上一次的 state, payload)，等它完成，把返回值存成新的 state
-  // 3. 无论 action 成功还是抛错，最后都把 isPending 设回 false
-  return [initialState, () => {}, false]; // 占位：换成你的实现
-}
-
-// —— 第 2 部分：把提交逻辑写成 Action ——
+// —— 第 1 部分：把提交逻辑写成 Action ——
 // 参数：上一次的 state、表单的 FormData。返回值：新的 state
 async function subscribeAction(prevState, formData) {
   // 1. tries 在上一次的基础上加 1
@@ -77,15 +67,14 @@ async function subscribeAction(prevState, formData) {
   return prevState; // 占位：换成你的实现
 }
 
+// —— 第 2 部分：把 Action 接到组件上 ——
 function App() {
-  const [state, formAction, isPending] = useActionState(subscribeAction, { tries: 0 });
-  // React 19 中直接写 <form action={formAction}>。React 18 没有这个功能，这里用 onSubmit 模拟
-  function handleSubmit(e) {
-    e.preventDefault();
-    formAction(new FormData(e.currentTarget));
-  }
+  // 占位：换成 useActionState(subscribeAction, { tries: 0 })
+  const state = { tries: 0 };
+  const formAction = undefined;
+  const isPending = false;
   return (
-    <form onSubmit={handleSubmit}>
+    <form action={formAction}>
       <input id="email" name="email" placeholder="邮箱" />
       <button id="submit" disabled={isPending}>{isPending ? '提交中…' : '订阅'}</button>
       {state.error && <p id="error">{state.error}</p>}
@@ -94,31 +83,14 @@ function App() {
     </form>
   );
 }`,
-    solution: `import { useState } from 'react';
+    solution: `import { useActionState } from 'react';
 
-// 模拟服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
+// 模拟的服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
 const api = {
   subscribe: (email) => new Promise(resolve => setTimeout(() => resolve(email !== 'taken@example.com'), 300)),
 };
 
-// —— 第 1 部分：用 React 18 写一个迷你 useActionState ——
-// 返回 [state, dispatch, isPending]
-function useActionState(action, initialState) {
-  const [state, setState] = useState(initialState);
-  const [isPending, setIsPending] = useState(false);
-  async function dispatch(payload) {
-    setIsPending(true);
-    try {
-      const next = await action(state, payload);
-      setState(next);
-    } finally {
-      setIsPending(false);
-    }
-  }
-  return [state, dispatch, isPending];
-}
-
-// —— 第 2 部分：把提交逻辑写成 Action ——
+// —— 第 1 部分：把提交逻辑写成 Action ——
 // 参数：上一次的 state、表单的 FormData。返回值：新的 state
 async function subscribeAction(prevState, formData) {
   const tries = prevState.tries + 1;
@@ -129,15 +101,11 @@ async function subscribeAction(prevState, formData) {
   return { ok: true, tries };
 }
 
+// —— 第 2 部分：把 Action 接到组件上 ——
 function App() {
   const [state, formAction, isPending] = useActionState(subscribeAction, { tries: 0 });
-  // React 19 中直接写 <form action={formAction}>。React 18 没有这个功能，这里用 onSubmit 模拟
-  function handleSubmit(e) {
-    e.preventDefault();
-    formAction(new FormData(e.currentTarget));
-  }
   return (
-    <form onSubmit={handleSubmit}>
+    <form action={formAction}>
       <input id="email" name="email" placeholder="邮箱" />
       <button id="submit" disabled={isPending}>{isPending ? '提交中…' : '订阅'}</button>
       {state.error && <p id="error">{state.error}</p>}
@@ -146,31 +114,15 @@ function App() {
     </form>
   );
 }`,
-    hint: "1. dispatch 做三件事：把 isPending 设为 true；<code>await action(state, payload)</code> 并保存结果；把 isPending 设回 false。抛错时也要设回 false，所以用 try/finally。2. Action 只依赖两个参数：tries 从 prevState 算，email 用 <code>formData.get('email')</code> 读。",
-    faded: `import { useState } from 'react';
+    hint: "1. Action 只依赖两个参数：tries 从 prevState 算，email 用 <code>formData.get('email')</code> 读；先校验，再 <code>await api.subscribe(email)</code>，最后根据返回值决定返回什么。2. 在 App 里：<code>const [state, formAction, isPending] = useActionState(subscribeAction, { tries: 0 })</code>。",
+    faded: `import { useActionState } from 'react';
 
-// 模拟服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
+// 模拟的服务器（不用修改）：0.3 秒后返回。这个邮箱已经订阅过，就返回 false
 const api = {
   subscribe: (email) => new Promise(resolve => setTimeout(() => resolve(email !== 'taken@example.com'), 300)),
 };
 
-// —— 第 1 部分：用 React 18 写一个迷你 useActionState ——
-// 返回 [state, dispatch, isPending]
-function useActionState(action, initialState) {
-  const [state, setState] = useState(initialState);
-  const [isPending, setIsPending] = useState(false);
-  async function dispatch(payload) {
-    setIsPending(true);
-    try {
-      /* ✏️ 调用 action：传入上一次的 state 和 payload，等它完成，把返回值存成新的 state */
-    } finally {
-      /* ✏️ 无论成功还是抛错，最后都要做的一件事 */
-    }
-  }
-  return [state, dispatch, isPending];
-}
-
-// —— 第 2 部分：把提交逻辑写成 Action ——
+// —— 第 1 部分：把提交逻辑写成 Action ——
 // 参数：上一次的 state、表单的 FormData。返回值：新的 state
 async function subscribeAction(prevState, formData) {
   /* ✏️ 算出 tries：在上一次的基础上加 1 */
@@ -180,15 +132,11 @@ async function subscribeAction(prevState, formData) {
   /* ✏️ ok 为 false 时返回错误；否则返回 { ok: true, tries } */
 }
 
+// —— 第 2 部分：把 Action 接到组件上 ——
 function App() {
-  const [state, formAction, isPending] = useActionState(subscribeAction, { tries: 0 });
-  // React 19 中直接写 <form action={formAction}>。React 18 没有这个功能，这里用 onSubmit 模拟
-  function handleSubmit(e) {
-    e.preventDefault();
-    formAction(new FormData(e.currentTarget));
-  }
+  /* ✏️ 调用 useActionState，取出 state、formAction、isPending */
   return (
-    <form onSubmit={handleSubmit}>
+    <form action={formAction}>
       <input id="email" name="email" placeholder="邮箱" />
       <button id="submit" disabled={isPending}>{isPending ? '提交中…' : '订阅'}</button>
       {state.error && <p id="error">{state.error}</p>}
@@ -197,9 +145,12 @@ function App() {
     </form>
   );
 }`,
-    exports: ['useActionState', 'subscribeAction'],
+    exports: ['subscribeAction'],
     test: async t => {
+      // 这一课跑在 React 19：用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（全局的是 18）
+      const { React, ReactDOM } = t;
       t.assert(t.text('#tries') === '0' && !t.q('#error') && !t.q('#ok'), `初始应显示“已提交 0 次”，没有错误和成功提示。实际是 ${t.text('#tries') || '空'} 次`);
+      t.assert(/useActionState\s*\(/.test(t.source), '请在 App 里调用 useActionState(subscribeAction, { tries: 0 })，不要用 useState 自己管理');
       const btn = () => t.q('#submit');
       const waitIdle = async () => {
         for (let i = 0; i < 30 && btn() && btn().disabled; i++) await t.wait(50);
@@ -209,23 +160,22 @@ function App() {
         await t.click('#submit');
       };
       await submit('abc');
-      await t.wait(60);
       await waitIdle();
       t.assert(
         t.text('#error') === '邮箱格式不对',
-        `提交“abc”后应显示“邮箱格式不对”，实际是：${t.text('#error') || '没有 #error'}。dispatch 有没有调用 action，并把它的返回值存成新的 state？`,
+        `提交“abc”后应显示“邮箱格式不对”，实际是：${t.text('#error') || '没有 #error'}。App 有没有用 useActionState 返回的 formAction？Action 有没有返回新的 state？`,
       );
       t.assert(
         t.text('#tries') === '1',
         `提交 1 次后，“已提交”应为 1，实际是 ${t.text('#tries')}。` +
           (t.text('#tries') === 'NaN'
-            ? 'Action 读 prevState.tries 没有得到数字：dispatch 调用 action 时，第一个参数要传上一次的 state'
+            ? 'Action 读 prevState.tries 没有得到数字：第一个参数是上一次的 state，formData 是第二个参数'
             : 'Action 要在上一次 state 的 tries 上加 1'),
       );
       await submit('taken@example.com');
-      t.assert(btn().disabled && t.text('#submit') === '提交中…', '等待服务器时，按钮应禁用并显示“提交中…”。dispatch 一开始就要把 isPending 设为 true');
+      t.assert(btn().disabled && t.text('#submit') === '提交中…', '等待服务器时，按钮应禁用并显示“提交中…”。isPending 要用 useActionState 返回的第三个值');
       await waitIdle();
-      t.assert(!btn().disabled, '服务器返回后，按钮应恢复可点。action 完成后要把 isPending 设回 false');
+      t.assert(!btn().disabled, '服务器返回后，按钮应恢复可点');
       t.assert(
         t.text('#error') === '这个邮箱已经订阅过了',
         `taken@example.com 已经订阅过，应显示“这个邮箱已经订阅过了”，实际是：${t.text('#error') || '没有 #error'}。Action 要 await api.subscribe(email)，再看它的返回值`,
@@ -235,47 +185,37 @@ function App() {
       await waitIdle();
       t.assert(t.q('#ok') && !t.q('#error'), '提交 a@b.com 后，应显示“订阅成功”，并且不再显示错误。成功时返回的新 state 里不要带上旧的 error');
       t.assert(t.text('#tries') === '3', `提交 3 次后，“已提交”应为 3，实际是 ${t.text('#tries')}`);
-      const { useActionState, subscribeAction } = t.exports;
-      t.assert(typeof useActionState === 'function' && typeof subscribeAction === 'function', '没有找到 useActionState 和 subscribeAction');
-      // Action 只依赖两个参数：直接调用它
+      // Action 只依赖两个参数：直接调用它，并且它不能修改传入的 prevState
+      const { subscribeAction } = t.exports;
+      t.assert(typeof subscribeAction === 'function', '没有找到 subscribeAction');
       const fd = new FormData();
       fd.set('email', 'xyz');
-      const r = await subscribeAction({ tries: 41 }, fd);
+      const prev = { tries: 41 };
+      const r = await subscribeAction(prev, fd);
       t.assert(
         r && r.error === '邮箱格式不对' && r.tries === 42,
-        `subscribeAction({ tries: 41 }, 邮箱 xyz) 应返回 { error: '邮箱格式不对', tries: 42 }，实际是 ${JSON.stringify(r)}。tries 要从第一个参数 prevState 算出来，不要读组件外的变量`,
+        `subscribeAction({ tries: 41 }, 邮箱 xyz) 应返回 { error: '邮箱格式不对', tries: 42 }，实际是 ${JSON.stringify(r)}。tries 要从第一个参数 prevState 算出来`,
       );
-      // 单独测试 Hook：传上一次的 state；action 抛错时 isPending 也要恢复
+      t.assert(prev.tries === 41 && r !== prev, '不要修改 prevState：返回一个新对象。原对象被改了，或者返回了同一个对象，React 就看不出 state 变了');
+      // 另开一个 root，用真的 useActionState 驱动这个 Action，再卸载
       let probe: any;
       function Probe() {
-        const [st, dispatch, pending] = useActionState(async (prev, x) => {
-          await null;
-          if (x === 'boom') throw new Error('boom');
-          return prev + x;
-        }, 0);
+        const [st, dispatch, pending] = React.useActionState(subscribeAction, { tries: 0 });
         probe = { st, dispatch, pending };
         return null;
       }
       const box = document.createElement('div');
       const root = ReactDOM.createRoot(box);
       ReactDOM.flushSync(() => root.render(React.createElement(Probe)));
-      const run = x => {
-        try {
-          const p = probe.dispatch(x);
-          if (p && p.catch) p.catch(() => {});
-        } catch (e) {}
-      };
       try {
-        run(2);
-        await t.wait(80);
-        t.assert(probe.st === 2 && probe.pending === false, `用 action (prev, x) => prev + x、初始值 0 测试：dispatch(2) 后应为 2，实际是 ${probe.st}`);
-        run(3);
-        await t.wait(80);
-        t.assert(probe.st === 5, `再 dispatch(3) 后应为 2 + 3 = 5，实际是 ${probe.st}。action 的第一个参数要传上一次的 state`);
-        run('boom');
-        await t.wait(80);
-        t.assert(probe.pending === false, 'action 抛错后，isPending 仍是 true：按钮会一直显示“提交中…”。用 try/finally，保证最后一定设回 false');
-        t.assert(probe.st === 5, `action 抛错时，state 应保持 5，实际是 ${probe.st}`);
+        const fd2 = new FormData();
+        fd2.set('email', 'x@y.com');
+        React.startTransition(() => probe.dispatch(fd2));
+        await t.wait(450);
+        t.assert(
+          probe.st.ok === true && probe.st.tries === 1 && probe.pending === false,
+          `用真的 useActionState 驱动 subscribeAction，提交 x@y.com 后应得到 { ok: true, tries: 1 }，实际是 ${JSON.stringify(probe.st)}`,
+        );
       } finally {
         root.unmount();
       }
@@ -335,15 +275,57 @@ function Comments({ postId }) {
     },
   ],
   plays: {
-    '用 React 18 模拟乐观更新的效果': {
-      note: '① 点击时立刻把乐观值加 1，界面马上显示 43。② 服务器成功时，把真实值 likes 加 1。③ 无论成功或失败，最后都移除乐观值。失败时真实值没变，数字回到 42，这就是“回滚”。',
+    'useOptimistic：先显示，失败再回滚': {
+      note: '① 点击时立刻调用 addOptimistic(1)，界面马上显示 43。② 服务器成功时，把真实值 likes 加 1。③ Action 结束时，React 自动丢弃乐观值，不用自己写。失败时真实值没变，数字回到 42，这就是“回滚”。',
       predict: {
         q: '点击“点赞（会失败）”。点击后立刻和 1.2 秒后，数字分别是？',
         options: ['42，42', '43，然后回到 42', '43，43', '42，然后变成 43'],
         answer: 1,
-        explain: '乐观值立刻加 1。服务器失败后移除乐观值，界面回到真实值 42。',
+        explain: '乐观值立刻加 1。服务器失败后，Action 结束，React 丢弃乐观值，界面回到真实值 42。',
       },
       pkey: 'react-19|用 React 18 模拟乐观更新的效果',
+    },
+    'useFormStatus：按钮写在哪里': {
+      note: 'useFormStatus 读取的是“上层最近的 form”的状态。按钮 B 在 SubmitB 里，SubmitB 渲染在 form 内部，所以 pending 为 true。App 本身渲染 form，它的上层没有 form，所以按钮 A 读到的 pending 始终是 false，也不会报错。修法：把按钮拆成 form 内部的子组件。',
+      predict: {
+        q: '点击任意一个按钮提交表单。提交后的 1.5 秒内，哪些按钮显示“提交中…”？',
+        options: ['A 和 B 都显示', '只有 B', '只有 A', '都不显示'],
+        answer: 1,
+        explain: 'useFormStatus 读的是上层 form 的状态。App 自己渲染 form，调用它读不到；SubmitB 在 form 里面，能读到。',
+      },
+      pkey: 'react-19|useFormStatus：按钮写在哪里',
+    },
+    'use() 读取 Promise，配合 Suspense': {
+      note: '同一个 id 的 Promise 缓存在组件外面，所以是同一个对象。React 记住了它已经完成，再次 use 它时直接返回结果，不会再暂停。第一次读取 Bob 的 Promise 还没完成，所以显示 fallback。如果 fetchUser 每次都新建 Promise，切回 Alice 也要再等 1 秒，甚至反复挂起。',
+      predict: {
+        q: '页面打开后等 Alice 出现，点“看 Bob”，等 Bob 出现，再点“看 Alice”。最后这一次点击后，页面会显示“加载中…”吗？',
+        options: ['不会，Alice 的内容立刻出现', '会，要再等 1 秒', '会，但只闪一下', '报错'],
+        answer: 0,
+        explain: 'Alice 的 Promise 是缓存的同一个对象，并且已经完成。use() 对已完成的 Promise 直接返回结果，组件不会暂停。',
+      },
+      pkey: 'react-19|use() 读取 Promise，配合 Suspense',
+    },
+    'Activity：隐藏界面，保留 state': {
+      note: '条件渲染的标签 A 在切走时被卸载，state 丢失，effect 被清理。Activity 隐藏的标签 B 只是被隐藏：state 保留，effect 被清理，切回来时 effect 重新运行。看下面的控制台：B 的 effect 在隐藏时被清理，显示时又运行。',
+      predict: {
+        q: '在标签 A 的输入框输入“甲”，切到标签 B，在它的输入框输入“乙”，再依次切回 A、切回 B。此时 A 和 B 的输入框里分别是什么？',
+        options: ['A：甲，B：乙', 'A：空，B：乙', 'A：空，B：空', 'A：甲，B：空'],
+        answer: 1,
+        explain: '标签 A 是条件渲染，切走就卸载，输入的内容丢了。标签 B 在 Activity 里，隐藏时 state 保留，所以“乙”还在。',
+      },
+      pkey: 'react-19|Activity：隐藏界面，保留 state',
+    },
+    'ref 作为普通 prop': {
+      note: 'FancyInput 是函数组件，直接从 props 里取 ref，没有用 forwardRef。点“卸载方框”，看控制台：卸载时 React 调用的是 ref 回调返回的清理函数。React 18 中卸载时会以 null 再调用回调，上面的 node.tagName 就会报错。',
+    },
+    'Context 直接当 Provider': {
+      note: '这里写的是 <ThemeContext value={theme}>，没有 .Provider。React 18 里这样写不会生效。',
+    },
+    'useEffectEvent：读最新值但不重启 effect': {
+      note: '点“换房间”：控制台出现“断开”和“连接到”。点“换主题”：什么也不重启，但下一次连接完成时，onConnected 读到的是最新的主题。不用 useEffectEvent 的话，theme 要写进依赖数组，换主题就会断开重连。',
+    },
+    'ViewTransition：进入和离开的动画': {
+      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。',
     },
   },
 } satisfies Lesson;
