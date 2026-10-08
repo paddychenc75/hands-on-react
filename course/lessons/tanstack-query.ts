@@ -4,7 +4,7 @@ export default {
   id: 'tanstack-query',
   stage: 4,
   title: '数据请求：TanStack Query',
-  mins: 28,
+  mins: 34,
   runtime: 19,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
@@ -16,7 +16,7 @@ export default {
   keyPoints: [
     '问题：服务端数据需要缓存、去重、过期刷新和重试。用 useEffect 手写，每个组件都要重复这些代码。',
     "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
-    '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后先显示缓存，再在后台刷新。',
+    '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。',
     '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
   ],
@@ -317,6 +317,24 @@ const { data: posts } = useQuery({
       explain:
         'mutation 在等待响应时 isPending 是 true，variables 是传给 mutate 的参数，所以临时项会半透明地显示。它只存在于这次渲染里，没有写进缓存，所以失败时不需要回滚。请求结束后 invalidateQueries 取回真数据，临时项随 isPending 变为 false 而消失。“已经写进缓存”是缓存写法（setQueryData）的行为，不是这里的。',
     },
+    {
+      q: `用户在筛选栏里切换分类，列表却一直不变。问题出在哪里？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function TodoList({ filter }) {
+  const { data } = useQuery({
+    queryKey: ['todos'],
+    queryFn: () =&gt; getTodos(filter),
+  });
+  // …
+}</code></pre></div>`,
+      options: [
+        'queryFn 必须写成 async 函数',
+        'queryKey 里漏了 filter：filter 变了，key 没变，Query 认为数据还是同一份',
+        '需要在 useQuery 里加 refetchOnMount: true',
+        'staleTime 太长，应该设为 0',
+      ],
+      answer: 1,
+      explain:
+        "缓存按 queryKey 存取，Query 只看 key 是否变化来决定要不要换一份数据。queryFn 用到的每个变量都要写进 key，这里应写成 ['todos', filter]。把 staleTime 设为 0 只会让同一个 key 更频繁地刷新，不会让 key 不同的数据分开。",
+    },
   ],
   plays: {
     '迷你 useQuery': {
@@ -328,6 +346,22 @@ const { data: posts } = useQuery({
         explain: '相同的 queryKey 只会发一次请求，第二个组件直接复用进行中的那个 Promise。这就是请求去重。',
       },
       pkey: 'tanstack-query|迷你 useQuery',
+    },
+    'staleTime：切回标签页会不会请求': {
+      pkey: 'tanstack-query|staleTime：切回标签页会不会请求',
+      predict: {
+        q: '等数据加载完，保持 staleTime 为 0，点一次“模拟：切到别的标签页再切回来”。接下来会怎样？',
+        options: [
+          '什么都不发生：缓存里已经有数据了',
+          '页面变回“首次加载中…”，请求完成后显示新数据',
+          '页面继续显示旧数据，同时在后台请求；请求完成后换成第 2 次请求的数据',
+          '页面报错：窗口焦点事件不能触发请求',
+        ],
+        answer: 2,
+        explain:
+          'staleTime 为 0，数据一到手就算过期。窗口重新获得焦点时，过期的数据会在后台刷新：缓存先继续显示，请求完成后换成新数据。“变回加载中”混淆了“过期”和“没有缓存”。把 staleTime 改成 1 分钟再点一次，数据仍然新鲜，就不会发请求。',
+      },
+      note: '对照控制台和页面上的“第几次请求”：<ol class="task-steps"><li>staleTime 为 0：每次点按钮都多一次请求，旧数据一直显示，直到新数据回来。</li><li>staleTime 为 1 分钟：1 分钟内点多少次都不请求。</li></ol>',
     },
   },
 } satisfies Lesson;
