@@ -45,7 +45,6 @@ const inPg = (p, title, fn, arg) =>
     },
     { title, fn: fn.toString(), arg },
   );
-const consoleOf = (p, title) => inPg(p, title, pg => pg.querySelector('.console').innerText);
 // 在第一个普通实验台里运行一段代码，返回控制台文字
 async function runCode(p, code, title = '') {
   return inPg(
