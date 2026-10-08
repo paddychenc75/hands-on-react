@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'perf-clinic',
   stage: 5,
+  runtime: 19,
   title: '性能诊断实战',
   mins: 42,
   summary: '拿到一份不是你写的、很卡的代码。按“复现、测量、假设、修改、再测量”的流程找出病因，用数字证明修好了，并且功能不变。',
@@ -467,6 +468,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const h = React.createElement;
       const { App, probe, feed, ORDERS } = t.exports;
       t.assert(typeof App === 'function', '请保留名为 App 的组件');

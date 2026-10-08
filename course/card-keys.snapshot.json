@@ -372,6 +372,8 @@
     "error-handling|一次能恢复的渲染错误",
     "perf-clinic|memo 挡得住 Context 吗？",
     "form-architecture|Action 表单：失败后输入框还剩什么？",
-    "form-architecture|Action 排队：连点会提交几次？"
+    "form-architecture|Action 排队：连点会提交几次？",
+    "headless-components|合并 ref：卸载时调用谁？",
+    "headless-components|复合组件：选项被包了一层"
   ]
 }

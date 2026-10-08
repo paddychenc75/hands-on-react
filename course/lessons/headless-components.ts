@@ -3,8 +3,9 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'headless-components',
   stage: 5,
+  runtime: 19,
   title: '组件库 API 设计：Headless 组件',
-  mins: 40,
+  mins: 46,
   summary:
     '把状态、键盘和 ARIA 封装进 Hook，把标记和样式交给使用者。学会 useControllableState、prop getters、两种键盘焦点方案，以及怎样改 API 而不伤到使用者。',
   goals: [
@@ -342,6 +343,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const useListbox = t.exports.useListbox;
       t.assert(typeof useListbox === 'function', '请保留名为 useListbox 的函数');
       t.assert(t.qa('[role="listbox"]').length >= 2, '页面上应有两个 role="listbox" 的列表。getListboxProps 要返回 role: "listbox"（步骤 4）');
@@ -643,6 +645,28 @@ function App() {
           'JSX 的属性和对象展开一样，后写的覆盖先写的。按钮最终只有使用者的 onClick，Hook 的 setOpen 没被调用，所以面板不展开。aria-expanded 也一直是 false。修法：把 onClick 传给 getButtonProps，由 getter 合并。',
       },
       pkey: 'headless-components|同一个 Hook，两种界面',
+    },
+    '合并 ref：卸载时调用谁？': {
+      note: '使用者的 ref 回调返回了清理函数。mergeRefs 收集到它，并在自己返回的清理函数里调用。React 看到 ref 回调返回了函数，卸载时只调用这个函数，不再用 <code>null</code> 调用 ref 回调，所以控制台只多一行“清理函数被调用”。<br>如果 mergeRefs 只是依次赋值，没有返回任何东西，React 卸载时会用 null 调用它，使用者的回调收到 null，它返回的清理函数则永远不会被调用。React 18 的 mergeRefs 就是这样写的。',
+      predict: {
+        q: '点“卸载 Field”。控制台里新增什么？',
+        options: ['“使用者的 ref 清理函数被调用”', '“使用者的 ref 回调收到：null”', '以上两行都有', '什么也没有：合并后的回调丢掉了使用者的 ref'],
+        answer: 0,
+        explain:
+          '合并后的回调返回了清理函数，React 卸载时只调用它，不再用 null 调用 ref 回调。mergeRefs 在清理函数里转发了使用者的清理函数，所以只多一行。如果返回的是 undefined，React 才会用 null 调用回调。',
+      },
+      pkey: 'headless-components|合并 ref：卸载时调用谁？',
+    },
+    '复合组件：选项被包了一层': {
+      note: '包了 div 之后，<code>Children.toArray(children)</code> 只看到一个子元素，选项数组只有一项 <code>{ value: undefined }</code>。Option 用自己的 value 去找序号，找不到，得到 -1，点击时执行 <code>options[-1].value</code>，抛出 TypeError。事件处理函数里的错误不会让页面白屏，只是点击没有效果。<br>这就是复合组件“只认直接子元素”的代价。集合 API 或注册方式可以解决它。',
+      predict: {
+        q: '点“给选项包一层 div”，再点“香蕉”。会发生什么？',
+        options: ['选中“香蕉”，和没包 div 时一样', '没有选中任何选项，控制台出现 TypeError', '页面白屏，因为渲染出错', '选中“苹果”：序号错位'],
+        answer: 1,
+        explain:
+          'Listbox 收集选项时只看直接子元素，div 把两个 Option 藏起来了。Option 在 options 里找不到自己，序号是 -1，点击时读 options[-1].value 就抛出 TypeError。错误发生在事件处理函数里，不在渲染期间，所以页面没有白屏，选中状态也不变。',
+      },
+      pkey: 'headless-components|复合组件：选项被包了一层',
     },
     'roving tabindex 与 aria-activedescendant': {
       note: '在工具栏里按左右方向键，最下面一行跟着变：焦点真的在按钮之间移动。再按 Tab 进入字号列表，按上下方向键，最下面一行一直是“ul：字号”：焦点没动，变的只是 aria-activedescendant 和高亮样式。<br>另外注意：从工具栏按一次 Tab 就离开了整个工具栏，它只占一个 Tab 停靠点。',
