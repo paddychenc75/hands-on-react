@@ -79,7 +79,7 @@ export default {
   );
 }`,
     test: async t => {
-      // 这一课跑在 React 19：用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（全局的是 18）
+      // 用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（实验台没有这两个全局）
       const { React, ReactDOM } = t;
       const h2 = t.q('h2');
       t.assert(h2 && h2.textContent.trim() === '小明', '需要一个内容为“小明”的 <h2>');

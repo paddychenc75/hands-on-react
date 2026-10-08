@@ -342,21 +342,24 @@ React 19 除了 Actions，还带来了几项别的能力。它们各有更合适
 
 | 内容 | 去哪里学 |
 |---|---|
-| `use()` 读取 Promise 和 Context | [Suspense 数据获取与资源模式](/lessons/suspense-data) |
+| `use()` 读取 Promise | [Suspense、懒加载与错误边界](/lessons/suspense)（入门）、[Suspense 数据获取与资源模式](/lessons/suspense-data)（深入） |
+| `use(Ctx)` 读取 Context、`<Context value>` 直接当 Provider | [Context：跨层级共享数据](/lessons/context) |
 | `<Activity>` 隐藏界面并保留 state | [渲染机制：React 到底做了什么](/lessons/rendering) |
-| ref 作为普通 prop、ref 回调的清理函数 | [DOM 逃生舱](/lessons/escape-hatches)、[useRef](/lessons/use-ref) |
-| `<Context value>` 直接当 Provider | [Context：跨层级共享数据](/lessons/context) |
+| ref 作为普通 prop、ref 回调的清理函数 | [useRef](/lessons/use-ref)、[DOM 逃生舱](/lessons/escape-hatches) |
 | `useEffectEvent` | [闭包陷阱与 Effect 依赖](/lessons/closures) |
-| `<ViewTransition>` | [并发特性](/lessons/concurrent) |
-| 从 React 18 升级、被移除的 API | [项目搭建与交付](/lessons/engineering) |
+| `<ViewTransition>` | 暂时只有下面选读区的示例 |
+| `createRoot` 的 `onCaughtError`、`onUncaughtError` | [错误处理与监控](/lessons/error-handling) |
+| 从 React 18 升级、被移除的 API | [项目搭建与交付](/lessons/engineering)的选读“维护 React 18 项目：升级到 React 19” |
 | 大表单的组织 | [表单与校验架构](/lessons/form-architecture) |
 
-<details className="optional" open>
-<summary><span className="opt-tag">选读</span>六个小示例：快速看一眼上表里的写法<small>主讲在上表的课里，可以先跳过</small></summary>
+19.1、19.2、19.3 每个版本的完整变更，见 react.dev 的[版本页](https://react.dev/versions)。
 
-下面是上表里六项内容的最小示例，可以直接改着试。
+<details className="optional">
+<summary><span className="opt-tag">选读</span>三个小示例：use()、Activity 和 ViewTransition<small>主讲在上表的课里，可以先跳过</small></summary>
 
-`use()` 在渲染中读取 Promise，配合 Suspense 显示加载状态：
+下面是上表里三项内容的最小示例，可以直接改着试。另外三项（ref 作为 prop、`<Context value>`、`useEffectEvent`）在各自的课里有可运行的示例，见上表。
+
+`use()` 在渲染中读取 Promise，配合 Suspense 显示加载状态。完整讲解见 [Suspense 数据获取与资源模式](/lessons/suspense-data)：
 
 ```jsx play title="use() 读取 Promise，配合 Suspense"
 import { use, Suspense, useState } from 'react';
@@ -390,7 +393,7 @@ function App() {
 }
 ```
 
-`<Activity>` 隐藏界面但保留 state：
+`<Activity>` 隐藏界面但保留 state。完整讲解见[渲染机制](/lessons/rendering)：
 
 ```jsx play title="Activity：隐藏界面，保留 state"
 import { Activity, useState, useEffect } from 'react';
@@ -422,104 +425,7 @@ function App() {
 }
 ```
 
-ref 作为普通 prop，不再需要 `forwardRef`。ref 回调可以返回清理函数，卸载时 React 调用它：
-
-```jsx play title="ref 作为普通 prop"
-import { useRef, useState, useCallback } from 'react';
-
-// 函数组件直接接收 ref，不需要 forwardRef
-function FancyInput({ ref, label }) {
-  return (
-    <label>
-      {label}：<input ref={ref} />
-    </label>
-  );
-}
-
-function Box() {
-  const attach = useCallback(node => {
-    console.log('ref 回调：挂上 <' + node.tagName.toLowerCase() + '>');
-    return () => console.log('ref 回调：返回的清理函数运行了');
-  }, []);
-  return <div ref={attach}>我是一个方框</div>;
-}
-
-function App() {
-  const inputRef = useRef(null);
-  const [show, setShow] = useState(true);
-  return (
-    <div>
-      <FancyInput ref={inputRef} label="姓名" />
-      <button onClick={() => inputRef.current.focus()}>聚焦输入框</button>
-      <button onClick={() => setShow(s => !s)}>{show ? '卸载方框' : '挂上方框'}</button>
-      {show && <Box />}
-    </div>
-  );
-}
-```
-
-Context 对象本身可以直接当 Provider 用：
-
-```jsx play title="Context 直接当 Provider"
-import { createContext, useContext, useState } from 'react';
-
-const ThemeContext = createContext('light');
-
-function Panel() {
-  const theme = useContext(ThemeContext);
-  const dark = theme === 'dark';
-  return (
-    <p style={{ padding: 12, borderRadius: 6, background: dark ? '#222' : '#eee', color: dark ? '#eee' : '#222' }}>
-      当前主题：{theme}
-    </p>
-  );
-}
-
-function App() {
-  const [theme, setTheme] = useState('light');
-  return (
-    <ThemeContext value={theme}>
-      <button onClick={() => setTheme(t => (t === 'light' ? 'dark' : 'light'))}>切换主题</button>
-      <Panel />
-    </ThemeContext>
-  );
-}
-```
-
-`useEffectEvent` 读最新的 props 和 state，又不必写进 effect 的依赖数组。切换主题不会重新连接，只有换房间才会：
-
-```jsx play title="useEffectEvent：读最新值但不重启 effect"
-import { useState, useEffect, useEffectEvent } from 'react';
-
-function ChatRoom({ roomId, theme }) {
-  const onConnected = useEffectEvent(() => {
-    console.log('已连接到 ' + roomId + '，当前主题：' + theme);
-  });
-  useEffect(() => {
-    console.log('连接到 ' + roomId + ' …');
-    const id = setTimeout(() => onConnected(), 600);
-    return () => {
-      clearTimeout(id);
-      console.log('断开 ' + roomId);
-    };
-  }, [roomId]); // 不用写 theme，也不用写 onConnected
-  return <p>房间：{roomId}，主题：{theme}</p>;
-}
-
-function App() {
-  const [roomId, setRoomId] = useState('general');
-  const [theme, setTheme] = useState('light');
-  return (
-    <div>
-      <button onClick={() => setRoomId(r => (r === 'general' ? 'travel' : 'general'))}>换房间</button>
-      <button onClick={() => setTheme(t => (t === 'light' ? 'dark' : 'light'))}>换主题</button>
-      <ChatRoom roomId={roomId} theme={theme} />
-    </div>
-  );
-}
-```
-
-`<ViewTransition>` 用浏览器的 View Transition API，为元素的进入和离开做动画。放在 `startTransition` 里的更新才会触发动画：
+`<ViewTransition>` 用浏览器的 View Transition API，为元素的进入和离开做动画。放在 `startTransition` 里的更新才会触发动画。目前只有这里有它的示例：
 
 ```jsx play title="ViewTransition：进入和离开的动画"
 import { ViewTransition, startTransition, useState } from 'react';

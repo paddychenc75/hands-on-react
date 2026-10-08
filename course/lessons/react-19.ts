@@ -158,7 +158,7 @@ function App() {
 }`,
     exports: ['subscribeAction'],
     test: async t => {
-      // 这一课跑在 React 19：用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（全局的是 18）
+      // 用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（实验台没有这两个全局）
       const { React, ReactDOM } = t;
       t.assert(t.text('#tries') === '0' && !t.q('#error') && !t.q('#ok'), `初始应显示“已提交 0 次”，没有错误和成功提示。实际是 ${t.text('#tries') || '空'} 次`);
       t.assert(/useActionState\s*\(/.test(t.source), '请在 App 里调用 useActionState(subscribeAction, { tries: 0 })，不要用 useState 自己管理');
@@ -372,17 +372,8 @@ function App() {
       },
       pkey: 'react-19|Activity：隐藏界面，保留 state',
     },
-    'ref 作为普通 prop': {
-      note: 'FancyInput 是函数组件，直接从 props 里取 ref，没有用 forwardRef。点“卸载方框”，看控制台：卸载时 React 调用的是 ref 回调返回的清理函数。维护 React 18 项目时：18 要用 forwardRef，卸载时 ref 回调会以 null 再调用一次。这一项的完整讲解在《DOM 逃生舱》。',
-    },
-    'Context 直接当 Provider': {
-      note: '这里写的是 <ThemeContext value={theme}>，没有 .Provider。React 18 要写 .Provider。这一项的完整讲解在《Context》。',
-    },
-    'useEffectEvent：读最新值但不重启 effect': {
-      note: '点“换房间”：控制台出现“断开”和“连接到”。点“换主题”：什么也不重启，但下一次连接完成时，onConnected 读到的是最新的主题。不用 useEffectEvent 的话，theme 要写进依赖数组，换主题就会断开重连。这一项的完整讲解在《闭包陷阱与 Effect 依赖》。',
-    },
     'ViewTransition：进入和离开的动画': {
-      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。这一项的完整讲解在《并发特性》。',
+      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。目前只有这一课有 ViewTransition 的示例。',
     },
   },
 } satisfies Lesson;

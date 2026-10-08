@@ -25,6 +25,9 @@ async function open(ctx, id) {
 // 回答所有预测题（都选第一项），滚动让所有示例运行
 async function reveal(p) {
   await p.evaluate(async () => {
+    document.querySelectorAll('details.optional').forEach(d => {
+      d.open = true;
+    });
     for (const pg of document.querySelectorAll('.pg')) {
       pg.scrollIntoView();
       await new Promise(r => setTimeout(r, 60));
@@ -291,36 +294,6 @@ const VERSION_CODE = "console.log('V=' + React.version + '/' + ReactDOM.version)
     'useActionState + form action：报错、提交中、成功都正常，Action 结束后输入框被重置',
     JSON.stringify(ua),
   );
-  // ref、useEffectEvent
-  const rf = await inPg(p, 'ref 作为普通 prop', async pg => {
-    const btn = t => [...pg.querySelectorAll('.preview button')].find(x => x.textContent === t);
-    btn('聚焦输入框').click();
-    const focused = document.activeElement === pg.querySelector('.preview input');
-    btn('卸载方框').click();
-    await new Promise(r => setTimeout(r, 100));
-    return { focused, cons: pg.querySelector('.console').innerText };
-  });
-  ok(
-    rf.focused && rf.cons.includes('挂上 <div>') && rf.cons.includes('清理函数运行了'),
-    'ref 作为 prop 能聚焦；ref 回调的清理函数在卸载时运行',
-    JSON.stringify(rf),
-  );
-  const ee = await inPg(p, 'useEffectEvent', async pg => {
-    const btn = t => [...pg.querySelectorAll('.preview button')].find(x => x.textContent === t);
-    await new Promise(r => setTimeout(r, 800));
-    btn('换主题').click();
-    await new Promise(r => setTimeout(r, 100));
-    btn('换房间').click();
-    await new Promise(r => setTimeout(r, 900));
-    return pg.querySelector('.console').innerText;
-  });
-  ok(ee.includes('已连接到 travel，当前主题：dark') && (ee.match(/连接到 /g) || []).length >= 2, 'useEffectEvent：换主题不重连，连接完成时读到最新主题', ee);
-  const ctxp = await inPg(p, 'Context 直接', async pg => {
-    [...pg.querySelectorAll('.preview button')][0].click();
-    await new Promise(r => setTimeout(r, 100));
-    return pg.querySelector('.preview p').textContent;
-  });
-  ok(ctxp.includes('dark'), 'Context 直接当 Provider：切换主题后值更新', ctxp);
   const vt = await inPg(p, 'ViewTransition', async pg => {
     const btn = pg.querySelector('.preview button');
     btn.click();
@@ -390,6 +363,62 @@ const VERSION_CODE = "console.log('V=' + React.version + '/' + ReactDOM.version)
   const r5 = await check(alt);
   ok(pass(r5), '练习：不同写法（Object.fromEntries + 展开运算符）通过', r5.slice(0, 160));
   await ctx.close();
+}
+
+/* 7. 别的课里 19 的写法：ref 作为 prop 与 ref 回调清理、useEffectEvent、<Context value> */
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await open(ctx, 'use-ref');
+  await reveal(p);
+  const rf = await inPg(p, 'ref 作为普通 prop', async pg => {
+    const btn = t => [...pg.querySelectorAll('.preview button')].find(x => x.textContent === t);
+    btn('聚焦').click();
+    const focused = document.activeElement === pg.querySelector('.preview input');
+    btn('ref.current 是什么？').click();
+    await new Promise(r => setTimeout(r, 100));
+    return { focused, cons: pg.querySelector('.console').innerText };
+  });
+  ok(rf.focused && rf.cons.includes('INPUT'), 'use-ref：ref 作为 prop 能聚焦，ref.current 是子组件里的 input', JSON.stringify(rf));
+  const rc = await inPg(p, 'ref 回调：挂载与清理', async pg => {
+    const first = pg.querySelector('.console').innerText;
+    [...pg.querySelectorAll('.preview button')][0].click();
+    await new Promise(r => setTimeout(r, 150));
+    return { first, cons: pg.querySelector('.console').innerText };
+  });
+  ok(rc.first.includes('挂载：INPUT') && rc.cons.includes('清理：节点离开页面'), 'use-ref：ref 回调挂载时调用，移除时运行返回的清理函数', JSON.stringify(rc));
+  await ctx.close();
+
+  const ctx2 = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p2 = await open(ctx2, 'closures');
+  await reveal(p2);
+  const ee = await inPg(p2, '聊天室：读到最新主题', async pg => {
+    const btn = t => [...pg.querySelectorAll('.preview button')].find(x => x.textContent === t);
+    await new Promise(r => setTimeout(r, 1300));
+    btn('切换主题').click();
+    await new Promise(r => setTimeout(r, 1300));
+    const afterTheme = pg.querySelector('.console').innerText;
+    btn('切换房间').click();
+    await new Promise(r => setTimeout(r, 300));
+    return { afterTheme, end: pg.querySelector('.console').innerText };
+  });
+  ok(
+    ee.afterTheme.includes('当前主题：深色') && !ee.afterTheme.includes('断开') && ee.end.includes('断开 综合') && ee.end.includes('连接 旅行'),
+    'closures：useEffectEvent 换主题不重连，读到最新主题；换房间才重连',
+    JSON.stringify(ee),
+  );
+  await ctx2.close();
+
+  const ctx3 = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p3 = await open(ctx3, 'context');
+  await reveal(p3);
+  const cx = await inPg(p3, '主题切换', async pg => {
+    const before = pg.querySelector('.preview').innerText;
+    [...pg.querySelectorAll('.preview button')].find(x => x.textContent === '切换主题').click();
+    await new Promise(r => setTimeout(r, 150));
+    return { before, after: pg.querySelector('.preview').innerText };
+  });
+  ok(cx.before !== cx.after && cx.after.includes('dark'), 'context：<Context value> 直接当 Provider，切换主题后值更新', JSON.stringify(cx));
+  await ctx3.close();
 }
 
 await b.close();

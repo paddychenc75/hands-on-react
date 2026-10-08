@@ -149,7 +149,7 @@ function App() {
 
 ## 异步过渡：startTransition 接收 async 函数
 
-React 19 起，`startTransition` 可以接收 async 函数。这样的函数叫 **Action**（见[React 19 新特性](/lessons/react-19)一课）。`isPending` 在整个异步过程中都是 true，直到函数结束。先看代码，再预测：
+React 19 起，`startTransition` 可以接收 async 函数。这样的函数叫 **Action**（见[Actions:异步提交、表单与乐观更新](/lessons/react-19)一课）。`isPending` 在整个异步过程中都是 true，直到函数结束。先看代码，再预测：
 
 ```jsx play title="异步过渡的 isPending"
 import { useState, useTransition } from 'react';

@@ -12,7 +12,7 @@ title: "Suspense 数据获取与资源模式"
 
 <LessonProse>
 
-第 22 课用 lazy 体验了 Suspense：代码没到，就显示 fallback。那一课只用一条提示说“Suspense 也能用于数据”。这一课把这条提示展开：用 React 19 的 `use()` 在渲染中读取 Promise，亲手写出一个能配合 Suspense 的小数据层。
+第 22 课用 lazy 体验了 Suspense：代码没到，就显示 fallback。那一课还用 `use()` 读过一个缓存的 Promise，只是一个入门示例。这一课把它展开：用 React 19 的 `use()` 在渲染中读取 Promise，亲手写出一个能配合 Suspense 的小数据层。
 
 TanStack Query 的 `useSuspenseQuery`、Relay、Next.js 的服务端组件，底层都是这几个模式。你会用库之后，也能判断库在背后做了什么、哪里会出问题。
 

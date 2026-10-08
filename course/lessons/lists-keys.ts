@@ -98,7 +98,7 @@ export default {
   );
 }`,
     test: async t => {
-      // 这一课跑在 React 19：用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（全局的是 18）
+      // 用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（实验台没有这两个全局）
       const { React, ReactDOM } = t;
       const lis = t.qa('li');
       const li = lis.map(x => x.textContent.trim());

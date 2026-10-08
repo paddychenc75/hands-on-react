@@ -131,7 +131,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: 'Context',
     en: 'Context',
-    def: '把数据传给整棵子树的机制。不需要逐层传 props。',
+    def: '把数据传给整棵子树的机制。不需要逐层传 props。React 19 里直接写 <Ctx value={…}> 提供值；<Ctx.Provider> 是旧写法，读旧代码时认得即可。',
     avoid: '上下文',
   },
   {
@@ -143,8 +143,14 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: 'action',
     en: 'action',
-    def: "reducer 中描述“发生了什么”的对象，例如 { type: 'added' }。路由和表单里处理提交的函数另称“路由 action”和“Server Function”。",
+    def: "reducer 中描述“发生了什么”的对象，例如 { type: 'added' }。传给 startTransition 或 <form action> 的异步函数叫 Action（首字母大写，见下一条）；路由里的叫“路由 action”。",
     avoid: '',
+  },
+  {
+    term: 'Action',
+    en: 'Action',
+    def: '传给 startTransition 或 <form action> 的函数，通常是异步函数。React 自动追踪它的等待状态和错误，useActionState、useOptimistic 都围绕它工作。',
+    avoid: '“动作”；它不是 reducer 的 action 对象',
   },
   {
     term: 'dispatch',
@@ -281,7 +287,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   {
     term: '乐观更新',
     en: 'optimistic update',
-    def: '请求完成前先显示预期结果；失败时回滚。',
+    def: '请求完成前先显示预期结果；失败时回滚。React 19 用 useOptimistic 实现：Action 结束后，乐观值自动丢弃。',
     avoid: '',
   },
 ];

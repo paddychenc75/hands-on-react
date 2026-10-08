@@ -6,6 +6,4 @@ interface Window {
   __hocReact19?: any;
 }
 
-/** 练习的检查函数在实验台里运行，代码里会用到实验台的 ReactDOM 全局（React 由 @types/react 的 UMD 声明提供） */
-declare const ReactDOM: any;
 declare const Babel: any;

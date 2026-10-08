@@ -4,7 +4,7 @@ import { el } from './util.ts';
 
 export function markTerms(root: HTMLElement): void {
   const terms = [...GLOSSARY].sort((a, b) => b.term.length - a.term.length);
-  const skip = (n: Node) => n.parentElement.closest('code, pre, a, abbr, .pg, .codeblock, h2, th, details.optional');
+  const skip = (n: Node) => n.parentElement.closest('code, pre, a, abbr, .pg, .codeblock, h1, h2, h3, h4, th, details.optional');
   terms.forEach(g => {
     const re = /^[A-Za-z]/.test(g.term) ? new RegExp('(?<![A-Za-z])' + g.term + '(?![A-Za-z])') : new RegExp(g.term);
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
