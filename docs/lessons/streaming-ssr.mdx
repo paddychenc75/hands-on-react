@@ -381,7 +381,10 @@ export async function updatePrice(id, price) {
 }
 ```
 
-- **按时间重新验证是“先给旧的，后台更新”**：revalidate 为 60，第 61 秒的第一个请求仍拿到旧数据，同时触发后台重新生成。下一个请求才拿到新数据。
+- **按时间重新验证：要看是哪种缓存**（下面按 Next.js 16.4.0 的 `next build` + `next start` 实测）：
+  - `fetch(url, { next: { revalidate: 60 } })`，和路由段的 `export const revalidate = 60`（ISR，增量静态再生成）：**先给旧的，后台更新**。第 61 秒的第一个请求仍拿到旧数据，同时触发后台重新生成；生成完成后的请求才拿到新数据。整页 ISR 的重新生成要花时间，这段时间里的请求拿到的还是旧页面。开着 `cacheComponents` 时，请求时才执行的 `fetch` 也是这样。
+  - `'use cache'` + `cacheLife` 的 `revalidate`：官方文档也写“先给旧的”。实测分两种。整页静态预渲染、`revalidate` 不少于 5 分钟的条目，重新生成页面时先给旧页面。请求时才执行的条目（在 `<Suspense>` 里先读了 `connection()`、cookies 之类），默认的内存缓存处理器把过期条目当作不存在，过期后的第一个请求要等新内容。想让后一种也“先给旧的”，用 `revalidateTag(tag, 'max')`。详见[Next.js App Router](/lessons/nextjs)一课的“缓存条目的生命周期”。
+  - `next dev` 的行为与生产构建不同，验证缓存时间线要先 `build` 再 `start`。
 - **按路径还是按标签**：`revalidatePath('/product/7')` 只管这一条路由。同一个商品还出现在首页、搜索页时，给数据打标签，用标签失效。
 - **个人数据要进缓存键**：`'use cache'` 的函数里不能读 cookies 和 headers，Next.js 16 会直接报错。在外面读出用户 id，作为参数传进去，参数是缓存键的一部分。函数不带用户参数却返回了某个用户的数据，A 的数据才会被 B 看到。
 
