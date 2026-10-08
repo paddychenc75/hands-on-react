@@ -14,7 +14,7 @@ title: "Server Components 与全栈 React"
 
 React 正在从“浏览器里的 UI 库”演进为**全栈架构**。理解这一课，你就能看懂 Next.js App Router 等现代框架的设计。
 
-<strong>本课的示例代码只能阅读。</strong>原因是：服务端组件和 Server Function 要在服务器上运行，还要由 Next.js 这类框架打包。本页的实验台只是浏览器里的 React 19，没有服务器，也没有打包器。课末的练习是纯 JavaScript，可以运行。想在真实项目里试，见“在本地动手试”。
+<strong>本课展示服务端组件和 Server Function 的代码块只能阅读。</strong>原因是：它们要在服务器上运行，还要由 Next.js 这类框架打包。本页的实验台只是浏览器里的 React 19，没有服务器，也没有打包器。所以本课的三个可运行示例和课末练习，都用普通对象和函数**模拟**服务器；每个示例开头会写明它模拟什么、和真实环境差在哪。想在真实项目里试，见“在本地动手试”。
 
 先认识本课反复出现的两个词：
 
@@ -93,6 +93,152 @@ export default function AddToCart({ productId }) {
 
 </CallBox>
 
+下面的示例模拟打包器怎样决定“哪些文件进入浏览器”。勾选或取消 `'use client'`，看浏览器里的文件怎样变化。
+
+```jsx play title="模拟：哪些文件会进入浏览器"
+// 模拟：打包器怎样决定哪些模块进入浏览器。
+// 规则：文件顶部写了 'use client' 的是客户端入口；它 import 的所有模块，也都进入浏览器。
+// 与真实环境的差别：这里只看 import 关系。真实的打包器还要处理 children 传入、动态 import 等情况。
+import { useState } from 'react';
+
+const FILES = {
+  'page.jsx': ['Header.jsx', 'ProductList.jsx', 'Footer.jsx'],
+  'Header.jsx': [],
+  'ProductList.jsx': ['ProductItem.jsx'],
+  'ProductItem.jsx': ['Price.jsx', 'AddToCart.jsx'],
+  'Price.jsx': [],
+  'AddToCart.jsx': ['Icon.jsx'],
+  'Icon.jsx': [],
+  'Footer.jsx': [],
+};
+// 顶部写了 'use client' 的文件
+const MARKED = ['AddToCart.jsx'];
+
+function filesInBrowser(marked) {
+  const result = new Set();
+  const add = file => {
+    if (result.has(file)) return;
+    result.add(file);
+    FILES[file].forEach(add);
+  };
+  marked.forEach(add);
+  return result;
+}
+
+console.log('进入浏览器的文件：', [...filesInBrowser(MARKED)].join('、'));
+
+function App() {
+  const [marked, setMarked] = useState(MARKED);
+  const inBrowser = filesInBrowser(marked);
+  const toggle = file => setMarked(m => (m.includes(file) ? m.filter(f => f !== file) : [...m, file]));
+  return (
+    <div>
+      {Object.keys(FILES).map(file => (
+        <label key={file} style={{ display: 'block', padding: '2px 6px', background: inBrowser.has(file) ? '#fde68a' : 'transparent' }}>
+          <input type="checkbox" checked={marked.includes(file)} onChange={() => toggle(file)} /> {file}
+          <small> {inBrowser.has(file) ? '→ 浏览器' : '→ 只在服务器'}</small>
+        </label>
+      ))}
+      <p>
+        共 <b>{inBrowser.size}</b> 个文件进入浏览器
+      </p>
+    </div>
+  );
+}
+```
+
+再取消 `AddToCart.jsx`、勾选 `page.jsx`，数一数：整个页面都进了浏览器。这就是 `"use client"` 要放在叶子上的原因。
+
+## 哪些值能传给客户端组件
+
+服务端组件的 props 要经过网络送到浏览器，所以必须能序列化（变成可传输的数据）。以 react.dev 的说明为准：
+
+- **可以传**：字符串、数字、布尔值、`bigint`、`undefined`、`null`；用 `Symbol.for` 注册过的 `symbol`；数组、`Map`、`Set`、`TypedArray`、`ArrayBuffer`（里面的值也要可序列化）；`Date`；用对象字面量创建的普通对象；Promise；JSX 元素；Server Function。
+- **不能传**：普通函数；class 本身；class 的实例；原型为 null 的对象；没有用 `Symbol.for` 注册的 `symbol`。
+
+```jsx play title="模拟：哪些 props 能跨过边界"
+// 模拟：服务端组件把 props 交给客户端组件之前，React 要先把它们序列化。
+// 这里的 problem() 按 react.dev 列出的规则判断“能不能过”。真实环境遇到不支持的值时，React 会在渲染时报错。
+// 与真实环境的差别：真实的序列化格式不是 JSON，这里只判断能不能过，不生成数据。
+
+// 模拟：框架给 'use server' 导出的函数打上标记
+function serverFunction(fn) {
+  fn.isServerFunction = true;
+  return fn;
+}
+class User {
+  constructor(name) {
+    this.name = name;
+  }
+}
+
+// 返回不能过的原因；能过则返回 null
+function problem(v) {
+  if (v === null || v === undefined) return null;
+  const type = typeof v;
+  if (['string', 'number', 'boolean', 'bigint'].includes(type)) return null;
+  if (type === 'symbol') return Symbol.keyFor(v) === undefined ? '没有用 Symbol.for 注册的 symbol' : null;
+  if (type === 'function') return v.isServerFunction ? null : '普通函数：代码没法变成数据发给浏览器';
+  if (Array.isArray(v) || v instanceof Set) {
+    for (const item of v) {
+      const p = problem(item);
+      if (p) return p;
+    }
+    return null;
+  }
+  if (v instanceof Map) {
+    for (const [k, x] of v) {
+      const p = problem(k) || problem(x);
+      if (p) return p;
+    }
+    return null;
+  }
+  if (v instanceof Date || v instanceof ArrayBuffer || ArrayBuffer.isView(v) || v instanceof Promise) return null;
+  const proto = Object.getPrototypeOf(v);
+  if (proto === Object.prototype) {
+    for (const x of Object.values(v)) {
+      const p = problem(x);
+      if (p) return p;
+    }
+    return null;
+  }
+  return proto === null ? '原型为 null 的对象' : 'class 的实例：原型和方法不会跟着过去';
+}
+
+const props = {
+  title: '机械键盘',
+  tags: ['新品', '包邮'],
+  releasedAt: new Date('2025-01-01'),
+  stock: new Map([['黑', 12], ['白', 0]]),
+  seller: { name: '小李', rating: 4.8 },
+  onBuy: () => console.log('买！'),
+  addToCart: serverFunction(async id => {}),
+  owner: new User('小王'),
+  extra: Object.assign(Object.create(null), { note: '预售' }),
+};
+
+function App() {
+  return (
+    <table>
+      <tbody>
+        {Object.entries(props).map(([name, value]) => {
+          const why = problem(value);
+          return (
+            <tr key={name}>
+              <td>{name}</td>
+              <td>{why ? '❌ 不能传' : '✅ 可以传'}</td>
+              <td><small>{why}</small></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+```
+
+Server Function 能传，是因为浏览器拿到的不是函数本身，而是一个引用。下一节演示调用时发生了什么。
+
 ## Server Functions：从客户端调用服务器函数
 
 用 `"use server"` 标记的异步函数叫 **Server Function**。把它用作表单或按钮的 action 时，也叫 Server Action。Next.js 文档常用后一个名字。
@@ -139,6 +285,57 @@ RSC 的传输格式不是 HTML。它是一种特殊的序列化格式，叫 RSC 
 - **带公开前缀的环境变量会进入浏览器**，例如 Next.js 的 `NEXT_PUBLIC_`、Vite 的 `VITE_`。密钥不要用这些前缀。
 - **只把需要的字段传给客户端**。传给客户端组件的 props 和 Server Function 的返回值，都会发送到浏览器。不要传整条数据库记录，例如写 `<Profile name={user.name} />`，而不是 `<Profile user={user} />`，否则密码哈希之类的字段也跟着走了。
 - **及时升级 React 和框架，并关注安全公告。** 2025 年 12 月，React 公布了一个无需登录即可利用的 RSC 远程代码执行漏洞（CVE-2025-55182）。此后到 2026 年 7 月，React 又陆续修复了多个 Server Function 拒绝服务和源码泄露漏洞，公告发布在 react.dev 博客和 React 仓库的 GitHub Security Advisories。截至 2026 年 10 月，各版本线的安全版本是 19.0.8、19.1.9、19.2.8，以及 19.3.0 及之后的版本。具体版本号会继续变化：以 `npm audit` 的结果和上述公告为准，并同时升级框架（Next.js 等自带 React 的 RSC 实现）。没有服务器的纯客户端应用不受影响。
+
+下面的示例模拟一次 Server Function 调用：客户端拿到的只是引用，参数被序列化后发给服务器，服务器按引用找到函数再执行。
+
+```jsx play title="模拟：绕过界面直接调用 Server Function"
+// 模拟：Server Function 的调用路径。
+// 真实环境：框架在构建时把 'use server' 函数换成一个“引用”，客户端调用引用时发一个 HTTP POST 请求，
+// 服务器按引用找到函数再执行。这里用对象和 JSON 模拟这条路径。
+// 与真实环境的差别：真实请求用 React 自己的序列化格式（支持 Date、Map 等），不是 JSON；也没有真实的网络。
+import { useState } from 'react';
+
+// ---------- 服务器端：浏览器看不到这一段 ----------
+const db = { posts: { p1: { id: 'p1', authorId: 'alice', title: 'Alice 的文章' } } };
+const serverFunctions = {
+  'actions#deletePost': async postId => {
+    delete db.posts[postId];
+    return '已删除 ' + postId;
+  },
+};
+// 模拟服务器收到请求：只看请求体，不知道它来自哪个按钮
+async function handleRequest(body) {
+  const { id, args } = JSON.parse(body);
+  return serverFunctions[id](...args);
+}
+
+// ---------- 浏览器端：只有引用，没有函数体 ----------
+const deletePostRef = { id: 'actions#deletePost' };
+async function callServerFunction(ref, ...args) {
+  const body = JSON.stringify({ id: ref.id, args });
+  console.log('浏览器发出的请求体：', body);
+  return handleRequest(body);
+}
+
+function App() {
+  const [log, setLog] = useState('');
+  const [, refresh] = useState(0);
+  const run = async fn => {
+    setLog(await fn());
+    refresh(n => n + 1);
+  };
+  return (
+    <div>
+      <p>当前没有任何人登录。数据库里的文章：{Object.values(db.posts).map(p => p.title).join('、') || '（空）'}</p>
+      <button onClick={() => run(() => callServerFunction(deletePostRef, 'p1'))}>用界面上的按钮删除 p1</button>{' '}
+      <button onClick={() => run(() => handleRequest('{"id":"actions#deletePost","args":["p1"]}'))}>绕过界面，脚本直接发请求</button>
+      <p>结果：{log || '（还没有调用）'}</p>
+    </div>
+  );
+}
+```
+
+两个按钮到达服务器的是同一份请求体，服务器分不出请求来自你的界面还是别人的脚本。在真实项目里，请求里带着函数的 id 和参数，浏览器的开发者工具里看得到，任何人都能照着重放。所以检查要写在函数里面：
 
 ```jsx title="不要假设调用者一定来自你的界面"
 'use server';
