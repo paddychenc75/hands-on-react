@@ -26,6 +26,9 @@ export default function ReadingAids() {
     if (b) b.hidden = !id;
     if (!id) return;
     let timer: any;
+    // 提示“继续上次位置”之前不保存：页面刚打开时的滚动（浏览器恢复位置、版面变化）会把上次的位置覆盖掉
+    let offered = false;
+    let scrolled = false;
     const paint = () => {
       const total = document.documentElement.scrollHeight - innerHeight;
       if (b) b.style.transform = `scaleX(${total > 0 ? Math.min(1, scrollY / total) : 0})`;
@@ -33,12 +36,17 @@ export default function ReadingAids() {
     const onScroll = () => {
       paint();
       clearTimeout(timer);
-      timer = setTimeout(() => savePos(id), 400);
+      scrolled = true;
+      if (offered) timer = setTimeout(() => savePos(id), 400);
     };
     paint();
     window.addEventListener('scroll', onScroll, { passive: true });
     // 实验台是异步加载的，页面高度稳定后再提示“继续上次位置”
-    const resume = setTimeout(() => offerResume(id), 1200);
+    const resume = setTimeout(() => {
+      offerResume(id);
+      offered = true;
+      if (scrolled) savePos(id);
+    }, 1200);
     return () => {
       window.removeEventListener('scroll', onScroll);
       clearTimeout(timer);

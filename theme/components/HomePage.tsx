@@ -118,8 +118,7 @@ export default function HomePage() {
         </div>
       </div>
       <p className="section-sub">
-        <b>简明的写法：</b>课文参考
-        ASD-STE100（简化技术英语）的写作原则。一句话只讲一件事，长句拆成短句，操作写成编号步骤，多用主动语态。一个概念只用一个说法，见
+        <b>简明的写法：</b>一句话只讲一件事，长句拆成短句，操作写成编号步骤，多用主动语态。一个概念只用一个说法，见
         <Link href="/glossary">术语表</Link>。
       </p>
       <p className="section-sub">
