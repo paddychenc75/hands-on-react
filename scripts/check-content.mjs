@@ -10,7 +10,7 @@
 //      course/lessons.generated.ts 是最新的；每个阶段有 docs/check/N.mdx。
 //   2. 课文与数据：MDX 里 play 代码块的键在本课内唯一；数据 plays 的每个键都能在 MDX 里找到；pkey 写对；
 //      MDX 的 <Quiz />、<Exercise /> 和数据里的 quiz、exercise 对得上；MDX 标题和数据 title 一致。
-//   3. 题目：每道 quiz / checkOnly / predict 题的 options ≥ 2、answer 是合法下标、explain 非空；有 exercise 的课有 starter、solution、test。
+//   3. 题目（含 drills 变式练习的字段、localMins）：每道 quiz / checkOnly / predict 题的 options ≥ 2、answer 是合法下标、explain 非空；有 exercise 的课有 starter、solution、test。
 //   4. 复习卡片键快照 course/card-keys.snapshot.json：已有的键不能消失、不能换位置（题目文字的指纹不变），只能在每课末尾追加。
 //   5. 站内引用："第 N 课《标题》"的课号和标题要一致；"词（第 N 课）""第 N 课“词”"里的词要出现在第 N 课里；站内链接指向存在的课。
 import { createHash } from 'node:crypto';
@@ -194,6 +194,8 @@ for (const id of mdxIds) {
   if (l.quiz?.length && !has('Quiz')) fail(where, '数据里有 quiz，但课文里没有 <Quiz />');
   if (!l.quiz?.length && has('Quiz')) fail(where, '课文里有 <Quiz />，但数据里没有 quiz');
   if (l.exercise && !has('Exercise')) fail(where, '数据里有 exercise，但课文里没有 <Exercise />');
+  if (l.drills && l.drills.length && !has('Drills')) fail(where, '数据里有 drills，但课文里没有 <Drills />');
+  if (!(l.drills && l.drills.length) && has('Drills')) fail(where, '课文里有 <Drills />，但数据里没有 drills');
   if (!l.exercise && has('Exercise')) fail(where, '课文里有 <Exercise />，但数据里没有 exercise');
 }
 
@@ -227,6 +229,26 @@ for (const [id, l] of Object.entries(lessons)) {
     if (typeof ex.test !== 'function') fail(where, 'exercise.test 缺失，必须是 async (t) => { … }');
     if (ex.exports !== undefined && !Array.isArray(ex.exports)) fail(where, 'exercise.exports 必须是名字数组');
   }
+  if (l.drills !== undefined) {
+    if (!Array.isArray(l.drills) || l.drills.length < 2 || l.drills.length > 3)
+      fail(where, `drills 要有 2–3 道变式练习，现在是 ${Array.isArray(l.drills) ? l.drills.length : '不是数组'} 道`);
+    else {
+      if (!l.exercise) fail(where, '有 drills 但没有 exercise：变式练习是正式练习的补充');
+      const titles = new Set();
+      l.drills.forEach((d, i) => {
+        for (const f of ['title', 'task', 'starter', 'solution', 'hint'])
+          if (typeof d[f] !== 'string' || !d[f].trim()) fail(where, `drills[${i}].${f} 缺失或为空`);
+        if (typeof d.test !== 'function') fail(where, `drills[${i}].test 缺失，必须是 async (t) => { … }`);
+        if (d.exports !== undefined && !Array.isArray(d.exports)) fail(where, `drills[${i}].exports 必须是名字数组`);
+        if (d.starter && d.starter === d.solution) fail(where, `drills[${i}] 的 starter 和 solution 相同`);
+        if (l.exercise && d.solution === l.exercise.solution) fail(where, `drills[${i}] 的 solution 和正式练习相同：变式练习要换情境`);
+        if (titles.has(d.title)) fail(where, `drills[${i}].title 和别的变式重复`);
+        titles.add(d.title);
+      });
+    }
+  }
+  if (l.localMins !== undefined && (!Number.isInteger(l.localMins) || l.localMins <= 0))
+    fail(where, `localMins 是 ${JSON.stringify(l.localMins)}，必须是正整数（分钟）`);
 }
 
 // ---------- 4. 卡片键快照 ----------

@@ -215,7 +215,7 @@ abbr.term:focus-visible { outline: 2px solid var(--accent); }
 .jumps a { padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); color: var(--ink-2); text-decoration: none; }
 .jumps a:hover { border-color: var(--accent); color: var(--accent); }
 .jumps a.ok { border-color: var(--good); color: var(--good); background: var(--good-wash); }
-#sec-read, #sec-quiz, #sec-ex, #sec-self { scroll-margin-top: 72px; }
+#sec-read, #sec-quiz, #sec-ex, #sec-drills, #sec-self { scroll-margin-top: 72px; }
 .kbd-hint { margin: 10px 0 0; text-align: center; font-size: 12px; color: var(--ink-3); }
 .sx-keys { margin: 0 0 4px; padding-left: 1.4em; display: grid; gap: 4px; color: var(--ink); }
 .selfx .sx-ask { font-size: 13.5px; color: var(--ink-3); margin-bottom: 6px; }
@@ -346,3 +346,9 @@ html:root { --rp-sidebar-width: 280px; --rp-outline-width: 190px; --rp-content-p
 .editor pre, .editor textarea { white-space: pre-wrap; }
 .rp-doc-footer, .rp-prev-next-page { display: none !important; } /* 自己的上一课/下一课在 LessonFooter */
 html.dark .btn.sun, html.dark .rp-doc .btn.sun, html.dark a[data-hoc-due]::after { color: #1b1204; }
+
+/* 变式练习：每道一个小块，标题行显示“变式 x/y” */
+.drills { display: grid; gap: 28px; }
+.drill-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 8px; font-size: 16px; }
+.drill-no { font: 600 12px var(--f-mono); letter-spacing: .06em; color: var(--sun); border: 1px solid var(--sun); border-radius: 99px; padding: 1px 9px; white-space: nowrap; }
+.drill .pg-badge.ex { color: var(--violet); border-color: var(--violet); }

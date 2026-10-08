@@ -1,5 +1,5 @@
 /* 实验台：编辑器 + 预览 + 控制台，可带"先预测再运行"的预测题。 */
-import type { Exercise, Predict } from '../types.ts';
+import type { Drill, Exercise, Predict } from '../types.ts';
 import { makeEditor, type Editor } from './editor.ts';
 import { seeded } from './logic/random.ts';
 import { libsInSource } from './logic/runtime.ts';
@@ -14,8 +14,10 @@ export interface PlaygroundOptions {
   title?: string;
   note?: string;
   badge?: string;
-  exercise?: Exercise;
+  exercise?: Exercise | Drill;
   lessonId?: string;
+  /** 保存代码的记录。缺省是正式练习（lp(lessonId)）；变式练习传自己的记录 */
+  record?: () => { code?: string; sawSol?: boolean; rewrite?: boolean };
   predict?: Predict;
   predictKey?: string;
   /** 用哪个 React 运行时跑代码。缺省是全站唯一的运行时，必须已经加载 */
@@ -39,6 +41,7 @@ export function makePlayground({
   badge = 'LIVE',
   exercise,
   lessonId,
+  record,
   predict,
   predictKey,
   runtime = getRuntime(),
@@ -75,10 +78,13 @@ export function makePlayground({
 
   const body = el('div', { class: 'pg-body' });
   let timer: ReturnType<typeof setTimeout>;
-  const savedCode = exercise && lessonId && progress[lessonId] && progress[lessonId].code;
+  const rec = () => (record ? record() : exercise && lessonId ? lp(lessonId) : null);
+  // 读已保存的代码时不创建记录（lp 会创建），所以正式练习先看 progress
+  const savedCode = record ? record().code : exercise && lessonId && progress[lessonId] && progress[lessonId].code;
   const editor = makeEditor(savedCode || src, v => {
-    if (exercise && lessonId) {
-      lp(lessonId).code = v;
+    const r = rec();
+    if (r) {
+      r.code = v;
       save();
     }
     if (!revealed) return;
@@ -187,9 +193,9 @@ export function makePlayground({
     if (before === src) return;
     editor.value = src;
     // 看过答案后点重置，表示要自己重写一遍：之后写出和答案相同的代码也可以通过
-    const wasRewrite = exercise && lessonId && lp(lessonId).rewrite;
-    if (exercise && lessonId) {
-      const q = lp(lessonId);
+    const wasRewrite = rec() && rec().rewrite;
+    if (rec()) {
+      const q = rec();
       delete q.code;
       if (q.sawSol) q.rewrite = true;
       save();
@@ -197,8 +203,8 @@ export function makePlayground({
     run();
     toast('代码已恢复成初始版本。', 6000, '撤销', () => {
       editor.value = before;
-      if (exercise && lessonId) {
-        const q = lp(lessonId);
+      if (rec()) {
+        const q = rec();
         q.code = before;
         q.rewrite = wasRewrite;
         save();
