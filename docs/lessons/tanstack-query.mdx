@@ -62,7 +62,11 @@ function Todos() {
 
 ## 自己动手：迷你 useQuery
 
-本页的沙箱不能加载 TanStack Query。下面用 `useSyncExternalStore` 实现一个带缓存的迷你 useQuery。这是原理演示，真实项目的写法见上面的代码块。
+实验台里不安装第三方库，所以本课分三层：
+
+1. **迷你实现**（本节和下一节）：用 `useSyncExternalStore` 实现一个带缓存的迷你 useQuery，弄懂缓存、去重和过期刷新，并通过预测检验自己的理解。
+2. **本机任务**（课末）：在你的电脑上装真库，把同样的实验做一遍，并按清单自查。
+3. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库做依赖查询、错误处理和测试。
 
 注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：queryFn 每次渲染换成新函数，不会触发重新请求；它只认 queryKey。
 
@@ -136,10 +140,87 @@ function App() {
 迷你版和真库的差别：
 
 1. 真库失败后默认重试 3 次（约 7 秒）才报错，迷你版立刻报错。
-2. 真库在窗口重新获得焦点、网络恢复时，会刷新过期的数据。
+2. 真库在网络恢复时，也会刷新过期的数据。
 3. 真库在没有组件使用一份缓存 5 分钟后删除它（`gcTime`）。
 4. 迷你版没有 `invalidateQueries` 和 `useMutation`。
 
+## staleTime：新鲜期内不请求，过期后台刷新
+
+缓存里有数据，不等于这份数据还可信。`staleTime` 就是“这份数据多久之内算新鲜”。新鲜期内，用到它的组件不会触发请求；过期以后，组件挂载、窗口重新获得焦点这类时刻，会先显示缓存，同时在后台请求新数据。默认值是 0，数据一到手就算过期。
+
+下面的迷你版补上了“窗口重新获得焦点时刷新”。页面上的按钮用来模拟“切到别的标签页再切回来”。先预测，再运行。
+
+```jsx play title="staleTime：切回标签页会不会请求"
+import { useSyncExternalStore, useEffect, useRef, useState } from 'react';
+
+// ===== 迷你 Query 缓存（第二版：窗口重新获得焦点时，过期的数据在后台刷新） =====
+const cache = new Map();      // key -> { data, updatedAt, fetching, promise }
+const listeners = new Set();
+const notify = () => listeners.forEach(l => l());
+const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
+
+function fetchQuery(key, fn) {
+  const entry = cache.get(key) || {};
+  if (entry.promise) return entry.promise;
+  const promise = fn().then(
+    data => { cache.set(key, { data, updatedAt: Date.now() }); notify(); },
+    error => { cache.set(key, { ...cache.get(key), error, fetching: false, promise: null }); notify(); }
+  );
+  cache.set(key, { ...entry, error: null, fetching: true, promise }); notify();
+  return promise;
+}
+const isStale = (entry, staleTime) => !entry || !entry.updatedAt || Date.now() - entry.updatedAt >= staleTime;
+
+function useQuery({ queryKey, queryFn, staleTime = 0 }) {
+  const key = JSON.stringify(queryKey);
+  const entry = useSyncExternalStore(subscribe, () => cache.get(key));
+  const opts = useRef({ queryFn, staleTime });      // 总是指向最新的 queryFn 和 staleTime
+  useEffect(() => { opts.current = { queryFn, staleTime }; });
+  useEffect(() => {
+    const refresh = () => {
+      if (isStale(cache.get(key), opts.current.staleTime)) fetchQuery(key, opts.current.queryFn);
+    };
+    refresh();                                       // 组件挂载时
+    window.addEventListener('focus', refresh);       // 窗口重新获得焦点时
+    return () => window.removeEventListener('focus', refresh);
+  }, [key]);
+  return {
+    data: entry && entry.data,
+    isPending: !entry || entry.data === undefined,
+    isFetching: !!(entry && entry.fetching),
+  };
+}
+
+// ===== 模拟后端 =====
+let calls = 0;
+const getTime = () => new Promise(resolve => setTimeout(() => {
+  calls++;
+  console.log('🌐 发出请求（累计 ' + calls + ' 次）');
+  resolve({ at: new Date().toLocaleTimeString('zh-CN'), n: calls });
+}, 600));
+
+// ===== 应用 =====
+function App() {
+  const [staleTime, setStaleTime] = useState(0);
+  const { data, isPending, isFetching } = useQuery({ queryKey: ['time'], queryFn: getTime, staleTime });
+  return (
+    <div>
+      <label>staleTime：
+        <select value={staleTime} onChange={e => setStaleTime(Number(e.target.value))}>
+          <option value={0}>0（默认）</option>
+          <option value={60000}>1 分钟</option>
+        </select>
+      </label>
+      {isPending
+        ? <p>⏳ 首次加载中…</p>
+        : <p>服务器时间 {data.at}（第 {data.n} 次请求）{isFetching && <small>　后台刷新中…</small>}</p>}
+      <button onClick={() => window.dispatchEvent(new Event('focus'))}>模拟：切到别的标签页再切回来</button>
+    </div>
+  );
+}
+```
+
+这个示例同样没有 `invalidateQueries`、重试和垃圾回收。真库在窗口重新获得焦点时的行为，由 `refetchOnWindowFocus` 控制，默认开启。
 ## useMutation：修改数据
 
 ```jsx title="修改后让相关缓存失效，是最简单可靠的同步方式"
@@ -213,6 +294,51 @@ useMutation({
 在 Next.js App Router 中，很多数据可以在服务端组件里直接 `await`。这时不需要 useQuery。TanStack Query 适合客户端频繁交互的数据。例如无限滚动、轮询和乐观更新。两者可以搭配使用。
 
 </CallBox>
+
+## 本机任务：用真库做一遍
+
+请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目里做下面几步。
+
+1. 运行 `npm install @tanstack/react-query`。在 `main.tsx` 里创建一个 `QueryClient`，用 `QueryClientProvider` 包住 `<App />`。
+2. 新建 `src/api.ts`，写一个模拟后端：
+
+```ts title="在本机项目里：src/api.ts"
+let calls = 0;
+const names: Record<number, string> = { 1: '张三', 2: '李四', 3: '王五' };
+
+export async function fetchUser(id: number) {
+  calls += 1;
+  console.log(`🌐 请求用户 ${id}（累计 ${calls} 次）`);
+  await new Promise(resolve => setTimeout(resolve, 800));
+  if (!names[id]) throw new Error('用户不存在');
+  return { id, name: names[id] };
+}
+
+export async function renameUser(id: number, name: string) {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  names[id] = name;
+}
+```
+
+3. 写一个 `UserCard` 组件：`useQuery` 的 `queryKey` 是 `['user', id]`，`queryFn` 调用 `fetchUser(id)`，`staleTime` 设为 `10_000`。按“加载中、出错、成功”渲染。
+4. 在页面上放“用户 1”到“用户 4”四个按钮，同时渲染**两个**同一个 `id` 的 `UserCard`。
+5. 再写一个“改名”按钮：用 `useMutation` 调用 `renameUser`，成功后 `invalidateQueries({ queryKey: ['user', id] })`。
+
+对照下面的表自查：
+
+| 做什么 | 应该看到 |
+|---|---|
+| 打开页面，两个 `UserCard` 同时显示用户 1 | 控制台只有 1 行“请求用户 1” |
+| 点“用户 2”，10 秒内再点回“用户 1” | 名字立刻显示，没有新的请求日志 |
+| 等超过 10 秒，再切回一个看过的用户 | 先显示旧名字，随后出现 1 行请求日志 |
+| 把 `staleTime` 改成 0，切到别的浏览器标签页再切回来 | 出现 1 行请求日志（窗口重新获得焦点）。`staleTime` 是 10 秒且没过期时，不出现 |
+| 点“用户 4” | 默认重试 3 次，约 7 秒后才显示“用户不存在”。给 `useQuery` 加 `retry: false`，立刻显示 |
+| 点“改名” | 名字更新，控制台多 1 行请求（`invalidateQueries` 触发的重新获取） |
+| 把 `queryKey` 改成 `['user']`（漏写 id），再点“用户 2” | 页面仍显示用户 1 的名字：漏写依赖的症状。试完改回来 |
+
+想看每个 key 是新鲜还是过期，可以再装 `@tanstack/react-query-devtools`，把 `<ReactQueryDevtools />` 放进 `QueryClientProvider` 里。
+
+做完后，你就可以在项目课里直接用这套写法了。
 
 </LessonProse>
 

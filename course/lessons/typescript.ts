@@ -4,20 +4,21 @@ export default {
   id: 'typescript',
   stage: 4,
   title: 'TypeScript + React',
-  mins: 30,
+  mins: 36,
+  runtime: 19,
   summary: '给组件、状态、事件和 Hook 加上类型，让编辑器替你找 bug。',
   goals: [
     '能写出 props 的类型：必填、可选（?）和字面量联合类型',
     '能判断 useState 什么时候要手写类型（例如 User | null），并给事件和 ref 标注类型',
     '能读懂并写出泛型列表组件，并给 reducer、Context 和自定义 Hook 写类型',
-    '能指出 any 和“联合类型里混进 string”为什么让检查失效',
+    '能指出 any 和“联合类型里混进 string”为什么让检查失效，并用 unknown 加类型守卫检查外部数据',
   ],
   keyPoints: [
     '问题：JavaScript 只在运行时出错。TypeScript 在你写代码时检查 props、字段名和 null，编辑器立即标红。',
     "props 用 <code>type</code> 或 <code>interface</code> 描述。<code>?</code> 表示可选，<code>'a' | 'b'</code> 只允许这几个值。",
     '能推断就不手写。初始值说明不了全部类型时才写，例如 <code>useState&lt;User | null&gt;(null)</code>。',
     '最常见的坑：写 <code>any</code>，或在联合类型里加 <code>| string</code>。代码照样能运行，但类型检查已经失效。',
-    '本课程的运行环境只去掉类型、不检查类型。真正的报错要在编辑器或 <code>tsc</code> 里看。',
+    '类型在运行前就被擦掉：本课程的运行环境只去掉类型、不检查类型，真正的报错要在编辑器或 <code>tsc</code> 里看。来自外部的数据，用 <code>unknown</code> 加类型守卫在运行时检查。',
   ],
   quiz: [
     {
@@ -251,11 +252,62 @@ function View({ s }: { s: State }) {
       explain:
         '不加 as const 时，数组字面量被推断成元素类型的联合数组，每一项都可能是 boolean 或函数。写 <code>return [on, toggle] as const;</code> 才得到元组 readonly [boolean, () => void]，位置和类型一一对应。',
     },
+    {
+      q: `项目使用 @types/react 19。下面的代码会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Form() {
+  const inputRef = useRef();
+  return &lt;input ref={inputRef} /&gt;;
+}</code></pre></div>`,
+      options: [
+        '不报错：useRef 的参数可以省略',
+        'TypeScript 报错：ref 属性不能用在 input 上',
+        'TypeScript 报错：useRef 需要一个初始值，应写成 useRef<HTMLInputElement>(null)',
+        '不报错，但 inputRef.current 的类型是 any',
+      ],
+      answer: 2,
+      explain:
+        '@types/react 19 要求 useRef 必须传初始值，不传会报“Expected 1 arguments, but got 0”。绑定 DOM 元素时，写 <code>useRef&lt;HTMLInputElement&gt;(null)</code>，此时 current 的类型是 <code>HTMLInputElement | null</code>，用之前要先判断。“可以省略”是 @types/react 18 的写法，升级类型包以后会报错。',
+    },
+    {
+      q: `下面的代码会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function show(x: unknown) {
+  return x.name;
+}</code></pre></div>`,
+      options: [
+        'TypeScript 报错：x 的类型是 unknown，要先收窄（例如用 typeof 或类型守卫）才能读属性',
+        '不报错：unknown 和 any 一样，可以随便读属性',
+        '不报错，但 x 没有 name 时返回 undefined',
+        'TypeScript 报错：参数不能写成 unknown',
+      ],
+      answer: 0,
+      explain:
+        'unknown 表示“什么值都可能”，所以在检查之前，不允许读它的属性、调用它或把它当成别的类型用。any 才是“随便用”，它会关掉检查。<code>JSON.parse</code> 和 <code>response.json()</code> 都返回 any：先把结果放进 unknown 变量，再用类型守卫检查，才能得到可靠的类型。',
+    },
   ],
   plays: {
     '带类型的 Button': {},
     泛型组件: {
       note: '在编辑器中，把鼠标放到 renderItem 的参数 b 上。你会看到它的类型是 Book。',
+    },
+    类型在运行时不存在: {
+      pkey: 'typescript|类型在运行时不存在',
+      predict: {
+        q: '“传错了”那一行有两处类型错误（<code>level="danger"</code> 和 <code>count={\'1\'}</code>）。运行后它显示什么？',
+        options: ['页面报错，什么都不显示：类型错误会阻止运行', '“传错了 ×2”，蓝色', '“传错了 ×11”，蓝色', '“传错了 ×11”，红色'],
+        answer: 2,
+        explain:
+          "类型在运行前就被擦掉了，浏览器看到的是普通 JavaScript。<code>level</code> 不是 'warn'，所以走蓝色分支。<code>count</code> 实际是字符串 '1'，<code>'1' + 1</code> 是字符串拼接，得到 '11'。TypeScript 不会转换数据，也不会拦住运行，它只在你写代码时标红。第一行的 level 是 warn、count 是数字 1，显示红色的“×2”。",
+      },
+      note: '类型错误只在编辑器和 <code>tsc</code> 里出现。如果数据来自网络或用户输入，类型帮不上忙，要在运行时检查，见后面的“unknown：先检查，再使用”。',
+    },
+    'unknown：先检查，再使用': {
+      pkey: 'typescript|unknown：先检查，再使用',
+      predict: {
+        q: '5 条输入里，有几条能通过 <code>isUser</code> 的检查，显示出名字？',
+        options: ['1 条', '2 条', '3 条', '4 条'],
+        answer: 1,
+        explain:
+          "第 1 条和第 4 条通过。第 2 条的 id 是字符串 '2'，不是数字；第 3 条是数组，没有 id 和 name；第 5 条不是 JSON，<code>JSON.parse</code> 抛错，被 catch 接住。第 4 条多了一个 admin 字段，但检查只关心 id 和 name，所以通过。这个检查在运行时执行，才是真正的保险；而 <code>JSON.parse(raw) as User</code> 只是对编译器的保证。",
+      },
+      note: '类型守卫 <code>x is User</code> 告诉编译器：函数返回 true 时，x 就是 User。守卫里的检查写得不对，编译器也发现不了，所以要认真写。',
     },
   },
 } satisfies Lesson;

@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '实战四：城市天气应用',
   mins: 40,
+  runtime: 19,
   summary: '在本机把 Vite、TypeScript、React Router、TanStack Query 和测试接成一个小应用：搜索城市、查看天气、收藏城市。',
   goals: [
     '能给一个应用里的每一份数据归类（URL、界面、服务器、浏览器本地），并说出各放在哪里',
@@ -361,8 +362,8 @@ expect(await screen.findByRole('alert')).toBeInTheDocument();</code></pre></div>
       note: '页面一打开就请求了上海（1 条），点“北京”请求北京（2 条）。点回“上海”时，上海的数据在缓存里，不再请求。点“收藏”只改了界面状态，也没有请求。服务器状态按 id 缓存，收藏单独保存，两者互不影响。',
       predict: {
         q: '页面一打开就加载了上海。依次点“北京”“上海”“收藏”之后，“请求记录”那一行里一共有几条？',
-        options: ['1 条', '2 条', '3 条', '4 条'],
-        answer: 1,
+        options: ['1 条', '3 条', '2 条', '4 条'],
+        answer: 2,
         explain: '请求记录是：请求 上海（页面打开）、请求 北京。切回上海用缓存，不请求；点“收藏”只改界面状态，不请求。一共 2 条。',
       },
       pkey: 'project-weather|服务器缓存与收藏：互不干扰',

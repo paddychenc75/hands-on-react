@@ -12,7 +12,13 @@ title: "测试：Vitest + Testing Library"
 
 <LessonProse>
 
-第 31 课简单提到过测试。这一课动手写。目标不是追求覆盖率数字，而是让你**敢于重构**：改完代码跑一遍测试，绿了就放心上线。
+[《项目搭建与交付》](/lessons/engineering)简单提到过测试。这一课动手写。目标不是追求覆盖率数字，而是让你**敢于重构**：改完代码跑一遍测试，绿了就放心上线。
+
+Vitest 和 Testing Library 需要 Node.js 和 jsdom，实验台里跑不了。所以本课以“读”为主，分三层：
+
+1. **读懂**：看真实的测试文件，弄清查询优先级、异步等待和网络模拟。
+2. **迷你实现**（选读）：30 行的迷你测试运行器，看清 `render`、`getByRole` 和“测试只抓得住断言过的东西”。站内练习用同样的迷你库，练的是“写出能抓住 bug 的断言”。
+3. **本机任务**：在[《实战四：城市天气应用》](/lessons/project-weather)的里程碑 5 里，用真库给整个应用写测试。
 
 ## 一个完整的测试文件
 
@@ -72,9 +78,10 @@ describe('Counter', () => {
 
 </CallBox>
 
-## 自己动手：一个迷你测试运行器
+<details className="optional">
+<summary><span className="opt-tag">选读</span>自己动手：一个迷你测试运行器<small>可以先跳过，需要时再展开</small></summary>
 
-本页不能运行 Vitest。下面的代码用 30 行实现了 `render`、`getByText`、`getByRole` 和 `test`。我们用它测试一个真实组件。试着让 Counter 出一个 bug，再运行，看哪些测试变红。
+下面的代码用 30 行实现了 `render`、`getByText`、`getByRole` 和 `test`。我们用它测试一个真实组件。试着让 Counter 出一个 bug，再运行，看哪些测试变红。
 
 ```jsx play title="在浏览器里跑测试"
 import { useState } from 'react';
@@ -156,7 +163,29 @@ test('重置后回到 0', async () => {
 function App() { return <Counter />; }
 ```
 
-## 异步与 Hook 的测试
+</details>
+
+## 异步查询与模拟网络（MSW）
+
+真实组件常常在挂载后请求数据，界面稍后才更新。测试要做两件事：等待内容出现，并让请求不依赖真实的服务器。下面的代码只读，实验台不能运行 Vitest。
+
+```jsx title="被测组件：挂载后请求用户，结果稍后才显示"
+function UserProfile({ id }) {
+  const { data, isPending, isError } = useQuery({
+    queryKey: ['user', id],
+    queryFn: () => fetch(`/api/users/${id}`).then(r => {
+      if (!r.ok) throw new Error('请求失败');
+      return r.json();
+    }),
+  });
+  if (isPending) return <p>加载中…</p>;
+  if (isError) return <p role="alert">加载失败</p>;
+  return <h2>{data.name}</h2>;
+}
+```
+
+这个组件有三种状态，测试也应该各写一条。等待的办法是 `findBy…`：它每隔一小段时间重新查一次，默认最多等 1 秒。被测代码的请求交给 **MSW**（Mock Service Worker）：它在网络层拦截请求，组件里的 `fetch` 不用改，换成不同的接口响应就能测不同的状态。
+
 
 ```jsx
 // 异步：用 findBy 等待内容出现；网络请求用 MSW 在网络层模拟
@@ -175,7 +204,7 @@ it('useToggle 可以切换', () => {
 });
 ```
 
-## 真实项目：模拟网络，包好 Provider
+## 真实项目：写测试时要包好 Provider
 
 ```jsx title="组件用了 Router 或 Query，测试里就要包上对应的 Provider"
 import { http, HttpResponse } from 'msw';
@@ -217,6 +246,47 @@ it('接口失败时显示错误', async () => {
 4. 少量端到端测试：用 Playwright 在真实浏览器里走完整流程。
 
 </CallBox>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>端到端：Playwright 一个最小用例<small>可以先跳过，需要时再展开</small></summary>
+
+Testing Library 在 jsdom 里测试，没有真正的浏览器。端到端测试用 Playwright 启动真实的浏览器，从头走一遍用户流程。它很慢，所以只覆盖最关键的几条路径，比如“搜索一个城市，看到结果”。
+
+```bash title="在本机终端里做：安装"
+npm init playwright@latest
+```
+
+```ts title="在本机项目里：tests/search.spec.ts"
+import { test, expect } from '@playwright/test';
+
+test('搜索城市，看到结果', async ({ page }) => {
+  await page.goto('http://localhost:5173/');
+  await page.getByRole('textbox', { name: '城市' }).fill('北京');
+  await page.getByRole('button', { name: '搜索' }).click();
+  await expect(page.getByRole('link', { name: '北京' })).toBeVisible();
+});
+```
+
+Playwright 的查询和 Testing Library 一样，优先按角色和名称找元素。先用 `npm run dev` 启动应用，再运行 `npx playwright test`。也可以在 `playwright.config.ts` 的 `webServer` 里写上启动命令，让它自动启动。
+
+</details>
+
+## 本机任务
+
+在[《实战四：城市天气应用》](/lessons/project-weather)的里程碑 5 里完成，也可以用任何一个小应用。
+
+1. 安装第一个提示框里的依赖，配好 `environment: 'jsdom'`、`globals: true` 和 setup 文件。
+2. 给一个组件写 3 条测试：初始状态、一次点击后的结果、一个异步状态（用 `findBy…` 等待）。
+3. 用 MSW 让接口返回 500，写一条“显示错误提示”的测试。
+
+对照下面的表自查：
+
+| 做什么 | 应该看到 |
+|---|---|
+| 运行 `npx vitest run` | 全部通过，终端显示通过的测试数 |
+| 把组件里的 `n + 1` 改成 `n + 2` | 点击相关的测试变红，失败信息写着期望值和实际值。改回后恢复 |
+| 把 `findByText` 换成 `getByText` 测试异步内容 | 测试失败：内容还没出现 |
+| 测试里去掉 `retry: false` 再测错误状态 | 约 1 秒后超时失败（见项目课里程碑 5 的“常见坑”） |
 
 </LessonProse>
 

@@ -16,7 +16,7 @@ Next.js 是使用最广的 React 全栈框架。Server Components 主要就用�
 
 <CallBox kind="tip" label="要点">
 
-Next.js 需要 Node.js 服务器，本页的示例都是只读代码。创建项目只需一行：`npx create-next-app@latest my-app`，选“使用推荐的默认设置”即可（需要 Node.js 20.9 以上）。
+Next.js 需要 Node.js 服务器，实验台跑不了，所以本课的代码块都是只读的，站内练习实现的是它最核心的一条规则（文件夹就是路由）。课末的“本机任务”带你在自己的电脑上亲手跑一遍。创建项目只需一行：`npx create-next-app@latest my-app`，选“使用推荐的默认设置”即可（需要 Node.js 20.9 以上）。
 
 </CallBox>
 
@@ -160,6 +160,25 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 你也可以选择其他框架。例如 React Router（框架模式）和 TanStack Start。它们的核心概念相同：**按路由组织代码；在服务端或路由层加载数据；用 action 提交表单**。学会一个，迁移到另一个很快。
 
 </CallBox>
+
+## 本机任务：跑一个 Next.js 项目
+
+在你的电脑上做下面四步。照着做，对照表格自查。
+
+1. 运行 `npx create-next-app@latest my-shop`，选择推荐的默认设置，再 `cd my-shop && npm run dev`，打开 `http://localhost:3000`。
+2. **动态路由**：新建 `app/shop/[id]/page.tsx`，用 `const { id } = await params` 读出 id 并显示。再新建 `app/shop/layout.tsx`，在 `{children}` 上方放一个标题。
+3. **Server Function 表单**：新建 `app/shop/[id]/actions.ts`（第一行 `'use server'`），导出一个函数，用 `formData.get('text')` 读出文字并 `console.log`。在页面里用 `<form action={…}>` 调用它。
+4. **看 RSC payload**：在首页放一个 `<Link href="/shop/42">`，打开浏览器开发者工具的 Network 面板，点这个链接。
+
+| 做什么 | 应该看到 |
+|---|---|
+| 访问 `/shop/42` | 页面显示 42；页面外面套着根布局和 `shop` 布局两层 |
+| 在 `shop/layout.tsx` 里加一行 `console.log('layout')`，刷新页面 | 输出出现在运行 `npm run dev` 的终端，不在浏览器控制台：服务端组件在服务器上运行 |
+| 在 `page.tsx` 里写 `useState`，不加 `'use client'` | 页面报错，提示在服务端组件里不能使用。加上 `'use client'` 后恢复，再把它删掉（更好的做法是只拆出小的客户端组件） |
+| 提交表单 | 终端输出你填的文字；页面没有整页刷新，Network 里多了一个发到当前页面地址的 POST 请求 |
+| 点首页的 `Link` 去 `/shop/42` | Network 里出现一个带 `_rsc` 参数的请求，返回的是文本格式的 RSC payload，不是整页 HTML。具体的请求形式随 Next.js 版本变化，以所用版本为准 |
+
+做完后，再回头看上面的目录图，你就能说出每个文件在哪里运行。
 
 </LessonProse>
 

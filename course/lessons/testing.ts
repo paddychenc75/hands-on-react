@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 import { stripComments } from '../engine/exec.ts';
 
 // 检查程序自己的三个版本：和起始代码里的写法一样，但不依赖学习者的代码
-function makeList(bug) {
+function makeList(React, bug) {
   const h = React.createElement;
   return function ShoppingList() {
     const [items, setItems] = React.useState([]);
@@ -33,7 +33,8 @@ export default {
   id: 'testing',
   stage: 4,
   title: '测试：Vitest + Testing Library',
-  mins: 27,
+  mins: 29,
+  runtime: 19,
   summary: '像用户一样测试组件：按文字和角色找元素，模拟交互，断言结果。',
   goals: [
     '能判断一条断言测的是“用户看到的行为”还是“实现细节”',
@@ -502,6 +503,7 @@ export function defineTests(Component) {
 }`,
     hint: '只确认“牛奶出现了”不够：加了两件时，“牛奶”同样能找到。要断言用户能看到的<b>确切结果</b>，例如显示的件数，或者 <code>queryByText</code> 返回 <code>null</code>。',
     test: async t => {
+      const { React } = t;
       const { defineTests, runTests } = t.exports;
       t.assert(typeof defineTests === 'function', '找不到函数 defineTests。不要改它的名字');
       t.assert(typeof runTests === 'function', '找不到函数 runTests。不要修改迷你测试库');
@@ -524,16 +526,16 @@ export function defineTests(Component) {
         t.assert(Array.isArray(r), 'runTests 没有返回结果数组。不要修改迷你测试库');
         return r;
       };
-      const good = await run(makeList(null));
+      const good = await run(makeList(React, null));
       t.assert(good.length >= 2, '至少要有 2 个 it(…) 测试，现在只有 ' + good.length + ' 个（步骤 3、4）');
       const bad = good.filter(x => !x.ok);
       t.assert(bad.length === 0, '正确的组件也没通过：“' + (bad[0] && bad[0].name) + '” → ' + (bad[0] && bad[0].error) + '。测试写错了，先对照规格检查期望值');
-      const a = await run(makeList('double'));
+      const a = await run(makeList(React, 'double'));
       t.assert(
         a.some(x => !x.ok),
         '“一次加两件”的 bug 没被抓住：所有测试都通过了。添加一件后，断言显示的件数（步骤 3）',
       );
-      const b = await run(makeList('clear'));
+      const b = await run(makeList(React, 'clear'));
       t.assert(
         b.some(x => !x.ok),
         '“清空无效”的 bug 没被抓住：所有测试都通过了。清空后，断言物品消失、件数归零（步骤 4）',
@@ -604,6 +606,22 @@ expect(screen.getByText('登录成功')).toBeInTheDocument();</code></pre></div>
       answer: 1,
       explain:
         'user.click 只等点击事件处理完，不会等请求返回。getBy… 立刻查找，找不到就抛错。findBy… 会反复查找，默认最多等 1 秒，适合异步出现的内容。getByLabelText 按 &lt;label&gt; 的文字查找，前提是 label 和输入框有关联（htmlFor 对上 id，或者 label 包住输入框）。',
+    },
+    {
+      q: `Counter 有个 bug：点“+1”实际加了 2。下面的测试能抓住它吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">test('点击后计数变化', async () =&gt; {
+  render(&lt;Counter /&gt;);
+  await user.click(screen.getByRole('button', { name: '+1' }));
+  expect(screen.queryByText('计数：0')).not.toBeInTheDocument();
+});</code></pre></div>`,
+      options: [
+        '能：点击后“计数：0”消失了',
+        '不能：加 2 以后“计数：0”同样消失，测试照样通过；应断言确切的“计数：1”',
+        '能：queryByText 找不到元素时会抛错',
+        '不能：click 没有 await，断言太早执行',
+      ],
+      answer: 1,
+      explain:
+        "这条断言只说“旧文字不见了”，加 1、加 2、加 100 都满足，所以抓不住 bug。好的断言写确切的结果：<code>expect(screen.getByText('计数：1')).toBeInTheDocument()</code>。“queryBy 会抛错”不对：queryBy 找不到时返回 null，这里的 not.toBeInTheDocument 正是利用这一点。题目里的 click 已经写了 await。",
     },
   ],
   plays: {
