@@ -18,7 +18,7 @@ export default {
     '部署就是把 <code>dist/</code> 放到静态托管上。导入仓库、构建命令 <code>npm run build</code>、输出目录 <code>dist</code>，推送后自动部署。GitHub Pages 的网址带仓库名，要设置 <code>base</code>。',
     '单页应用的服务器要把找不到的页面路径回退到 index.html，由前端路由接管。缺失的资源文件（带扩展名）不该回退：回退会把 HTML 当成 JS 交给浏览器，页面白屏。',
     '密钥只放服务端，前端请求自己的服务端，服务端带着密钥转发。这个转发入口是公开的，谁都能直接调用，所以必须校验输入、只转发需要的请求。',
-    '（选读）CI 里依次跑 <code>npm ci</code>、类型检查、lint、测试、构建。从 React 18 升级：先升 18.3.1 清警告，再跑 codemod，最后升 19。',
+    '（选读）CI 里依次跑 <code>npm ci</code>、类型检查、lint、测试、构建。从 React 18 升级：先升 18.3.1 清警告，再升 19，最后跑 codemod。',
   ],
   quiz: [
     {
@@ -191,6 +191,12 @@ function cacheControl(file) {
       r = resolve('/city/1?tab=2', files);
       t.assert(r && r.status === 200 && r.file === '/index.html', '页面路由带查询字符串时也要回退到 index.html。得到：' + show(r));
 
+      r = resolve('/v1.2/city', files);
+      t.assert(
+        r && r.status === 200 && r.file === '/index.html',
+        '只看路径的最后一段有没有扩展名。/v1.2/city 最后一段是 city，是页面路由，应回退到 index.html。得到：' + show(r),
+      );
+
       // 缺失的资源文件：404，不回退
       r = resolve('/assets/index-old000.js', files);
       t.assert(
@@ -221,7 +227,7 @@ function cacheControl(file) {
       await t.click('#send');
       let text = t.text('#res');
       t.assert(
-        text.includes('200') && text.includes('/index.html') && /no-cache/.test(text),
+        text.includes('200') && text.includes('/index.html') && /no-cache|no-store|max-age=0/.test(text),
         '请求 /city/9 时，预览应显示 200、/index.html 和它的缓存头。现在是：' + text,
       );
       await t.type('#path', '/assets/index-old000.js');

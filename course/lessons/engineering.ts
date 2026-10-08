@@ -90,7 +90,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<p>在本机项目里，构建工具会读取 <code>.env</code>，把代码里的 <code>import.meta.env.名字</code> 换成值，再生成给所有访客下载的 JS。下面用两个函数模拟这一步。</p><ol class="task-steps"><li>不要修改 <code>ENV</code> 和 <code>SOURCE</code>。</li><li>写 <code>exposeEnv(env)</code>：只保留名字以 <code>VITE_</code> 开头的变量，返回一个<strong>新对象</strong>，不要修改传入的对象。</li><li>写 <code>inline(code, publicEnv)</code>：把代码里<strong>每一处</strong> <code>import.meta.env.名字</code> 换成值的字面量。名字在 <code>publicEnv</code> 里，就换成带引号的字符串字面量（值里有引号也要写对）；不在，就换成 <code>undefined</code>。</li><li>预览区会显示“访客能读到的代码”。检查它：地址出现了，密码没有。</li></ol>',
+    task: '<p>在本机项目里，构建工具会读取 <code>.env</code>，把代码里的 <code>import.meta.env.名字</code> 换成值，再生成给所有访客下载的 JS。下面用两个函数模拟这一步。</p><ol class="task-steps"><li>不要修改 <code>ENV</code> 和 <code>SOURCE</code>。</li><li>写 <code>exposeEnv(env)</code>：只保留名字以 <code>VITE_</code> 开头的变量，返回一个<strong>新对象</strong>，不要修改传入的对象。</li><li>写 <code>inline(code, publicEnv)</code>：把代码里<strong>每一处</strong> <code>import.meta.env.名字</code> 换成值的字面量。名字在 <code>publicEnv</code> 里，就换成用双引号括起的字符串字面量（值里有引号也要写对）；不在，就换成 <code>undefined</code>。</li><li>预览区会显示“访客能读到的代码”。检查它：地址出现了，密码没有。</li></ol>',
     starter: `import { useState } from 'react';
 
 // ===== 这个项目的 .env 文件（不要修改） =====
