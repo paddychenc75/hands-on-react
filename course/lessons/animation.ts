@@ -263,6 +263,23 @@ function App() {
       });
       await settleClosed();
 
+      // 1b. 面板里子元素的 transitionend 会冒泡上来，不能让面板提前卸载（只认面板自己的事件）
+      await t.retry(async () => {
+        await settleClosed();
+        await open();
+        await t.click('#toggle');
+        if (!panel()) return; // 一关闭就卸载，前面的检查已经报过
+        const child = document.createElement('span');
+        panel().appendChild(child);
+        child.dispatchEvent(new TransitionEvent('transitionend', { bubbles: true, propertyName: 'opacity', elapsedTime: 0.2 }));
+        await t.wait(30);
+        t.timing(
+          panel(),
+          '面板里一个子元素的过渡结束了，面板就被卸载。transitionend 会从子元素冒泡上来：onTransitionEnd 里要检查 e.target === e.currentTarget，只认面板自己的事件',
+        );
+      });
+      await settleClosed();
+
       // 2. 离场中再次打开：取消离场
       await t.retry(async () => {
         await settleClosed();
@@ -286,7 +303,7 @@ function App() {
       try {
         await open();
         await t.click('#toggle');
-        await until(() => !panel(), bl.limit(1500));
+        await until(() => !panel(), bl.limit(1200));
         t.assert(!panel(), '过渡没有真正发生时（这里把 transition 关掉了），transitionend 不会触发，#panel 仍要被卸载。加一个不超过 1 秒的超时兜底');
       } finally {
         style.remove();
@@ -364,18 +381,23 @@ function App() {
           t.assert(!box(), '点“关闭”后 #box 应该被卸载');
         };
         const frame = () => new Promise<void>(r => requestAnimationFrame(() => r()));
+        // 连续打开 3 次，每次都要有淡入：靠时机碰运气的写法（例如 effect 里立刻改类名）在慢设备上偶尔能过一次，连续 3 次都过的可能很小
         await t.retry(async () => {
-          await ensureClosed();
-          await t.click('#toggle');
-          t.assert(box(), '点“打开”后应该出现 #box');
-          await frame();
-          const early = Number(getComputedStyle(box()).opacity);
-          t.timing(
-            early < 0.85,
-            '卡片刚挂载时 opacity 已经是 ' +
-              early.toFixed(2) +
-              '，没有淡入。新挂载的节点没有“变化前”的值，过渡不会开始：用 @starting-style 给它一个起点，或者先渲染透明样式、画过一帧再改类名',
-          );
+          for (let i = 0; i < 3; i++) {
+            await ensureClosed();
+            await t.click('#toggle');
+            t.assert(box(), '点“打开”后应该出现 #box');
+            await frame();
+            const early = Number(getComputedStyle(box()).opacity);
+            t.timing(
+              early < 0.85,
+              '卡片刚挂载时 opacity 已经是 ' +
+                early.toFixed(2) +
+                '，没有淡入（第 ' +
+                (i + 1) +
+                ' 次打开）。新挂载的节点没有“变化前”的值，过渡不会开始：用 @starting-style 给它一个起点，或者先渲染透明样式、画过一帧再改类名',
+            );
+          }
         });
         // 最后要变成不透明（600ms 过渡）
         const end = performance.now() + bl.limit(2500);
@@ -433,7 +455,8 @@ function App() {
           queries++;
           return {
             get matches() {
-              return matches;
+              // 只有“减少动画”这个查询才返回 matches，查别的（例如深色模式）一律是 false
+              return /prefers-reduced-motion(?!\s*:\s*no-preference)/.test(q) ? matches : false;
             },
             media: q,
             onchange: null,
@@ -506,7 +529,7 @@ function App() {
       options: ['两个元素都按共享元素处理', '较晚挂载的那个自动改名', '界面照常更新，但浏览器放弃这次动画', '界面停留在旧状态'],
       answer: 2,
       explain:
-        '<code>name</code> 在同一时刻必须唯一。重名时浏览器无法建立快照对应关系，放弃整次动画（控制台提示重复的 view-transition-name），DOM 更新本身不受影响。',
+        '<code>name</code> 在同一时刻必须唯一。重名时浏览器无法建立快照对应关系，放弃整次动画；React 开发版还会在控制台警告“两个 &lt;ViewTransition name&gt; 同名”。DOM 更新本身不受影响。',
     },
     {
       q: "一个离场状态机在面板上写了 <code>onTransitionEnd={() =&gt; setPhase('gone')}</code>，没有检查事件来源和当前阶段。面板里有一个带 hover 过渡的按钮。面板处于 <code>entered</code> 时，鼠标划过按钮，会发生什么？",
@@ -517,7 +540,7 @@ function App() {
     },
   ],
   plays: {
-    '条件渲染：入场有动画，离场没有': {
+    '条件渲染：入场和离场': {
       note: '打开时卡片带着淡入出现，那是 @starting-style 给了它起点。关闭时，React 在这次渲染里就把节点从 DOM 里删了，过渡没有可以作用的元素，所以没有淡出。看控制台：下一帧时卡片已经不在 DOM 里。',
       predict: {
         q: '点“打开”，卡片带着淡入出现。再点“关闭”，卡片会怎样？',
@@ -555,14 +578,14 @@ function App() {
     'FLIP：自己量位置，再反向变换': {
       note: '点“反转”：每项从旧位置滑到新位置。“删除第一项”：下面的项上移，被删除的那一项没有离场动画（FLIP 只管留下来的元素）。动画进行中连点几次，元素会从旧位置“跳”一下再动，这是手写 FLIP 的边界。',
     },
-    '只动 transform：每帧的布局代价': {
-      note: '典型的结果是 transform 的耗时明显更低，margin-left 是它的两倍以上。看相对差距，绝对数值因设备而异。transform 的值也不是 0：读 offsetHeight 本身和动画调度都有开销。',
+    两种动画写法的每帧布局代价: {
+      note: '典型的结果是 transform 的耗时接近 0（零点几毫秒），margin-left 高出一个数量级左右。看相对差距，绝对数值因设备和负载而异。transform 的值也不是 0：读 offsetHeight 本身和动画调度都有开销。这里测的只是强制布局这一步，不是完整的帧耗时。',
       predict: {
         q: '同一个方块，分别用 transform 和 margin-left 动画，每帧读一次 offsetHeight（强制布局）。耗时中位数的关系是？',
         options: ['两者差不多，浏览器都要重新布局', 'transform 明显更低', 'margin-left 明显更低', 'transform 是 0 毫秒，margin-left 约几十毫秒'],
         answer: 1,
         explain:
-          'transform 不改变布局，强制布局时几乎没有要算的东西；margin-left 每帧都弄脏布局，那 8000 个元素要重新排。最后一项错在“正好 0”和“几十毫秒”：真实数值是个位数毫秒，差距看倍数。',
+          'transform 不改变布局，强制布局时几乎没有要算的东西；margin-left 每帧都弄脏布局，那 8000 个元素要重新排。最后一项错在两个绝对数字：transform 读到的不会正好是 0，margin-left 也不一定是几十毫秒，数值因设备而异，该看的是两者的倍数。',
       },
       pkey: 'animation|只动 transform：每帧的布局代价',
     },

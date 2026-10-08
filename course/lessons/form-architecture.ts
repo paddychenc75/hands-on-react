@@ -835,6 +835,11 @@ function App() {
           bad.password && bad.password[0] === '密码至少 8 位',
           'password 只有 3 位时，应给出“密码至少 8 位”，实际：' + JSON.stringify(bad.password) + '（步骤 1）',
         );
+        const edge = fields(schema.safeParse({ email: 'a@b.co', password: '1234567', confirm: '1234567' }));
+        t.assert(
+          edge.password && edge.password[0] === '密码至少 8 位',
+          'password 是 7 位时仍应给出“密码至少 8 位”，实际：' + JSON.stringify(edge.password) + '（步骤 1，最少要 8 位）',
+        );
         const mismatch = fields(schema.safeParse({ email: 'a@b.co', password: '12345678', confirm: '1234567' }));
         t.assert(
           mismatch.confirm && mismatch.confirm.includes('两次密码不一致'),
@@ -1074,7 +1079,7 @@ function App() {
       note: '什么都不填就点“注册”：handleSubmit 先校验，有错误就不调用 onValid，并把焦点移到第一个出错的字段。三个字段的错误同时出现。填对以后再点：onValid 运行，期间 isSubmitting 为 true，按钮显示“提交中…”，结束后控制台打印提交的值。<br>mode 是 onTouched：第一次离开字段时才校验，之后每次输入都重新校验，错误一改对就消失。',
     },
     '真库：谁订阅了别的字段的错误？': {
-      note: "表单组件（调用 useForm）不读 formState，所以输入和出错都不会让它渲染；它的 2 次是挂载时库更新了一次内部的 isReady 状态。A 订阅整个 errors：用户名出错，A 就渲染。B 加了 name: 'email'，只订阅邮箱，用户名的错误跟它无关。邮箱自己出错时，A 和 B 都渲染。<br>所以“只读 errors.email 的组件”在别的字段出错时也会渲染：订阅的是 errors 这一种状态，不是 email 这个字段。",
+      note: "表单组件（调用 useForm）不读 formState，所以输入和出错都不会让它渲染；它的 2 次是挂载时库更新了一次内部的 isReady 状态。（次数以实验台为准：不开严格模式，mode 是 onTouched；严格模式下渲染函数会多调用一次，数字会变。）A 订阅整个 errors：用户名出错，A 就渲染。B 加了 name: 'email'，只订阅邮箱，用户名的错误跟它无关。邮箱自己出错时，A 和 B 都渲染。<br>所以“只读 errors.email 的组件”在别的字段出错时也会渲染：订阅的是 errors 这一种状态，不是 email 这个字段。",
       predict: {
         q: '页面刚打开时三行分别是 2、1、1 次。在“用户名”里输入 ab，再点一下“邮箱”输入框（用户名离开，校验出错）。三行的渲染次数变成多少？',
         options: ['表单组件 4 次，A 2 次，B 1 次', '表单组件 2 次，A 2 次，B 2 次', '表单组件 2 次，A 1 次，B 1 次', '表单组件 2 次，A 2 次，B 1 次'],
