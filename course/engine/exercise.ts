@@ -3,8 +3,10 @@ import type { Lesson } from '../types.ts';
 import { maybeComplete } from './completion.ts';
 import { explainError } from './logic/errors.ts';
 import { LADDER, fadedExample, isAttempt, isPastedSolution, ladderButton, normCode } from './logic/ladder.ts';
+import { runtimeOf } from './logic/runtime.ts';
 import { esc } from './logic/text.ts';
 import { makePlayground } from './playground.ts';
+import { getRuntime } from './runtime.ts';
 import { lp, save } from './store.ts';
 import { TestFail, makeTester } from './tester.ts';
 import { el, highlight, sleep, smooth } from './util.ts';
@@ -22,7 +24,14 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
         '<div class="task-rule">先独立尝试。每次改过代码后检查失败，就会多解锁一级帮助：提示 → 半成品示例 → 参考答案。</div>',
     ),
   );
-  const pg = makePlayground({ src: ex.starter, title: '你的代码', badge: 'EXERCISE', exercise: ex, lessonId: lesson.id });
+  const pg = makePlayground({
+    src: ex.starter,
+    title: '你的代码',
+    badge: 'EXERCISE',
+    exercise: ex,
+    lessonId: lesson.id,
+    runtime: getRuntime(runtimeOf(lesson)),
+  });
   const foot = el('div', { class: 'pg-foot' });
   const checkBtn = el('button', { class: 'btn sun', type: 'button' }, '✓ 检查答案');
   const hintBtn = el('button', { class: 'btn small', type: 'button' });
@@ -72,7 +81,7 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
       await sleep(80);
       const err = pg._mount.querySelector(':scope > .pv-err');
       if (err) throw new TestFail(err.textContent);
-      await ex.test(makeTester(pg._mount, pg._editor.value, res.exports, () => pg._runner.unpreventedSubmits));
+      await ex.test(makeTester(pg._mount, pg._editor.value, res.exports, () => pg._runner.unpreventedSubmits, pg._runtime));
       if (p.sawSol && !p.ex) p.exHelp = p.rewrite ? 'rewrite' : 'solution';
       p.ex = true;
       save();

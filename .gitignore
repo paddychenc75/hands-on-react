@@ -4,3 +4,4 @@ doc_build/
 *.log
 .rspress/
 *.tsbuildinfo
+docs/public/runtime/

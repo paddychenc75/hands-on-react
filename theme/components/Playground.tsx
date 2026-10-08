@@ -1,4 +1,5 @@
-import { makePlayground, disposePlayground } from '../../course/engine/index.ts';
+import { makePlayground, disposePlayground, getRuntime } from '../../course/engine/index.ts';
+import { runtimeOf } from '../../course/engine/logic/runtime.ts';
 import { useSlot } from '../lib/useSlot';
 
 /** 由 remark 插件从 ```jsx play 代码块生成。说明和预测题按示例标题（或 playKey）到本课数据文件的 plays 里查。 */
@@ -12,6 +13,7 @@ export default function Playground({ code, title, playKey }: { code: string; tit
         note: meta.note,
         predict: meta.predict,
         predictKey: meta.pkey,
+        runtime: getRuntime(runtimeOf(lesson)),
       });
     },
     { needsRuntime: true, cleanup: disposePlayground, deps: [code, title, playKey] },

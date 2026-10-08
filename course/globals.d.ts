@@ -1,10 +1,12 @@
 /* 实验台运行环境（course/engine/runtime.ts 动态加载）放在 window 上的全局：React 18 开发版、ReactDOM、Babel、Prism。
-   它们来自 CDN 的 UMD 脚本，没有现成类型，所以这里按 any 声明（这是整个工程里唯一的"外部全局"入口）。 */
+   它们来自 CDN 的 UMD 脚本，没有现成类型，所以这里按 any 声明（这是整个工程里唯一的"外部全局"入口）。
+   window.React / window.ReactDOM 只属于 18。React 19 登记在 window.__hocReact19 一个名字下，引擎通过 Runtime 对象显式传给学习者的代码。 */
 interface Window {
   React: any;
   ReactDOM: any;
   Babel: any;
   Prism: any;
+  __hocReact19?: any;
 }
 
 /** 练习的检查函数在实验台里运行，代码里会用到实验台的 ReactDOM 全局（React 由 @types/react 的 UMD 声明提供） */

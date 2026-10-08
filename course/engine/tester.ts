@@ -1,11 +1,18 @@
 /* 练习检查器：给 exercise.test(t) 的工具。检查函数的写法见 AGENTS.md「练习检查」。 */
 import type { Tester } from '../types.ts';
 import { stripComments } from './exec.ts';
+import type { Runtime } from './runtime.ts';
 import { sleep } from './util.ts';
 
 export class TestFail extends Error {}
 
-export function makeTester(root: HTMLElement, rawSource: string, exports?: Record<string, any>, unpreventedSubmits: () => number = () => 0): Tester {
+export function makeTester(
+  root: HTMLElement,
+  rawSource: string,
+  exports?: Record<string, any>,
+  unpreventedSubmits: () => number = () => 0,
+  runtime?: Pick<Runtime, 'React' | 'ReactDOM'>,
+): Tester {
   const source = stripComments(rawSource);
   const q = (s: string) => root.querySelector(s);
   const qa = (s: string) => Array.from(root.querySelectorAll(s));
@@ -19,6 +26,9 @@ export function makeTester(root: HTMLElement, rawSource: string, exports?: Recor
     source,
     rawSource,
     exports: exports || {},
+    // 这一课运行时的 React / ReactDOM。没传（单元测试）时退回 18 的全局
+    React: runtime ? runtime.React : (globalThis as any).React,
+    ReactDOM: runtime ? runtime.ReactDOM : (globalThis as any).ReactDOM,
     unpreventedSubmits,
     q,
     qa,

@@ -103,6 +103,9 @@ html.dark {
 .pg-head .pg-title { font-weight: 600; font-size: 14px; margin-right: auto; display: flex; gap: 8px; align-items: center; min-width: 0; }
 .pg-head .pg-badge { font: 600 10.5px var(--f-mono); letter-spacing: .08em; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; }
 .pg-head .pg-badge.ex { color: var(--sun); border-color: var(--sun); }
+/* 实验台运行的 React 版本：18 很淡（默认），19 用强调色的小药丸，让人看得出这一课跑在 React 19 上 */
+.pg-head .pg-rt { font: 500 11px var(--f-mono); color: var(--ink-3); opacity: .75; white-space: nowrap; }
+.pg-head .pg-rt.r19 { opacity: 1; color: var(--accent); background: var(--accent-wash); border: 1px solid var(--accent); border-radius: 99px; padding: 0 8px; font-weight: 600; }
 .pg-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
 .editor { position: relative; background: var(--code-bg); min-height: 120px; }
 .editor pre, .editor textarea { margin: 0; padding: 14px 16px; font: 13px/1.65 var(--f-mono); tab-size: 2; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; border: 0; letter-spacing: 0; }

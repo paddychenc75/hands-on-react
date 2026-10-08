@@ -1,7 +1,9 @@
 /* 代码执行引擎：把学习者的代码编译、运行进实验台的预览区，并收集控制台输出和错误。 */
 import { prepare, compile } from './exec.ts';
 import { explainError } from './logic/errors.ts';
+import { reactWarning, warningLine } from './logic/warnings.ts';
 import { esc } from './logic/text.ts';
+import { onReact19Console, type Runtime } from './runtime.ts';
 import { el } from './util.ts';
 
 let activeRunner: Runner | null = null;
@@ -24,8 +26,8 @@ function formatArg(a: any): string {
   }
 }
 
-function makeBoundary(onError: (err: Error) => void) {
-  return class Boundary extends window.React.Component {
+function makeBoundary(React: any, onError: (err: Error) => void) {
+  return class Boundary extends React.Component {
     constructor(p: any) {
       super(p);
       this.state = { error: null };
@@ -37,7 +39,7 @@ function makeBoundary(onError: (err: Error) => void) {
       onError(error);
     }
     render() {
-      if (this.state.error) return window.React.createElement('div', { className: 'pv-err' }, '渲染出错：' + this.state.error.message);
+      if (this.state.error) return React.createElement('div', { className: 'pv-err' }, '渲染出错：' + this.state.error.message);
       return this.props.children;
     }
   };
@@ -49,9 +51,12 @@ export class Runner {
   root: any;
   timers: Set<any>;
   gen: number;
+  /** 这个实验台用的 React 运行时。React、ReactDOM 都从它取，不读全局 */
+  runtime: Runtime;
   /** 本次运行中，学习者的处理函数没有调用 preventDefault 就提交了表单的次数（供练习检查读取） */
   unpreventedSubmits = 0;
-  constructor(mount: HTMLElement, consoleEl: HTMLElement) {
+  constructor(mount: HTMLElement, consoleEl: HTMLElement, runtime: Runtime) {
+    this.runtime = runtime;
     this.mount = mount;
     this.consoleEl = consoleEl;
     this.root = null;
@@ -133,8 +138,8 @@ export class Runner {
         return id;
       };
     const sandbox = {
-      React: window.React,
-      ReactDOM: window.ReactDOM,
+      React: this.runtime.React,
+      ReactDOM: this.runtime.ReactDOM,
       console: fakeConsole,
       setTimeout: wrapTimer(window.setTimeout.bind(window)),
       setInterval: wrapTimer(window.setInterval.bind(window)),
@@ -150,7 +155,7 @@ export class Runner {
     };
     let result: any;
     try {
-      const body = prepare(source, exportNames);
+      const body = prepare(source, exportNames, this.runtime);
       const fn = compile(Object.keys(sandbox), body);
       result = fn(...Object.values(sandbox));
     } catch (e) {
@@ -158,9 +163,21 @@ export class Runner {
       return { error: e };
     }
     if (result && typeof result.App === 'function') {
-      const Boundary = makeBoundary(err => self.log('error', ['渲染出错：' + explainError(err)]));
-      this.root = window.ReactDOM.createRoot(this.mount);
-      this.root.render(window.React.createElement(Boundary, null, window.React.createElement(result.App)));
+      const { React, ReactDOM } = this.runtime;
+      const Boundary = makeBoundary(React, err => self.log('error', ['渲染出错：' + explainError(err)]));
+      // React 19 把错误交给 createRoot 的回调：没被错误边界接住的错误显示在这个实验台的控制台里（不走 window 的 error 事件），
+      // 被接住的错误已经由 Boundary 显示过，这里什么也不做。React 18 没有这些选项，继续靠 installHooks 里的全局监听
+      const opts =
+        this.runtime.version === 19
+          ? {
+              onUncaughtError: (err: any) => {
+                if (gen === self.gen) self.log('error', ['运行时错误：' + explainError(err)]);
+              },
+              onCaughtError: () => {},
+            }
+          : undefined;
+      this.root = ReactDOM.createRoot(this.mount, opts);
+      this.root.render(React.createElement(Boundary, null, React.createElement(result.App)));
     } else {
       this.mount.innerHTML = '<div class="pv-empty">这段代码没有定义 App 组件，运行结果请看下方控制台。</div>';
     }
@@ -188,22 +205,17 @@ export function installHooks(): void {
   console.error = (...a: any[]) => {
     nativeConsoleError(...a);
     if (typeof a[0] === 'string' && /The above error occurred/.test(a[0]) && /error boundary you provided/.test(a.join(' '))) pendingErrors.clear();
-    if (!activeRunner || typeof a[0] !== 'string' || !a[0].startsWith('Warning:')) return;
-    let i = 1;
-    const msg = a[0]
-      .replace(/%s/g, () => String(a[i++] ?? ''))
-      .replace(/^Warning: /, '')
-      .split('\n')[0]
-      .trim();
-    const zh = /unique "key" prop/.test(msg)
-      ? '列表中的每个元素都需要唯一的 key。'
-      : /`value` prop to a form field without an `onChange`/.test(msg)
-        ? '输入框有 value 但没有 onChange，所以它是只读的。'
-        : /Cannot update a component .* while rendering a different component/.test(msg)
-          ? '不要在渲染期间更新另一个组件的 state。'
-          : '';
-    activeRunner.log('warn', ['React 警告：' + (zh ? zh + '（' + msg + '）' : msg)]);
+    // 全局 console.error 里的 React 警告只可能来自 React 18（19 的警告走自己包里的 console，见下）
+    if (!activeRunner || activeRunner.runtime.version !== 18) return;
+    const w = reactWarning(18, 'error', a);
+    if (w) activeRunner.log('warn', [warningLine(w)]);
   };
+  // React 19 包里的 console.error / console.warn：消息出处可靠（都来自 React），由 reactWarning(19, …) 排除错误报告后显示
+  onReact19Console((method, args) => {
+    if (!activeRunner || activeRunner.runtime.version !== 19) return;
+    const w = reactWarning(19, method, args);
+    if (w) activeRunner.log('warn', [warningLine(w)]);
+  });
   window.addEventListener('unhandledrejection', e => {
     if (activeRunner) {
       activeRunner.log('error', ['未处理的 Promise 错误：' + explainError(e.reason)]);

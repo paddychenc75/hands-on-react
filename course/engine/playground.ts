@@ -4,6 +4,8 @@ import { makeEditor, type Editor } from './editor.ts';
 import { seeded } from './logic/random.ts';
 import { esc, fmtOpt } from './logic/text.ts';
 import { Runner, getActiveRunner, installHooks, setActiveRunner } from './runner.ts';
+import { getRuntime, type Runtime } from './runtime.ts';
+import { DEFAULT_RUNTIME } from './logic/runtime.ts';
 import { lp, progress, save } from './store.ts';
 import { el, smooth, toast } from './util.ts';
 
@@ -16,17 +18,31 @@ export interface PlaygroundOptions {
   lessonId?: string;
   predict?: Predict;
   predictKey?: string;
+  /** 用哪个 React 运行时跑代码。缺省按 lessonId 对应课的 runtime 字段，再缺省为 18；必须已经加载 */
+  runtime?: Runtime;
 }
 /** 实验台的根元素，上面挂着给练习检查和测试用的句柄 */
 export type PlaygroundBox = HTMLDivElement & {
   _run: () => any;
   _editor: Editor;
   _runner: Runner;
+  /** 这个实验台用的 React 运行时 */
+  _runtime: Runtime;
   _mount: HTMLElement;
   _ran: boolean;
 };
 
-export function makePlayground({ src, title, note, badge = 'LIVE', exercise, lessonId, predict, predictKey }: PlaygroundOptions): PlaygroundBox {
+export function makePlayground({
+  src,
+  title,
+  note,
+  badge = 'LIVE',
+  exercise,
+  lessonId,
+  predict,
+  predictKey,
+  runtime = getRuntime(DEFAULT_RUNTIME),
+}: PlaygroundOptions): PlaygroundBox {
   installHooks();
   const box = el('div', { class: 'pg wide' }) as PlaygroundBox;
   const head = el('div', { class: 'pg-head' });
@@ -39,7 +55,10 @@ export function makePlayground({ src, title, note, badge = 'LIVE', exercise, les
   );
   const runBtn = el('button', { class: 'btn small primary', type: 'button' }, '▶ 运行');
   const resetBtn = el('button', { class: 'btn small', type: 'button' }, '重置');
-  head.append(resetBtn, runBtn);
+  // 版本标记：19 的课写得醒目，18 的课很淡
+  const rtTag = el('span', { class: 'pg-rt r' + runtime.version, title: '这个实验台运行的 React 版本' }, 'React ' + runtime.reactVersion);
+  box.dataset.react = runtime.reactVersion;
+  head.append(rtTag, resetBtn, runBtn);
 
   progress.__pred = progress.__pred || {};
   const preds = progress.__pred;
@@ -74,7 +93,7 @@ export function makePlayground({ src, title, note, badge = 'LIVE', exercise, les
     box.appendChild(noteEl);
   }
 
-  const runner = new Runner(mount, cons);
+  const runner = new Runner(mount, cons, runtime);
   function run() {
     if (!revealed) return {};
     clearTimeout(timer);
@@ -169,6 +188,7 @@ export function makePlayground({ src, title, note, badge = 'LIVE', exercise, les
   box._run = run;
   box._editor = editor;
   box._runner = runner;
+  box._runtime = runtime;
   box._mount = mount;
   box._ran = false;
   const obs = getObserver();
