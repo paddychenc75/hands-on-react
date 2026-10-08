@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '实战四：城市天气应用',
   mins: 40,
+  runtime: 19,
   summary: '在本机把 Vite、TypeScript、React Router、TanStack Query 和测试接成一个小应用：搜索城市、查看天气、收藏城市。',
   goals: [
     '能给一个应用里的每一份数据归类（URL、界面、服务器、浏览器本地），并说出各放在哪里',

@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '路由：React Router',
   mins: 30,
+  runtime: 19,
   summary: '让单页应用拥有多个“页面”：路由表、动态参数、嵌套布局与跳转。',
   goals: [
     '能解释客户端路由的三步：URL 变化、路由库读 URL、渲染匹配的组件',

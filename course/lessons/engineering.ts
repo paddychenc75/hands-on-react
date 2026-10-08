@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '项目搭建与交付',
   mins: 40,
+  runtime: 19,
   summary: '在本机用 Vite 建项目、把单文件拆成模块、选样式方案、管好环境变量，再部署到网上并接上持续集成。',
   goals: [
     '能在本机用 Vite 创建 React + TypeScript 项目，说出各目录和三条命令的作用，并判断什么时候该用框架',
