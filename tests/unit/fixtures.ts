@@ -19,6 +19,7 @@ export const lesson = (id: string): LessonMeta => ({
   nCheck: 0,
   hasExercise: false,
   nDrills: 0,
+  drillTitles: [],
   nPlays: 0,
 });
 export const card = (l: LessonMeta, qi: number, prefix = ''): Card => ({ key: `${l.id}#${prefix}${qi}`, l, qi, item: item(`${l.id}-${qi}`) });

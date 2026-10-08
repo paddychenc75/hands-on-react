@@ -13,6 +13,7 @@ const component = (name: string) => path.join(here, 'theme/components', name + '
 const lessonSidebar = [
   { text: '今日复习', link: '/review' },
   { text: '术语表', link: '/glossary' },
+  { text: '变式练习', link: '/drills' },
   ...STAGES.flatMap((s, si) => [
     { sectionHeaderText: `${s.no} ${s.name}` },
     ...LESSONS.filter(l => l.stage === si).map(l => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),
@@ -47,6 +48,7 @@ export default defineConfig({
       'HomePage',
       'ReviewPage',
       'GlossaryPage',
+      'DrillsPage',
       'StageCheck',
     ].map(component),
     link: { checkDeadLinks: true },

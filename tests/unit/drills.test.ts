@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DRILL_LADDER, drillLadderButton, drillStat } from '../../course/engine/logic/drills.ts';
+import { DRILL_LADDER, drillLadderButton, drillRows, drillStat, drillTotals } from '../../course/engine/logic/drills.ts';
 import { LADDER } from '../../course/engine/logic/ladder.ts';
 import { isAttempt, isPastedSolution } from '../../course/engine/logic/ladder.ts';
 
@@ -49,5 +49,28 @@ describe('drillStat：变式练习进度，旧数据没有这个字段也正常'
   });
   it('下标超出总数的旧记录不计入（练习被删减后）', () => {
     expect(drillStat({ 0: { ok: true }, 5: { ok: true } }, 2)).toEqual({ done: 1, total: 2 });
+  });
+});
+
+describe('变式练习总览：只靠目录和进度算每课、每道、合计', () => {
+  const metas = [
+    { id: 'a', nDrills: 2 },
+    { id: 'b', nDrills: 0 },
+    { id: 'c', nDrills: 3 },
+  ];
+  const dr: Record<string, any> = { a: { 0: { ok: true }, 1: { ok: false } }, c: { 0: { ok: true }, 1: { ok: true }, 2: { ok: true }, 7: { ok: true } } };
+  it('没有变式的课不出现；每道的完成情况按下标；超出 nDrills 的记录不计', () => {
+    const rows = drillRows(metas, id => dr[id]);
+    expect(rows.map(r => r.id)).toEqual(['a', 'c']);
+    expect(rows[0]).toEqual({ id: 'a', done: 1, total: 2, oks: [true, false] });
+    expect(rows[1]).toEqual({ id: 'c', done: 3, total: 3, oks: [true, true, true] });
+  });
+  it('合计', () => {
+    expect(drillTotals(drillRows(metas, id => dr[id]))).toEqual({ done: 4, total: 5 });
+  });
+  it('旧进度没有 dr 字段时全是未完成', () => {
+    const rows = drillRows(metas, () => undefined);
+    expect(rows.map(r => r.done)).toEqual([0, 0]);
+    expect(drillTotals(rows)).toEqual({ done: 0, total: 5 });
   });
 });

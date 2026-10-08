@@ -170,6 +170,8 @@ export interface LessonMeta {
   hasExercise: boolean;
   /** 变式练习数 */
   nDrills: number;
+  /** 每道变式练习的标题（总览页同步渲染用，长度 = nDrills；没有变式时是空数组） */
+  drillTitles: string[];
   /** 变式练习的预计分钟数之和（没有变式时缺省） */
   drillMins?: number;
   /** 可运行示例数（plays 的键数） */

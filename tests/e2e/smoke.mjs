@@ -351,7 +351,7 @@ for (const id of LESSONS) {
     meter: document.querySelector('.home .stage .meter span')?.textContent,
   }));
   ok(
-    /继续学习：/.test(r2.cta) && r2.done === 1 && r2.stat === '1/49' && r2.meter === '1/10',
+    /继续学习：/.test(r2.cta) && r2.done === 1 && r2.stat === '1/49' && /^1\/10( · 变式 0\/\d+)?$/.test(r2.meter),
     'i. 学完一课后：首页出现“继续学习”，阶段进度 1/10，总数 1/49',
     JSON.stringify(r2),
   );

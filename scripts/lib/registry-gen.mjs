@@ -37,6 +37,7 @@ export function metaOf(l) {
     nCheck: (l.checkOnly || []).length,
     hasExercise: !!l.exercise,
     nDrills: (l.drills || []).length,
+    drillTitles: (l.drills || []).map(d => d.title),
     ...(l.drillMins ? { drillMins: l.drillMins } : {}),
     nPlays: Object.keys(l.plays || {}).length,
   };

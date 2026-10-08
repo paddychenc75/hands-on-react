@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'throttle', 'split'];
+const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'drillhub', 'throttle', 'split'];
 
 const args = process.argv.slice(2);
 const runs = [];

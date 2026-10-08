@@ -25,3 +25,27 @@ export function drillStat(dr: Record<number, DrillProgress> | undefined, total: 
   for (let i = 0; i < total; i++) if (dr && dr[i] && dr[i].ok) done++;
   return { done, total };
 }
+
+/** 总览页的一行：一课的变式练习，每道是否完成 */
+export interface DrillRow {
+  id: string;
+  done: number;
+  total: number;
+  oks: boolean[];
+}
+
+/** 只靠目录（id、nDrills）和进度算总览；没有变式的课不出现。drOf 取一课的 LessonProgress.dr */
+export function drillRows(metas: { id: string; nDrills: number }[], drOf: (id: string) => Record<number, DrillProgress> | undefined): DrillRow[] {
+  return metas
+    .filter(m => m.nDrills > 0)
+    .map(m => {
+      const dr = drOf(m.id);
+      const oks = Array.from({ length: m.nDrills }, (_, i) => !!(dr && dr[i] && dr[i].ok));
+      return { id: m.id, done: oks.filter(Boolean).length, total: m.nDrills, oks };
+    });
+}
+
+export const drillTotals = (rows: DrillRow[]): { done: number; total: number } => ({
+  done: rows.reduce((s, r) => s + r.done, 0),
+  total: rows.reduce((s, r) => s + r.total, 0),
+});

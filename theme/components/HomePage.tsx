@@ -1,5 +1,5 @@
 import { Link } from '@rspress/core/theme';
-import { buildHeroTree, doneCount, dueCount, progress, isDone } from '../../course/engine/index.ts';
+import { buildHeroTree, doneCount, drillCount, dueCount, progress, isDone } from '../../course/engine/index.ts';
 import { LESSONS } from '../../course/registry.ts';
 import { STAGES } from '../../course/stages.ts';
 import { useProgress } from '../lib/useProgress';
@@ -23,6 +23,7 @@ export default function HomePage() {
     l => l.mins + (l.localMins || 0),
   );
   // 变式练习是选做：时间单独列出，不并入 mins
+  const drillTotal = LESSONS.reduce((s, l) => s + l.nDrills, 0);
   const drillMinsTotal = sum(LESSONS, l => l.drillMins || 0);
   const hours = (mins: number) => Math.round((mins / 60) * 10) / 10;
   const exCount = LESSONS.filter(l => l.hasExercise).length;
@@ -77,6 +78,10 @@ export default function HomePage() {
         <div>
           <b>{exCount}</b>
           <span>道自动批改练习</span>
+        </div>
+        <div>
+          <b>{drillTotal}</b>
+          <span>道变式练习（选做）</span>
         </div>
         <div>
           <b>{hours(inSiteMins)}</b>
@@ -154,6 +159,7 @@ export default function HomePage() {
           const ls = LESSONS.filter((l: any) => l.stage === si);
           const d = mounted ? ls.filter((l: any) => isDone(l.id)).length : 0;
           const rec = st[si];
+          const [dd, dn] = mounted ? drillCount(si) : [0, ls.reduce((n: number, l: any) => n + l.nDrills, 0)];
           return (
             <section className="stage" key={si}>
               <div className="stage-head">
@@ -179,6 +185,12 @@ export default function HomePage() {
                 </div>
                 <span>
                   {d}/{ls.length}
+                  {dn ? (
+                    <small className="dim">
+                      {' '}
+                      · 变式 {dd}/{dn}
+                    </small>
+                  ) : null}
                 </span>
               </div>
               <Link className="check-link" href={'/check/' + si}>

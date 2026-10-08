@@ -40,7 +40,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就八个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就九个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 49 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -52,7 +52,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 
 | 位置 | 放什么 | 不放什么 |
 |---|---|---|
-| `docs/` | Rspress 文档根。`lessons/<id>.mdx` 课文；`index.mdx` 首页；`review.mdx` 今日复习；`glossary.mdx` 术语表；`check/0..5.mdx` 六个阶段测验页；`_nav.json` 顶部导航 | 题目、练习、预测题（放数据文件） |
+| `docs/` | Rspress 文档根。`lessons/<id>.mdx` 课文；`index.mdx` 首页；`review.mdx` 今日复习；`glossary.mdx` 术语表；`drills.mdx` 变式练习总览；`check/0..5.mdx` 六个阶段测验页；`_nav.json` 顶部导航 | 题目、练习、预测题（放数据文件） |
 | `course/types.ts` | 课程数据和进度存储的**全部类型**（`Lesson`、`QuizItem`、`Exercise`、`Predict`、`PlayMeta`、`GlossaryEntry`、`Stage`、`Progress`、`SrsCard`…） | 逻辑 |
 | `course/order.ts` | **唯一的课程顺序**（课 id 数组，课号 = 位置）。阶段归属在每课数据文件的 `stage` | 课的内容 |
 | `course/lessons/<id>.ts` | 每课的非正文数据，`export default {…} satisfies Lesson`。只放课文件 | 共用的辅助模块（会被当成一课收集进注册表） |
@@ -240,6 +240,7 @@ export default {
 每课除了一道正式练习（`exercise`），可以有 2–3 道**小而快**的变式练习：同一个核心概念的不同情境（换数据形状、换交互、给一段有 bug 的代码让学习者修、把写法 A 改成写法 B），不是把正式练习换个名字。每道 3–8 分钟，任务比正式练习窄。
 
 - **数据**：`drills: Drill[]`（类型在 `course/types.ts`）。每道有 `title`（一句话定位，显示在标题上）、`task`、`starter`、`solution`、`hint`、`test`，可选 `exports`。没有 `faded`（不提供半成品）。有 `drills` 必须有 `exercise`，MDX 里在 `<Exercise />` 后面写 `<Drills />`（`check:content` 检查两边对得上，并检查字段完整、2–3 道、标题不重复、`solution` 不能和正式练习相同）。`mins` 不含变式练习（选做）。
+- **入口**：侧栏里有变式练习的课，课名后有很淡的“变式 x/y”（全部做完变成绿色“变式 ✓”；`ProgressMarks` 读目录的 `nDrills` 和进度写 `data-hoc-dr` / `data-hoc-dr-done`，不加载课数据）。侧栏“术语表”下面和顶部导航有“变式练习”总览页（`/drills`，`DrillsPage`）：按阶段列出每课每道变式的标题和完成情况，点击跳到该课的 `#sec-drills`；页面只用目录里的 `nDrills`、`drillTitles`、`drillMins` 和进度，同步渲染。首页统计有“道变式练习”，课程地图各阶段旁有“变式 x/y”。
 - **界面**：“动手练习”之后是“变式练习”区，每道是独立的实验台和“检查答案”，标题行显示“变式 x/y”，本课跳转条里有“变式练习 x/y”，课末的掌握标准条也显示进度。
 - **进度**：`LessonProgress.dr`（下标 → `DrillProgress`：`ok`、`code`、`fails`、`lastFail`、`sawSol`、`rewrite`、`exHelp`）。localStorage 的键 `hands-on-react-v1` 和已有字段都不变，旧数据没有 `dr` 时一切照常（`drillStat` 和 `drillRec` 都容错）。**变式练习不影响“本课完成”**：`maybeComplete` 仍然只看随堂测验全对和正式练习通过。
 - **提示规则（简化，正式练习的阶梯一行没改）**：失败 1 次给提示，失败 2 次可看参考答案；没有半成品，也没有时间门槛。“代码是否真的改了”、粘贴参考答案原文不能通过、看过答案后点“重置”自己重写，规则和正式练习相同（`logic/drills.ts` 复用 `logic/ladder.ts`）。
@@ -364,8 +365,8 @@ export default {
 - **React 组件只是薄包装**：服务端渲染只输出占位元素；浏览器里 `useEffect` 调用引擎函数，把返回的 DOM 挂进去（`theme/lib/useSlot.ts`、`useDomSlot.ts`）。学习机制的逻辑都在引擎里，不在组件里。**不要把交互组件改写成纯 React**。
 - **实验台不用 iframe**：页面内按需加载 React 19.3.0 **开发版**，站点自己的 React 与它互不干扰，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
 - **进度**只存在浏览器 `localStorage['hands-on-react-v1']`（键和结构不要改，结构见 `course/types.ts` 的 `Progress`）；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
-- **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`），样式在 `theme/style.css`。
-- **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`drillMins`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
+- **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`、`data-hoc-dr`、`data-hoc-dr-done`），样式在 `theme/style.css`。
+- **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`drillTitles`（每道变式的标题，总览页用）、`drillMins`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
   - **同步的只靠目录**：课头、学习目标、测验题数、跳转条、侧栏、首页统计、顶栏、翻页、课末“掌握标准”条（`completion.ts` 用 `quizAnswers` 判断是否全对）、复习到期数量、阶段进度。这些在静态 HTML 里照常输出，水合时不会不一致。**写这类组件时用 `useLesson()`（返回 `LessonMeta`），不要为了读一个字段去加载整课。**
   - **要重数据的用 `useSlot(build)`**（`theme/lib/useSlot.ts`）：先在占位里显示加载状态（`.hoc-loading`，0.15 秒后才淡入，数据很快到达时看不到），数据到了再 `build(lesson)`（拿到的是完整的 `Lesson`）；加载失败显示 `.hoc-loaderr`（原因和“重试”）。实验台、练习的运行时和课数据并行加载。只需要目录的占位用 `useMetaSlot`（例如课前热身）。
   - **跨课取题**（热身、复习、阶段测验）：先用目录和进度选题，得到 `CardRef`（键、课目录项、题号），选好之后才 `resolveCards(refs)`，**只加载选中的题所属的课**（并行），界面在这期间显示加载状态，失败给出重试。**不要在这些页面一次加载全部课。**
