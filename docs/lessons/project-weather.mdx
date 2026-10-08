@@ -424,6 +424,8 @@ function App() {
 | `src/components/SearchForm.tsx` | 默认导出。props：`initial`、`onSearch`。输入框的标签文字是“城市名”，按钮文字是“搜索”；草稿只存在表单自己的 state 里 |
 | `src/pages/SearchPage.tsx` | 默认导出。搜索词 `q` 从网址的 `?q=` 读，去掉前后空格；少于两个字时不发请求，显示“输入至少两个字的城市名，例如“上海”。”；提交表单时把搜索词写进网址 |
 
+测试只依赖 `src/App.tsx`（默认导出，里面只有路由）和 `src/api/weather.ts` 的导出，再加上上表规定的界面文字。表里的其他文件名是建议的拆分，换成你自己的结构也可以，只要界面文字和行为一致。
+
 **验收标准**
 
 - 下载 `2-search.test.tsx` 放进 `src/acceptance/`，`npm test -- 2-search` 全部通过（`1-api` 也仍然通过）。

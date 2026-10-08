@@ -13,7 +13,7 @@ describe('里程碑 2：搜索页', () => {
     expect(screen.getByText(/加载中/)).toBeInTheDocument();
     const link = await screen.findByRole('link', { name: /上海/ });
     expect(link).toHaveAttribute('href', '/city/1796236');
-    expect(screen.getAllByRole('link')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: /北京/ })).toHaveAttribute('href', '/city/1816670');
     expect(screen.queryByText(/加载中/)).not.toBeInTheDocument();
   });
 

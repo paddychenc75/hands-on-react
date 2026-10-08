@@ -7,17 +7,17 @@ import { MemoryRouter, useLocation } from 'react-router';
 import { vi } from 'vitest';
 import App from '../App.tsx';
 
-type Route = unknown | Response | (() => unknown | Response);
+type Route = unknown | Response | ((url: string) => unknown | Response);
 
 // 用假的 fetch 代替真实网络：网址里包含某个片段，就返回对应的数据。
-// 值可以是普通对象（200 + JSON）、Response，或者每次请求都会执行的函数（用来模拟“先失败后成功”）。
+// 值可以是普通对象（200 + JSON）、Response，或者每次请求都会执行的函数（参数是请求的网址；用来模拟“先失败后成功”，或按网址返回不同的数据）。
 export function mockFetch(routes: Record<string, Route>) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     const key = Object.keys(routes).find((k) => url.includes(k));
     if (!key) throw new Error(`没有准备这个请求的假数据：${url}`);
     const entry = routes[key];
-    const body = typeof entry === 'function' ? (entry as () => unknown)() : entry;
+    const body = typeof entry === 'function' ? (entry as (url: string) => unknown)(url) : entry;
     return body instanceof Response ? body : new Response(JSON.stringify(body), { status: 200 });
   });
   vi.stubGlobal('fetch', fetchMock);
