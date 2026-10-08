@@ -161,7 +161,7 @@ function App() {
 }
 ```
 
-真实项目里，写错的那一行不会安静地得到 `undefined`。TypeScript 在编辑器里立刻标红，Vite 也会报错“没有名为 PriceTag 的导出”。但原因相同：文件导出的和你导入的对不上。
+真实项目里，写错的那一行不会安静地得到 `undefined`。TypeScript 在编辑器里立刻标红，`npx tsc -b` 报 `has no exported member 'PriceTag'`；开发服务器的页面会变空白，浏览器控制台报 `does not provide an export named 'PriceTag'`。原因相同：文件导出的和你导入的对不上。
 
 选哪一种？没有绝对的答案，一个常见的约定：**组件文件用默认导出，工具函数、常量、类型用具名导出**。团队里先约定，再统一。
 
@@ -453,7 +453,7 @@ jobs:
 
 1. 改了环境变量，页面没变化：开发服务器要重启；线上要重新构建。
 2. CI 里 Node 版本和本机差别太大，出现“本机能过，CI 不过”：让 `node-version` 的大版本和 `node -v` 一致。
-3. 在 Node.js 25 及以后的版本上，用 jsdom 跑测试时，浏览器环境的 `localStorage` 可能被 Node 自带的同名对象盖住，报 `localStorage.getItem is not a function`。用 Node 24，或者把 `package.json` 里的 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（Windows 的 PowerShell 要先单独设置这个环境变量）。新版本的 Vitest 修好这个问题后，可以去掉它。
+3. 在 Node.js 25 及以后的版本上，旧版 Vitest 搭配 jsdom 跑测试时，浏览器环境的 `localStorage` 会被 Node 自带的同名对象盖住，报 `localStorage.setItem is not a function`（实测 Vitest 4.1.11 加 jsdom 27，Node 25.6.0）。Vitest 5.0.3 已经修好：同样的环境、同一个测试通过。遇到时升级 Vitest，或者用 Node 24，或者把 `package.json` 里的 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（在 Vitest 4 上实测有效；Windows 的 PowerShell 要先单独设置这个环境变量）。
 4. Actions 的版本标签（例如 `@v7`）会更新。以各个 Action 仓库的最新发布为准，Dependabot 可以帮你自动升级。
 
 </CallBox>
@@ -494,10 +494,10 @@ React 19 移除了下面这些 API：
 | 任务 | 怎样做 | 应该看到 |
 |---|---|---|
 | 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-ts --eslint`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
-| 2. 搬代码并拆文件 | 把第 9 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件） | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错 |
-| 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红，终端或浏览器报“没有名为 Counter 的导出”；改回后恢复 |
+| 2. 搬代码并拆文件 | 把第 9 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件）。模板开启了严格的类型检查，原样搬进来的 JS 写法会让 `npm run build` 在 `tsc -b` 这一步失败（开发服务器不受影响，因为它只去掉类型）。先补上最少的类型：在类型文件里写 `export type Todo = { id: number; text: string; done: boolean }`，把 `useState([])` 改成 `useState<Todo[]>([])`，给函数参数标上类型，提交表单的处理函数参数写 `React.SubmitEvent<HTMLFormElement>`。类型的完整写法在[《TypeScript》](/lessons/typescript)里讲 | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错；`npx tsc -b` 和 `npm run build` 通过 |
+| 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红；`npx tsc -b` 报 `has no exported member`；浏览器页面变空白，控制台报 `does not provide an export named`；改回后恢复。（`Counter` 换成你自己的组件名。直接运行 `npx vite build` 会报 `Missing export`） |
 | 4. 样式（选读） | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
-| 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
+| 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如先在组件里定义变量 `title`，再写 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
 | 6. 环境变量 | 新建 `.env`，写 `VITE_API_BASE=...` 和 `SECRET_TOKEN=abc`，在代码里分别读取并显示，再 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索这两个值 | 能搜到 `VITE_API_BASE` 的值；搜不到 `SECRET_TOKEN` 的值，代码里读到 `undefined` |
 | 7. 部署 | 推送到 GitHub，在 Vercel 导入项目 | 得到一个网址，用手机也能打开 |
 | 8. 路由回退 | 如果应用有多个路由，在线上网址直接打开一个子路径，再刷新 | 不出现 404；没有 `vercel.json` 时对比一下 |

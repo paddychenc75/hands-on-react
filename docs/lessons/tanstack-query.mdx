@@ -221,7 +221,7 @@ function App() {
 }
 ```
 
-这个示例同样没有 `invalidateQueries`、重试和垃圾回收。真库在窗口重新获得焦点时的行为，由 `refetchOnWindowFocus` 控制，默认开启。
+这个示例同样没有 `invalidateQueries`、重试和垃圾回收。真库在窗口重新获得焦点时的行为，由 `refetchOnWindowFocus` 控制，默认开启。迷你版为了方便模拟，监听的是 window 的 `focus` 事件。真库（5.x）监听的是页面可见性的变化（`visibilitychange`）：切换浏览器标签页再切回来，或者最小化窗口再恢复，才会触发；只有 window 的 `focus` 事件时不会。
 
 ## useMutation：修改数据
 
@@ -304,7 +304,7 @@ const fetchUser = id => new Promise((resolve, reject) => setTimeout(() => {
   else resolve({ id, name: ['张三', '李四'][id - 1] });
 }, 800));
 
-// 真库默认在失败后重试 3 次（约 7 秒后才报错）。这里关掉重试，让错误立刻显示。
+// 真库默认在失败后重试 3 次（间隔 1、2、4 秒），这个示例里要等约 10 秒才报错。这里关掉重试，让错误立刻显示。
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 function UserCard({ id }) {
@@ -537,6 +537,7 @@ function App() {
 | 现象或需求 | 做法 |
 |---|---|
 | 接口失败后，约 7 秒才显示错误 | 默认会重试 3 次，间隔 1、2、4 秒。测试里要设 `retry: false` |
+| 断网时一直显示“加载中”，没有错误 | 默认的 `networkMode` 是 `'online'`：没有网络时，查询暂停（`fetchStatus` 是 `paused`），不发请求，也不报错。想在断网时得到错误，设 `networkMode: 'always'` |
 | key 到处手写，容易拼错 | 用 key 工厂集中定义：`userKeys = { all: ['users'], detail: id => ['users', id] }`。`invalidateQueries({ queryKey: userKeys.all })` 能一次让所有用户缓存失效。v5 也可以用 `queryOptions({ queryKey, queryFn })` 把两者绑在一起 |
 | 翻页或搜索时，界面闪回“加载中” | `placeholderData: keepPreviousData`：换 key 时先显示上一页数据 |
 | 要等前一个数据到了再请求 | `enabled: !!userId` |
@@ -584,8 +585,8 @@ export async function renameUser(id: number, name: string) {
 | 打开页面，两个 `UserCard` 同时显示用户 1 | 控制台只有 1 行“请求用户 1” |
 | 点“用户 2”，10 秒内再点回“用户 1” | 名字立刻显示，没有新的请求日志 |
 | 等超过 10 秒，再切回一个看过的用户 | 先显示旧名字，随后出现 1 行请求日志 |
-| 把 `staleTime` 改成 0，切到别的浏览器标签页再切回来 | 出现 1 行请求日志（窗口重新获得焦点）。`staleTime` 是 10 秒且没过期时，不出现 |
-| 点“用户 4” | 默认重试 3 次，约 7 秒后才显示“用户不存在”。给 `useQuery` 加 `retry: false`，立刻显示 |
+| 把 `staleTime` 改成 0，切到别的浏览器标签页再切回来 | 出现 1 行请求日志（页面重新可见时触发；只有 window 的 `focus` 事件不算）。`staleTime` 是 10 秒且没过期时，不出现 |
+| 点“用户 4” | 默认重试 3 次：控制台共 4 行“请求用户 4”，间隔 1、2、4 秒，加上每次请求的 0.8 秒，约 10 秒后才显示“用户不存在”。给 `useQuery` 加 `retry: false`，约 0.8 秒后就显示 |
 | 点“改名” | 名字更新，控制台多 1 行请求（`invalidateQueries` 触发的重新获取） |
 | 把 `queryKey` 改成 `['user']`（漏写 id），再点“用户 2” | 页面仍显示用户 1 的名字：漏写依赖的症状。试完改回来 |
 

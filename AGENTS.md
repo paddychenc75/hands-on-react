@@ -37,7 +37,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.generated.ts`（dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习），可以写多个；不写就四个都跑。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router 和 tanstack-query 两课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），可以写多个；不写就五个都跑。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 46 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -268,6 +268,37 @@ export default {
 - 显式传入：`loadRuntime()` 返回 `Runtime`（`React`、`ReactDOM`、`reactVersion`），`Runner`、`prepare`、`makeTester` 都显式拿着它；学习者代码里的 `React`、`ReactDOM`、`import … from 'react'` 都解析到它，引擎不读全局。
 - 加载失败：实验台显示“运行环境加载失败，请检查网络后刷新页面。”，页面其余部分正常；之后再进入有实验台的页面会重试（`tests/e2e/runtime.mjs` 用 route 拦截验证）。
 - 界面：实验台标题栏有一行不抢眼的灰字 `React 19.3.0`。
+
+### 第三方库（react-router、@tanstack/react-query）
+
+实验台的示例里可以 `import` 两个真库，其余的包不行（`import` 别的包会被悄悄忽略）：
+
+| 库 | 版本 | 示例里的写法 | 说明 |
+|---|---|---|---|
+| react-router | 8.4.0 | `from 'react-router'`、`from 'react-router/dom'` | 路径 `react-router/dom` 里是 `RouterProvider`，和真实项目的写法一致 |
+| @tanstack/react-query | 5.104.1 | `from '@tanstack/react-query'` | |
+
+**两条约定**：
+1. **路由用内存路由**：实验台不能改动页面的真实地址。示例用 `createMemoryRouter`（或 `MemoryRouter`），预览区里要显示当前的内存地址（`useLocation().pathname`），课文里写明“真实项目里用 `createBrowserRouter`，这里为了不改动页面地址用内存路由”。示例里不要用 `BrowserRouter`、`createBrowserRouter`、`createHashRouter`。
+2. **不发真实网络请求**：Query 和 `loader` 的数据来自返回 Promise 的模拟函数（`setTimeout` 加 `resolve`），并在代码注释里写明是模拟。示例里不要 `fetch` 外部接口。
+
+**怎么实现**：
+- 版本的唯一来源：`course/engine/logic/runtime.ts` 的 `LIBS`（包名、版本、打包文件名里的短名、可以 import 的路径）。`package.json` 的 `devDependencies` 里同名包写**精确版本**（不带 `^`），`tests/unit/runtime.test.ts` 和 `scripts/build-libs.mjs` 都会核对两处一致。`esbuild`（也是精确版本）只用来打包这两个库，不进站点。
+- `scripts/build-libs.mjs`（`predev`、`prebuild` 在 `build-react19.mjs` 之后自动跑）用 esbuild 把每个库的**开发版**（`development` 条件）打成一个自包含的 IIFE：`docs/public/runtime/<短名>-<版本>.dev.js`（不提交；react-router 约 470 KB，gzip 约 97 KB；react-query 约 155 KB，gzip 约 33 KB）。`react`、`react-dom`、`react-dom/client`、`react/jsx-runtime` 标成外部依赖，加载时解析到 `window.__hocReact19` 里实验台那一份 React（`React`、`ReactDOM`、`jsxRuntime`）：库**不自带第二份 React**，Hook 才不会报错。产物登记在 `window.__hocLibs[包名] = { version, modules }`，不写别的全局变量。库里的 `console.warn` / `console.error` 经 `window.__hocLibConsole` 显示在当前实验台的控制台里（前缀 `react-router 提示：` / `报告：`）。
+- 按需加载：`logic/runtime.ts` 的 `libsInSource(代码)` 按 `import` 语句判断需要哪些库（注释和字符串里的不算）。`theme/lib/useSlot.ts` 在创建实验台前先 `loadLibs`；`Playground` 传 `[code]`，`Exercise` 传起始代码和参考答案。没有 `import` 这两个库的课不请求任何库文件。学习者在编辑器里新加 `import` 时，`makePlayground` 的 `run` 会先加载再运行。
+- `prepare`（`exec.ts`）把这两个包名的 `import` 解析到加载好的模块对象：具名导入写成 `const { … } = __libs["包名"]`，`import * as X` 和默认导入得到整个模块；`import type` 被忽略；库还没加载就 `import` 会报“还没有加载”。`Runner` 把 `runtime.libs` 作为 `__libs` 传进沙箱。
+- 加载失败：该实验台显示“运行环境加载失败（react-router），请检查网络后刷新页面。”，课文、测验、不用库的示例都正常；之后再进入有这个库的页面会重试。
+- 界面：实验台标题栏在 `React 19.3.0` 旁再显示一行同样风格的灰字 `react-router 8.4.0`（`.pg-lib`，没用到库就隐藏）。
+- 练习检查：`t.libs['react-router']`、`t.libs['@tanstack/react-query']` 是加载好的模块对象（练习的代码 `import` 了才有）。
+
+**升级版本**：改 `package.json` 里的精确版本和 `LIBS` 里的 `version`（两处一致），`npm install`，重新跑 `npm run build` 和 `npm run test:e2e -- libs`，并重新实测两课所有示例、预测题的答案和课文里对库行为的描述（课文里写了版本号的地方一起改）。
+
+**再加一个库**（例如另一个状态库）：
+1. `npm install -D -E <包名>@<版本>`，在 `LIBS` 里加一项（包名、版本、短名、可以 import 的路径）。
+2. 如果库引用了 `build-libs.mjs` 里 `EXTERNAL` 没有的 React 子路径，先在那里登记，否则打包会报错。
+3. 在 `tests/unit/runtime.test.ts` 加 `libsInSource` 和 `prepare` 的断言；在 `tests/e2e/libs.mjs` 加按需加载、标记和示例行为的测试，并确认其余的课不会请求新库。
+4. 在用到它的课里按“迷你实现 → 真库示例 → 本机任务”组织，示例里的网络请求一律模拟；在本节的表里补一行。
+5. 看一下主包和库文件的体积，写进提交说明。
 
 **警告识别**（`logic/warnings.ts`，有单元测试，样例是实测的）：19 的警告消息**没有 `Warning: ` 前缀**，链接是 `react.dev/link/…`，不再拼组件栈（标签嵌套类警告附 DOM 树）。所以不能靠前缀。19 的包里 `console` 是一份副本，React 发出的 `error`/`warn` 交给引擎，来源可靠；规则是“排除错误报告，其余都是警告”。错误报告：被错误边界接住的是 `console.error('%o\n\n%s\n\n%s\n', err, 'The above error occurred in the <X> component.', …)`，没接住的是 `console.warn('%s\n\n%s\n', 'An error occurred in the <X> component.', …)`。`createRoot` 的 `onUncaughtError` 把未接住的渲染错误记到对应的实验台；事件处理函数里抛的错误走 window 的 `error` 事件。学习者自己的 `console.error` 走实验台的假 console，永远不会被当成 React 警告。不要让 React 包写真正的 `console`（React 会为了屏蔽探测日志改写 `console` 方法，包里用副本就是为了避免它改到真的 console，否则会无限递归）。
 

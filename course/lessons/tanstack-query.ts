@@ -18,7 +18,7 @@ export default {
     "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
     '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。',
     '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
-    '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，约 7 秒后才报错。',
+    '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，间隔 1、2、4 秒，所以要等 7 秒以上才报错。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
   ],
   quiz: [
@@ -62,7 +62,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>不要修改“模拟后端”（<code>fetchUser</code>）。它不发真实请求，每次约 300 毫秒，用户 4 会失败。<code>QueryClient</code> 和 <code>QueryClientProvider</code> 已经写好。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>真库在请求失败后默认重试 3 次，约 7 秒后才显示错误。给 <code>useQuery</code> 加 <code>retry: false</code>（也可以写在 <code>new QueryClient</code> 的 <code>defaultOptions</code> 里），用户 4 才会立刻显示 <code>#error</code>。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
+    task: '<ol class="task-steps"><li>不要修改“模拟后端”（<code>fetchUser</code>）。它不发真实请求，每次约 300 毫秒，用户 4 会失败。<code>QueryClient</code> 和 <code>QueryClientProvider</code> 已经写好。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>真库在请求失败后默认重试 3 次，要等 8 秒左右才显示错误。给 <code>useQuery</code> 加 <code>retry: false</code>（也可以写在 <code>new QueryClient</code> 的 <code>defaultOptions</code> 里），用户 4 才会立刻显示 <code>#error</code>。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
     starter: `import { useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
@@ -85,7 +85,7 @@ const queryClient = new QueryClient();
 function UserCard({ id }) {
   // 步骤 2：调用 useQuery。queryKey 要包含 id；queryFn 调用 fetchUser(id)。
   // 步骤 3：设置 staleTime，例如 60_000（1 分钟）。
-  // 步骤 5：真库失败后默认重试 3 次，约 7 秒后才报错。给它加 retry: false，用户 4 才会立刻出错。
+  // 步骤 5：真库失败后默认重试 3 次，间隔 1、2、4 秒，要等 8 秒左右才报错。给它加 retry: false，用户 4 才会立刻出错。
 
   // 步骤 4：按状态渲染：
   //   加载中 → <p id="loading">加载中…</p>
@@ -308,7 +308,7 @@ onSuccess: () =&gt; { queryClient.invalidateQueries({ queryKey: ['todos'] }); },
   plays: {
     '真库：useQuery 的状态字段': {
       pkey: 'tanstack-query|真库：useQuery 的状态字段',
-      note: '用户 3 会失败。这个示例在 <code>QueryClient</code> 里关掉了重试（<code>retry: false</code>），所以错误立刻显示。真库默认失败后重试 3 次，间隔 1、2、4 秒，约 7 秒后 <code>status</code> 才变成 <code>error</code>。',
+      note: '用户 3 会失败。这个示例在 <code>QueryClient</code> 里关掉了重试（<code>retry: false</code>），所以错误立刻显示。真库默认失败后重试 3 次，间隔 1、2、4 秒，加上每次请求的 0.8 秒，约 10 秒后 <code>status</code> 才变成 <code>error</code>。',
     },
     '真库：相同的 queryKey 共享请求': {
       pkey: 'tanstack-query|真库：相同的 queryKey 共享请求',

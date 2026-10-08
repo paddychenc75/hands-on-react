@@ -674,7 +674,7 @@ function App() {
 | 要在进入页面前取数据，或要显示待定状态 | 数据模式（`createBrowserRouter`） |
 | 新项目，需要服务端渲染 | 框架模式（react.dev 推荐从框架开始） |
 
-版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2 以上，并且只提供 ESM。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
+版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2.7 以上、Node.js 22.22 以上，并且只提供 ESM。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
 
 <CallBox kind="tip" label="维护 React 18 项目时">
 
@@ -711,10 +711,10 @@ React Router 的数据模式（`createBrowserRouter`）和框架模式还提供�
 
 ## 本机任务：用真库再做一遍
 
-迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2 以上的项目）里做下面几步。
+迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2.7 以上的项目）里做下面几步。react-router 8 要求 Node.js 22.22 以上，本课程用的 Node.js 24 满足。
 
 1. 运行 `npm install react-router`，再运行 `npm ls react-router`，确认版本是 8.x。
-2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。
+2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。路由表和路由组件写在同一个文件里时，模板的 `react-refresh/only-export-components` 规则会在 `npm run lint` 里报错：把路由表写在 `main.tsx` 里，或者把组件放进别的文件。
 3. 给 `users/:id` 加一个 `loader`，里面等 1 秒再返回用户，详情页用 `useLoaderData()` 读取。
 4. 在 `Layout` 里用 `useNavigation()` 显示“导航中…”。
 5. 用 `useSearchParams` 在用户列表上加一个搜索框，搜索词存进 `?q=`。

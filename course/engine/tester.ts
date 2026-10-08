@@ -11,7 +11,7 @@ export function makeTester(
   rawSource: string,
   exports: Record<string, any> | undefined,
   unpreventedSubmits: () => number,
-  runtime: Pick<Runtime, 'React' | 'ReactDOM'>,
+  runtime: Pick<Runtime, 'React' | 'ReactDOM' | 'libs'>,
 ): Tester {
   const source = stripComments(rawSource);
   const q = (s: string) => root.querySelector(s);
@@ -29,6 +29,7 @@ export function makeTester(
     // 实验台运行时的 React / ReactDOM（不要读全局的）
     React: runtime.React,
     ReactDOM: runtime.ReactDOM,
+    libs: runtime.libs,
     unpreventedSubmits,
     q,
     qa,

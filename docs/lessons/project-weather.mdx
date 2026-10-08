@@ -158,7 +158,7 @@ import App from './App.tsx';
 import './index.css';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, networkMode: 'always' } },
 });
 
 createRoot(document.getElementById('root')!).render(
@@ -172,7 +172,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-`retry: 1` 让失败的请求只重试一次，错误提示不会等太久。
+`retry: 1` 让失败的请求只重试一次，错误提示不会等太久。`networkMode: 'always'` 让没有网络时请求照常发出，然后失败。默认值 `'online'` 在断网时会暂停查询，页面一直是“加载中”，永远看不到“出错了”和“重试”按钮（验收时要用到）。
 
 **应该看到：**`npm run dev` 打开的页面没有报错；`npm run typecheck` 通过。
 
@@ -836,7 +836,7 @@ describe('详情页', () => {
 | 后退后输入框里是旧文字，结果列表是新的 | 草稿用 `useState(q)` 初始化，之后和 URL 脱节 | 给 `SearchForm` 加 `key={q}` |
 | 错误时页面崩溃，报 `Cannot read properties of undefined` | 先读了 `data.length`，再判断 `isError` | 顺序：`isPending`、`isError`、再读 `data` |
 | 切换城市后，先短暂看到上一个城市的天气 | `queryKey` 里漏了城市 id | 把 id 写进 `queryKey` |
-| `localStorage.getItem is not a function`（运行测试时） | Node 25 及以后的版本默认带 `localStorage`，盖住了 jsdom 的 | 用 Node 24，或把 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（新版本的 Vitest 修好后可以去掉） |
+| `localStorage.setItem is not a function`（运行测试时，旧版 Vitest） | Node 25 及以后的版本默认带 `localStorage`，旧版 Vitest 搭配 jsdom 时它盖住了 jsdom 的（实测 Vitest 4.1.11 加 Node 25.6.0 会出现，Vitest 5.0.3 不会） | 升级 Vitest；或用 Node 24；或把 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run` |
 | 收藏一点就报“getSnapshot 应该被缓存” | `getSnapshot` 每次返回新数组 | 按原始字符串缓存解析结果 |
 | 刷新详情页得到 404 | 静态托管没有路由回退 | 见第 31 课的 `vercel.json` |
 
@@ -848,7 +848,7 @@ describe('详情页', () => {
 | 状态 | 打开 React DevTools，逐个看 state | 没有重复存放的数据：搜索词只在 URL 里，加载和错误没有单独的 state |
 | URL | 复制带 `?q=` 的网址到新标签页 | 同样的结果 |
 | 缓存 | 来回切换两个城市 | 第二次进入同一个城市，网络面板里没有新请求 |
-| 出错 | 开 Offline，搜索新词，再打开新城市 | 都有错误提示和重试按钮 |
+| 出错 | 在开发者工具的 Network 面板选 Offline，搜索新词，再打开新城市 | 都有错误提示和重试按钮；恢复网络后点“重试”，数据出现 |
 | 版本 | 运行 `npm ls react react-router @tanstack/react-query` | react 是 19.2 以上，react-router 是 8.x，@tanstack/react-query 是 5.x |
 | 质量 | `npm run typecheck`、`npm run lint`、`npm test`、`npm run build` | 全部通过 |
 | 测试 | 故意改坏一处再运行测试 | 至少一个变红 |
