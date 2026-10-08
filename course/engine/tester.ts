@@ -13,8 +13,8 @@ export class TimingFail extends TestFail {}
 export class EnvFail extends TestFail {}
 
 /** 基线用的固定计算量，和它在参考机（开发机）上的实测耗时。数字是用 Chrome 实测定的，见 AGENTS.md「练习检查」 */
-const SPIN_N = 600_000;
-const SPIN_REF_MS = 2;
+const SPIN_N = 2_000_000;
+const SPIN_REF_MS = 2.4; // 开发机（Apple 芯片、Chrome）上冷启动时前两次取小的实测值；CPU 降速 4 倍时约 7ms，6 倍时约 10ms
 const BACKGROUND = '检查期间这个标签页在后台，浏览器会放慢计时器，结果不可信。请保持本页在前台，再点一次“检查答案”（这次不计入失败次数）。';
 
 const spin = (): number => {
