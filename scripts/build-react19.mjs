@@ -1,7 +1,7 @@
 // 生成 docs/public/runtime/react-<版本>.dev.js：React 19 开发版 + ReactDOM（含 react-dom/client）+ scheduler，打成一个自包含的脚本。
 // 来源是 node_modules 里固定版本的别名包 react-runtime-19、react-dom-runtime-19（版本见 course/engine/logic/runtime.ts），
 // 与站点自己打包的 react / react-dom 是两份，互不影响。
-// 这个文件不进主包，实验台遇到 runtime: 19 的课时才按需加载；它由 predev / prebuild 生成，不提交。
+// 这个文件不进主包，第一个实验台需要时才按需加载；它由 predev / prebuild 生成，不提交。
 // 做法：不用打包器，把 CJS 文件原样包进一个小的模块表里。三处特别处理：
 //   1. process.env.NODE_ENV 固定为 development（要开发版的警告和完整报错）；
 //   2. 文件里的 console 换成一份副本（React 会改写 console 的方法来屏蔽探测时的日志，不能改到真正的 console 上）：console.error / warn 先交给 setConsoleHook 注册的函数（引擎靠它识别 React 自己发出的警告），再转给真正的 console；
@@ -10,12 +10,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { REACT_VERSIONS, react19Path } from '../course/engine/logic/runtime.ts';
+import { REACT_VERSION, react19Path } from '../course/engine/logic/runtime.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require_ = createRequire(path.join(root, 'package.json'));
 const pkgDir = name => path.dirname(require_.resolve(name + '/package.json'));
-const want = REACT_VERSIONS[19];
+const want = REACT_VERSION;
 
 const reactDir = pkgDir('react-runtime-19');
 const domDir = pkgDir('react-dom-runtime-19');

@@ -33,15 +33,14 @@ export const HOOK_NAMES = [
   'Profiler',
 ];
 
-/** 编译时要用的运行时：`ReactDOM` 用来判断 react-dom 的具名导入存在不存在，`version` 为 19 时 'react' 的具名导入不受 HOOK_NAMES 限制 */
+/** 编译时要用的运行时：`React` 判断 'react' 的具名导入存在不存在，`ReactDOM` 判断 react-dom 的具名导入存在不存在 */
 export interface PrepareRuntime {
-  version?: number;
-  React?: any;
-  ReactDOM?: any;
+  React: any;
+  ReactDOM: any;
 }
 
-export function prepare(source: string, exportNames?: string[], rt?: PrepareRuntime): string {
-  const dom = rt?.ReactDOM ?? window.ReactDOM;
+export function prepare(source: string, exportNames: string[] | undefined, rt: PrepareRuntime): string {
+  const dom = rt.ReactDOM;
   const imported = new Set<string>();
   const fromDom = new Set<string>();
   const code = source
@@ -70,11 +69,10 @@ export function prepare(source: string, exportNames?: string[], rt?: PrepareRunt
     filename: 'App.jsx',
   }).code;
   const names = [...imported];
-  // 19 的新 API（use、useActionState、useOptimistic、Activity、ViewTransition…）不在 HOOK_NAMES 里：只要运行时的 React 真有这个导出就取出来
-  const all19 = rt?.version === 19 && rt.React;
+  // 新 API（use、useActionState、useOptimistic、Activity、ViewTransition…）不在 HOOK_NAMES 里：只要运行时的 React 真有这个导出就取出来
   const reactNames = names.filter(n => {
     const k = n.split(':')[0].trim();
-    return HOOK_NAMES.includes(k) || (all19 && !fromDom.has(n) && k in rt.React);
+    return HOOK_NAMES.includes(k) || (!fromDom.has(n) && k in rt.React);
   });
   // react-dom 的具名导入（createPortal、flushSync 等）从 ReactDOM 取
   const domNames = names.filter(n => fromDom.has(n) && !HOOK_NAMES.includes(n.split(':')[0].trim()) && n.split(':')[0].trim() in dom);

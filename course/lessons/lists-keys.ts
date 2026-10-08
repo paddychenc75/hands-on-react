@@ -4,7 +4,6 @@ import { prepare, compile } from '../engine/exec.ts';
 export default {
   id: 'lists-keys',
   stage: 0,
-  runtime: 19,
   title: '列表渲染与 key',
   mins: 21,
   summary: '用 map 渲染列表，理解 key 为什么重要。',
@@ -162,7 +161,7 @@ export default {
       if (typeof prepare === 'function' && typeof compile === 'function') {
         let App2: any;
         try {
-          App2 = compile(['React', 'ReactDOM'], prepare(changed, [], { version: 19, React, ReactDOM }))(React, ReactDOM).App;
+          App2 = compile(['React', 'ReactDOM'], prepare(changed, [], { React, ReactDOM }))(React, ReactDOM).App;
         } catch (e) {}
         if (typeof App2 === 'function') {
           const box = document.createElement('div');

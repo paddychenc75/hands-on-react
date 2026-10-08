@@ -1,7 +1,7 @@
 // 测试共用：启动浏览器，并把构建产物（doc_build）按 base /hands-on-react/ 用静态服务器托管。
 //   SITE_URL=http://localhost:4173/hands-on-react/ node tests/e2e/xxx.mjs   测试已经在运行的站点（例如 rspress preview）
 //   CHROMIUM=/path/to/chrome                                            用本机 Chrome 而不是 Playwright 的 Chromium
-// 需要网络：实验台从 cdn.jsdelivr.net 加载 React 18 开发版、Babel、Prism。
+// 需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 开发版是站内静态文件（doc_build/runtime/）。
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'forms',
   stage: 0,
-  runtime: 19,
   title: '表单与受控组件',
   mins: 23,
   summary: '让 React state 成为表单数据的唯一数据源。',

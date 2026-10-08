@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'error-handling',
   stage: 5,
-  runtime: 19,
   title: '错误处理与监控',
   mins: 46,
   summary: '错误边界只是起点。学会把异步错误交给边界、让边界可以重置、决定边界放在哪一层，再把错误连同上下文送到监控服务。',

@@ -3,7 +3,7 @@
 //   npm run test:e2e -- lessons                      只跑逐课测试（46 课）
 //   npm run test:e2e -- lessons state use-effect     逐课测试只测这两课（课 id 跟在 lessons 后面）
 //   npm run test:e2e -- mechanics smoke              只跑学习机制和冒烟
-// 前提：已经 npm run build（测试读 doc_build）；需要联网（实验台从 jsdelivr 加载 React 18、Babel、Prism）。
+// 前提：已经 npm run build（测试读 doc_build）；需要联网（实验台从 jsdelivr 加载 Babel、Prism；React 19 开发版在站内）。
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

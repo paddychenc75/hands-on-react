@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { loadRuntime } from '../../course/engine/index.ts';
-import { runtimeOf } from '../../course/engine/logic/runtime.ts';
 import type { Lesson } from '../../course/types.ts';
 import { useLesson } from './useLesson';
 
 /**
  * 薄包装的核心：服务端渲染只输出一个空占位元素；
  * 在浏览器里 useEffect 调用引擎函数，把返回的 DOM 挂进占位元素，卸载时清理。
- * needsRuntime：需要先加载这一课的 React 运行时（18 或 19，见课数据的 runtime 字段）和 Babel（实验台、练习）。
+ * needsRuntime：需要先加载实验台的 React 运行时和 Babel（实验台、练习）。
  */
 export function useSlot<N extends HTMLElement = HTMLElement>(
   build: (lesson: Lesson) => N | null,
@@ -27,7 +26,7 @@ export function useSlot<N extends HTMLElement = HTMLElement>(
       if (node) host.appendChild(node);
     };
     if (needsRuntime) {
-      loadRuntime(runtimeOf(lesson))
+      loadRuntime()
         .then(mount)
         .catch((e: Error) => {
           if (!dead) host.innerHTML = '<div class="pv-err">运行环境加载失败，请检查网络后刷新页面。</div>';

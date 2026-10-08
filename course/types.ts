@@ -37,7 +37,7 @@ export interface Tester {
   rawSource: string;
   /** 按练习的 exports 字段导出的顶层名字 */
   exports: Record<string, any>;
-  /** 这一课的运行时里的 React / ReactDOM（19 的课必须用它们，不要读全局的 React / ReactDOM，全局的只属于 18） */
+  /** 实验台运行时里的 React / ReactDOM（练习检查必须用它们，不要读全局的 React / ReactDOM，全局没有） */
   React: any;
   ReactDOM: any;
   /** 本次运行里表单被提交、但学习者的处理函数没有调用 preventDefault 的次数。实验台会替学习者拦住刷新，所以只有这个计数能看出漏写 */
@@ -70,8 +70,6 @@ export interface Exercise {
 export interface Lesson {
   /** 与 docs/lessons/<id>.mdx、course/lessons/<id>.ts 同名 */
   id: string;
-  /** 这一课的实验台和练习用哪个 React 运行时，缺省 18。写 19 就是 React 19 开发版（见 AGENTS.md「实验台运行时」） */
-  runtime?: 18 | 19;
   stage: StageIndex;
   title: string;
   /** 预计学习分钟数 */

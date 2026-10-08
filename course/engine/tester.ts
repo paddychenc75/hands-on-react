@@ -9,9 +9,9 @@ export class TestFail extends Error {}
 export function makeTester(
   root: HTMLElement,
   rawSource: string,
-  exports?: Record<string, any>,
-  unpreventedSubmits: () => number = () => 0,
-  runtime?: Pick<Runtime, 'React' | 'ReactDOM'>,
+  exports: Record<string, any> | undefined,
+  unpreventedSubmits: () => number,
+  runtime: Pick<Runtime, 'React' | 'ReactDOM'>,
 ): Tester {
   const source = stripComments(rawSource);
   const q = (s: string) => root.querySelector(s);
@@ -26,9 +26,9 @@ export function makeTester(
     source,
     rawSource,
     exports: exports || {},
-    // 这一课运行时的 React / ReactDOM。没传（单元测试）时退回 18 的全局
-    React: runtime ? runtime.React : (globalThis as any).React,
-    ReactDOM: runtime ? runtime.ReactDOM : (globalThis as any).ReactDOM,
+    // 实验台运行时的 React / ReactDOM（不要读全局的）
+    React: runtime.React,
+    ReactDOM: runtime.ReactDOM,
     unpreventedSubmits,
     q,
     qa,

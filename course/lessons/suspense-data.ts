@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'suspense-data',
   stage: 5,
-  runtime: 19,
   title: 'Suspense 数据获取与资源模式',
   mins: 46,
   summary: '用 React 19 的 use() 读取 Promise，亲手写出一个能配合 Suspense 的数据层：Promise 缓存、并行预取、用过渡更新保留旧界面、出错后重试。',

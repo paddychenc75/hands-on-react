@@ -3,10 +3,8 @@ import type { Lesson } from '../types.ts';
 import { maybeComplete } from './completion.ts';
 import { explainError } from './logic/errors.ts';
 import { LADDER, fadedExample, isAttempt, isPastedSolution, ladderButton, normCode } from './logic/ladder.ts';
-import { runtimeOf } from './logic/runtime.ts';
 import { esc } from './logic/text.ts';
 import { makePlayground } from './playground.ts';
-import { getRuntime } from './runtime.ts';
 import { lp, save } from './store.ts';
 import { TestFail, makeTester } from './tester.ts';
 import { el, highlight, sleep, smooth } from './util.ts';
@@ -30,7 +28,6 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
     badge: 'EXERCISE',
     exercise: ex,
     lessonId: lesson.id,
-    runtime: getRuntime(runtimeOf(lesson)),
   });
   const foot = el('div', { class: 'pg-foot' });
   const checkBtn = el('button', { class: 'btn sun', type: 'button' }, '✓ 检查答案');

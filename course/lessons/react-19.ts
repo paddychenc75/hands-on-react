@@ -2,7 +2,6 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/react-19.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'react-19',
-  runtime: 19,
   stage: 3,
   title: 'Actions：异步提交、表单与乐观更新',
   mins: 55,

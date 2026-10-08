@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'headless-components',
   stage: 5,
-  runtime: 19,
   title: '组件库 API 设计：Headless 组件',
   mins: 46,
   summary:

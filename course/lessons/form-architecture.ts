@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'form-architecture',
   stage: 5,
-  runtime: 19,
   title: '表单与校验架构',
   mins: 47,
   summary: '大表单要回答五个问题：数据放哪里、规则写在哪里、错误什么时候显示、异步检查怎样不乱序、提交怎样不重复。',

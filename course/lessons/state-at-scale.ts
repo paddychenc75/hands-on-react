@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'state-at-scale',
   stage: 5,
-  runtime: 19,
   title: '大型应用状态架构实战',
   mins: 42,
   summary: '数据量和页面一多，state 的“形状”就决定了 bug 的数量。学会规范化、记忆化选择器、并发安全的乐观更新、撤销重做和状态机。',

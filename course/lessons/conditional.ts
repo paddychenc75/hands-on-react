@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'conditional',
   stage: 0,
-  runtime: 19,
   title: '条件渲染',
   mins: 16,
   summary: '根据条件显示不同的内容。',

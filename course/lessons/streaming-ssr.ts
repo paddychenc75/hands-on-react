@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'streaming-ssr',
   stage: 5,
-  runtime: 19,
   title: '流式 SSR、选择性水合与 RSC 缓存',
   mins: 40,
   summary: 'HTML 怎样分批到达，哪一块先能点，服务端数据缓存多久。在浏览器里亲手水合一段“服务端 HTML”，再修好一个水合不匹配。',

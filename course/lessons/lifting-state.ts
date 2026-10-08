@@ -2,7 +2,6 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/lifting-state.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'lifting-state',
-  runtime: 19,
   stage: 1,
   title: '状态提升与组件通信',
   mins: 18,

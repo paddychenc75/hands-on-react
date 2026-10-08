@@ -55,7 +55,6 @@ export default {
   stage: 4,
   title: 'Next.js App Router',
   mins: 30,
-  runtime: 19,
   summary: '用文件夹定义路由，在服务端取数据，用 Server Function 处理表单。',
   goals: [
     '能根据 app/ 目录说出一个 URL 对应哪个 page.tsx、套着哪几层 layout.tsx、params 是什么',

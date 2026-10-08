@@ -165,18 +165,14 @@ export class Runner {
     if (result && typeof result.App === 'function') {
       const { React, ReactDOM } = this.runtime;
       const Boundary = makeBoundary(React, err => self.log('error', ['渲染出错：' + explainError(err)]));
-      // React 19 把错误交给 createRoot 的回调：没被错误边界接住的错误显示在这个实验台的控制台里（不走 window 的 error 事件），
-      // 被接住的错误已经由 Boundary 显示过，这里什么也不做。React 18 没有这些选项，继续靠 installHooks 里的全局监听
-      const opts =
-        this.runtime.version === 19
-          ? {
-              onUncaughtError: (err: any) => {
-                if (gen === self.gen) self.log('error', ['运行时错误：' + explainError(err)]);
-              },
-              onCaughtError: () => {},
-            }
-          : undefined;
-      this.root = ReactDOM.createRoot(this.mount, opts);
+      // React 把错误交给 createRoot 的回调：没被错误边界接住的错误显示在这个实验台的控制台里（不走 window 的 error 事件），
+      // 被接住的错误已经由 Boundary 显示过，这里什么也不做
+      this.root = ReactDOM.createRoot(this.mount, {
+        onUncaughtError: (err: any) => {
+          if (gen === self.gen) self.log('error', ['运行时错误：' + explainError(err)]);
+        },
+        onCaughtError: () => {},
+      });
       this.root.render(React.createElement(Boundary, null, React.createElement(result.App)));
     } else {
       this.mount.innerHTML = '<div class="pv-empty">这段代码没有定义 App 组件，运行结果请看下方控制台。</div>';
@@ -188,32 +184,13 @@ export class Runner {
 export function installHooks(): void {
   if (hooksInstalled || typeof window === 'undefined') return;
   hooksInstalled = true;
-  // React 开发版会把渲染中抛出的错误先报给 window，即使错误边界随后接住了它。
-  // 所以先暂存，稍后再显示；如果 React 说“错误边界已处理”，就丢弃。
-  const pendingErrors = new Set<{ runner: Runner; error: any }>();
+  // 事件处理函数、effect 外抛出的错误会报给 window（渲染中的错误由 createRoot 的回调处理，见 Runner.run）
   window.addEventListener('error', e => {
-    if (!activeRunner || !e.error) return;
-    // 不调用 preventDefault：否则 React 开发版不再打印“错误边界已处理”的提示，我们就无法区分
-    const item = { runner: activeRunner, error: e.error };
-    pendingErrors.add(item);
-    setTimeout(() => {
-      if (pendingErrors.delete(item)) item.runner.log('error', ['运行时错误：' + explainError(item.error)]);
-    }, 0);
+    if (activeRunner && e.error) activeRunner.log('error', ['运行时错误：' + explainError(e.error)]);
   });
-  // 把 React 开发版的警告（缺少 key、受控输入框没有 onChange 等）显示到实验台的控制台
-  const nativeConsoleError = console.error.bind(console);
-  console.error = (...a: any[]) => {
-    nativeConsoleError(...a);
-    if (typeof a[0] === 'string' && /The above error occurred/.test(a[0]) && /error boundary you provided/.test(a.join(' '))) pendingErrors.clear();
-    // 全局 console.error 里的 React 警告只可能来自 React 18（19 的警告走自己包里的 console，见下）
-    if (!activeRunner || activeRunner.runtime.version !== 18) return;
-    const w = reactWarning(18, 'error', a);
-    if (w) activeRunner.log('warn', [warningLine(w)]);
-  };
-  // React 19 包里的 console.error / console.warn：消息出处可靠（都来自 React），由 reactWarning(19, …) 排除错误报告后显示
-  onReact19Console((method, args) => {
-    if (!activeRunner || activeRunner.runtime.version !== 19) return;
-    const w = reactWarning(19, method, args);
+  // React 包里的 console.error / console.warn：消息都来自 React，由 reactWarning 排除错误报告后显示在实验台的控制台里
+  onReact19Console((_method, args) => {
+    const w = activeRunner && reactWarning(args);
     if (w) activeRunner.log('warn', [warningLine(w)]);
   });
   window.addEventListener('unhandledrejection', e => {

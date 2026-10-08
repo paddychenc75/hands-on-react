@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'events',
   stage: 0,
-  runtime: 19,
   title: '事件处理',
   mins: 18,
   summary: '响应点击、输入、键盘等用户操作。',

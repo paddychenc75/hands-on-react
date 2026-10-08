@@ -5,7 +5,6 @@ export default {
   stage: 4,
   title: '数据请求：TanStack Query',
   mins: 34,
-  runtime: 19,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
     '能列出 useEffect 手写请求没有解决的三个问题：重复请求、没有缓存、数据过期',

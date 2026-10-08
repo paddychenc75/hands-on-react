@@ -34,7 +34,6 @@ export default {
   stage: 4,
   title: '测试：Vitest + Testing Library',
   mins: 29,
-  runtime: 19,
   summary: '像用户一样测试组件：按文字和角色找元素，模拟交互，断言结果。',
   goals: [
     '能判断一条断言测的是“用户看到的行为”还是“实现细节”',

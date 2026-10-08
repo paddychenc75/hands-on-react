@@ -3,7 +3,6 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'scheduler',
   stage: 5,
-  runtime: 19,
   title: '调度、优先级与撕裂',
   mins: 40,
   summary: '看清 React 怎样把渲染切成小片、给更新排优先级、打断再重来，以及外部 store 为什么会在并发渲染中“撕裂”。',

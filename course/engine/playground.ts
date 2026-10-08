@@ -5,7 +5,6 @@ import { seeded } from './logic/random.ts';
 import { esc, fmtOpt } from './logic/text.ts';
 import { Runner, getActiveRunner, installHooks, setActiveRunner } from './runner.ts';
 import { getRuntime, type Runtime } from './runtime.ts';
-import { DEFAULT_RUNTIME } from './logic/runtime.ts';
 import { lp, progress, save } from './store.ts';
 import { el, smooth, toast } from './util.ts';
 
@@ -18,7 +17,7 @@ export interface PlaygroundOptions {
   lessonId?: string;
   predict?: Predict;
   predictKey?: string;
-  /** 用哪个 React 运行时跑代码。缺省按 lessonId 对应课的 runtime 字段，再缺省为 18；必须已经加载 */
+  /** 用哪个 React 运行时跑代码。缺省是全站唯一的运行时，必须已经加载 */
   runtime?: Runtime;
 }
 /** 实验台的根元素，上面挂着给练习检查和测试用的句柄 */
@@ -41,7 +40,7 @@ export function makePlayground({
   lessonId,
   predict,
   predictKey,
-  runtime = getRuntime(DEFAULT_RUNTIME),
+  runtime = getRuntime(),
 }: PlaygroundOptions): PlaygroundBox {
   installHooks();
   const box = el('div', { class: 'pg wide' }) as PlaygroundBox;
@@ -55,8 +54,8 @@ export function makePlayground({
   );
   const runBtn = el('button', { class: 'btn small primary', type: 'button' }, '▶ 运行');
   const resetBtn = el('button', { class: 'btn small', type: 'button' }, '重置');
-  // 版本标记：19 的课写得醒目，18 的课很淡
-  const rtTag = el('span', { class: 'pg-rt r' + runtime.version, title: '这个实验台运行的 React 版本' }, 'React ' + runtime.reactVersion);
+  // 版本标记：全站同一个版本，用很淡的小字
+  const rtTag = el('span', { class: 'pg-rt', title: '这个实验台运行的 React 版本' }, 'React ' + runtime.reactVersion);
   box.dataset.react = runtime.reactVersion;
   head.append(rtTag, resetBtn, runBtn);
 
