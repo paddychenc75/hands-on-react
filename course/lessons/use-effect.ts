@@ -139,11 +139,11 @@ function App() {
             calls++;
             return r.apply(this, arguments);
           };
-          return [q.interleaved, q.pending];
+          return q.pending;
         });
         root.unmount();
         await t.wait(1200);
-        const moved = queues.some((q, i) => q.interleaved !== before[i][0] || q.pending !== before[i][1]);
+        const moved = queues.some((q, i) => q.pending !== before[i]);
         t.assert(
           !calls && !moved,
           '组件卸载 1.2 秒后，定时器还在调用 setSeconds：卸载时它没有被停掉。在启动前清除旧定时器不够，组件消失时也要停止同步。请让 effect 返回清理函数：return () => clearInterval(id)',

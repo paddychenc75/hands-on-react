@@ -24,7 +24,7 @@ export default {
       options: ['"小红"', 'count 的值', 'undefined', '报错'],
       answer: 1,
       explain:
-        '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。迷你实现不会报错，只会悄悄读错。真实的 React 多做了一层保护：它发现这次渲染调用的 Hook 数量和上次不同，就抛出 `Rendered fewer hooks than expected`；数量不变但类型顺序变了（例如 useState 和 useEffect 互换）时，也会报错，例如 `Should have a queue. You are likely calling Hooks conditionally`；多出 Hook 时，开发模式还会先警告 `React has detected a change in the order of Hooks`（第 15 课见过这些报错）。',
+        '游标从 0 开始。跳过第一个调用后，name 的 useState 拿到了下标 0，也就是 count 的 state。不会是 "小红"：Hook 只认位置，不认变量名。迷你实现不会报错，只会悄悄读错。真实的 React 多做了一层保护：它发现这次渲染调用的 Hook 数量和上次不同，就抛出 `Rendered fewer hooks than expected`；数量不变但类型顺序变了（例如 useState 和 useEffect 互换）时，也会报错，例如 `Should have a queue. You are likely calling Hooks conditionally`；顺序变了或多出 Hook 时，开发模式都会先警告 `React has detected a change in the order of Hooks`，再抛错（第 15 课见过这些报错）。',
     },
     {
       q: '一棵 3000 个组件的树正在渲染一次过渡更新，渲染到一半时用户按下了键盘。在 Fiber 架构下会怎样？',

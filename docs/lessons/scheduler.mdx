@@ -353,7 +353,7 @@ function App() {
 4. `workLoopConcurrentByScheduler`：`for (; workInProgress !== null && !shouldYield(); ) performUnitOfWork(workInProgress)`。
 5. `prepareFreshStack`：丢弃进度、从根重新开始的地方。
 6. `isRenderConsistentWithExternalStores`：useSyncExternalStore 在提交前的一致性检查。
-7. `computeExpirationTime`：给每个 lane 算过期时间（输入类约 250ms，过渡类约 5 秒）；等待太久的 lane 被标为已过期，改用同步渲染。
+7. `markStarvedLanesAsExpired` → `computeExpirationTime`：给每个 lane 算过期时间（输入类约 250ms，默认和过渡类约 5 秒）；等待太久的 lane 被标为已过期，改用同步渲染。19.3 的构建产物把前者内联进了 `scheduleTaskForRootDuringMicrotask`，在源码仓库里才能看到这个名字。
 
 读源码时，先用一个最小示例在这些函数里打断点，比从头通读有效得多。
 
