@@ -212,7 +212,12 @@ function App() {
         const add = window.addEventListener;
         const rem = window.removeEventListener;
         window.addEventListener = function (type, fn, ...rest) {
-          if (type === 'keydown') live.add(fn);
+          if (type === 'keydown') {
+            live.add(fn);
+            // 用 AbortController 的 signal 移除监听器也算清理
+            const signal = rest[0] && rest[0].signal;
+            if (signal) signal.addEventListener('abort', () => live.delete(fn));
+          }
           return add.call(this, type, fn, ...rest);
         };
         window.removeEventListener = function (type, fn, ...rest) {

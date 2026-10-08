@@ -245,7 +245,8 @@ export default {
           for (let f = fiberOf(node); f && f.stateNode !== boundary; f = f.return) if (f.key != null) return String(f.key);
           return null;
         };
-        const hasToken = (key, id) => new RegExp('(^|[^a-z0-9])' + id + '([^a-z0-9]|$)', 'i').test(key);
+        // key 取自 id（可以加前缀、拼接），或取自名字（组内名字也是唯一、稳定的）
+        const hasToken = (key, id, name) => new RegExp('(^|[^a-z0-9])' + id + '([^a-z0-9]|$)', 'i').test(key) || key.endsWith(id) || key.startsWith(id) || key.includes(name);
         const canReadKeys = fiberOf(sections[0]) != null;
         sections.forEach((sec, si) => {
           const exp = expect[si];
@@ -266,7 +267,7 @@ export default {
             const k = keyOf(li, ul);
             t.assert(k != null, `“${title}”没有 key。key 要写在内层 map 直接返回的元素上，用商品自己的 id`);
             t.assert(k !== String(i), `“${title}”的 key 是 ${k}，看起来是数组下标。插入、删除或重排时，下标会对应到别的数据。请用商品自带的 id`);
-            t.assert(hasToken(k, id), `“${title}”的 key 是“${k}”，里面没有它的 id（${id}）。key 要能区分每一项，而且一直不变`);
+            t.assert(hasToken(k, id, title), `“${title}”的 key 是“${k}”，里面没有它的 id（${id}）。key 要能区分每一项，而且一直不变`);
             t.assert(!seen.includes(k), `“${exp.name}”里有两个列表项的 key 都是“${k}”。同一个数组里的 key 必须各不相同`);
             seen.push(k);
           });
@@ -276,7 +277,7 @@ export default {
             const k = keyOf(sec, sec.parentElement);
             t.assert(k != null, `“${expect[si].name}”这一组没有 key。外层 map 返回的元素也要有 key，用分组的 id`);
             t.assert(k !== String(si), `“${expect[si].name}”这一组的 key 是 ${k}，看起来是数组下标。请用分组自带的 id`);
-            t.assert(hasToken(k, expect[si].gid), `“${expect[si].name}”这一组的 key 是“${k}”，里面没有它的 id（${expect[si].gid}）`);
+            t.assert(hasToken(k, expect[si].gid, expect[si].name), `“${expect[si].name}”这一组的 key 是“${k}”，里面没有它的 id（${expect[si].gid}）`);
             return k;
           });
           t.assert(gkeys[0] !== gkeys[1], '两个分组的 key 相同。同一个数组里的 key 必须各不相同');

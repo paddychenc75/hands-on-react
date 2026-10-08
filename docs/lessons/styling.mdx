@@ -208,7 +208,7 @@ function App() {
 }
 ```
 
-**原子类**的思路是反过来的：不给每个组件起名字、写一份专属的 CSS，而是预先提供一批只做一件事的小类（`p-4` 是内边距，`font-bold` 是粗体），组件用 `className` 把它们组合起来。Tailwind 在构建时扫描你的源码，只生成用到的类。因为它扫描的是源码里的完整字符串，类名不能拼出来：`` `text-${color}-500` `` 扫描不到，要写成完整的 `'text-red-500'` 再按条件选择。安装方式随大版本变化，以[官方文档](https://tailwindcss.com/docs/installation)为准。
+**原子类**的思路是反过来的：不给每个组件起名字、写一份专属的 CSS，而是预先提供一批只做一件事的小类（`p-4` 是内边距，`font-bold` 是粗体），组件用 `className` 把它们组合起来。Tailwind 在构建时扫描你的源码，只生成用到的类。因为它把源码当作纯文本扫描，只认完整写出的类名，所以类名不能拼出来：`` `text-${color}-500` `` 扫描不到，要写成完整的 `'text-red-500'` 再按条件选择。安装方式随大版本变化，以[官方文档](https://tailwindcss.com/docs/installation)为准。
 
 **运行时 CSS-in-JS**（styled-components、Emotion 一类）把样式写在组件文件里，样式能直接读 props。代价是渲染时多做一轮计算，并且依赖在浏览器里插入样式，所以多数这类库要放进客户端组件里用。也有在构建时就生成静态 CSS 的方案（例如 vanilla-extract），用法接近 CSS Modules。选它之前，先确认它支持你用的框架。
 
