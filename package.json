@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
+    "@hookform/resolvers": "5.9.1",
     "@rspress/core": "^2.0.23",
     "@tanstack/react-query": "5.104.1",
     "@types/node": "^26.6.4",
@@ -38,10 +39,12 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-dom-runtime-19": "npm:react-dom@19.3.0",
+    "react-hook-form": "7.89.0",
     "react-router": "8.4.0",
     "react-runtime-19": "npm:react@19.3.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
+    "zod": "4.6.5",
     "zustand": "5.0.15"
   }
 }

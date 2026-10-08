@@ -6,7 +6,7 @@
    必须是开发版：引擎靠拦截 React 的警告向学习者显示它们（识别规则见 logic/warnings.ts）。
    不放 iframe：站点自己打包的 React 是另一份，各自独立的 root，互不干扰。运行时只加载一次。 */
 import { BASE } from '../site.ts';
-import { libPath, react19Path, type LibInfo } from './logic/runtime.ts';
+import { libDeps, libPath, react19Path, type LibInfo } from './logic/runtime.ts';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/';
 const COMMON_LIBS = [
@@ -114,28 +114,30 @@ const libLoading = new Map<string, Promise<void>>();
 /** 加载示例用到的第三方库（在 loadRuntime 完成之后调用）。已经加载过的不再请求；失败后可以重试 */
 export function loadLibs(libs: LibInfo[], assetBase = BASE): Promise<void> {
   const rt = getRuntime();
-  return Promise.all(
-    libs.map(lib => {
-      if (rt.libVersions[lib.name]) return Promise.resolve();
-      let p = libLoading.get(lib.name);
-      if (!p) {
-        p = loadScript(assetBase + libPath(lib)).then(
+  const load = (lib: LibInfo): Promise<void> => {
+    if (rt.libVersions[lib.name]) return Promise.resolve();
+    let p = libLoading.get(lib.name);
+    if (!p) {
+      // 依赖的库先加载好（本库的脚本在运行时从 window.__hocLibs 里取它们）
+      p = Promise.all(libDeps(lib).map(load))
+        .then(() => loadScript(assetBase + libPath(lib)))
+        .then(
           () => {
             const reg = (window as any).__hocLibs?.[lib.name];
             if (!reg) throw new LibLoadError(lib.name);
             Object.assign(rt.libs, reg.modules);
             rt.libVersions[lib.name] = reg.version;
           },
-          () => {
-            throw new LibLoadError(lib.name);
+          e => {
+            throw e instanceof LibLoadError ? e : new LibLoadError(lib.name);
           },
         );
-        libLoading.set(lib.name, p);
-        p.catch(() => libLoading.delete(lib.name));
-      }
-      return p;
-    }),
-  ).then(() => {});
+      libLoading.set(lib.name, p);
+      p.catch(() => libLoading.delete(lib.name));
+    }
+    return p;
+  };
+  return Promise.all(libs.map(load)).then(() => {});
 }
 
 /** 注册第三方库里的 console.error / console.warn 的接收函数（库的包装脚本通过 window.__hocLibConsole 调用它） */

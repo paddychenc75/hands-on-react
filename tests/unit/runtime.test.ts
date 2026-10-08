@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { prepare } from '../../course/engine/exec.ts';
-import { LIBS, REACT_VERSION, libPath, libsInSource, react19Path } from '../../course/engine/logic/runtime.ts';
+import { LIBS, REACT_VERSION, libDeps, libPath, libsInSource, react19Path } from '../../course/engine/logic/runtime.ts';
 import { LESSON_MODULES } from '../../course/lessons.generated.ts';
 
 describe('运行时版本', () => {
@@ -96,6 +96,29 @@ describe('第三方库：从 import 语句判断要加载哪些库', () => {
       'zustand',
     ]);
   });
+  it('react-hook-form、zod、@hookform/resolvers/zod 各算一个库；resolvers 的别的路径和 zod/v3 没暴露，不算', () => {
+    expect(names("import { useForm } from 'react-hook-form';")).toEqual(['react-hook-form']);
+    expect(names("import { z } from 'zod';")).toEqual(['zod']);
+    expect(names("import { zodResolver } from '@hookform/resolvers/zod';")).toEqual(['@hookform/resolvers']);
+    expect(names("import { yupResolver } from '@hookform/resolvers/yup';\nimport { z } from 'zod/v3';")).toEqual([]);
+    expect(names("import { zodResolver } from '@hookform/resolvers/zod';\nimport { z } from 'zod';\nimport { useForm } from 'react-hook-form';")).toEqual([
+      'react-hook-form',
+      'zod',
+      '@hookform/resolvers',
+    ]);
+  });
+  it('libDeps：resolvers 依赖 react-hook-form（要先加载）；其余库没有依赖', () => {
+    const by = (n: string) => LIBS.find(l => l.name === n)!;
+    expect(libDeps(by('@hookform/resolvers')).map(l => l.name)).toEqual(['react-hook-form']);
+    expect(libDeps(by('react-hook-form'))).toEqual([]);
+    expect(libDeps(by('zod'))).toEqual([]);
+    for (const l of LIBS)
+      for (const d of l.deps ?? [])
+        expect(
+          LIBS.some(x => x.name === d),
+          `${l.name} 的依赖 ${d}`,
+        ).toBe(true);
+  });
   it('react-router/dom 也算 react-router；react-router-dom 和别的包不算', () => {
     expect(names("import { RouterProvider } from 'react-router/dom';")).toEqual(['react-router']);
     expect(names("import { Link } from 'react-router-dom';\nimport x from 'lodash';")).toEqual([]);
@@ -122,6 +145,9 @@ describe('prepare：第三方库的 import 解析到加载好的库对象', () =
       zustand: { create() {} },
       'zustand/middleware': { persist() {} },
       'zustand/react/shallow': { useShallow() {} },
+      'react-hook-form': { useForm() {} },
+      zod: { z: {} },
+      '@hookform/resolvers/zod': { zodResolver() {} },
     } as Record<string, unknown>,
   };
   const run = (src: string, r: any = rt) => {
@@ -157,6 +183,14 @@ describe('prepare：第三方库的 import 解析到加载好的库对象', () =
     expect(out).toContain('const { create } = __libs["zustand"];');
     expect(out).toContain('const { persist } = __libs["zustand/middleware"];');
     expect(out).toContain('const { useShallow } = __libs["zustand/react/shallow"];');
+  });
+  it('react-hook-form、zod、@hookform/resolvers/zod 各取各的模块', () => {
+    const out = run(
+      "import { useForm } from 'react-hook-form';\nimport * as z from 'zod';\nimport { zodResolver } from '@hookform/resolvers/zod';\nfunction App(){}",
+    );
+    expect(out).toContain('const { useForm } = __libs["react-hook-form"];');
+    expect(out).toContain('const z = __libs["zod"];');
+    expect(out).toContain('const { zodResolver } = __libs["@hookform/resolvers/zod"];');
   });
   it('和 react 的 import 混用时，两边都解析', () => {
     const out = run("import { useState } from 'react';\nimport { Link } from 'react-router';\nfunction App(){}");
