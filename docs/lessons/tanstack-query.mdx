@@ -567,7 +567,7 @@ function Posts() {
   const { data, isPending, isFetching, isPlaceholderData } = useQuery({
     queryKey: ['posts', page],           // 页码是查询用到的变量，要写进 key
     queryFn: () => fetchPosts(page),
-    placeholderData: keepPreviousData,   // 换页时，先显示上一页的数据
+    placeholderData: keepPreviousData,   // 本例要观察的选项
   });
   if (isPending) return <p>⏳ 首次加载中…</p>;
   return (
