@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/project-search.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'project-search',
+  runtime: 19,
   stage: 1,
   title: '实战二：异步搜索',
   mins: 41,
@@ -141,6 +142,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const names = () => t.qa('li.user').map(li => li.textContent.trim());
       // 步骤 4：请求逻辑要真的在 Hook 里。先看 App 本身，再单独调用 Hook
       const useUserSearch = t.exports.useUserSearch;

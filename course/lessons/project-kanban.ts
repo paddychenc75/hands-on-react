@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/project-kanban.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'project-kanban',
+  runtime: 19,
   stage: 1,
   title: '实战三：看板应用',
   mins: 42,
@@ -219,6 +220,7 @@ function boardReducer(state, action) {
   }
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const titles = col => t.qa(`.column[data-col="${col}"] .card`).map(c => c.firstChild.textContent);
       const card = title => t.qa('.card').find(c => c.firstChild.textContent === title);
       const btn = (c, label) => Array.from<HTMLElement>(c.querySelectorAll('button')).find(b => b.textContent === label);

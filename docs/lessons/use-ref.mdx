@@ -97,9 +97,76 @@ state 像公告栏，一改大家（界面）都看到；ref 像你的私人口�
 
 </CallBox>
 
-<CallBox kind="deep" label="深入一点">
+## 用途三：把 ref 传给自己的组件
 
-在 React 18 中，要把 ref 传给你**自己写的组件**，需要用 `forwardRef` 包装。React 19 简化了这一点：ref 可以像普通 prop 一样直接传递，第 28 课会讲。
+在 React 19 里，`ref` 是自定义组件的**普通 prop**。函数组件可以直接从 props 里取出 `ref`，再交给里面的 DOM 元素。父组件就能拿到子组件内部的节点。
+
+```jsx play title="ref 作为普通 prop"
+import { useRef } from 'react';
+
+function FancyInput({ ref, placeholder }) {
+  return <input ref={ref} placeholder={placeholder} style={{ padding: 6 }} />;
+}
+
+function App() {
+  const inputRef = useRef(null);
+  return (
+    <div>
+      <FancyInput ref={inputRef} placeholder="我在子组件里" />
+      <p>
+        <button onClick={() => inputRef.current.focus()}>聚焦</button>{' '}
+        <button onClick={() => console.log('ref.current 是：', inputRef.current.tagName)}>
+          ref.current 是什么？
+        </button>
+      </p>
+    </div>
+  );
+}
+```
+
+注意，子组件必须自己把 `ref` 取出来，再交给某个 DOM 元素。没有取出来，父组件的 `ref.current` 就一直是 `null`。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 及更早的版本里，函数组件收不到 `ref` 这个 prop，要用 `forwardRef` 包装：`const FancyInput = forwardRef(function FancyInput(props, ref) { … })`。React 19 仍然支持 `forwardRef`，官方说明以后会弃用它。读到旧项目里的 `forwardRef` 时，把它看成“让函数组件收到 ref 的包装”即可。更完整的用法见 [DOM 逃生舱](/lessons/escape-hatches)。
+
+</CallBox>
+
+## ref 回调：挂载时调用，移除时清理
+
+`ref` 属性除了接收 `useRef` 创建的对象，还可以接收一个函数，叫 **ref 回调**。DOM 节点放进页面时，React 调用它，参数是这个节点。
+
+从 React 19 起，ref 回调可以**返回一个清理函数**。节点从页面移除时，React 调用清理函数。这样“挂载时做什么，移除时就撤销什么”写在同一处，例如注册和取消监听。
+
+```jsx play title="ref 回调：挂载与清理"
+import { useState } from 'react';
+
+function App() {
+  const [show, setShow] = useState(true);
+  const [n, setN] = useState(0);
+  return (
+    <div>
+      <button onClick={() => setShow(s => !s)}>{show ? '隐藏' : '显示'}输入框</button>{' '}
+      <button onClick={() => setN(n + 1)}>重新渲染（{n}）</button>
+      {show && (
+        <input
+          placeholder="我带着一个 ref 回调"
+          ref={node => {
+            console.log('挂载：' + node.tagName);
+            return () => console.log('清理：节点离开页面');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+```
+
+在 React 18 里没有清理函数。节点移除时，React 会再调用一次 ref 回调，参数是 `null`，所以回调里要写 `if (node)` 判断。React 19 里，回调返回了清理函数，移除时就不再用 `null` 调用它。
+
+<CallBox kind="warn" label="常见坑">
+
+示例里的 ref 回调是内联箭头函数，每次渲染都是一个新函数。React 发现 `ref` 换了，就先调用旧的清理函数，再用新函数挂载一次。点“重新渲染”按钮，控制台会再出现“清理”和“挂载”。回调里的工作很重时，用 `useCallback` 让函数保持不变。
 
 </CallBox>
 

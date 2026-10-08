@@ -2,9 +2,10 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/use-effect.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'use-effect',
+  runtime: 19,
   stage: 1,
   title: 'useEffect 与副作用',
-  mins: 25,
+  mins: 28,
   summary: '让组件与外部世界同步：定时器、网络请求、订阅、修改标题。',
   goals: [
     '能说出 effect 的用途：让组件与外部系统保持同步',
@@ -53,6 +54,13 @@ export default {
       explain:
         '能从现有 props 和 state 算出来的值，直接在渲染时计算。最迷惑的是第一项：它能工作，但每次都先用旧的 fullName 完整渲染一遍，再马上渲染第二遍。第三项多出一份要手动保持一致的 state。',
     },
+    {
+      q: '应用包在 <code>&lt;StrictMode&gt;</code> 里，在开发环境运行。effect 里写了 <code>setInterval(() =&gt; setN(n =&gt; n + 1), 1000)</code>，没有返回清理函数。数字大约怎么变化？',
+      options: ['每秒加 1', '每秒加 2', '每秒加 1，但组件卸载后还会继续', '不增加：严格模式会阻止定时器'],
+      answer: 1,
+      explain:
+        '严格模式做了“开始 → 停止 → 再开始”。第一个定时器没有被清理函数停掉，第二轮又启动了一个，两个定时器一起加，每秒加 2。生产环境只有一个定时器，每秒加 1。最迷惑的是第三项：卸载后继续运行确实是没有清理的后果，但开发环境里更早暴露的是数字加得太快。',
+    },
   ],
   exercise: {
     task: '<ol class="task-steps"><li>在 <code>useEffect</code> 中调用 <code>setInterval</code>，每秒把 seconds 加 1。</li><li>在清理函数中调用 <code>clearInterval</code>，停掉这个定时器。</li><li>在 <code>&lt;p id="seconds"&gt;</code> 中显示 seconds，从 0 开始。</li><li>检查时，你的 App 还会在严格模式下运行一次。React 会做“开始 → 停止 → 再开始”，只有清理函数真的停掉了定时器，数字才会正确。</li></ol>',
@@ -92,6 +100,7 @@ function App() {
   return <p id="seconds">{seconds}</p>;
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       t.assert(t.text('#seconds') === '0', '初始应为 0');
       t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
       // 另开一个严格模式的根：React 会做“开始 → 停止 → 再开始”。清理函数没停掉第一个定时器，就会有两个定时器一起加
@@ -200,6 +209,17 @@ return &lt;List items={visible} /&gt;;</code></pre></div>`,
           '打字改变的是 name。① 没有依赖数组，每次渲染后都运行；② 不读任何会变的值，第一次渲染后同步一次就够了；③ 只读 count，count 没变，就不重新同步。',
       },
       pkey: 'use-effect|观察三种 effect 的执行时机',
+    },
+    '严格模式：开始 → 停止 → 再开始': {
+      note: '点“进入房间”，StrictMode 随 Room 一起出现，React 把 effect 多做了一轮：连接 a、断开 a、再连接 a。这是检查清理函数是否真的能停止同步。再点“离开”，Room 卸载，打印最后一次“断开 a”。',
+      predict: {
+        q: '点一次“进入房间”，控制台依次打印什么？',
+        options: ['连接 a', '连接 a、连接 a', '连接 a、断开 a、连接 a', '断开 a、连接 a'],
+        answer: 2,
+        explain:
+          '严格模式在开发环境把组件第一次挂载时的 effect 多做一轮：开始 → 停止 → 再开始。所以是“连接 a、断开 a、连接 a”。最迷惑的是“连接 a、连接 a”：那是清理函数不存在或写得不对时的后果，不是 React 的做法；React 一定先运行清理函数，再开始新的同步。',
+      },
+      pkey: 'use-effect|严格模式：开始 → 停止 → 再开始',
     },
     定时器的启动与清理: {},
     带竞态处理的数据请求: {

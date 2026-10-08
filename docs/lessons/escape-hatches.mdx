@@ -14,38 +14,37 @@ title: "DOM 逃生舱：Portal、useLayoutEffect 与 useId"
 
 React 推荐声明式写法：用 state 描述界面。但有些事无法用 props 和 state 表达。例如：让输入框获得焦点、测量元素尺寸、把弹窗放到页面最外层。
 
-本课的 5 个 API 就是为这些情况准备的“逃生舱”。逃生舱很有用，但只在需要时打开。每一节最后都会说明**什么时候不要用**。
+本课的 5 组 API 就是为这些情况准备的“逃生舱”。逃生舱很有用，但只在需要时打开。每一节最后都会说明**什么时候不要用**。
 
 ## 一、把 ref 传给自己的组件
 
-你写 `<FancyInput ref={r} />`，想让父组件拿到子组件里的 input。能不能做到，取决于 React 版本。
+你写 `<FancyInput ref={r} />`，想让父组件拿到子组件里的 input。在 React 19 里，`ref` 是普通 prop：函数组件直接从 props 里取出它，再交给里面的 DOM 元素。
 
-| | React 19 | React 18 |
-|---|---|---|
-| `ref` 是不是普通 prop | 是，函数组件直接从 props 里取 | 不是，函数组件**收不到** |
-| 怎样接收 | `function FancyInput({ ref, ...props })` | 用 `forwardRef` 包装，ref 是第二个参数 |
-| `forwardRef` | 不再需要，将来会被废弃 | 必须用 |
-
-React 19 的写法最短（只能阅读，实验台是 React 18）：
-
-```jsx title="React 19：ref 是普通 prop（只能阅读）"
+```jsx title="ref 是普通 prop"
 function FancyInput({ ref, ...props }) {
   return <input ref={ref} {...props} />;
 }
 ```
 
-本课的实验台运行 React 18.3.1，所以下面的示例用 React 18 的写法。读到旧项目里的 `forwardRef` 时，把它看成“让函数组件收到 ref 的包装”即可。
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 及更早的版本里，函数组件**收不到** `ref` 这个 prop，要用 `forwardRef` 包装，ref 是第二个参数：
 
 ```jsx title="React 18：用 forwardRef 接收 ref"
 import { forwardRef } from 'react';
 
-// 第一个参数是 props，第二个参数是 ref
 const FancyInput = forwardRef(function FancyInput(props, ref) {
   return <input ref={ref} {...props} />;
 });
 ```
 
+React 19 仍然支持 `forwardRef`，官方说明以后会弃用它。读到旧项目里的 `forwardRef` 时，把它看成“让函数组件收到 ref 的包装”即可。
+
+</CallBox>
+
 两种写法下，父组件拿到的都是**整个 input DOM 节点**。父组件可以改它的样式、内容，甚至删除它。这暴露得太多了。
+
+`ref` 属性也可以接收函数，并在函数里返回清理函数，见 [useRef](/lessons/use-ref) 一课的“ref 回调”一节。
 
 ## 二、只暴露几个方法：useImperativeHandle
 
@@ -56,9 +55,9 @@ const FancyInput = forwardRef(function FancyInput(props, ref) {
 3. 父组件的 `ref.current` 就是这个对象，而不是 DOM 节点。
 
 ```jsx play title="只暴露 focus() 和 clear()"
-import { useRef, useImperativeHandle, forwardRef } from 'react';
+import { useRef, useImperativeHandle } from 'react';
 
-const FancyInput = forwardRef(function FancyInput({ label }, ref) {
+function FancyInput({ label, ref }) {
   const inputRef = useRef(null); // 真正的 DOM 节点，只在组件内部使用
 
   useImperativeHandle(ref, () => ({
@@ -76,7 +75,7 @@ const FancyInput = forwardRef(function FancyInput({ label }, ref) {
       {label} <input ref={inputRef} defaultValue="一些文字" />
     </label>
   );
-});
+}
 
 function App() {
   const ref = useRef(null);
@@ -98,12 +97,6 @@ function App() {
 <CallBox kind="like" label="打个比方">
 
 useImperativeHandle 像自动售货机。机器外面只有几个按钮：选商品、投币、退币。机器里的货架和电机，你看不到也碰不到。厂家换了内部零件，按钮的用法也不变。
-
-</CallBox>
-
-<CallBox kind="tip" label="要点">
-
-`useImperativeHandle` 在 React 18 和 19 中用法相同。区别只在第一个参数 ref 从哪里来：18 来自 `forwardRef` 的第二个参数，19 来自 props。
 
 </CallBox>
 
@@ -182,13 +175,13 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-React 18 有一个细节：如果更新由点击、按键等离散事件触发，useEffect 也会在绘制前同步执行。所以本演示用了鼠标悬停。不要依赖这个细节。需要在绘制前测量时，就明确使用 useLayoutEffect。
+有一个细节：如果更新由点击、按键等离散事件触发，useEffect 也会在绘制前同步执行。所以本演示用了鼠标悬停。不要依赖这个细节。需要在绘制前测量时，就明确使用 useLayoutEffect。
 
 </CallBox>
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>默认用 useEffect。</strong>useLayoutEffect 会阻塞绘制。代码慢，整个页面就卡住（上面右边按钮的延迟就是这样来的）。只有“读布局，再同步修改 DOM 或 state”时才用它。另外，useLayoutEffect 不会在服务端执行，React 18 在服务端渲染时还会给出警告。
+<strong>默认用 useEffect。</strong>useLayoutEffect 会阻塞绘制。代码慢，整个页面就卡住（上面右边按钮的延迟就是这样来的）。只有“读布局，再同步修改 DOM 或 state”时才用它。另外，useLayoutEffect 不会在服务端执行。React 18 及更早的版本在服务端渲染时会为此打印警告，React 19 不再警告。
 
 </CallBox>
 
@@ -304,7 +297,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>不要用 useId 生成列表的 key。</strong>key 应该来自数据，例如数据库 id。一个组件需要多个 id 时，只调用一次 useId，再加后缀：`id + '-hint'`。useId 的格式（例如 `:r1:`）会随版本变化，不要解析它。
+<strong>不要用 useId 生成列表的 key。</strong>key 应该来自数据，例如数据库 id。一个组件需要多个 id 时，只调用一次 useId，再加后缀：`id + '-hint'`。useId 返回的字符串格式会随版本变化（React 18 里形如 `:r1:`，React 19.2 起形如 `_r_1_`），不要解析或依赖它。
 
 </CallBox>
 
@@ -339,7 +332,7 @@ function handleAdd() {
 
 | API | 用来做什么 | 什么时候不要用 |
 |---|---|---|
-| `forwardRef`（18）/ ref prop（19） | 把 ref 传进自己的组件 | 父组件只需要传数据时 |
+| ref 作为 prop（旧项目里是 `forwardRef`） | 把 ref 传进自己的组件 | 父组件只需要传数据时 |
 | `useImperativeHandle` | 只暴露 focus() 等少数方法 | 能用 props 表达时（例如 isOpen） |
 | `useLayoutEffect` | 绘制前测量布局，避免闪烁 | 其他所有情况，默认用 useEffect |
 | `createPortal` | 弹窗、提示框跳出父容器 | 普通内容；它也不会自动处理焦点 |

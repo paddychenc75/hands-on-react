@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/escape-hatches.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'escape-hatches',
+  runtime: 19,
   stage: 1,
   title: 'DOM 逃生舱：Portal、useLayoutEffect 与 useId',
   mins: 35,
@@ -170,6 +171,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       // 记录检查期间在 document 和 window 上添加、移除的 keydown 监听，用来确认清理函数真的移除了监听
       const live = new Set();
       const origAdd = EventTarget.prototype.addEventListener,

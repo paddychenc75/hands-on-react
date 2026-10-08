@@ -20,24 +20,18 @@ title: "Context：跨层级共享数据"
 // ① 创建：给一个默认值
 const ThemeContext = createContext('light');
 
-// ② 提供：用 Provider 包住子树，传入 value
-<ThemeContext.Provider value="dark">
+// ② 提供：Context 本身就是 Provider，传入 value
+<ThemeContext value="dark">
   <Page />
-</ThemeContext.Provider>
+</ThemeContext>
 
 // ③ 消费：在任意后代组件中读取
 const theme = useContext(ThemeContext); // 'dark'
 ```
 
-<CallBox kind="tip" label="React 18 与 19 的写法">
+<CallBox kind="tip" label="维护 React 18 项目时">
 
-第 ② 步，React 18 写 `<ThemeContext.Provider value="dark">`，这是本课实验台（React 18.3.1）能运行的写法。React 19 可以把 Context 本身当作 Provider：`<ThemeContext value="dark">`。官方说明以后会弃用 `.Provider`。两种写法的行为一样，读到旧项目里的 `.Provider` 时不用奇怪。
-
-```jsx title="React 19 写法（只能阅读，实验台是 React 18）"
-<ThemeContext value="dark">
-  <Page />
-</ThemeContext>
-```
+React 18 及更早的版本里，第 ② 步要写 `<ThemeContext.Provider value="dark">`，直接写 `<ThemeContext value>` 渲染不出内容。React 19 仍然支持 `.Provider`，官方说明以后会弃用它。两种写法的行为一样，读到旧代码里的 `.Provider` 时，把它看成 `<ThemeContext value>` 即可。
 
 </CallBox>
 
@@ -50,10 +44,10 @@ function App() {
   const [theme, setTheme] = useState('light');
   return (
     <>
-      <ThemeContext.Provider value={theme}>
+      <ThemeContext value={theme}>
         <button onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>切换主题</button>
         <Page />
-      </ThemeContext.Provider>
+      </ThemeContext>
       <ThemedCard title="卡片 C（在 Provider 外面）" />
     </>
   );
@@ -91,9 +85,9 @@ function CartProvider({ children }) {
   const add = (name) => setItems(list => [...list, name]);
   const clear = () => setItems([]);
   return (
-    <CartContext.Provider value={{ items, add, clear }}>
+    <CartContext value={{ items, add, clear }}>
       {children}
-    </CartContext.Provider>
+    </CartContext>
   );
 }
 
@@ -129,6 +123,34 @@ function ClearButton() {
 真实项目常再写一个 `useCart()` 函数：里面调用 `useContext(CartContext)`，找不到 Provider 时抛出错误，提醒“必须在 CartProvider 里使用”。这种以 use 开头、内部调用 Hook 的函数叫自定义 Hook。第 15 课会讲它，学完可以回来看这个写法。
 
 </CallBox>
+
+## React 19 新增：用 use 读取 Context
+
+React 19 的 `use` 函数也能读取 Context：`use(ThemeContext)` 读到的值和 `useContext(ThemeContext)` 一样。区别在于调用位置。Hooks 规则要求 `useContext` 写在组件顶层，不能放在 `if` 或提前 `return` 的后面。`use` 不受这条规则限制，可以放在条件分支、循环里，也可以放在提前 `return` 之后。
+
+```jsx play title="用 use 读取 Context"
+import { createContext, use, useState } from 'react';
+
+const ThemeContext = createContext('light');
+
+function ThemedNote({ visible }) {
+  if (!visible) return null; // 提前 return
+  const theme = use(ThemeContext); // 提前 return 之后读取 Context
+  return <p>当前主题：{theme}</p>;
+}
+
+function App() {
+  const [visible, setVisible] = useState(false);
+  return (
+    <ThemeContext value="dark">
+      <button onClick={() => setVisible(v => !v)}>{visible ? '隐藏' : '显示'}备注</button>
+      <ThemedNote visible={visible} />
+    </ThemeContext>
+  );
+}
+```
+
+`use` 还能读取 Promise，配合 Suspense 获取数据，见 [Suspense 数据获取](/lessons/suspense-data)。读取 Context 时，仍然优先用熟悉的 `useContext`；需要在条件分支后读取时，再用 `use`。
 
 <CallBox kind="warn" label="常见坑">
 

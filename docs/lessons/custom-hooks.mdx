@@ -82,23 +82,84 @@ function App() {
 }
 ```
 
-<CallBox kind="tip" label="要点">
-
-**自定义 Hook 共享的是逻辑，不是状态**。两个组件都调用 `useToggle()`，它们各自拥有独立的 on 状态，互不影响。就像两个人用同一份菜谱，做出的是两盘菜。
-
-</CallBox>
-
 **返回值怎么选**：
 
 - 只有一个值，直接返回（`useWindowWidth`）。
 - 两个值，调用者常要自己起名，返回数组（`useToggle`，和 `useState` 一样）。
 - 三个以上，返回对象，调用者按名字取用（`useFetch`）。
 
-参数会变时（例如 `url`），把它写进 Hook 内部 effect 的依赖数组。
+## 共享的是逻辑，不是状态
 
-## 一个更完整的例子：useFetch
+**自定义 Hook 共享的是逻辑，不是状态**。两个组件都调用 `useToggle()`，它们各自拥有独立的 on 状态，互不影响。就像两个人用同一份菜谱，做出的是两盘菜。
 
-```jsx title="把请求逻辑封装成 Hook"
+原因在于 Hook 里的 `useState` 属于调用它的那个组件。每调用一次 `useToggle()`，就多一份 state，挂在当前这个组件上。
+
+```jsx play title="两个组件各调用一次 useToggle"
+import { useState } from 'react';
+
+function useToggle(initial = false) {
+  const [on, setOn] = useState(initial);
+  const toggle = () => setOn(o => !o);
+  return [on, toggle];
+}
+
+// 每个 Lamp 自己调用 useToggle
+function Lamp({ name }) {
+  const [on, toggle] = useToggle();
+  return (
+    <button onClick={toggle}>
+      {name}：{on ? '开' : '关'}
+    </button>
+  );
+}
+
+// Lamp 的状态由父组件传入，不自己调用 useToggle
+function SharedLamp({ name, on, toggle }) {
+  return (
+    <button onClick={toggle}>
+      {name}：{on ? '开' : '关'}
+    </button>
+  );
+}
+
+function App() {
+  const [on, toggle] = useToggle(); // 只在这里调用一次
+  return (
+    <div>
+      <h4>各自调用 useToggle()</h4>
+      <Lamp name="灯 A" /> <Lamp name="灯 B" />
+      <h4>父组件调用一次，再传下去</h4>
+      <SharedLamp name="灯 C" on={on} toggle={toggle} />{' '}
+      <SharedLamp name="灯 D" on={on} toggle={toggle} />
+    </div>
+  );
+}
+```
+
+想让两个组件同步，就回到[状态提升](/lessons/lifting-state)的做法：把 Hook 调用提到共同父组件，再通过 props 传下去。
+
+## 参数变化时，Hook 要跟着变
+
+Hook 的参数可以变。例如 `useFetch(url)` 的 `url` 会随用户的选择变化。参数变了，Hook 里的 effect 要停止旧的请求，开始新的。做法是把参数写进 effect 的依赖数组，并用 [useEffect](/lessons/use-effect) 一课里的 `ignore` 标记忽略过期的响应。
+
+下面的示例用定时器模拟请求：用户 2 的响应很慢（1.5 秒），其他用户很快（0.3 秒），用户 9 不存在。
+
+```jsx play title="参数变化时重新请求：useFetch"
+import { useState, useEffect } from 'react';
+
+const NAMES = { 1: '小李', 2: '小王', 3: '小赵' };
+
+// 模拟 fetch：用户 2 很慢，用户 9 不存在
+function fakeFetch(url) {
+  const id = Number(url.split('/').pop());
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (NAMES[id]) resolve({ id, name: NAMES[id] });
+      else reject(new Error('HTTP 404'));
+    }, id === 2 ? 1500 : 300);
+  });
+}
+
 function useFetch(url) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -107,14 +168,9 @@ function useFetch(url) {
   useEffect(() => {
     let ignore = false;
     setLoading(true);
-    fetch(url)
-      .then(res => {
-        // fetch 遇到 404、500 不会报错，要自己检查
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
+    fakeFetch(url)
       .then(json => { if (!ignore) { setData(json); setError(null); } })
-      .catch(err => { if (!ignore) setError(err); })
+      .catch(err => { if (!ignore) { setData(null); setError(err); } })
       .finally(() => { if (!ignore) setLoading(false); });
     return () => { ignore = true; };
   }, [url]);
@@ -122,14 +178,25 @@ function useFetch(url) {
   return { data, error, loading };
 }
 
-// 使用：组件变得极其简洁
-function UserList() {
-  const { data, loading, error } = useFetch('/api/users');
-  if (loading) return <p>加载中…</p>;
-  if (error) return <p>出错了</p>;
-  return <ul>{data.map(u => <li key={u.id}>{u.name}</li>)}</ul>;
+function App() {
+  const [id, setId] = useState(1);
+  const { data, loading, error } = useFetch('/api/users/' + id);
+
+  return (
+    <div>
+      {[1, 2, 3, 9].map(n => (
+        <button key={n} onClick={() => setId(n)}>用户 {n}</button>
+      ))}
+      <p>当前选择：用户 {id}</p>
+      <p>
+        {loading ? '加载中…' : error ? '出错了：' + error.message : '结果：' + data.name}
+      </p>
+    </div>
+  );
 }
 ```
+
+调用方只要写 `useFetch(url)`，加载、出错、过期响应都由 Hook 管好了。真实的 `fetch` 遇到 404、500 不会报错，要自己检查 `res.ok`；这里的模拟请求直接用 reject 表示失败。
 
 真实项目通常用 TanStack Query 或 SWR 请求数据。这些库本质上是功能完善的自定义 Hook。它们增加了缓存、重试和去重。
 

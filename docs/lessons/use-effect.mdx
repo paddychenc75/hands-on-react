@@ -185,11 +185,41 @@ effect 是用来与**外部系统**同步的“逃生舱”。下面这些情况
 - **响应用户操作**：直接写在事件处理函数里，比如点击购买后发请求
 - **props 变化时重置状态**：给组件换一个 key
 
-<CallBox kind="deep" label="深入一点">
+## 严格模式：多做一轮“开始 → 停止 → 再开始”
 
-开发环境中，严格模式（StrictMode）会在组件第一次出现时多做一轮同步。顺序是：**开始同步 → 停止同步 → 再开始同步**。这样做是为了检查你的清理函数。严格模式还会在开发环境把组件函数调用两次，用来暴露渲染里的副作用。如果你在控制台看到 effect 运行了两次，这是正常的，生产环境不会这样。本课练习的检查也会用严格模式运行你的代码。
+开发环境中，严格模式（`<StrictMode>`）会在组件第一次出现时，多做一轮同步。顺序是：**开始同步 → 停止同步 → 再开始同步**。
 
-</CallBox>
+这样做是为了检查你的清理函数：如果 effect 只会开始、停不下来（或者停得不彻底），多出来的这一轮会让问题立刻暴露，例如两个定时器同时在跑。生产环境不会多做这一轮。
+
+```jsx play title="严格模式：开始 → 停止 → 再开始"
+import { useState, useEffect, StrictMode } from 'react';
+
+function Room({ id }) {
+  useEffect(() => {
+    console.log('连接 ' + id);
+    return () => console.log('断开 ' + id);
+  }, [id]);
+  return <p>已进入房间 {id}</p>;
+}
+
+function App() {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setShow(s => !s)}>{show ? '离开' : '进入'}房间</button>
+      {show && (
+        <StrictMode>
+          <Room id="a" />
+        </StrictMode>
+      )}
+    </div>
+  );
+}
+```
+
+真实项目里，`<StrictMode>` 包在整个应用的最外面，应用一启动就会这样。示例里让它随按钮一起出现，是为了让你点击时能观察到。
+
+严格模式还有两个检查：把组件函数调用两次，用来暴露渲染里的副作用；React 19 起，也对 ref 回调做同样的“挂载 → 清理 → 再挂载”。如果你在控制台看到 effect 运行了两次，这是正常的。本课练习的检查也会用严格模式运行你的代码。
 
 </LessonProse>
 
