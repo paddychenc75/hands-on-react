@@ -1,6 +1,6 @@
 # 动手学 React
 
-中文交互式 React 课程：47 课，6 个阶段（入门、Hooks 与数据流、渲染与性能、应用架构与全栈 React、生态与实战、深入专题与毕业设计），约 25 小时。可运行示例、先预测再运行、练习自动判分、间隔复习和阶段测验。站点用 [Rspress 2](https://rspress.rs)（React + MDX）构建，静态发布到 GitHub Pages。
+中文交互式 React 课程：47 课，6 个阶段（入门、Hooks 与数据流、渲染与性能、应用架构与全栈 React、生态与实战、深入专题与毕业设计），约 26 小时。可运行示例、先预测再运行、练习自动判分、间隔复习和阶段测验。站点用 [Rspress 2](https://rspress.rs)（React + MDX）构建，静态发布到 GitHub Pages。
 
 学习进度只存在你的浏览器里（`localStorage`），不上传到任何地方。
 
