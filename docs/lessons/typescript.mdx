@@ -16,13 +16,13 @@ title: "TypeScript + React"
 
 <CallBox kind="tip" label="要点">
 
-本课的代码框支持 TypeScript 语法，可以直接运行。不过这里只会**去掉类型**后执行，并不做类型检查。真正的类型报错要在 VS Code 等编辑器或 `tsc` 里才能看到。
+本课的代码框支持 TypeScript 语法，可以直接运行。不过这里只会**去掉类型**后执行，并不做类型检查。所以本课分两层：实验台里的示例让你看清“类型到底管什么、不管什么”；真正的类型报错要在 VS Code 等编辑器或 `tsc` 里才能看到，请在课末的“本机任务”里亲手做一遍。
 
 </CallBox>
 
 ## 给 props 写类型
 
-最常用的做法是用 `type` 或 `interface` 描述 props 的形状。`?` 表示可选，`'a' | 'b'` 是联合类型，只允许这几个值。
+最常用的做法是用 `type` 或 `interface` 描述 props 的形状。两者在这里几乎等价，本课统一用 `type`。`?` 表示可选，`'a' | 'b'` 是联合类型，只允许这几个值。
 
 ```jsx play title="带类型的 Button"
 type ButtonProps = {
@@ -54,11 +54,48 @@ function App() {
 }
 ```
 
+这个类型一次说清了三件事：`label` 必须传，其他可以不传，`variant` 只能取两个值。调用方写错时，编辑器在你保存之前就告诉你。
+
 注意：写成 `variant?: 'primary' | 'ghost' | string` 时，`string` 会吞掉前两个字面量。`variant="danger"` 不再报错，联合类型失去作用。
+
+## 类型只存在于编辑器里
+
+TypeScript 的类型在运行前就被擦掉了。浏览器执行的是普通 JavaScript，它看不到你写的类型。所以类型错误不会让代码“跑不起来”，也不会帮你转换数据。下面的示例里有两处类型错误：`level="danger"` 不在联合类型里，`count` 应该是数字，却传了字符串。在编辑器里这两处都会标红。先预测，再运行。
+
+```jsx play title="类型在运行时不存在"
+type TagProps = {
+  text: string;
+  level?: 'info' | 'warn';
+  count?: number;
+};
+
+function Tag({ text, level = 'info', count }: TagProps) {
+  const color = level === 'warn' ? 'crimson' : 'royalblue';
+  return (
+    <p style={{ color }}>
+      {text}
+      {count !== undefined && ` ×${count + 1}`}
+    </p>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Tag text="正常" level="warn" count={1} />
+      <Tag text="传错了" level="danger" count={'1'} />
+    </div>
+  );
+}
+```
+
+结论：类型检查是在写代码时帮你找错，不是运行时的保险。来自网络、`localStorage`、用户输入的数据，类型帮不上忙，必须在运行时自己检查，后面“从 JS 迁移”一节会讲怎么做。
 
 ## children 与原生属性
 
-```jsx
+`children` 的类型用 `React.ReactNode`：元素、字符串、数字、数组、`null` 都可以。很多组件只是给原生元素加一点东西，这时可以直接继承原生元素的全部属性，不用一个个抄。
+
+```tsx
 type CardProps = {
   title: string;
   children: React.ReactNode;        // 任何可渲染的内容：元素、字符串、数组、null
@@ -71,29 +108,42 @@ type IconButtonProps = React.ComponentProps<'button'> & {
 function IconButton({ icon, children, ...rest }: IconButtonProps) {
   return <button {...rest}>{icon} {children}</button>;
 }
+
+// React 19 中，ref 是普通 prop，不需要 forwardRef。
+// React.ComponentProps<'input'> 已经包含 ref，直接取出来转交给 <input>
+function TextField({ label, ref, ...rest }: React.ComponentProps<'input'> & { label: string }) {
+  return <label>{label}<input ref={ref} {...rest} /></label>;
+}
 ```
+
+JSX 元素本身的类型叫 `React.JSX.Element`。它只表示“一个 JSX 元素”，所以不要拿它当 `children` 的类型。
 
 ## State、事件与 ref
 
 大多数时候 TypeScript 能**自动推断**类型，比如 `useState(0)` 就是 number。只有初始值不能说明全部类型时，才需要手写。最常见的情况是：开始是 null，以后会有值。
 
-```jsx title="常用类型速查"
+事件处理函数的参数类型是 `React.事件名<元素类型>`。输入框的变化是 `React.ChangeEvent<HTMLInputElement>`，表单提交是 `React.SubmitEvent<HTMLFormElement>`。记不住时，把函数直接写在 JSX 的 `onChange={…}` 里，编辑器会推断出参数类型，鼠标放上去就能看到。
+
+```tsx title="常用类型速查"
 type User = { id: number; name: string };
 
 const [count, setCount] = useState(0);                 // 推断为 number
 const [user, setUser] = useState<User | null>(null);   // 需要手动标注
-const inputRef = useRef<HTMLInputElement>(null);
+const inputRef = useRef<HTMLInputElement>(null);       // current 的类型是 HTMLInputElement | null
 
 function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
   setName(e.target.value);
 }
-function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) { // 旧版 @types/react 写作 React.FormEvent
+function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) { // 旧写法是 React.FormEvent，已被标记为弃用
   e.preventDefault();
 }
 
 // 使用可能为 null 的值时，TypeScript 会强迫你先判断
+inputRef.current?.focus();
 return <p>{user ? user.name : '未登录'}</p>;
 ```
+
+React 19 的类型要求 `useRef` 必须传一个初始值：`useRef()` 会报错 `Expected 1 arguments, but got 0`。绑定 DOM 元素时传 `null`。
 
 <CallBox kind="warn" label="常见坑">
 
@@ -102,6 +152,8 @@ return <p>{user ? user.name : '未登录'}</p>;
 </CallBox>
 
 ## 泛型组件：一个列表组件，适配任何数据
+
+有些组件不关心数据长什么样，只关心“有一组同类数据”。用泛型 `<T>` 表示“某种类型”，调用时由 TypeScript 从 `items` 推断出来，再用它给回调的参数定类型。
 
 ```jsx play title="泛型组件"
 type ListProps<T> = {
@@ -133,7 +185,9 @@ function App() {
 
 ## 可辨识联合：让矛盾的状态写不出来
 
-```jsx title="第 17 课的搜索状态可以这样写（下一节的 action 也是）"
+第 17 课里的搜索状态有“加载中、成功、出错”几种。如果写成 `{ loading: boolean; data?: string[]; error?: Error }`，就可能出现“既加载中又出错”这种不可能的组合。可辨识联合给每种状态一个固定的标签字段（这里是 `status`），每种状态只带自己需要的数据。
+
+```tsx title="第 17 课的搜索状态可以这样写（下一节的 action 也是）"
 type SearchState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -147,9 +201,11 @@ function show(s: SearchState) {
 }
 ```
 
+`if` 判断标签字段后，TypeScript 会在这个分支里把类型缩小到对应的那一种。这叫**类型收窄**。
+
 ## 给 reducer 和 Context 写类型
 
-reducer 的 action 最适合写成可辨识联合：每种 action 一个 `type`，带不同的数据。`switch` 里 TypeScript 会按 `type` 收窄 action。
+reducer 的 action 最适合写成可辨识联合：每种 action 一个 `type`，带不同的数据。`switch` 里 TypeScript 会按 `type` 收窄 action。在 `default` 分支里把 action 赋给 `never` 类型的变量，还能让编译器帮你检查“有没有漏处理的 action”：以后新增一种 action 却忘了处理时，这一行会报错。
 
 ```tsx
 type Action =
@@ -164,6 +220,10 @@ function reducer(state: Todo[], action: Action): Todo[] {
     case 'add':    return [...state, { id: Date.now(), title: action.title, done: false }]; // 这里才有 title
     case 'toggle': return state.map(t => (t.id === action.id ? { ...t, done: !t.done } : t));
     case 'clear':  return [];
+    default: {
+      const _exhaustive: never = action;   // 漏处理某种 action 时，这里报错
+      return _exhaustive;
+    }
   }
 }
 ```
@@ -178,6 +238,12 @@ function useTheme() {
   const theme = useContext(ThemeContext);
   if (!theme) throw new Error('useTheme 必须在 ThemeProvider 里使用');
   return theme;               // 这里已收窄为 Theme
+}
+
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [mode, setMode] = useState<Theme['mode']>('light');
+  const toggle = () => setMode(m => (m === 'light' ? 'dark' : 'light'));
+  return <ThemeContext value={{ mode, toggle }}>{children}</ThemeContext>;  // React 19：Context 对象直接当 Provider
 }
 ```
 
@@ -195,6 +261,118 @@ function useLocalStorage<T>(key: string, initial: T) {
 }
 const [page, setPage] = useLocalStorage('page', 1);   // page 推断为 number
 ```
+
+注意 `JSON.parse(raw) as T`：`as` 是你对编译器的**保证**，不是检查。`localStorage` 里存的如果不是 `T`，运行时照样出错。下一节讲怎么真正检查。
+
+## 从 JS 迁移：用 unknown 代替 any，装对类型包
+
+把一个 JavaScript 项目改成 TypeScript，不用一次改完。可以先把 `tsconfig.json` 的 `allowJs` 打开，逐个文件把 `.jsx` 改名为 `.tsx`，每改一个就补好类型，让项目始终能通过检查。
+
+迁移时最诱人的做法是遇到报错就写 `any`。更好的选择是 `unknown`。两者都表示“什么值都可能”，区别是：`any` 让你随便用，`unknown` 要你先检查再用。
+
+```tsx
+type User = { id: number; name: string };
+
+function isUser(x: unknown): x is User {          // 类型守卫：返回 true 时，x 就是 User
+  return (
+    typeof x === 'object' && x !== null &&
+    typeof (x as { id?: unknown }).id === 'number' &&
+    typeof (x as { name?: unknown }).name === 'string'
+  );
+}
+
+function parseUser(json: string): User | null {
+  try {
+    const data: unknown = JSON.parse(json);       // JSON.parse 返回 any，先收进 unknown
+    return isUser(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+下面的示例运行这个检查。先预测，再运行。
+
+```jsx play title="unknown：先检查，再使用"
+type User = { id: number; name: string };
+
+function isUser(x: unknown): x is User {
+  return (
+    typeof x === 'object' && x !== null &&
+    typeof (x as { id?: unknown }).id === 'number' &&
+    typeof (x as { name?: unknown }).name === 'string'
+  );
+}
+
+function parseUser(json: string): User | null {
+  try {
+    const data: unknown = JSON.parse(json);
+    return isUser(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+const inputs = [
+  '{"id":1,"name":"张三"}',
+  '{"id":"2","name":"李四"}',
+  '[1,2,3]',
+  '{"id":4,"name":"赵六","admin":true}',
+  '这不是 JSON',
+];
+
+function App() {
+  return (
+    <ul>
+      {inputs.map(text => {
+        const user = parseUser(text);
+        console.log(user ? '✅ ' : '❌ ', text);
+        return <li key={text}><code>{text}</code> → {user ? user.name : '无效'}</li>;
+      })}
+    </ul>
+  );
+}
+```
+
+第三方库的类型来自哪里，分三种情况：
+
+| 情况 | 例子 | 怎么办 |
+|---|---|---|
+| 库自带类型 | React Router、TanStack Query | 装库就够了，类型随包发布 |
+| 类型单独发布在 `@types/` 下 | React 本身：`@types/react`、`@types/react-dom` | 额外装成开发依赖，大版本和库对齐：`npm i -D @types/react@19 @types/react-dom@19` |
+| 没有类型 | 一些很老的库 | 先查有没有 `@types/库名`；没有就自己写一行 `declare module '库名';` 暂时放行，之后再补 |
+
+用 Vite 的 `react-ts` 模板创建的项目已经装好了 React 的类型包。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+`@types/react@18` 里，全局的 `JSX.Element` 可以直接用，`useRef()` 也可以不传初始值。升级到 `@types/react@19` 后，前者要改成 `React.JSX.Element`，后者必须传初始值。
+
+</CallBox>
+
+## 本机任务：给待办应用加 5 处类型
+
+这一课的类型检查只能在本机做。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite + `react-ts` 项目里，用第 9 课的待办应用（或任何小应用）做下面 5 件事，每件事都要让 `npx tsc -b` 通过。
+
+1. **props**：给 `TodoItem` 等组件的 props 写类型。
+2. **事件**：给输入框的 `onChange` 和表单的 `onSubmit` 处理函数写参数类型。
+3. **reducer 的 action**：写成可辨识联合，并在 `default` 分支用 `never` 检查。
+4. **Context**：写成 `Value | null`，用一个自定义 Hook 把 `null` 挡在外面。
+5. **自定义 Hook 的返回值**：返回元组时加 `as const`。
+
+做完后，故意写错一次，看编辑器和 `npx tsc -b` 是否报出下面的错误。试完改回来：
+
+| 故意怎么写错 | 应该看到 |
+|---|---|
+| 把 `<TodoItem onToggle="x" />` 的 `onToggle` 传成字符串 | `TS2322`：类型 `string` 不能赋给函数类型 |
+| `dispatch({ type: 'toggle', id: 'a' })` | `TS2322`：类型 `string` 不能赋给 `number` |
+| `dispatch({ type: 'add' })` 漏掉 `title` | `TS2345`：缺少属性 `title` |
+| 新增一种 action `rename` 但不改 reducer | `default` 分支里的 `never` 那一行报 `TS2322` |
+| 不用自定义 Hook，直接 `useContext(ThemeContext).mode` | `TS18047`：对象可能为 `null` |
+| 去掉自定义 Hook 的 `as const`，再调用返回的函数 | `TS2349`：表达式不可调用 |
+| 写 `const ref = useRef()` | `TS2554`：需要 1 个参数，但得到 0 个 |
+
+全部做完、`npx tsc -b` 零错误时，这项任务就完成了。项目课[《实战四：城市天气应用》](/lessons/project-weather)的代码全部是 TypeScript。
 
 </LessonProse>
 

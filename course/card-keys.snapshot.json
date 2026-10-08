@@ -186,6 +186,8 @@
     "typescript#c1": "f4a8a835",
     "typescript#c2": "972d1e91",
     "typescript#c3": "fb77c5e5",
+    "typescript#c4": "5b70137d",
+    "typescript#c5": "ef4ab76c",
     "router#0": "a4691af3",
     "router#1": "201869a5",
     "router#2": "6ea5d194",
@@ -371,6 +373,8 @@
     "react-19|Activity：隐藏界面，保留 state",
     "router|嵌套路由：Link 与普通 a 标签",
     "router|loader：先取数据，还是先换页面",
-    "tanstack-query|staleTime：切回标签页会不会请求"
+    "tanstack-query|staleTime：切回标签页会不会请求",
+    "typescript|类型在运行时不存在",
+    "typescript|unknown：先检查，再使用"
   ]
 }
