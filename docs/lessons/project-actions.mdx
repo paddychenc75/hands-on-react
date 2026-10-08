@@ -467,7 +467,7 @@ function App() {
 
 | 现象 | 原因 | 修法 |
 |---|---|---|
-| 点击后卡片没有立刻动，等服务器回复才动；控制台警告 “optimistic state update outside a transition” | `showMove` 写在普通的事件处理函数里 | 放进 `startTransition(async () => { … })` |
+| 点击后卡片只闪一下就退回，等服务器回复才真正移动；控制台警告 “optimistic state update outside a transition” | `showMove` 写在普通的事件处理函数里 | 放进 `startTransition(async () => { … })` |
 | 服务器明明成功了，卡片先到新列，又跳回原来的列 | 只调用了 `showMove`，没有把服务器的结果存进 `cards` | 成功后 `startTransition(() => setCards(next))` |
 | 校验失败后输入框被清空 | Action 结束后 React 重置了表单 | 返回 `title`，输入框用 `defaultValue` 带回 |
 | 按钮一直不显示“添加中” | `useFormStatus` 写在渲染 `<form>` 的同一个组件里 | 抽成 `form` 的子组件 |

@@ -35,7 +35,7 @@ React 18 没有 Action、`<form action>`、`useActionState`、`useOptimistic`。
 
 </CallBox>
 
-## Action：放进 transition 的异步函数
+## Action：传给 startTransition 的异步函数
 
 `startTransition` 可以接收**异步函数**。这类函数叫 **Action**。React 会追踪它：函数开始时 `isPending` 变成 true，函数结束（正常返回、提前 return 或抛错）时变回 false。
 
@@ -63,11 +63,11 @@ function handleSubmit() {
 }
 ```
 
-有一个细节要注意：**`await` 之后，函数已经不在这个 transition 里了**。`await` 之后的 set 函数调用是普通的紧急更新。要让它仍作为 transition 更新，再包一层 `startTransition`。
+有一个细节要注意：**`await` 之后，函数已经不在这个过渡更新里了**。`await` 之后的 set 函数调用是普通的紧急更新。要让它仍作为过渡更新，再包一层 `startTransition`。
 
 下面的示例有两个保存按钮。两个按钮的区别，只在 `await` 之后有没有再包一层 `startTransition`。点保存，等 0.8 秒，再看控制台里每次渲染打印的 `isPending` 和 `name`。点“重置”回到旧名字，再试另一个按钮。
 
-```jsx play title="Action：异步函数当 transition"
+```jsx play title="Action：异步函数与过渡更新"
 import { useState, useTransition } from 'react';
 
 // 模拟的服务器：0.8 秒后保存成功
@@ -80,7 +80,7 @@ function App() {
   function rename(wrapAgain) {
     startTransition(async () => {
       await save();
-      // 到这里，已经不在 transition 里了
+      // 到这里，已经不在过渡更新里了
       if (wrapAgain) startTransition(() => setName('新名字'));
       else setName('新名字');
     });
@@ -252,7 +252,7 @@ function App() {
 
 两点规则：
 
-- `addOptimistic` 必须在 Action 或 `startTransition` 里调用。表单的 `action` 本身就是 Action。在普通事件处理函数里直接调用，开发模式会警告：“An optimistic state update occurred outside a transition or action.”
+- `addOptimistic` 必须在 Action 或 `startTransition` 里调用。表单的 `action` 本身就是 Action。在普通事件处理函数里直接调用，开发模式会警告“An optimistic state update occurred outside a transition or action.”。乐观值提交后会立刻被撤回，界面可能闪一下。
 - ② 要再包一层 `startTransition`，原因和上一节一样：`await` 之后不再属于这个 Action。
 
 表单里的写法更常见。把 `addOptimistic` 写在表单的 `action` 函数里：
@@ -344,7 +344,7 @@ React 19 除了 Actions，还带来了几项别的能力。它们各有更合适
 |---|---|
 | `use()` 读取 Promise | [Suspense、懒加载与错误边界](/lessons/suspense)（入门）、[Suspense 数据获取与资源模式](/lessons/suspense-data)（深入） |
 | `use(Ctx)` 读取 Context、`<Context value>` 直接当 Provider | [Context：跨层级共享数据](/lessons/context) |
-| `<Activity>` 隐藏界面并保留 state | [渲染机制：React 到底做了什么](/lessons/rendering) |
+| `<Activity>` 隐藏界面并保留 state | [并发特性：useTransition 与 useDeferredValue](/lessons/concurrent) |
 | ref 作为普通 prop、ref 回调的清理函数 | [useRef](/lessons/use-ref)、[DOM 逃生舱](/lessons/escape-hatches) |
 | `useEffectEvent` | [闭包陷阱与 Effect 依赖](/lessons/closures) |
 | `<ViewTransition>` | 暂时只有下面选读区的示例 |
@@ -393,7 +393,7 @@ function App() {
 }
 ```
 
-`<Activity>` 隐藏界面但保留 state。完整讲解见[渲染机制](/lessons/rendering)：
+`<Activity>` 隐藏界面但保留 state。完整讲解见[并发特性：useTransition 与 useDeferredValue](/lessons/concurrent)：
 
 ```jsx play title="Activity：隐藏界面，保留 state"
 import { Activity, useState, useEffect } from 'react';

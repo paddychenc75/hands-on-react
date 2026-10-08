@@ -527,7 +527,7 @@ function Board() {
       ],
       answer: 1,
       explain:
-        '<code>useOptimistic</code> 的更新函数必须在 Action 或 <code>startTransition</code> 里调用。写在普通的点击处理函数里，乐观值不会显示，控制台警告 “An optimistic state update occurred outside a transition or action”。按钮要等 0.5 秒后 <code>setCol</code> 的真实值到了，才变成 doing。修法：把 <code>showMove</code> 放进 <code>startTransition(async () =&gt; { … })</code>。第一项是想当然的结果。',
+        '<code>useOptimistic</code> 的更新函数必须在 Action 或 <code>startTransition</code> 里调用。写在普通的点击处理函数里，乐观值提交后立刻被撤回，卡片可能闪一下，控制台警告 “An optimistic state update occurred outside a transition or action”。按钮要等 0.5 秒后 <code>setCol</code> 的真实值到了，才变成 doing。修法：把 <code>showMove</code> 放进 <code>startTransition(async () =&gt; { … })</code>。第一项是想当然的结果。',
     },
     {
       q: `按钮上显示的是 <code>shown</code>，真实值 <code>col</code> 的初始值是 'todo'。点击后过了 0.1 秒和 1 秒，按钮各显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function handleClick() {

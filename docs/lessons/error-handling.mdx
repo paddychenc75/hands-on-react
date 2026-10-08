@@ -293,7 +293,7 @@ document.addEventListener('visibilitychange', () => {
 
 ## 六、根级回调：三个错误的出口
 
-边界之外，React 还在**根**上提供三个回调。`createRoot` 和 `hydrateRoot` 都接受它们。回调的第二个参数是 `{ componentStack }`，`onUncaughtError` 和 `onCaughtError` 的 `info` 里还有 `errorBoundary`（接住错误的边界实例，源码和类型定义里有，react.dev 的文档没有列出）。
+边界之外，React 还在**根**上提供三个回调。`createRoot` 和 `hydrateRoot` 都接受它们。回调的第二个参数是 `info`，都有 `componentStack`。只有 `onCaughtError` 的 `info` 还多一个 `errorBoundary`（接住错误的边界实例，源码和类型定义里有，react.dev 的文档没有列出）；`onUncaughtError` 的 `info` 里没有它，因为没有边界接住错误。
 
 | 回调 | 什么时候调用 | 不传时的默认行为 |
 |---|---|---|

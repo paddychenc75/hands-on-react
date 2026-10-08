@@ -14,7 +14,7 @@ export default {
   ],
   keyPoints: [
     '一次异步提交要管 4 件事：提交中（pending）、错误和结果、成功后重置表单、乐观值。手写要自己写 state；Action 统一接管。',
-    '<code>startTransition</code> 可以接收异步函数，这类函数叫 Action。React 自动追踪它的 pending，提前 return 或抛错时也会结束 pending。注意：<code>await</code> 之后的 set 函数调用已不在这个 transition 里，要再包一层 <code>startTransition</code>。',
+    '<code>startTransition</code> 可以接收异步函数，这类函数叫 Action。React 自动追踪它的 pending，提前 return 或抛错时也会结束 pending。注意：<code>await</code> 之后的 set 函数调用已不在这个过渡更新里，要再包一层 <code>startTransition</code>。',
     '<code>useActionState(action, 初始 state)</code> 返回 <code>[state, formAction, isPending]</code>。Action 的形状是 <code>(上一次的 state, formData) =&gt; 新的 state</code>。Action 结束后，React 重置表单里的非受控字段，出错返回时也一样。',
     '<code>useOptimistic</code> 在 Action 进行中显示预期结果。Action 结束后，乐观值自动丢弃，界面回到真实 state。<code>addOptimistic</code> 必须在 Action 或 <code>startTransition</code> 里调用。',
     '常见坑：在渲染 form 的组件里调用 <code>useFormStatus</code>，读不到这个 form 的状态；预期内的失败（如“邮箱已订阅”）抛错，而不是返回错误值，整块界面会被错误边界换掉。',
@@ -51,12 +51,12 @@ export default {
       options: [
         '数字加 1 并一直保持，要自己写代码回滚',
         '抛出错误，页面崩溃',
-        '开发模式下控制台警告：乐观更新发生在 transition 或 action 之外；界面上的数字没有变',
+        '开发模式下控制台警告：乐观更新发生在过渡更新或 Action 之外；乐观值提交后立刻被撤回，界面上的数字可能先闪成加 1 的值，再变回原值',
         '照常工作，Action 结束时自动回滚',
       ],
       answer: 2,
       explain:
-        'useOptimistic 的乐观值依附在 Action 上：Action 结束，它才知道什么时候丢弃。没有 Action，乐观值没有“生命周期”，React 在开发模式下警告“An optimistic state update occurred outside a transition or action”，并且不显示乐观值。修法：把调用放进 startTransition，或者放进表单的 action 函数。',
+        'useOptimistic 的乐观值依附在 Action 上：Action 结束，它才知道什么时候丢弃。没有 Action，乐观值没有“生命周期”，React 在开发模式下警告“An optimistic state update occurred outside a transition or action”，并且乐观值提交后立刻被撤回：界面可能先闪成加 1 的值，再回到原来的值。修法：把调用放进 startTransition，或者放进表单的 action 函数。',
     },
   ],
   exercise: {
@@ -274,7 +274,7 @@ function App() {
       ],
       answer: 2,
       explain:
-        '<code>await</code> 之后，这个函数已经不在 transition 里了，setName 成了普通的紧急更新，所以会比 Action 的结束更早渲染。再包一层 <code>startTransition</code>，它就重新成为 transition 更新，和 Action 的结束一起提交。把 setName 移到 await 之前，会在服务器确认之前就显示新名字，失败时也不会回滚。自己管 pending 等于放弃 Action。去掉 async 就没有 await 可等了。',
+        '<code>await</code> 之后，这个函数已经不在过渡更新里了，setName 成了普通的紧急更新，所以会比 Action 的结束更早渲染。再包一层 <code>startTransition</code>，它就重新成为过渡更新，和 Action 的结束一起提交。把 setName 移到 await 之前，会在服务器确认之前就显示新名字，失败时也不会回滚。自己管 pending 等于放弃 Action。去掉 async 就没有 await 可等了。',
     },
     {
       q: `在 React 19 中，输入“买菜”并提交，saveTodo 成功完成后，输入框里是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">async function add(formData) {
@@ -292,8 +292,8 @@ function App() {
     },
   ],
   plays: {
-    'Action：异步函数当 transition': {
-      note: '点“保存（再包一层）”：控制台里，name 变成“新名字”的那一次渲染，isPending 同时变回 false。点“重置”后再点“保存（不再包）”：服务器返回后，会先出现一次 isPending 仍为 true、name 已是“新名字”的渲染，然后 isPending 才变回 false。原因：await 之后的 setName 不在 transition 里，是普通的紧急更新，比 Action 的结束更早渲染。',
+    'Action：异步函数与过渡更新': {
+      note: '点“保存（再包一层）”：控制台里，name 变成“新名字”的那一次渲染，isPending 同时变回 false。点“重置”后再点“保存（不再包）”：服务器返回后，会先出现一次 isPending 仍为 true、name 已是“新名字”的渲染，然后 isPending 才变回 false。原因：await 之后的 setName 不在过渡更新里，是普通的紧急更新，比 Action 的结束更早渲染。',
     },
     'useActionState 与 form action': {
       note: '输入不含 @ 的内容提交，出错信息显示后，输入框被清空：Action 结束时，React 会重置表单里的非受控字段，出错返回时也一样。成功时同理。要保留用户的输入，把它放进返回的 state，用 defaultValue 填回去。',
@@ -363,7 +363,7 @@ function App() {
       pkey: 'react-19|use() 读取 Promise，配合 Suspense',
     },
     'Activity：隐藏界面，保留 state': {
-      note: '条件渲染的标签 A 在切走时被卸载，state 丢失，effect 被清理。Activity 隐藏的标签 B 只是被隐藏：state 保留，effect 被清理，切回来时 effect 重新运行。看下面的控制台：B 的 effect 在隐藏时被清理，显示时又运行。这一项的完整讲解在《渲染机制》。',
+      note: '条件渲染的标签 A 在切走时被卸载，state 丢失，effect 被清理。Activity 隐藏的标签 B 只是被隐藏：state 保留，effect 被清理，切回来时 effect 重新运行。看下面的控制台：B 的 effect 在隐藏时被清理，显示时又运行。这一项的完整讲解在《并发特性：useTransition 与 useDeferredValue》。',
       predict: {
         q: '在标签 A 的输入框输入“甲”，切到标签 B，在它的输入框输入“乙”，再依次切回 A、切回 B。此时 A 和 B 的输入框里分别是什么？',
         options: ['A：甲，B：乙', 'A：空，B：乙', 'A：空，B：空', 'A：甲，B：空'],
