@@ -13,7 +13,8 @@ export default function HomePage() {
   const done = mounted ? doneCount() : 0;
   const due = mounted ? dueCount() : 0;
   const next = (mounted && LESSONS.find((l: any) => !isDone(l.id))) || LESSONS[0];
-  const totalMins = LESSONS.reduce((s: number, l: any) => s + l.mins, 0);
+  // 毕业设计在课外完成，不计入课内时长（和下面的标签一致）
+  const totalMins = LESSONS.filter((l: any) => l.id !== 'portfolio').reduce((s: number, l: any) => s + l.mins, 0);
   const exCount = LESSONS.filter((l: any) => l.exercise).length;
   const playCount = LESSONS.reduce((s: number, l: any) => s + Object.keys(l.plays || {}).length, 0);
   const learned = mounted ? Object.keys(progress.__srs || {}).length : 0;
