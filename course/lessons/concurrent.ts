@@ -2,15 +2,17 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/concurrent.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'concurrent',
+  runtime: 19,
   stage: 2,
   title: '并发特性：useTransition 与 useDeferredValue',
-  mins: 26,
+  mins: 33,
   summary: '区分紧急和不紧急的更新，让界面在繁重新渲染时依然流畅。',
   goals: [
     '能判断一个更新是紧急更新还是过渡更新',
     '能用 useTransition 把一次 set 函数调用标记为过渡更新',
     '能用 useDeferredValue 和 memo 让输入框在慢列表重新渲染时保持流畅',
     '能在 useTransition 和 useDeferredValue 之间做出选择',
+    '能说出异步过渡里 isPending 的变化，以及 await 之后的更新为什么要再包一层 startTransition',
   ],
   keyPoints: [
     '紧急更新（打字、点击）要立刻反馈。过渡更新（筛选大列表、切换标签页）可以慢一点，还可以被打断。',
@@ -268,10 +270,43 @@ const [isPending, startTransition] = useTransition();
       explain:
         '过渡更新不紧急。React 先做一次紧急渲染：tab 还是旧值，isPending 为 true，所以显示 About 和“切换中…”。然后在后台渲染 SlowPosts。它在组件之间会让出主线程，所以用户还能点击，新的点击会打断这次渲染。“页面卡住 1 秒”是不用 startTransition 时的表现。注意：如果 SlowPosts 是一个耗时 1 秒的单个组件，React 也无法在它中间打断。',
     },
+    {
+      q: `点击“保存”，0.8 秒后保存完成。<code>name</code> 变成“新”的那次渲染里，<code>isPending</code> 是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [isPending, startTransition] = useTransition();
+const [name, setName] = useState('旧');
+
+startTransition(async () =&gt; {
+  const saved = await save();
+  setName(saved);
+});</code></pre></div>`,
+      options: ['false：保存结束了', 'true，下一次渲染才变回 false', '一直是 false，async 函数不会让 isPending 变成 true', '报错：await 之后不能调用 set 函数'],
+      answer: 1,
+      explain:
+        'isPending 在整个异步函数运行期间都是 true。await 之后的 setName 不属于这次过渡，它触发一次紧急渲染，这时 isPending 仍是 true。函数结束后又渲染一次，isPending 才变回 false。想让 setName 也是过渡更新，就在 await 之后再包一层 startTransition。',
+    },
   ],
   plays: {
     对比开启与关闭的输入体验: {
       note: '取消勾选后再快速打字，输入框会明显卡顿；勾选时输入始终流畅。',
+    },
+    '异步过渡的 isPending': {
+      note: '点“保存 A”：控制台里 isPending 在整个 0.8 秒内都是 true。新名字出现的那次渲染，isPending 仍是 true，随后才有第三次渲染把它变回 false。点“保存 B”：await 之后又包了一层 startTransition，新名字和 isPending = false 在同一次渲染里出现。',
+      predict: {
+        q: '点“保存 A”。0.8 秒的等待期间，isPending 是什么？',
+        options: ['一直是 true，直到整个异步函数结束', '只在点击的瞬间是 true，然后变回 false', '一直是 false', '报错：startTransition 不能接收 async 函数'],
+        answer: 0,
+        explain: 'React 19 的 startTransition 接收 async 函数，并在它运行的整个期间保持 isPending 为 true。React 18 只能传同步函数。',
+      },
+      pkey: 'concurrent|异步过渡的 isPending',
+    },
+    'useDeferredValue 的初始值': {
+      note: '第一行里 deferred 是“（初始值）”，随后 React 立即在后台再渲染一次，第二行里 deferred 才变成“搜索词”。去掉第二个参数，首次渲染就直接用“搜索词”，只有一行。',
+      predict: {
+        q: '页面第一次渲染时，控制台最先打印的那一行里，deferred 是什么？',
+        options: ['搜索词', '（初始值）', 'undefined', '先打印两行完全相同的'],
+        answer: 1,
+        explain: '第二个参数就是首次渲染用的值。首次渲染先用它，随后后台再渲染一次，换成真正的 query。',
+      },
+      pkey: 'concurrent|useDeferredValue 的初始值',
     },
     '用 useTransition 切换标签页': {
       note: '取消勾选，点“文章”，再立刻点“联系”：界面卡住约半秒。勾选后再试：可以立即切走，等待时显示“加载中…”。',

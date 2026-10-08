@@ -147,28 +147,72 @@ function App() {
 
 </CallBox>
 
-<CallBox kind="deep" label="React 19 的变化（只能阅读）">
+## 异步过渡：startTransition 接收 async 函数
 
-`useDeferredValue` 还能和 Suspense 配合：新值的内容挂起时，用户看到的是旧内容，而不是 fallback（React 18 和 19 都是如此，与版本无关）。这是它在真实项目里最常见的用法。
+React 19 起，`startTransition` 可以接收 async 函数。这样的函数叫 **Action**（见[React 19 新特性](/lessons/react-19)一课）。`isPending` 在整个异步过程中都是 true，直到函数结束。先看代码，再预测：
 
-本课的两个 Hook 在 React 19 里有三处变化。实验台运行 React 18.3.1，下面的代码只能阅读。
+```jsx play title="异步过渡的 isPending"
+import { useState, useTransition } from 'react';
 
-1. `startTransition` 可以接收 async 函数。`isPending` 在整个异步过程中都是 true。React 18 只能传同步函数。
-2. `await` 之后的 set 函数调用不再属于这次过渡。要再包一层 `startTransition`。这是最常见的坑。
-3. `useDeferredValue` 多了第二个参数，用于首次渲染。
+// 模拟保存：0.8 秒后完成
+const save = name => new Promise(resolve => setTimeout(() => resolve(name), 800));
 
-```jsx
-// React 19：startTransition 可以接收 async 函数。isPending 在整个过程中为 true
-startTransition(async () => {
-  const saved = await save(draft);
-  startTransition(() => setItem(saved)); // await 之后的更新要再包一层
-});
+function App() {
+  const [isPending, startTransition] = useTransition();
+  const [name, setName] = useState('旧名字');
+  console.log('渲染：isPending = ' + isPending + '，name = ' + name);
 
-// React 19：第二个参数是首次渲染时用的值
-const deferredQuery = useDeferredValue(query, '');
+  function saveA() {
+    startTransition(async () => {
+      const saved = await save('新名字 A');
+      setName(saved); // await 之后直接调用
+    });
+  }
+
+  function saveB() {
+    startTransition(async () => {
+      const saved = await save('新名字 B');
+      startTransition(() => setName(saved)); // await 之后再包一层
+    });
+  }
+
+  return (
+    <div>
+      <button onClick={saveA}>保存 A</button>
+      <button onClick={saveB}>保存 B</button>
+      <p>{isPending ? '保存中…' : '空闲'}：{name}</p>
+    </div>
+  );
+}
 ```
 
-async 的 `startTransition` 就是[第 28 课](/lessons/react-19)讲的 Action。
+`await` 之后的 set 函数调用不再属于这次过渡。要让它仍是过渡更新，就再包一层 `startTransition`，像“保存 B”那样。这是最常见的坑。对照控制台：A 的 `name` 变成新值的那次渲染里，`isPending` 还是 true，下一次渲染才变回 false，是两次渲染。B 只有一次。
+
+## useDeferredValue 的初始值
+
+`useDeferredValue(value, initialValue)` 的第二个参数是**首次渲染**时用的值。首次渲染先用 `initialValue`，随后 React 立即在后台再渲染一次，换成真正的 `value`。不传第二个参数时，首次渲染直接用 `value`。
+
+```jsx play title="useDeferredValue 的初始值"
+import { useDeferredValue } from 'react';
+
+function Results({ query }) {
+  const deferred = useDeferredValue(query, '（初始值）');
+  console.log('query = ' + query + '，deferred = ' + deferred);
+  return <p>显示：{deferred}</p>;
+}
+
+function App() {
+  return <Results query="搜索词" />;
+}
+```
+
+初始值常用来在首次渲染时跳过昂贵的内容，先显示一个轻量的占位，再在后台渲染完整的结果。
+
+`useDeferredValue` 还能和 Suspense 配合：新值的内容挂起时，用户看到的是旧内容，而不是 fallback。这是它在真实项目里最常见的用法。
+
+<CallBox kind="deep" label="维护 React 18 项目时">
+
+React 18 中，`startTransition` 只能接收同步函数，`useDeferredValue` 也没有第二个参数。
 
 </CallBox>
 
