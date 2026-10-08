@@ -3,8 +3,9 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'state-at-scale',
   stage: 5,
+  runtime: 19,
   title: '大型应用状态架构实战',
-  mins: 40,
+  mins: 42,
   summary: '数据量和页面一多，state 的“形状”就决定了 bug 的数量。学会规范化、记忆化选择器、并发安全的乐观更新、撤销重做和状态机。',
   goals: [
     '能把嵌套的接口数据规范化为 byId + ids，并写出只替换被修改实体的 reducer',
@@ -652,6 +653,29 @@ const send = (state, type) =&gt; machine[state][type] ?? state;</code></pre></di
       explain:
         'idle → validating → paying。在 paying 状态再发 SUBMIT，表里没有，状态不变（这就是“不会重复扣款”）。DECLINED → failed。failed 只响应 RETRY，第三次 SUBMIT 被忽略，最终是 failed。选 validating 的人以为 SUBMIT 在任何状态都会重新开始。',
     },
+    {
+      q: `两次点击几乎同时发生。第 1 个请求 1.5 秒后失败，第 2 个请求 0.5 秒后成功。在第 1 秒时，界面显示几个赞？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [confirmed, setConfirmed] = useState(0);
+const [likes, addOptimistic] = useOptimistic(confirmed, (cur, delta) =&gt; cur + delta);
+
+function like(n) {
+  startTransition(async () =&gt; {
+    addOptimistic(1);
+    try {
+      await fakeRequest(n);
+      setConfirmed(c =&gt; c + 1);
+    } catch {}
+  });
+}</code></pre></div>`,
+      options: [
+        '1 个：第 2 个请求已确认，乐观操作随即撤销',
+        '2 个：只显示两个乐观操作的结果',
+        '3 个：已确认的 1 个，加上仍在应用的两个乐观操作',
+        '0 个：第 1 个请求还没有结果',
+      ],
+      answer: 2,
+      explain:
+        '并发的异步 Action 合并成一批，乐观操作要等整批都结束才撤销。第 1 秒时，第 2 个请求已成功，confirmed 变成 1，而两个 addOptimistic(1) 还在生效，所以显示 1 + 1 + 1 = 3。1.5 秒后第 1 个请求失败，整批结束，乐观操作撤销，回到 1。最终结果正确，只是中间短暂多算。乐观值如果写成目标状态而不是增量，就没有这个问题。',
+    },
   ],
   plays: {
     '存对象还是存 id': {
@@ -669,7 +693,7 @@ const send = (state, type) =&gt; machine[state][type] ?? state;</code></pre></di
       note: '在输入框里打字：App 每次都重新渲染。普通函数每次都算，返回新数组，下面的 memo 列表跟着重新渲染。记忆化选择器发现 byId 和 ids 都没变，返回同一个数组，列表跳过渲染。点两次“给 c2 点赞”：byId 变了，两边都重新计算，c2 进入热门。',
     },
     两个请求并发时的回滚: {
-      note: '第 1 个请求保存的快照是 0。它失败时把界面恢复成 0，可是第 2 个赞已经成功了。界面显示 0，服务器上是 1。B 不保存快照：它记录“已确认的值”和“还在等待的操作”，显示值每次重新算。失败的操作从队列里删掉，成功的操作并入已确认值，所以最后是 1。',
+      note: '第 1 个请求保存的快照是 0。它失败时把界面恢复成 0，可是第 2 个赞已经成功了。界面显示 0，服务器上是 1。B 不保存快照：它记录“已确认的值”和“还在等待的操作”，显示值每次重新算。失败的操作从队列里删掉，成功的操作并入已确认值，所以最后是 1。C 用 useOptimistic：约 0.5 秒时第 2 个请求成功，两个乐观操作都还在，显示 3；约 1.5 秒后整批结束，回到 1。最终结果正确，中间会短暂多算。',
       predict: {
         q: '点 A 的“连点两次赞”，等 2 秒。A 最后显示几个赞？',
         options: ['1', '0', '2', '-1'],
