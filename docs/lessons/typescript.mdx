@@ -342,7 +342,7 @@ function App() {
 | 类型单独发布在 `@types/` 下 | React 本身：`@types/react`、`@types/react-dom` | 额外装成开发依赖，大版本和库对齐：`npm i -D @types/react@19 @types/react-dom@19` |
 | 没有类型 | 一些很老的库 | 先查有没有 `@types/库名`；没有就自己写一行 `declare module '库名';` 暂时放行，之后再补 |
 
-用 Vite 的 `react-ts` 模板创建的项目已经装好了 React 的类型包。
+用 Vite 的 `react-ts` 模板（或 `react-compiler-ts`）创建的项目已经装好了 React 的类型包。
 
 <CallBox kind="tip" label="维护 React 18 项目时">
 
@@ -352,7 +352,7 @@ function App() {
 
 ## 本机任务：给待办应用加 5 处类型
 
-这一课的类型检查只能在本机做。请在[《项目搭建与工具链》](/lessons/engineering)里创建的 Vite + `react-ts` 项目里，用第 10 课的待办应用（或任何小应用）做下面 5 件事，每件事都要让 `npx tsc -b` 通过。
+这一课的类型检查只能在本机做。请在[项目搭建一课](/lessons/engineering)里创建的 Vite + `react-ts` 项目里，用第 10 课的待办应用（或任何小应用）做下面 5 件事，每件事都要让 `npx tsc -b` 通过。
 
 1. **props**：给 `TodoItem` 等组件的 props 写类型。
 2. **事件**：给输入框的 `onChange` 和表单的 `onSubmit` 处理函数写参数类型。
@@ -369,10 +369,20 @@ function App() {
 | `dispatch({ type: 'add' })` 漏掉 `title` | `TS2345`：缺少属性 `title` |
 | 新增一种 action `rename` 但不改 reducer | `default` 分支里的 `never` 那一行报 `TS2322` |
 | 不用自定义 Hook，直接 `useContext(ThemeContext).mode` | `TS2531`：对象可能为 `null`（先存进变量 `theme`，再读 `theme.mode`，则是 `TS18047`：`'theme'` 可能为 `null`） |
-| 去掉自定义 Hook 的 `as const`，再调用返回的函数 | `TS2349`：表达式不可调用，因为元组里取出的值可能是 `boolean`，而 `boolean` 没有调用签名 |
+| 去掉自定义 Hook 的 `as const`，再调用返回的函数 | `TS2349`：表达式不可调用。元素类型是 `boolean \| (() => void)`，联合里的 `boolean` 不能被调用 |
 | 写 `const ref = useRef()` | `TS2554`：需要 1 个参数，但得到 0 个 |
 
-全部做完、`npx tsc -b` 零错误时，这项任务就完成了。项目课[《实战四：城市天气应用》](/lessons/project-weather)的代码全部是 TypeScript。
+全部做完、`npx tsc -b` 零错误时，这项任务就完成了。
+
+<CallBox kind="tip" label="TypeScript 版本">
+
+上面的错误码是用 TypeScript 6.0.3 和 7.0.2 各实测一遍的（2026 年 10 月，`@types/react` 19.3.0）：两个版本报出的错误码和位置一致，`tsc -b` 照常工作，`React.SubmitEvent` 可用，`React.FormEvent` 仍被标记为弃用，全局的 `JSX` 命名空间仍然找不到。
+
+要注意的是工具链：这时的 typescript-eslint 不支持 TypeScript 7.0。把项目升级到 7.0 后运行 `npm run lint`，会报 `typescript-eslint does not support TS 7.0`。Vite 的模板把 TypeScript 固定在 `~6.0.2`。需要升级到 7 的项目，先查 typescript-eslint 的发布说明，确认支持再升。
+
+</CallBox>
+
+项目课[《实战四：城市天气应用》](/lessons/project-weather)的代码全部是 TypeScript。
 
 </LessonProse>
 

@@ -4,8 +4,9 @@ export default {
   id: 'project-weather',
   stage: 4,
   title: '实战四：城市天气应用',
-  mins: 40,
-  summary: '在本机把 Vite、TypeScript、React Router、TanStack Query 和测试接成一个小应用：搜索城市、查看天气、收藏城市。',
+  mins: 63,
+  summary:
+    '在本机自己写一个小应用：搜索城市、查看天气、收藏城市。Vite、TypeScript、React Router、TanStack Query 和测试接在一起，用一组下载的验收测试判断是否做对。',
   goals: [
     '能给一个应用里的每一份数据归类（URL、界面、服务器、浏览器本地），并说出各放在哪里',
     '能按“加载中、出错、没有找到、成功”四种状态写出搜索结果，并说出判断的先后顺序',
@@ -17,7 +18,7 @@ export default {
     '渲染一个查询的顺序：先判断 isPending，再判断 isError，最后才读 data。没有匹配是正常结果（空数组），不是错误。',
     '依赖查询用 enabled 控制，不要在 queryFn 里返回 null。queryKey 里要写全所有影响结果的参数，漏掉的参数会让不同页面共用同一份缓存。',
     '不要把界面状态写进服务器数据（例如给城市对象加 fav 字段）。分开保存，切换页面、重新请求都不会互相影响。',
-    '测试用户看到的行为：用假的 fetch 代替网络，每个测试用新的 QueryClient 并关掉重试，覆盖结果、空结果、错误和收藏。',
+    '测试用户看到的行为：用假的 fetch 代替网络，每个测试用新的 QueryClient 并关掉重试，覆盖结果、空结果、错误和收藏。验收测试只认文件名、导出名和用户看得见的文字，不管内部怎么写。',
   ],
   quiz: [
     {
