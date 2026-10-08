@@ -128,6 +128,7 @@
     "concurrent#c0": "31e72267",
     "concurrent#c1": "54a73e7e",
     "concurrent#c2": "f1a10a74",
+    "concurrent#c3": "9fcc5b9a",
     "profiling#0": "12b96990",
     "profiling#1": "75914e7f",
     "profiling#2": "d91b3e98",
@@ -374,6 +375,8 @@
     "suspense|没有 Suspense 边界",
     "suspense|fallback 的最短显示时间",
     "suspense|切换时保留旧界面",
-    "suspense|过渡里抛出的错误"
+    "suspense|过渡里抛出的错误",
+    "concurrent|异步过渡的 isPending",
+    "concurrent|useDeferredValue 的初始值"
   ]
 }
