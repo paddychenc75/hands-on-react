@@ -1,6 +1,6 @@
 // 浏览器测试入口：npm run test:e2e [-- <套件> [课id ...]] ...
 //   npm run test:e2e                                 三个套件都跑（逐课、学习机制、冒烟），约 2~3 分钟
-//   npm run test:e2e -- lessons                      只跑逐课测试（49 课）
+//   npm run test:e2e -- lessons                      只跑逐课测试（50 课）
 //   npm run test:e2e -- lessons state use-effect     逐课测试只测这两课（课 id 跟在 lessons 后面）
 //   npm run test:e2e -- throttle                     4 倍 CPU 降速下，scheduler / concurrent / use-effect / suspense-data 的参考答案要通过
 //   npm run test:e2e -- mechanics smoke              只跑学习机制和冒烟

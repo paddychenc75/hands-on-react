@@ -2,7 +2,7 @@
   "name": "hands-on-react",
   "private": true,
   "type": "module",
-  "description": "动手学 React：中文交互式 React 课程，49 课 6 阶段，基于 Rspress 2（MDX + React），可运行示例、预测题、自动判分练习、间隔复习和阶段测验",
+  "description": "动手学 React：中文交互式 React 课程，50 课 6 阶段，基于 Rspress 2（MDX + React），可运行示例、预测题、自动判分练习、间隔复习和阶段测验",
   "scripts": {
     "predev": "node scripts/gen-registry.mjs && node --disable-warning=ExperimentalWarning scripts/build-react19.mjs && node --disable-warning=ExperimentalWarning scripts/build-libs.mjs",
     "dev": "rspress dev",

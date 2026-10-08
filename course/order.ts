@@ -30,6 +30,7 @@ export const LESSON_ORDER: string[] = [
   'profiling',
   'patterns',
   'accessibility',
+  'animation',
   'state-architecture',
   'react-19',
   'server-components',

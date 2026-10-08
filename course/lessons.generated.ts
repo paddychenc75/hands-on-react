@@ -2,6 +2,7 @@
 // Node 端收集 course/lessons 里的所有课；课程顺序在 course/order.ts。浏览器代码不要 import 这个文件（见 course/lessons.loaders.generated.ts）。
 import type { Lesson } from './types.ts';
 import l_accessibility from './lessons/accessibility.ts';
+import l_animation from './lessons/animation.ts';
 import l_closures from './lessons/closures.ts';
 import l_components_props from './lessons/components-props.ts';
 import l_concurrent from './lessons/concurrent.ts';
@@ -53,6 +54,7 @@ import l_what_is_react from './lessons/what-is-react.ts';
 
 export const LESSON_MODULES: Record<string, Lesson> = {
   'accessibility': l_accessibility,
+  'animation': l_animation,
   'closures': l_closures,
   'components-props': l_components_props,
   'concurrent': l_concurrent,

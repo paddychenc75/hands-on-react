@@ -227,15 +227,15 @@ for (const si of [0, 3]) {
     learned: [...document.querySelectorAll('.stats > div')].map(d => d.innerText.replace(/\s+/g, ' ')).filter(t => /道题在复习中|课已完成/.test(t)),
     checks: [...document.querySelectorAll('.check-link')].slice(0, 2).map(a => a.innerText),
   }));
-  ok(/已完成 2\/49/.test(home.top), '旧进度：顶栏已完成 2/49', home.top);
+  ok(/已完成 2\/50/.test(home.top), '旧进度：顶栏已完成 2/50', home.top);
   ok(
     home.mastered === 1 && /最好成绩 92%/.test(home.checks[0]) && /最好成绩 58%/.test(home.checks[1]),
     '旧进度：阶段测验记录（通过 92%、未通过 58%）显示一致',
     JSON.stringify(home.checks),
   );
   ok(
-    home.learned.some(t => t.includes('3 道题在复习中')) && home.learned.some(t => t.includes('2/49')),
-    '旧进度：首页“3 道题在复习中”“2/49 课已完成”',
+    home.learned.some(t => t.includes('3 道题在复习中')) && home.learned.some(t => t.includes('2/50')),
+    '旧进度：首页“3 道题在复习中”“2/50 课已完成”',
     JSON.stringify(home.learned),
   );
   ok(home.cta.includes('继续学习'), '旧进度：首页显示“继续学习”');
