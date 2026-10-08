@@ -93,7 +93,7 @@ function App() {
   const [state, dispatch] = useReducer(boardReducer, initialState);
   const [title, setTitle] = useState('');
   return (
-    <DispatchCtx.Provider value={dispatch}>
+    <DispatchCtx value={dispatch}>
       <form onSubmit={e => { e.preventDefault(); dispatch({ type: 'add', title }); setTitle(''); }}>
         <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
         <button>添加卡片</button>
@@ -104,7 +104,7 @@ function App() {
             cards={state.cards.filter(c => c.col === col)} />
         ))}
       </div>
-    </DispatchCtx.Provider>
+    </DispatchCtx>
   );
 }`,
     solution: `import { useReducer, useState, createContext, useContext } from 'react';
@@ -175,7 +175,7 @@ function App() {
   const [state, dispatch] = useReducer(boardReducer, initialState);
   const [title, setTitle] = useState('');
   return (
-    <DispatchCtx.Provider value={dispatch}>
+    <DispatchCtx value={dispatch}>
       <form onSubmit={e => { e.preventDefault(); dispatch({ type: 'add', title }); setTitle(''); }}>
         <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
         <button>添加卡片</button>
@@ -186,7 +186,7 @@ function App() {
             cards={state.cards.filter(c => c.col === col)} />
         ))}
       </div>
-    </DispatchCtx.Provider>
+    </DispatchCtx>
   );
 }`,
     hint: '<code>add</code> 用 <code>state.nextId</code> 作为新 id 并让 nextId + 1；<code>move</code> 用 <code>state.columns.indexOf(c.col) + action.dir</code> 算出新列的下标，越界就不变；每个分支都返回新对象。',
@@ -283,7 +283,7 @@ function boardReducer(state, action) {
         '<code>c.col = …</code> 直接修改了旧的卡片对象。严格模式在开发环境会把 reducer 调用两次。两次改的是同一个对象：第一次从待办改到进行中，第二次从进行中改到已完成。纯函数写法：<code>return { ...c, col: state.columns[i] }</code>。',
     },
     {
-      q: `App 里忘了写 <code>&lt;DispatchCtx.Provider&gt;</code>，其他代码不变。点卡片上的“删除”会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const DispatchCtx = createContext(null);
+      q: `App 里忘了写 <code>&lt;DispatchCtx value={dispatch}&gt;</code>，其他代码不变。点卡片上的“删除”会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const DispatchCtx = createContext(null);
 
 function Card({ card }) {
   const dispatch = useContext(DispatchCtx);
