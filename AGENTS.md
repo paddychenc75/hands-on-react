@@ -109,7 +109,7 @@ npm run new-lesson -- hooks-recap --stage 1 --after custom-hooks --title "Hook �
 然后：
 
 1. 把所有“【待写】”换成真内容（`npm run check:content` 会提示哪些课还有占位）。写作规范见下。
-2. **课号是位置**：插在中间会让后面的课号 +1。脚本会列出写了“第 N 课”且 N ≥ 新课号的位置；`check:content` 也会报“第 N 课《标题》”和“第 N 课“词””对不上的引用。逐个核对。毕业设计（portfolio）的验收表引用了很多课号；`theme/components/HomePage.tsx` 里写了“第 18 课”（渲染机制）。另外，`engineering`（第 33 课，第 5 阶段第一课）和 `delivery`（第 34 课）和 `project-weather`（第 40 课，第 5 阶段最后一课）有本机操作的命令、配置和版本要求，写进去前要对照官方文档核对。
+2. **课号是位置**：插在中间会让后面的课号 +1。脚本会列出写了“第 N 课”且 N ≥ 新课号的位置；`check:content` 也会报“第 N 课《标题》”和“第 N 课“词””对不上的引用。逐个核对。毕业设计（portfolio）的验收表引用了很多课号；`theme/components/HomePage.tsx` 里写了“第 19 课”（渲染机制）。另外，`engineering`（第 33 课，第 5 阶段第一课）和 `delivery`（第 34 课）和 `project-weather`（第 40 课，第 5 阶段最后一课）有本机操作的命令、配置和版本要求，写进去前要对照官方文档核对。
 3. 估算 `mins`：正文每 300 字约 1 分钟，可运行示例 +2，练习 +10~20，测验每题 +1。
 4. 新阶段要同时改 `course/stages.ts` 和新建 `docs/check/N.mdx`（阶段测验页，照抄现有的）；`new-lesson` 和 `check:content` 读 `STAGES.length`，不用改。
 5. `npm run check` → `npm run build` → `npm run test:e2e -- lessons <id>`（练习必须 `PASS`）。
@@ -310,7 +310,7 @@ export default {
 - 19 的行为细节：`<form action={fn}>` 的 Action 结束后，React 重置表单里的非受控字段（出错返回时也一样）；未被错误边界接住的渲染错误不再触发 window 的 `error` 事件；`useId` 的格式在 19.1、19.2 改过，不要依赖具体格式；警告文字和链接已变，不要引用 `Warning: …` 或组件栈原文；严格模式下的重复渲染和 effect 次数、`useEffect` 里 ref 回调的行为，预测题的答案和 `note` 要按 19.3.0 实测。
 - 写完实测：参考答案通过、起始代码被拒、两种常见错误被拒、一种合理的不同写法通过；`npm run test:e2e -- lessons <id> runtime`。
 
-**课文以 19 为默认**：正文只写 19 的写法（`<Ctx value>`、ref 作为 prop、`use()`、Action 等）。React 18 的差异放进提示框，标题统一写 `维护 React 18 项目时`（`<CallBox kind="tip" label="维护 React 18 项目时">`，种类一律用 tip），一课最多一两个，内容是“18 里怎么写、读旧代码时怎么认”。差异的版本边界在 19.x 之内时，标题照同样的体例写成 `维护 React 19.2 之前的项目时`（见 `closures`），种类仍是 tip。从 18 升级的完整路线只在 `engineering` 的选读里讲。
+**课文以 19 为默认**：正文只写 19 的写法（`<Ctx value>`、ref 作为 prop、`use()`、Action 等）。React 18 的差异放进提示框，标题统一写 `维护 React 18 项目时`（`<CallBox kind="tip" label="维护 React 18 项目时">`，种类一律用 tip），一课最多一两个，内容是“18 里怎么写、读旧代码时怎么认”。差异的版本边界在 19.x 之内时，标题照同样的体例写成 `维护 React 19.2 之前的项目时`（见 `closures`），种类仍是 tip。从 18 升级的完整路线只在 `delivery` 的选读里讲。
 
 **服务端内容只读**：`'use server'`、服务端组件、Next.js、`react-dom/server` 在实验台里跑不了：用只读 `code` 块展示，在文字里写明“只能阅读”，示例里的“服务器”用模拟的异步函数并说明是模拟。`hydrateRoot` 可以在实验台里跑（服务端 HTML 手写成字符串）。
 
