@@ -1,6 +1,6 @@
 # 动手学 React
 
-中文交互式 React 课程：46 课，6 个阶段（入门、进阶、高级、原理与架构、生态与实战、深入），约 23 小时。可运行示例、先预测再运行、练习自动判分、间隔复习和阶段测验。站点用 [Rspress 2](https://rspress.rs)（React + MDX）构建，静态发布到 GitHub Pages。
+中文交互式 React 课程：46 课，6 个阶段（入门、进阶、高级、原理与架构、生态与实战、深入），约 25 小时。可运行示例、先预测再运行、练习自动判分、间隔复习和阶段测验。站点用 [Rspress 2](https://rspress.rs)（React + MDX）构建，静态发布到 GitHub Pages。
 
 学习进度只存在你的浏览器里（`localStorage`），不上传到任何地方。
 
@@ -16,7 +16,7 @@ npm run build                     # 构建到 doc_build/
 npm run preview                   # 预览构建结果
 ```
 
-实验台需要联网：页面按需从 cdn.jsdelivr.net 加载 React 18.3.1 开发版、Babel 和 Prism。
+实验台跑的是 React 19.3.0 开发版（站内自带，构建时由 `scripts/build-react19.mjs` 生成）。Babel 和 Prism 按需从 cdn.jsdelivr.net 加载，所以实验台需要联网。
 
 ## 检查和测试
 

@@ -37,10 +37,10 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.generated.ts`（dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（React 18/19 运行时：版本隔离、19 的警告、资源被拦截、react-19 一课的示例和练习），可以写多个；不写就三个都跑。
-- 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 React 18.3.1 开发版、Babel、Prism；React 19 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习），可以写多个；不写就四个都跑。
+- 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
-- 期望结果：`lessons` 最后一行 `lessons 46 with issues 0`；`mechanics`（8 项）和 `smoke`（49 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
+- 期望结果：`lessons` 最后一行 `lessons 46 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
 - Node 版本：`.nvmrc` 是 24，`engines` 要求 `>=24`。脚本（`check:content`、`new-lesson`）靠 Node 的类型剥离直接读 `.ts`，所以需要 Node 24 以上。
 - **提交前钩子**：`npm install` 的 `prepare` 会把 `core.hooksPath` 设为 `.githooks/`，每次提交前自动跑 `npm run lint` 和 `npm run check:content`（几秒）。CI 里和没有 `.git` 的环境不会启用。紧急跳过：`git commit --no-verify`。
 - **格式化提交**：`.git-blame-ignore-revs` 记着“只改格式”的提交；本地用 `git config blame.ignoreRevsFile .git-blame-ignore-revs`，GitHub 网页会自动读取。
@@ -77,7 +77,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `store.ts` | 进度存储（`localStorage['hands-on-react-v1']`）、`lp(id)`、进度变化事件 |
 | `util.ts` | DOM 小工具（`el`、`toast`、`highlight`…） |
 | `exec.ts` | 代码预处理和编译（`prepare`、`compile`、`stripComments`）。练习的检查函数也 import 它 |
-| `runtime.ts` | 按需加载 React 运行时（18 或 19，按课选）+ Babel + Prism；`loadRuntime(版本)` 返回 `Runtime`，`getRuntime(版本)` 同步取已加载的 |
+| `runtime.ts` | 按需加载 React 19.3.0 开发版（站内文件）+ Babel + Prism；`loadRuntime()` 返回 `Runtime`，`getRuntime()` 同步取已加载的 |
 | `runner.ts` | 执行学习者的代码、收集控制台和错误（`Runner`） |
 | `editor.ts` | 代码编辑器（textarea 叠加高亮） |
 | `playground.ts` | 实验台，含“先预测再运行” |
@@ -93,7 +93,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `logic/ladder.ts` | 提示阶梯解锁、“代码是否真的改了”、半成品示例 |
 | `logic/selfExplain.ts` | 自我解释有效字数 |
 | `logic/stageCheck.ts` | 阶段测验抽题、及格、冷却、复测、交卷记录 |
-| `logic/runtime.ts` / `warnings.ts` | 运行时选择（`runtimeOf`、版本号、19 资源路径）/ 识别 React 18、19 的警告 |
+| `logic/runtime.ts` / `warnings.ts` | 运行时版本号常量 `REACT_VERSION` 和资源路径 / 识别 React 19 的警告 |
 | `logic/random.ts` / `text.ts` / `errors.ts` | 洗牌和种子随机 / 转义和选项格式 / 错误信息中文解释 |
 
 **不允许循环依赖**：`logic/` 只依赖 `logic/` 里的纯文件、类型和 `exec.ts`；DOM 模块之间只能单向依赖（例如 `quiz.ts` → `completion.ts`，反过来不行）。数据文件只能 import `../engine/exec.ts`（不要 import 引擎别的模块：会形成循环引用）。
@@ -142,7 +142,7 @@ npm run new-lesson -- hooks-recap --stage 1 --after custom-hooks --title "Hook �
 - 引擎是从旧 DOM 代码搬来的（`querySelector` 到处返回可能为空的元素），开 `strictNullChecks` 要加几百个断言，收益小。
 - 每课 `exercise.test` 是几十行的旧式 DOM 检查脚本，局部辅助函数没有写参数类型，开 `noImplicitAny` 要给 200 多处补注解。
 - 保留的检查已经能抓结构性错误：数据文件字段名写错、漏字段、类型不对（`satisfies Lesson`），引擎函数签名和 `Progress` 结构不匹配等。引擎模块的函数参数和返回值都写了类型。
-- 浏览器里的 `window.React/ReactDOM/Babel/Prism` 和练习里的 `t.q()` 结果按 `any` 声明（边界），其余尽量不用 `any`。
+- 浏览器里的 `window.Babel/Prism` 和练习里的 `t.q()` 结果按 `any` 声明（边界），其余尽量不用 `any`。
 
 以后收紧的顺序建议：先给 `logic/` 之外的引擎模块开 `noImplicitAny`，再考虑 `strictNullChecks`。
 
@@ -258,48 +258,36 @@ export default {
 
 改引擎后跑 `npm run test:unit` 和 `npm run test:e2e -- mechanics`；后者覆盖提示阶梯、自我解释门槛、阶段测验 12 题、交卷前不显示答案、中途离开冷却，以及 390px 宽度下无横向滚动。
 
-## 实验台运行时（React 18 / 19）
+## 实验台运行时（React 19.3.0）
 
-**怎么选**：课的数据文件里写 `runtime: 19`，这一课的全部实验台和练习都跑 React 19；不写就是 18（`course/types.ts` 的 `Lesson.runtime`，`check:content` 只允许 18、19）。现在只有 `react-19` 一课是 19。
+**只有一个运行时**：全站的实验台和练习都跑 React 19.3.0 开发版，没有按课选版本的开关（数据文件里写 `runtime` 字段会被 `check:content` 报错）。
 
 **怎么实现**：
-- 18：jsdelivr 的 React 18.3.1 开发版 UMD，会写 `window.React`、`window.ReactDOM`（只属于 18）。
-- 19：React 没有 UMD。`scripts/build-react19.mjs`（`predev`、`prebuild` 自动跑）把固定版本的 `react-runtime-19`、`react-dom-runtime-19`（npm 别名包，版本 19.3.0，与站点自己的 `react`、`react-dom` 无关）里的开发版 CJS 文件包成一个自包含脚本 `docs/public/runtime/react-19.3.0.dev.js`（不提交，约 1.2 MB，gzip 后约 210 KB，只在打开 19 的课时才加载，不进主包）。`react`、`react-dom`、`react-dom/client`、`scheduler` 在同一个模块表里，是同一个实例。只登记在 `window.__hocReact19`，不碰 `window.React`。升级 19 的版本：同时改 `package.json` 里两个别名包和 `course/engine/logic/runtime.ts` 的 `REACT_VERSIONS[19]`（脚本会核对两者一致），再 `npm install`。
-- 隔离：`loadRuntime(版本)` 返回 `Runtime`（`React`、`ReactDOM`、版本号），`Runner`、`prepare`、`makeTester` 都显式拿着它；学习者代码里的 `React`、`ReactDOM`、`import … from 'react'` 都解析到这一课的运行时，不读全局。两个运行时可以先后加载，互不覆盖。
-- 加载失败：实验台显示“运行环境加载失败，请检查网络后刷新页面。”，页面其余部分正常（`tests/e2e/runtime.mjs` 用 route 拦截验证）。
-- 界面：实验台标题栏有版本标记。19 是强调色小药丸，18 是很淡的灰字。
+- React 没有 UMD。`scripts/build-react19.mjs`（`predev`、`prebuild` 自动跑）把固定版本的 `react-runtime-19`、`react-dom-runtime-19`（npm 别名包，与站点自己的 `react`、`react-dom` 无关）里的开发版 CJS 文件包成一个自包含脚本 `docs/public/runtime/react-19.3.0.dev.js`（不提交，约 1.2 MB，gzip 后约 210 KB，不进主包，第一个实验台需要时才加载）。`react`、`react-dom`、`react-dom/client`、`scheduler` 在同一个模块表里，是同一个实例。只登记在 `window.__hocReact19`，不写 `window.React`、`window.ReactDOM`。Babel 和 Prism 照旧从 CDN 加载。
+- **升级版本**：同时改 `package.json` 里两个别名包的版本和 `course/engine/logic/runtime.ts` 的 `REACT_VERSION`（版本号集中在这一处，构建脚本会核对两者一致），再 `npm install`，然后重新实测示例和练习。
+- 显式传入：`loadRuntime()` 返回 `Runtime`（`React`、`ReactDOM`、`reactVersion`），`Runner`、`prepare`、`makeTester` 都显式拿着它；学习者代码里的 `React`、`ReactDOM`、`import … from 'react'` 都解析到它，引擎不读全局。
+- 加载失败：实验台显示“运行环境加载失败，请检查网络后刷新页面。”，页面其余部分正常；之后再进入有实验台的页面会重试（`tests/e2e/runtime.mjs` 用 route 拦截验证）。
+- 界面：实验台标题栏有一行不抢眼的灰字 `React 19.3.0`。
 
-**练习检查函数里**：19 的课用 `t.React`、`t.ReactDOM`（`const { React, ReactDOM } = t;`），不要读全局的 `React`、`ReactDOM`（全局的是 18，甚至可能没加载）。18 的课保持原写法。
+**警告识别**（`logic/warnings.ts`，有单元测试，样例是实测的）：19 的警告消息**没有 `Warning: ` 前缀**，链接是 `react.dev/link/…`，不再拼组件栈（标签嵌套类警告附 DOM 树）。所以不能靠前缀。19 的包里 `console` 是一份副本，React 发出的 `error`/`warn` 交给引擎，来源可靠；规则是“排除错误报告，其余都是警告”。错误报告：被错误边界接住的是 `console.error('%o\n\n%s\n\n%s\n', err, 'The above error occurred in the <X> component.', …)`，没接住的是 `console.warn('%s\n\n%s\n', 'An error occurred in the <X> component.', …)`。`createRoot` 的 `onUncaughtError` 把未接住的渲染错误记到对应的实验台；事件处理函数里抛的错误走 window 的 `error` 事件。学习者自己的 `console.error` 走实验台的假 console，永远不会被当成 React 警告。不要让 React 包写真正的 `console`（React 会为了屏蔽探测日志改写 `console` 方法，包里用副本就是为了避免它改到真的 console，否则会无限递归）。
 
-**警告识别**（`logic/warnings.ts`，有单元测试，样例是实测的）：
-- 18：全局 `console.error`，消息以 `Warning: ` 开头，格式串末尾带组件栈（`%s`）。
-- 19：消息没有 `Warning: ` 前缀，链接改成 `react.dev/link/…`，不再拼组件栈（标签嵌套类警告附 DOM 树）。所以不能靠前缀。19 的包里 `console` 是一份副本，React 发出的 `error`/`warn` 交给引擎，来源可靠；规则是“排除错误报告，其余都是警告”。错误报告：被错误边界接住的是 `console.error('%o\n\n%s\n\n%s\n', err, 'The above error occurred in the <X> component.', …)`，没接住的是 `console.warn('%s\n\n%s\n', 'An error occurred in the <X> component.', …)`。19 的 `createRoot` 用 `onUncaughtError` 把未接住的错误记到对应的实验台。学习者自己的 `console.error` 走实验台的假 console，永远不会被当成 React 警告。
-- 不要在 `console.error` 补丁里读 19 的消息，也不要让 19 的包写真正的 `console`（React 会为了屏蔽探测日志改写 `console` 方法，包里用副本就是为了避免它改到真的 console，否则会无限递归）。
+**写示例和练习检查时**：
+- 练习检查函数用 `t.React`、`t.ReactDOM`（`const { React, ReactDOM } = t;`），**不要读全局的** `React`、`ReactDOM`：全局没有。
+- 示例里 `import { … } from 'react'`，只要运行时的 React 真有这个导出就能用（`use`、`useActionState`、`useOptimistic`、`useEffectEvent`、`Activity`、`ViewTransition`、`startTransition` 等）；`react-dom` 的具名导入（`useFormStatus`、`createPortal`、`flushSync`、`preload` 等）从合并后的 `ReactDOM` 取。`ViewTransition` 要放进 `startTransition` 才有动画。
+- 19.3.0 实测可用：`<form action>`、`useActionState`、`useFormStatus`、`useOptimistic`、`use()` 读 Promise 配 Suspense、ref 作为 prop 和 ref 回调清理函数、`<Context value>` 当 Provider、`Activity`、`useEffectEvent`、`ViewTransition`。
+- **不能用已移除的 API**：`ReactDOM.render`、`unmountComponentAtNode`、`findDOMNode`、字符串 ref、函数组件的 `defaultProps`/`propTypes`；`act` 从 `react` 导入。引擎和练习检查工具都没有用到它们。
+- 19 的行为细节：`<form action={fn}>` 的 Action 结束后，React 重置表单里的非受控字段（出错返回时也一样）；未被错误边界接住的渲染错误不再触发 window 的 `error` 事件；`useId` 的格式在 19.1、19.2 改过，不要依赖具体格式；警告文字和链接已变，不要引用 `Warning: …` 或组件栈原文；严格模式下的重复渲染和 effect 次数、`useEffect` 里 ref 回调的行为，预测题的答案和 `note` 要按 19.3.0 实测。
+- 写完实测：参考答案通过、起始代码被拒、两种常见错误被拒、一种合理的不同写法通过；`npm run test:e2e -- lessons <id> runtime`。
 
-**19 的课里示例能用哪些 API**：`prepare` 对 19 的课，`import { … } from 'react'` 里只要运行时的 `React` 真有这个导出就取出来（`use`、`useActionState`、`useOptimistic`、`useEffectEvent`、`Activity`、`ViewTransition`、`startTransition` 等）；`react-dom` 的具名导入（`useFormStatus`、`createPortal`、`flushSync`、`preload` 等）从合并后的 `ReactDOM` 取。在 19.3.0 实测可用的有：`<form action>`、`useActionState`、`useFormStatus`、`useOptimistic`、`use()` 读 Promise 配 Suspense、ref 作为 prop 和 ref 回调清理函数、`<Context value>` 当 Provider、`Activity`、`useEffectEvent`、`ViewTransition`（react.dev 的 19.3 发布说明确认它在 19.3 稳定；要放进 `startTransition` 才有动画）。`'use server'`、服务端组件不能跑；示例里的“服务器”用模拟的异步函数，并在文字里写明是模拟。
+**课文以 19 为默认**：正文只写 19 的写法（`<Ctx value>`、ref 作为 prop、`use()`、Action 等）。React 18 的差异放进提示框，标题统一写 `维护 React 18 项目时`（`<CallBox kind="tip" label="维护 React 18 项目时">`），一课最多一两个，内容是“18 里怎么写、读旧代码时怎么认”。从 18 升级的完整路线只在 `engineering` 的选读里讲。
 
-**两个运行时的差异（写 19 的示例时注意）**：
-- 19 移除了 `ReactDOM.render`、`unmountComponentAtNode`、`findDOMNode`、字符串 ref、函数组件的 `defaultProps`/`propTypes`；`act` 从 `react` 导入。练习检查工具和引擎没有用到它们。
-- `<form action={fn}>`：Action 结束后 React 重置表单里的非受控字段（出错返回时也一样）；18 不支持这种写法。
-- 19 里未被错误边界接住的错误不再触发 window 的 `error` 事件（18 开发版会先报给 window），引擎用 `onUncaughtError` 处理。
-- 19 的警告文字、链接、组件栈都变了（见上）；`useId` 的格式在 19.1、19.2 改过，不要依赖具体格式。
-
-**把别的课切到 19 要检查什么**（清单）：
-1. 预测题的答案和 `note`、`explain` 是否依赖 18 的具体行为：严格模式下的重复渲染和 effect 次数、批处理、自动批处理之外的细节、`useEffect` 里 `ref` 回调以 `null` 再调用的行为。
-2. 示例和练习里有没有 `ReactDOM.render`、`unmountComponentAtNode`、`defaultProps`、`propTypes`、字符串 ref、`forwardRef` 必须的场景、`.Provider` 的说明文字（19 仍可用，但文字可能说“必须”）。
-3. 文字里有没有“React 18 中……”的描述与示例结果矛盾；有没有引用警告原文（`Warning: …`、组件栈）的地方：19 没有这些。
-4. 练习检查函数：全局 `React`/`ReactDOM` 改成 `t.React`/`t.ReactDOM`；依赖组件栈或警告文字的检查要重写；依赖 `act`、事件细节、渲染次数的检查要实测。
-5. `t.source` 之类的字面检查是否还成立。
-6. `useId`、`flushSync`、Suspense 回退时机、过渡更新的行为差异。
-7. 改完实测：参考答案通过、起始代码被拒、两种常见错误被拒、一种合理的不同写法通过；`npm run test:e2e -- lessons <id> runtime`。
-8. `quiz`、`checkOnly` 只能在原位改写表述，不能删、不能换位；改了题干错别字用 `check:content -- --update --force`；预测键 `pkey` 不改。
-9. 重新估算 `mins`。
+**服务端内容只读**：`'use server'`、服务端组件、Next.js、`react-dom/server` 在实验台里跑不了：用只读 `code` 块展示，在文字里写明“只能阅读”，示例里的“服务器”用模拟的异步函数并说明是模拟。`hydrateRoot` 可以在实验台里跑（服务端 HTML 手写成字符串）。
 
 ## 写作规范
 
 - 中文，约 80% 遵循 ASD-STE100 简化技术语言：一句一个意思，短句（尽量 ≤30 字），主动语态，固定术语。比喻和动机段落可以灵活，但同一个比喻不要用在两个概念上（已用过：遥控器、自动售货机、银行柜台等）。
 - 步骤写成有序列表，不要用 `<br>1.` 手工编号。
-- 术语与 `course/glossary.ts` 一致：set 函数（不写 setState/setter）、唯一数据源、无障碍（不写可访问性）、记忆化（指 memo/useMemo/useCallback 时不写缓存）、卸载（不写销毁）、重新渲染（不写重渲染）、渲染/提交、过渡更新。写“React 18 中”，不写“18 里”。新概念第一次出现给一句定义。
+- 术语与 `course/glossary.ts` 一致：set 函数（不写 setState/setter）、唯一数据源、无障碍（不写可访问性）、记忆化（指 memo/useMemo/useCallback 时不写缓存）、卸载（不写销毁）、重新渲染（不写重渲染）、渲染/提交、过渡更新、Action（异步提交函数，首字母大写，和 reducer 的 action 对象区分）。写“React 18 中”，不写“18 里”。新概念第一次出现给一句定义。
 - 学习目标用“能写出 / 能解释 / 能诊断 / 能判断……”开头。
 - 测验干扰项来自真实误解；正确项的位置和长度不要有规律；`explain` 说明为什么对，并点出最迷惑的错误项错在哪。
 - 技术准确，区分 React 18 与 19。
@@ -307,7 +295,7 @@ export default {
 ## 架构要点
 
 - **React 组件只是薄包装**：服务端渲染只输出占位元素；浏览器里 `useEffect` 调用引擎函数，把返回的 DOM 挂进去（`theme/lib/useSlot.ts`、`useDomSlot.ts`）。学习机制的逻辑都在引擎里，不在组件里。**不要把交互组件改写成纯 React**。
-- **实验台不用 iframe**：页面内按需加载 React **开发版**，站点自己的 React 与它互不干扰。运行时按课选择，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
+- **实验台不用 iframe**：页面内按需加载 React 19.3.0 **开发版**，站点自己的 React 与它互不干扰，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
 - **进度**只存在浏览器 `localStorage['hands-on-react-v1']`（键和结构不要改，结构见 `course/types.ts` 的 `Progress`）；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
 - **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`），样式在 `theme/style.css`。
 - **课程注册表自动收集**：`course/lessons/*.ts` → `scripts/gen-registry.mjs` → `course/lessons.generated.ts`（提交进仓库）。选生成脚本而不是 `import.meta.webpackContext`：rspress dev/build、Vitest、node 脚本和 tsc 要读同一份课程表，没有一种目录收集写法四处都能用。`dev`/`build` 前自动重新生成，`check:content` 检查它是否最新。
