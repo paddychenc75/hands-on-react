@@ -347,7 +347,7 @@ React 19 除了 Actions，还带来了几项别的能力。它们各有更合适
 | `<Activity>` 隐藏界面并保留 state | [并发特性：useTransition 与 useDeferredValue](/lessons/concurrent) |
 | ref 作为普通 prop、ref 回调的清理函数 | [useRef](/lessons/use-ref)、[DOM 逃生舱](/lessons/escape-hatches) |
 | `useEffectEvent` | [闭包陷阱与 Effect 依赖](/lessons/closures) |
-| `<ViewTransition>` | 暂时只有下面选读区的示例 |
+| `<ViewTransition>` | [动画与过渡](/lessons/animation)（下面选读区有一个入门示例） |
 | `createRoot` 的 `onCaughtError`、`onUncaughtError` | [错误处理与监控](/lessons/error-handling) |
 | 从 React 18 升级、被移除的 API | [交付：构建、部署与升级](/lessons/delivery)的选读“维护 React 18 项目：升级到 React 19” |
 | 大表单的组织 | [表单与校验架构](/lessons/form-architecture) |
@@ -425,7 +425,7 @@ function App() {
 }
 ```
 
-`<ViewTransition>` 用浏览器的 View Transition API，为元素的进入和离开做动画。放在 `startTransition` 里的更新才会触发动画。目前只有这里有它的示例：
+`<ViewTransition>` 用浏览器的 View Transition API，为元素的进入和离开做动画，放在 `startTransition` 里的更新才会触发。完整讲解（共享元素、列表重排、定制和降级）见[动画与过渡](/lessons/animation)。这里只留一个最小示例：
 
 ```jsx play title="ViewTransition：进入和离开的动画"
 import { ViewTransition, startTransition, useState } from 'react';

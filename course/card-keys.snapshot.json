@@ -164,8 +164,15 @@
     "accessibility#c0": "321742fc",
     "accessibility#c1": "cc542edb",
     "accessibility#c2": "cdb5a779",
-    "animation#0": "94696e6b",
-    "animation#c0": "e9b9c21e",
+    "animation#0": "61b591ad",
+    "animation#1": "4f55b99e",
+    "animation#2": "84f52553",
+    "animation#3": "19abf430",
+    "animation#4": "25415b81",
+    "animation#c0": "5fc4e9c9",
+    "animation#c1": "ae4a6ad4",
+    "animation#c2": "df12d89f",
+    "animation#c3": "1cd93d36",
     "state-architecture#0": "b12057d9",
     "state-architecture#1": "0a0aa6e2",
     "state-architecture#2": "054d5344",
@@ -494,6 +501,9 @@
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
     "perf-clinic|memo 挡得住 Context 吗？",
-    "animation|第一个示例"
+    "animation|条件渲染：入场有动画，离场没有",
+    "animation|先播放离场动画，再卸载",
+    "animation|ViewTransition：放不放进 startTransition",
+    "animation|只动 transform：每帧的布局代价"
   ]
 }

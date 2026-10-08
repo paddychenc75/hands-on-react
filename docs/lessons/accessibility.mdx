@@ -276,6 +276,8 @@ function App() {
 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 ```
 
+用户中途改设置时，上面这行不会更新。怎样用 `useSyncExternalStore` 订阅它，以及怎样让 `<ViewTransition>` 和离场动画尊重这个设置，见[动画与过渡](/lessons/animation)。
+
 </details>
 
 <details className="optional">
