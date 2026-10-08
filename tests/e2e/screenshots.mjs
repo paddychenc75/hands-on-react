@@ -107,7 +107,14 @@ await run('lesson-mobile', 390, 844, 'light', async p => {
 });
 // 真库示例（浅色）：router 课的 loader 导航状态、tanstack-query 课的状态字段。先点开预测题，再点一下，让页面停在有内容的时刻
 for (const [id, title, pick] of [
-  ['router', '真库：loader 运行期间', async pg => (await pg.locator('.preview a', { hasText: '用户 2' }).click(), await pg.page().waitForTimeout(350))],
+  [
+    'router',
+    '真库：loader 运行期间',
+    async pg => {
+      await pg.locator('.preview a', { hasText: '用户 2' }).click();
+      await pg.page().waitForTimeout(350);
+    },
+  ],
   [
     'tanstack-query',
     '真库：useQuery 的状态字段',
