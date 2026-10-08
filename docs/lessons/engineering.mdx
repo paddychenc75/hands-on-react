@@ -43,7 +43,7 @@ npm run dev
 | 场景 | 推荐 |
 |---|---|
 | 纯客户端应用、后台管理系统、学习练手 | **Vite**（本课的主线） |
-| 需要 SEO、服务端渲染、Server Components | **Next.js**（App Router，第 36 课）或 **React Router** 框架模式 |
+| 需要 SEO、服务端渲染、Server Components | **Next.js**（App Router，第 37 课）或 **React Router** 框架模式 |
 | 移动端 App | **React Native** + Expo |
 
 Create React App 已于 2025 年 2 月被官方弃用，新项目不要再用。
@@ -65,7 +65,7 @@ my-app/
    └─ index.css        全局样式
 ```
 
-`main.tsx` 里的 `createRoot` 把根组件挂到页面上的 `<div id="root">`。根组件外面包着 `<StrictMode>`，这是第 19 课讲过的开发期检查。
+`main.tsx` 里的 `createRoot` 把根组件挂到页面上的 `<div id="root">`。根组件外面包着 `<StrictMode>`，这是第 18 课讲过的开发期检查。
 
 三条命令要记住：
 
@@ -279,10 +279,10 @@ function App() {
 
 | 工具 | 发现什么 | 怎么跑 |
 |---|---|---|
-| **TypeScript** | 类型对不上：传错 prop、拼错字段（第 32 课） | `npx tsc -b`（模板的 `npm run build` 已包含）。注意：`vite build` 本身只去掉类型，不做类型检查 |
+| **TypeScript** | 类型对不上：传错 prop、拼错字段（第 33 课） | `npx tsc -b`（模板的 `npm run build` 已包含）。注意：`vite build` 本身只去掉类型，不做类型检查 |
 | **ESLint** | 规则违反：Hook 用错、依赖数组缺项、导出方式不对 | `npm run lint` |
 | **格式化工具** | 缩进、引号、分号不统一 | Prettier 或 Biome，二选一，团队统一 |
-| **测试** | 行为改坏了（第 35 课） | `npx vitest run` |
+| **测试** | 行为改坏了（第 36 课） | `npx vitest run` |
 
 关于测试，这里只记一个原则：**测用户看到的和做的，不测实现细节**。把组件从 `useState` 改成 `useReducer`，界面行为没变，测试就不该失败。
 
@@ -385,7 +385,7 @@ Netlify 的流程相同，识别的构建命令和输出目录也一样。GitHub
 
 ### 单页应用的路由回退
 
-如果你的应用用了 React Router（第 33 课），部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。解决办法：让服务器对找不到的路径一律返回 `index.html`，再由前端路由接管。
+如果你的应用用了 React Router（第 34 课），部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。解决办法：让服务器对找不到的路径一律返回 `index.html`，再由前端路由接管。
 
 ```json title="在本机项目里：vercel.json（放在项目根目录）"
 {

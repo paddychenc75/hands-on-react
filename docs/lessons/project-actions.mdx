@@ -1,0 +1,507 @@
+---
+title: "实战：给看板加上 Actions、乐观更新与无障碍"
+---
+
+# 实战：给看板加上 Actions、乐观更新与无障碍
+
+<LessonHeader />
+
+<Warmup />
+
+<LessonGoals />
+
+<LessonProse>
+
+[实战三](/lessons/project-kanban)（第 17 课）的看板只改本地的 state，点一下立刻生效。真实的看板要把数据存到服务器。服务器要等一会儿才回复，有时还会拒绝你。
+
+这一课把看板升级成这样的应用。你不会学新的 API，而是把本阶段学过的东西接在一起：
+
+| 学过的内容 | 在本课用在哪里 |
+|---|---|
+| [Actions](/lessons/react-19)（第 28 课） | 添加卡片用表单的 `action` 和 `useActionState`；按钮用 `useFormStatus`；移动卡片用 `useOptimistic` |
+| [无障碍](/lessons/accessibility)（第 26 课） | 移动按钮有名字；错误和输入框关联；结果被读屏软件读出 |
+| [错误边界](/lessons/suspense)（第 23 课） | 服务器出故障时，只替换看板，不让页面白屏 |
+| [状态架构](/lessons/state-architecture)（第 27 课） | 每份数据放在哪里，先分类再动手 |
+| [Context](/lessons/context)（第 12 课） | `moveCard` 放进 Context，`Card` 不用层层接收回调 |
+
+本课的“服务器”是模拟的异步函数：数据存在内存里，用 `setTimeout` 等一会儿再返回。刷新页面，数据就回到初始状态。
+
+## 要做的东西
+
+| 功能 | 要求 |
+|---|---|
+| 添加卡片 | 提交到服务器。等待时按钮禁用。标题为空或重复时显示错误，并保留用户输入的文字。成功后清空输入框 |
+| 移动卡片 | 点 ← 或 → 后卡片立刻移动。服务器拒绝时（“已完成”最多放 2 张），卡片回到原来的列，并说明原因 |
+| 服务器出故障 | 标题叫“崩溃”时，服务器抛出错误。看板换成备用界面，可以重试 |
+| 无障碍 | 每个按钮有名字；错误文字和输入框关联；操作结果会被读屏软件读出 |
+
+先玩三分钟。这是做完以后的样子：
+
+```jsx play title="成品：会等服务器的看板"
+import { Component, createContext, startTransition, useActionState, useContext, useId, useOptimistic, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+
+// 模拟的服务器：数据存在内存里，每个请求等 0.6 秒才返回
+function createServer(delay) {
+  let cards = [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+    { id: 3, title: '画界面', col: 'doing' },
+    { id: 4, title: '搭项目', col: 'done' },
+    { id: 5, title: '读文档', col: 'done' },
+  ];
+  let nextId = 6;
+  const wait = () => new Promise(resolve => setTimeout(resolve, delay));
+  return {
+    list: () => cards,
+    // 校验失败：返回 { error }。标题叫“崩溃”：模拟服务器出故障，直接抛错
+    async add(title) {
+      await wait();
+      if (title === '崩溃') throw new Error('服务器开小差了');
+      if (!title.trim()) return { error: '标题不能为空' };
+      if (cards.some(c => c.title === title.trim())) return { error: '已有同名卡片' };
+      cards = [...cards, { id: nextId++, title: title.trim(), col: 'todo' }];
+      return { cards };
+    },
+    // 规则：“已完成”最多 2 张，超过就抛错。成功时返回新的卡片数组
+    async move(id, col) {
+      await wait();
+      if (col === 'done' && cards.filter(c => c.col === 'done').length >= 2) throw new Error('“已完成”最多放 2 张卡片');
+      cards = cards.map(c => (c.id === id ? { ...c, col } : c));
+      return cards;
+    },
+  };
+}
+const server = createServer(600);
+
+const COLUMNS = [
+  { key: 'todo', name: '待办' },
+  { key: 'doing', name: '进行中' },
+  { key: 'done', name: '已完成' },
+];
+
+class CrashBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div id="crash">
+          看板出错了：{this.state.error.message}
+          <button onClick={() => this.setState({ error: null })}>重试</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const MoveCtx = createContext(null);
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return <button disabled={pending}>{pending ? '添加中…' : '添加卡片'}</button>;
+}
+
+function Card({ card, index }) {
+  const move = useContext(MoveCtx);
+  const prev = COLUMNS[index - 1];
+  const next = COLUMNS[index + 1];
+  return (
+    <div className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+      <div>{card.title}</div>
+      <button disabled={!prev} aria-label={prev ? '把“' + card.title + '”移到' + prev.name : '“' + card.title + '”已在最左列'} onClick={() => move(card.id, -1)}>←</button>
+      <button disabled={!next} aria-label={next ? '把“' + card.title + '”移到' + next.name : '“' + card.title + '”已在最右列'} onClick={() => move(card.id, 1)}>→</button>
+    </div>
+  );
+}
+
+function Board() {
+  const [cards, setCards] = useState(server.list()); // 真实值：服务器给的
+  const [message, setMessage] = useState('');
+  const errorId = useId();
+
+  const [shown, showMove] = useOptimistic(cards, (current, { id, col }) => current.map(c => (c.id === id ? { ...c, col } : c)));
+
+  function moveCard(id, dir) {
+    const card = shown.find(c => c.id === id); // 目标列要从“正在显示的”卡片算
+    const target = COLUMNS[COLUMNS.findIndex(c => c.key === card.col) + dir];
+    if (!target) return;
+    startTransition(async () => {
+      showMove({ id, col: target.key });
+      try {
+        const next = await server.move(id, target.key);
+        startTransition(() => {
+          setCards(next);
+          setMessage('已把“' + card.title + '”移到' + target.name);
+        });
+      } catch (e) {
+        setMessage('移动失败：' + e.message);
+      }
+    });
+  }
+
+  const [addState, addAction] = useActionState(
+    async (prev, formData) => {
+      const title = formData.get('title');
+      const res = await server.add(title); // 服务器崩溃会抛错：不要 catch，交给错误边界
+      if (res.error) return { error: res.error, title }; // 预期内的失败：返回错误值，并带回用户输入的标题
+      startTransition(() => { // await 之后，再包一层
+        setCards(res.cards);
+        setMessage('已添加“' + title.trim() + '”');
+      });
+      return { error: null, title: '' };
+    },
+    { error: null, title: '' },
+  );
+
+  return (
+    <MoveCtx value={moveCard}>
+      <form action={addAction}>
+        <input
+          id="new-title"
+          name="title"
+          aria-label="新卡片标题"
+          defaultValue={addState.title}
+          aria-invalid={!!addState.error}
+          aria-describedby={addState.error ? errorId : undefined}
+        />
+        <SubmitButton />
+        {addState.error && (
+          <p id={errorId} role="alert" style={{ color: 'crimson', margin: '4px 0' }}>{addState.error}</p>
+        )}
+      </form>
+      {/* 播报区一直存在，只改里面的文字 */}
+      <p role="status" style={{ color: '#5b6b73', minHeight: '1.5em', margin: '4px 0' }}>{message}</p>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {COLUMNS.map((col, i) => {
+          const list = shown.filter(c => c.col === col.key);
+          return (
+            <div className="column" data-col={col.key} key={col.key} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8, minWidth: 0 }}>
+              <h4 style={{ margin: 0 }}>{col.name}（{list.length}）</h4>
+              {list.map(c => <Card key={c.id} card={c} index={i} />)}
+            </div>
+          );
+        })}
+      </div>
+    </MoveCtx>
+  );
+}
+
+function App() {
+  return (
+    <CrashBoundary>
+      <Board />
+    </CrashBoundary>
+  );
+}
+```
+
+试这几件事：
+
+1. 把“写 reducer”移到“进行中”。点击后卡片立刻动了，0.6 秒后服务器才回复。
+2. 把“画界面”移到“已完成”。卡片先移过去，再回来，下面的文字说明了原因。
+3. 添加一张标题叫“写 reducer”的卡片，看错误提示和输入框。
+4. 添加一张标题叫“崩溃”的卡片，再点“重试”。
+
+## 动手前的设计
+
+不要先写代码。先回答两个问题：每份数据放在哪里？失败怎么分？
+
+### 状态放在哪里
+
+| 数据 | 放在哪里 | 为什么 |
+|---|---|---|
+| 服务器确认过的卡片 `cards` | `Board` 里的 `useState` | 这是**真实值**。只在服务器成功之后才改 |
+| 正在显示的卡片 `shown` | `useOptimistic(cards, …)` 的返回值 | 在真实值上叠加“还没确认的移动”。Action 一结束它就消失，不用自己存 |
+| 添加表单的错误和输入 | `useActionState` 的 state | 它是 Action 的返回值，不需要另开 `useState` |
+| “添加中” | 不存 | `SubmitButton` 里的 `useFormStatus` 读 form 的状态 |
+| 给用户和读屏软件的结果 `message` | `Board` 里的 `useState` | 成功和失败都写在这里 |
+| 移动函数 `moveCard` | Context | `Card` 在三层之下。和实战三的 `dispatch` 一样，不用层层传回调 |
+
+组件这样拆：
+
+```text
+CrashBoundary            接住服务器崩溃
+└─ Board                 cards、shown、message、addState 都在这里
+   ├─ form (action)
+   │  ├─ input           defaultValue 来自 addState.title
+   │  ├─ SubmitButton    useFormStatus：必须是 form 的子组件
+   │  └─ p[role=alert]   校验错误
+   ├─ p[role=status]     一直存在，只改里面的文字
+   └─ Column × 3
+      └─ Card × n        useContext(MoveCtx)，按钮有 aria-label
+```
+
+### 失败怎么分
+
+| 情况 | 属于哪一类 | 怎么处理 |
+|---|---|---|
+| 标题为空、标题重复 | 预期内的失败：用户改一下就行 | Action **返回**错误值，错误显示在表单旁边 |
+| “已完成”超过 2 张 | 业务规则：用户要知道原因，看板不该消失 | `catch` 住，写进 `message`；乐观值自动丢弃 |
+| 服务器崩溃 | 意外的错误：用户无能为力 | 不 `catch`，让它抛出，交给错误边界 |
+
+这张表就是[Actions 一课](/lessons/react-19)里“返回错误值，还是抛错”的应用。
+
+## 第一步：添加卡片
+
+添加卡片是一次提交，正好用表单的 `action`。`useActionState` 接收一个 Action 函数，返回当前 state 和要交给 `<form action>` 的函数。
+
+```jsx title="添加卡片的 Action"
+const [addState, addAction] = useActionState(
+  async (prev, formData) => {
+    const title = formData.get('title');
+    const res = await server.add(title);          // 服务器崩溃会抛错：不要 catch
+    if (res.error) return { error: res.error, title }; // 预期内的失败：返回错误值
+    startTransition(() => {                        // await 之后，再包一层
+      setCards(res.cards);                         // 成功：把服务器给的卡片存成真实值
+      setMessage('已添加“' + title.trim() + '”');
+    });
+    return { error: null, title: '' };
+  },
+  { error: null, title: '' },
+);
+```
+
+“添加中”的状态交给 `SubmitButton`：
+
+```jsx title="useFormStatus 要写在 form 的子组件里"
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return <button disabled={pending}>{pending ? '添加中…' : '添加卡片'}</button>;
+}
+```
+
+下面的示例是只有添加功能的简化版。列表里已经有“写 reducer”。先预测，再运行：
+
+```jsx play title="添加失败之后，输入框里有什么"
+import { useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+
+// 模拟的服务器：0.5 秒后返回。标题重复就拒绝
+const titles = ['设计数据结构', '写 reducer'];
+async function addToServer(title) {
+  await new Promise(resolve => setTimeout(resolve, 500));
+  if (!title.trim()) return { error: '标题不能为空' };
+  if (titles.includes(title.trim())) return { error: '已有同名卡片' };
+  titles.push(title.trim());
+  return { list: [...titles] };
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return <button disabled={pending}>{pending ? '添加中…' : '添加'}</button>;
+}
+
+function App() {
+  const [list, setList] = useState([...titles]);
+  const [state, formAction] = useActionState(async (prev, formData) => {
+    const title = formData.get('title');
+    const res = await addToServer(title);
+    if (res.error) return { error: res.error };
+    setList(res.list);
+    return { error: null };
+  }, { error: null });
+
+  return (
+    <div>
+      <form action={formAction}>
+        <input name="title" placeholder="新卡片标题" />
+        <SubmitButton />
+      </form>
+      {state.error && <p role="alert" style={{ color: 'crimson' }}>{state.error}</p>}
+      <ul>{list.map(t => <li key={t}>{t}</li>)}</ul>
+    </div>
+  );
+}
+```
+
+React 19 在 Action 结束后，会重置表单里的非受控字段。**出错返回时也一样**（[Actions 一课](/lessons/react-19)提过）。所以用户输入的标题没了，只能重新输入。
+
+修法是让输入框的 `defaultValue` 跟着返回的 state 走。重置时，输入框回到的就是 `defaultValue`：
+
+```jsx title="出错时把标题带回来"
+// Action 里：出错时连同标题一起返回
+if (res.error) return { error: res.error, title };
+
+// 输入框：defaultValue 读 state
+<input name="title" defaultValue={addState.title} />
+```
+
+成功时返回 `title: ''`，输入框就被重置成空的。把示例改成这样再试一次。
+
+## 第二步：移动卡片
+
+移动要立刻显示结果，再等服务器确认。这是 `useOptimistic` 的用法：
+
+```jsx title="移动卡片的 Action"
+const [shown, showMove] = useOptimistic(cards, (current, { id, col }) =>
+  current.map(c => (c.id === id ? { ...c, col } : c)),
+);
+
+function moveCard(id, dir) {
+  const card = shown.find(c => c.id === id);        // 从“正在显示的”卡片算目标列
+  const target = COLUMNS[COLUMNS.findIndex(c => c.key === card.col) + dir];
+  if (!target) return;
+  startTransition(async () => {
+    showMove({ id, col: target.key });               // 先显示
+    try {
+      const next = await server.move(id, target.key);
+      startTransition(() => {                         // await 之后要再包一层
+        setCards(next);
+        setMessage('已把“' + card.title + '”移到' + target.name);
+      });
+    } catch (e) {
+      setMessage('移动失败：' + e.message);          // 不用手写回滚
+    }
+  });
+}
+```
+
+三个细节：
+
+- `showMove` 必须在 Action 或 `startTransition` 里调用。
+- 目标列要从 `shown` 算，不能从 `cards` 算。用户连点两次时，第一次移动还没确认，卡片在界面上已经换列了。
+- `await` 之后的 set 函数不再属于这个 Action，所以 `setCards` 要再包一层 `startTransition`，让真实值和“丢弃乐观值”在同一次渲染里完成。
+
+下面的示例只保留移动功能，服务器等 1 秒。“已完成”里已经有 2 张卡片。点“画界面”卡片上的“移到已完成”，先预测：
+
+```jsx play title="乐观移动：服务器拒绝之后"
+import { startTransition, useOptimistic, useState } from 'react';
+
+const COLUMNS = { todo: '待办', doing: '进行中', done: '已完成' };
+
+// 模拟的服务器：1 秒后返回。规则：“已完成”最多放 2 张卡片
+let serverCards = [
+  { id: 1, title: '设计数据结构', col: 'todo' },
+  { id: 2, title: '画界面', col: 'doing' },
+  { id: 3, title: '搭项目', col: 'done' },
+  { id: 4, title: '读文档', col: 'done' },
+];
+async function moveOnServer(id, col) {
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  if (col === 'done' && serverCards.filter(c => c.col === 'done').length >= 2) {
+    throw new Error('“已完成”最多放 2 张卡片');
+  }
+  serverCards = serverCards.map(c => (c.id === id ? { ...c, col } : c));
+  return serverCards;
+}
+
+function App() {
+  const [cards, setCards] = useState(serverCards);
+  const [message, setMessage] = useState('');
+  const [shown, showMove] = useOptimistic(cards, (current, { id, col }) =>
+    current.map(c => (c.id === id ? { ...c, col } : c)),
+  );
+
+  function move(id, col) {
+    setMessage('');
+    startTransition(async () => {
+      showMove({ id, col });
+      try {
+        const next = await moveOnServer(id, col);
+        startTransition(() => setCards(next));
+      } catch (e) {
+        setMessage(e.message);
+      }
+    });
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {Object.entries(COLUMNS).map(([key, name]) => (
+          <div key={key} data-col={key} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8 }}>
+            <h4 style={{ margin: 0 }}>{name}</h4>
+            {shown.filter(c => c.col === key).map(c => (
+              <div key={c.id} className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+                <div>{c.title}</div>
+                {Object.entries(COLUMNS).filter(([k]) => k !== key).map(([k, n]) => (
+                  <button key={k} onClick={() => move(c.id, k)}>移到{n}</button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <p style={{ color: 'crimson' }}>{message}</p>
+    </div>
+  );
+}
+```
+
+## 第三步：让每个人都用得了
+
+看板的操作靠点击和读屏幕。键盘用户和读屏软件用户需要另外三样东西：
+
+1. **按钮要有名字。** 只有箭头“←”“→”的按钮，读屏软件读不出要移动哪张卡片。用 `aria-label` 写成“把‘写 reducer’移到进行中”。
+2. **错误要和输入框关联。** 错误文字放进 `role="alert"` 的元素，输入框用 `aria-invalid` 标出出错，用 `aria-describedby` 指向错误文字。id 用 `useId` 生成。
+3. **结果要被读出来。** 把 `message` 放进一个**一直渲染**的 `<p role="status">`，只改里面的文字。不要写成 `{message && <p role="status">…</p>}`：区域和内容同时出现，很多读屏软件不会读。
+
+```jsx title="三处无障碍写法"
+<button aria-label={'把“' + card.title + '”移到' + next.name} onClick={…}>→</button>
+
+<input name="title" aria-invalid={!!addState.error} aria-describedby={addState.error ? errorId : undefined} />
+{addState.error && <p id={errorId} role="alert">{addState.error}</p>}
+
+<p role="status">{message}</p>
+```
+
+为什么错误用 `alert`，结果用 `status`？`alert` 会打断用户正在听的内容，只适合“现在必须处理”的错误。移动成功只是通知，`status` 会等用户听完当前内容再读。
+
+## 第四步：意外的错误交给错误边界
+
+服务器崩溃时，`server.add` 抛出错误。`useActionState` 把这个错误当作渲染错误处理，抛给最近的错误边界。所以只要 `Board` 外面有边界，什么都不用写：
+
+```jsx title="看板外面包一层边界"
+<CrashBoundary>
+  <Board />
+</CrashBoundary>
+```
+
+不要为了“稳妥”在 Action 里用 `try/catch` 吞掉所有错误。吞掉以后，用户看不到任何提示，监控也收不到错误。边界的位置也有讲究：包在 `Board` 外面，崩溃时只有看板被替换，页面其他部分照常工作。
+
+## 常见坑
+
+| 现象 | 原因 | 修法 |
+|---|---|---|
+| 点击后卡片没有立刻动，等服务器回复才动；控制台警告 “optimistic state update outside a transition” | `showMove` 写在普通的事件处理函数里 | 放进 `startTransition(async () => { … })` |
+| 服务器明明成功了，卡片先到新列，又跳回原来的列 | 只调用了 `showMove`，没有把服务器的结果存进 `cards` | 成功后 `startTransition(() => setCards(next))` |
+| 校验失败后输入框被清空 | Action 结束后 React 重置了表单 | 返回 `title`，输入框用 `defaultValue` 带回 |
+| 按钮一直不显示“添加中” | `useFormStatus` 写在渲染 `<form>` 的同一个组件里 | 抽成 `form` 的子组件 |
+| 连点“→”两次，第二次没有再往右一列 | 目标列从 `cards` 算，而不是 `shown` | 从 `shown` 算 |
+| 标题重复时，整个看板变成备用界面 | 把预期内的失败 `throw` 了 | 返回错误值 |
+| 读屏软件不读操作结果 | 播报区用条件渲染，和内容一起挂载 | 让 `role="status"` 的元素一直存在 |
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 没有 `useActionState`、`useOptimistic` 和 `<form action>`。同样的看板在 18 里这样写：表单用 `onSubmit` 加 `preventDefault`；提交中和错误各用一个 `useState`；乐观值自己再存一个 state，失败时在 `catch` 里恢复。读旧代码时，按这个对照去认。
+
+</CallBox>
+
+## 验收
+
+自己对照一遍。每一项都应该能在成品里做到：
+
+| 检查 | 怎么验 |
+|---|---|
+| 添加成功 | 按钮在等待时禁用；新卡片出现在“待办”；输入框清空；下方文字写着“已添加……” |
+| 添加失败 | 标题重复或为空时，出现红色错误；输入框里的文字还在；没有新卡片 |
+| 移动成功 | 点击后卡片立刻换列；服务器回复后仍在新列 |
+| 移动失败 | 卡片先到“已完成”，再回到原列；下方文字写着失败原因 |
+| 服务器崩溃 | 看板换成备用界面；“重试”能回来 |
+| 键盘和读屏 | 只用 Tab 和 Enter 能完成全部操作；每个按钮有名字；错误和结果有对应的 `role` |
+
+下面的练习给你起始代码：服务器、错误边界和界面骨架都写好了，你要完成三个任务。
+
+</LessonProse>
+
+<Quiz />
+
+<Exercise />
+
+<SelfExplain />
+
+<LessonFooter />

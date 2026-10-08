@@ -82,7 +82,7 @@ box.querySelector('button').click(); // 模拟点击：事件处理函数真的�
 
 <CallBox kind="deep" label="深入一点">
 
-这个迷你渲染器只会挂载：它每次都从零创建 DOM。真实 React 会保留上一次的树。类型相同，就复用 DOM 节点，只更新变化的属性。类型不同，才删除旧节点并重建。这就是第 19 课的协调。
+这个迷你渲染器只会挂载：它每次都从零创建 DOM。真实 React 会保留上一次的树。类型相同，就复用 DOM 节点，只更新变化的属性。类型不同，才删除旧节点并重建。这就是第 18 课的协调。
 
 </CallBox>
 
@@ -132,7 +132,7 @@ console.log('内部 hooks 数组：', JSON.stringify(hooks));
 
 现在你知道为什么**不能在 if 里调用 Hook** 了。如果某次渲染跳过了第一个 useState，游标就会错位。结果 name 会读到 count 的值。我们的迷你实现会悄悄读错。真实 React 会记下上一次渲染的 Hook 链表，数量对不上时直接报错（第 15 课见过 `Rendered fewer hooks than expected`）。
 
-上面的演示只有一个组件，所以只用一个全局 hooks 数组。真实 React 中，每个组件实例对应一个 Fiber，Hook 链表存在 Fiber 上。React 先按树中的位置找到 Fiber，再按调用顺序找到 Hook。这就是第 19 课“状态跟着位置走”的原因：
+上面的演示只有一个组件，所以只用一个全局 hooks 数组。真实 React 中，每个组件实例对应一个 Fiber，Hook 链表存在 Fiber 上。React 先按树中的位置找到 Fiber，再按调用顺序找到 Hook。这就是第 18 课“状态跟着位置走”的原因：
 
 1. 位置和类型不变，就是同一个 Fiber，state 保留。
 2. 类型或 key 变了，React 新建 Fiber，state 清空。
@@ -199,7 +199,7 @@ workLoop(3);
 
 <CallBox kind="tip" label="要点">
 
-想深入学习，可以读两份材料：Rodrigo Pombo 的《Build your own React》；React 源码中的 `packages/react-reconciler`。理解了这一课，你就已经掌握了阅读源码的地图。第 38 课《调度、优先级与撕裂》会详细讲 React 怎样安排渲染的先后顺序。
+想深入学习，可以读两份材料：Rodrigo Pombo 的《Build your own React》；React 源码中的 `packages/react-reconciler`。理解了这一课，你就已经掌握了阅读源码的地图。第 39 课《调度、优先级与撕裂》会详细讲 React 怎样安排渲染的先后顺序。
 
 </CallBox>
 

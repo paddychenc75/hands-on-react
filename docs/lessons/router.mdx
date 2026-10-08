@@ -314,7 +314,7 @@ function Layout() {
 // 浏览器里：<RouterProvider router={router} />，从 'react-router/dom' 导入
 ```
 
-这样组件里不用 `useEffect` 取数据，新页面一出现就有数据。嵌套路由的 `loader` 会**同时**运行，不会一个等一个。它和第 34 课的 TanStack Query 分工不同：`loader` 解决“进入页面前取到数据”，Query 解决“缓存、过期和后台刷新”。两者也可以一起用。
+这样组件里不用 `useEffect` 取数据，新页面一出现就有数据。嵌套路由的 `loader` 会**同时**运行，不会一个等一个。它和第 35 课的 TanStack Query 分工不同：`loader` 解决“进入页面前取到数据”，Query 解决“缓存、过期和后台刷新”。两者也可以一起用。
 
 下面的迷你数据路由把 `loader` 的时机做成了可运行的版本。页面上有两种取数据的方式：“loader 版”的数据由路由在导航时取；“effect 版”的组件自己在 `useEffect` 里取。两个请求都要 900 毫秒。先预测，再运行。
 

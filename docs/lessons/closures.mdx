@@ -169,9 +169,9 @@ Effect Event 有三条限制：
 
 </CallBox>
 
-<CallBox kind="deep" label="维护 19.2 之前的项目时">
+<CallBox kind="tip" label="维护 React 19.2 之前的项目时">
 
-19.2 之前没有 `useEffectEvent`。老项目用 ref 保存最新值，效果相同：
+`useEffectEvent` 从 React 19.2 开始提供。React 18 和 React 19.0、19.1 都没有它。这些版本的项目用 ref 保存最新值，效果相同：
 
 ```jsx
 const latestTheme = useRef(theme);

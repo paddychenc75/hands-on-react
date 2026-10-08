@@ -185,9 +185,9 @@ function App() {
 
 ## 可辨识联合：让矛盾的状态写不出来
 
-第 17 课里的搜索状态有“加载中、成功、出错”几种。如果写成 `{ loading: boolean; data?: string[]; error?: Error }`，就可能出现“既加载中又出错”这种不可能的组合。可辨识联合给每种状态一个固定的标签字段（这里是 `status`），每种状态只带自己需要的数据。
+第 16 课里的搜索状态有“加载中、成功、出错”几种。如果写成 `{ loading: boolean; data?: string[]; error?: Error }`，就可能出现“既加载中又出错”这种不可能的组合。可辨识联合给每种状态一个固定的标签字段（这里是 `status`），每种状态只带自己需要的数据。
 
-```tsx title="第 17 课的搜索状态可以这样写（下一节的 action 也是）"
+```tsx title="第 16 课的搜索状态可以这样写（下一节的 action 也是）"
 type SearchState =
   | { status: 'idle' }
   | { status: 'loading' }

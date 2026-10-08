@@ -208,9 +208,9 @@ function App() {
 
 初始值常用来在首次渲染时跳过昂贵的内容，先显示一个轻量的占位，再在后台渲染完整的结果。
 
-`useDeferredValue` 还能和 Suspense 配合：新值的内容挂起时，用户看到的是旧内容，而不是 fallback。这是它在真实项目里最常见的用法。
+`useDeferredValue` 还能和 Suspense 配合。Suspense 在下一课讲：内容还没准备好时，它显示一个备用界面（fallback）。配合时，新值的内容挂起，用户看到的是旧内容，而不是 fallback。这是它在真实项目里最常见的用法。
 
-<CallBox kind="deep" label="维护 React 18 项目时">
+<CallBox kind="tip" label="维护 React 18 项目时">
 
 React 18 中，`startTransition` 只能接收同步函数，`useDeferredValue` 也没有第二个参数。
 

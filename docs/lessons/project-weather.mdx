@@ -12,7 +12,7 @@ title: "实战四：城市天气应用"
 
 <LessonProse>
 
-前三个实战都在前 18 课，只用到入门和进阶的知识。这一课把第 5 阶段学的工具接在一起：**项目搭建（第 31 课）、TypeScript（第 32 课）、React Router（第 33 课）、TanStack Query（第 34 课）和测试（第 35 课）**，做一个小而完整的应用：搜索城市，查看天气，收藏城市。
+前三个实战都在前 17 课，只用到前两个阶段的知识。这一课把第 5 阶段学的工具接在一起：**项目搭建（第 32 课）、TypeScript（第 33 课）、React Router（第 34 课）、TanStack Query（第 35 课）和测试（第 36 课）**，做一个小而完整的应用：搜索城市，查看天气，收藏城市。
 
 <CallBox kind="tip" label="这一课的时间">
 
@@ -116,7 +116,7 @@ function SearchBox({ initial }) {
 
 ## 里程碑 0：搭建项目
 
-**在本机终端里做。**具体命令、目录和说明见第 31 课。Node.js 用 24，原因见本课末尾的“常见坑”。
+**在本机终端里做。**具体命令、目录和说明见第 32 课。Node.js 用 24，原因见本课末尾的“常见坑”。
 
 ```bash title="在本机终端里做"
 npm create vite@latest weather-app -- --template react-compiler-ts --eslint
@@ -130,7 +130,7 @@ npm install -D vitest jsdom @testing-library/react @testing-library/dom @testing
 
 1. 删掉模板自带的 `src/App.css`、`src/assets/` 和 `App.tsx` 里的示例内容。
 2. 在 `package.json` 的 `scripts` 里加两条：`"typecheck": "tsc -b"`、`"test": "vitest run"`。
-3. 在 `vite.config.ts` 里把 `defineConfig` 改成从 `vitest/config` 导入，并加上测试配置。`react-compiler-ts` 模板已经启用了 React Compiler（第 31 课），`plugins` 保持原样：
+3. 在 `vite.config.ts` 里把 `defineConfig` 改成从 `vitest/config` 导入，并加上测试配置。`react-compiler-ts` 模板已经启用了 React Compiler（第 32 课），`plugins` 保持原样：
 
 ```ts title="在本机项目里：vite.config.ts"
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
@@ -670,7 +670,7 @@ function App() {
 
 ## 里程碑 5：测试
 
-测试用户看到的，不测实现细节（第 35 课）。三件基础设施先写好：`setup.ts` 每个测试后清理；`mockFetch` 用假的 `fetch` 代替网络；`renderApp` 每次用**新的** `QueryClient`，并且**关掉重试**。
+测试用户看到的，不测实现细节（第 36 课）。三件基础设施先写好：`setup.ts` 每个测试后清理；`mockFetch` 用假的 `fetch` 代替网络；`renderApp` 每次用**新的** `QueryClient`，并且**关掉重试**。
 
 ```ts title="在本机项目里：src/test/setup.ts"
 import '@testing-library/jest-dom/vitest';
@@ -825,7 +825,7 @@ describe('详情页', () => {
 ## 里程碑 6：收尾
 
 1. `npm run typecheck`、`npm run lint`、`npm test`、`npm run build` 全部通过。
-2. 加上第 31 课的 `.github/workflows/ci.yml`，推送到 GitHub，看到绿色对勾。
+2. 加上第 32 课的 `.github/workflows/ci.yml`，推送到 GitHub，看到绿色对勾。
 3. （可选）部署到 Vercel，并添加 `vercel.json` 的路由回退，直接打开 `/city/1796236` 也能显示。
 4. 在 README 里写下：每份状态放在哪里，为什么。
 
@@ -838,7 +838,7 @@ describe('详情页', () => {
 | 切换城市后，先短暂看到上一个城市的天气 | `queryKey` 里漏了城市 id | 把 id 写进 `queryKey` |
 | `localStorage.getItem is not a function`（运行测试时） | Node 25 及以后的版本默认带 `localStorage`，盖住了 jsdom 的 | 用 Node 24，或把 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（新版本的 Vitest 修好后可以去掉） |
 | 收藏一点就报“getSnapshot 应该被缓存” | `getSnapshot` 每次返回新数组 | 按原始字符串缓存解析结果 |
-| 刷新详情页得到 404 | 静态托管没有路由回退 | 见第 31 课的 `vercel.json` |
+| 刷新详情页得到 404 | 静态托管没有路由回退 | 见第 32 课的 `vercel.json` |
 
 ## 验收清单
 
@@ -855,9 +855,9 @@ describe('详情页', () => {
 
 ## 扩展方向
 
-1. 搜索时加防抖，并用 `placeholderData: keepPreviousData` 避免换词时列表闪回“加载中”（第 34 课）。
-2. 把收藏同步到服务器：用 `useMutation` 加乐观更新（第 34 课）。
-3. 用路由的 `loader` 在进入详情页前取数据（第 33 课），对比它和 `useQuery` 的分工。
+1. 搜索时加防抖，并用 `placeholderData: keepPreviousData` 避免换词时列表闪回“加载中”（第 35 课）。
+2. 把收藏同步到服务器：用 `useMutation` 加乐观更新（第 35 课）。
+3. 用路由的 `loader` 在进入详情页前取数据（第 34 课），对比它和 `useQuery` 的分工。
 4. 加一个“摄氏度/华氏度”开关，想想它属于哪一类状态。
 5. 加一个端到端测试（Playwright），在真实浏览器里走一遍“搜索、进详情、收藏”。
 

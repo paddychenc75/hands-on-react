@@ -25,6 +25,7 @@ import l_perf_clinic from './lessons/perf-clinic.ts';
 import l_performance from './lessons/performance.ts';
 import l_portfolio from './lessons/portfolio.ts';
 import l_profiling from './lessons/profiling.ts';
+import l_project_actions from './lessons/project-actions.ts';
 import l_project_kanban from './lessons/project-kanban.ts';
 import l_project_search from './lessons/project-search.ts';
 import l_project_todo from './lessons/project-todo.ts';
@@ -73,6 +74,7 @@ export const LESSON_MODULES: Record<string, Lesson> = {
   'performance': l_performance,
   'portfolio': l_portfolio,
   'profiling': l_profiling,
+  'project-actions': l_project_actions,
   'project-kanban': l_project_kanban,
   'project-search': l_project_search,
   'project-todo': l_project_todo,

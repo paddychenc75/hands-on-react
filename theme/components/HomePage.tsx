@@ -50,7 +50,7 @@ export default function HomePage() {
         </div>
         <div className="tree-card">
           <div ref={treeRef} />
-          <p className="cap">点击任意组件，模拟它调用了 set 函数：它和它的所有后代都会重新渲染（闪黄），兄弟和祖先不受影响。这就是第 19 课要讲的内容。</p>
+          <p className="cap">点击任意组件，模拟它调用了 set 函数：它和它的所有后代都会重新渲染（闪黄），兄弟和祖先不受影响。这就是第 18 课要讲的内容。</p>
         </div>
       </section>
 

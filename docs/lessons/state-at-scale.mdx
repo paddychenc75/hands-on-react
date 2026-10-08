@@ -107,7 +107,7 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-**什么时候不规范化**：数据只读、只在一个页面展示、实体之间没有共享时，嵌套结构更简单。另外，TanStack Query 按查询键缓存，不做规范化。同一个商品在列表查询和详情查询里是两份数据，修改后要让两个查询都失效（第 34 课）。Apollo Client 和 Relay 提供按实体 id 规范化的缓存，代价是更多的配置。RTK Query 和 TanStack Query 一样，按查询缓存，不做规范化。自己管理的客户端 state 需要规范化时，Redux Toolkit 的 `createEntityAdapter` 会替你生成 `{ ids, entities }` 结构和增删改的 reducer，它做的就是本节手写的这件事。
+**什么时候不规范化**：数据只读、只在一个页面展示、实体之间没有共享时，嵌套结构更简单。另外，TanStack Query 按查询键缓存，不做规范化。同一个商品在列表查询和详情查询里是两份数据，修改后要让两个查询都失效（第 35 课）。Apollo Client 和 Relay 提供按实体 id 规范化的缓存，代价是更多的配置。RTK Query 和 TanStack Query 一样，按查询缓存，不做规范化。自己管理的客户端 state 需要规范化时，Redux Toolkit 的 `createEntityAdapter` 会替你生成 `{ ids, entities }` 结构和增删改的 reducer，它做的就是本节手写的这件事。
 
 </CallBox>
 
@@ -210,7 +210,7 @@ function App() {
 
 ## 三、乐观更新的并发问题
 
-第 34 课的乐观更新是：先保存快照并改界面，失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
+第 35 课的乐观更新是：先保存快照并改界面，失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
 
 ```jsx play title="两个请求并发时的回滚"
 import { useState, useRef, useOptimistic, startTransition } from 'react';
@@ -355,7 +355,7 @@ function checkoutReducer(state, event) {
 | 唯一数据源在服务器上吗？ | 服务端缓存（TanStack Query、框架的加载器） | 复制进全局 store 后，两份数据不同步 |
 | 要撤销、要跨很远的组件读写、服务器不关心？ | 全局 store（Zustand、Redux），按实体规范化 | 每个页面各存一份，改一处漏一处 |
 | 关闭浏览器后还要保留，只属于这台设备？ | localStorage（带版本号） | 把服务器数据存进去，下次打开显示过期的值 |
-| 只有一个组件或一小棵子树用？ | useState / useReducer | 提升到太高的位置，打一个字整页重新渲染（第 19 课） |
+| 只有一个组件或一小棵子树用？ | useState / useReducer | 提升到太高的位置，打一个字整页重新渲染（第 18 课） |
 
 同一个功能常常横跨几行。例如评论区：评论列表在服务端缓存；“只看热门”在 URL；正在写的草稿是局部 state；离开页面时草稿存进 localStorage。
 

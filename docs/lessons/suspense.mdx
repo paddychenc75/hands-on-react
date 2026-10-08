@@ -172,7 +172,7 @@ function App() {
 
 在 React 19 中，组件挂起时，React 先让这个边界显示 fallback，再回头渲染同一边界里的兄弟组件，提前发起它们的加载。所以共用一个边界时，是同时开始加载，共等 3 秒，不是 4 秒。
 
-<CallBox kind="deep" label="维护 React 18 项目时">
+<CallBox kind="tip" label="维护 React 18 项目时">
 
 React 18 的顺序相反：先把同一边界里的兄弟组件都渲染一遍，再显示 fallback。加载也是同时开始的，所以等待时间相同，区别只在组件函数被调用的先后。
 
@@ -210,7 +210,7 @@ function App() {
 
 如果是**首次挂载**时挂起，又没有 Suspense，整棵树什么也不显示，直到加载完成。所以懒加载组件外面总要包一个 Suspense，给用户一个等待提示。
 
-<CallBox kind="deep" label="维护 React 18 项目时">
+<CallBox kind="tip" label="维护 React 18 项目时">
 
 React 18 中，点击这类同步更新引起的挂起，如果没有 Suspense，会报错 “A component suspended while responding to synchronous input”，并清空界面。
 
@@ -256,7 +256,7 @@ fallback 一旦显示出来，React 会让它至少停留约 300 毫秒，再换
 
 ### 切换时保留旧界面：startTransition
 
-已经显示的内容再次挂起时（例如切到一个还没加载的页面），默认会被 fallback 替换。把这次 set 函数调用放进 `startTransition`，React 会保留旧界面，等新内容准备好再切换，同时 `isPending` 为 true。`startTransition` 的详细用法见[并发特性](/lessons/concurrent)一课。
+已经显示的内容再次挂起时（例如切到一个还没加载的页面），默认会被 fallback 替换。把这次 set 函数调用放进 `startTransition`，React 会保留旧界面，等新内容准备好再切换，同时 `isPending` 为 true。`startTransition` 在[并发特性](/lessons/concurrent)一课学过，这里用它解决 Suspense 的一个具体问题。
 
 ```jsx play title="切换时保留旧界面"
 import { Suspense, use, useState, useTransition } from 'react';

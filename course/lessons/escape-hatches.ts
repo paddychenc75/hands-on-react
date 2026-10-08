@@ -2,7 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/escape-hatches.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'escape-hatches',
-  stage: 1,
+  stage: 2,
   title: 'DOM 逃生舱：Portal、useLayoutEffect 与 useId',
   mins: 38,
   summary: '少数情况下，props 和 state 不够用。学会 5 个直接和 DOM 打交道的 API，也学会什么时候不用它们。',
@@ -138,7 +138,7 @@ function App() {
   );
 }`,
     exports: ['Modal'],
-    hint: '回看第四节的 createPortal 示例：它包住的是什么，第二个参数是什么？Esc 的监听和上一课 useWindowWidth 里的 effect 结构相同：添加监听，返回清理函数。',
+    hint: '回看第四节的 createPortal 示例：它包住的是什么，第二个参数是什么？Esc 的监听和第 15 课 useWindowWidth 里的 effect 结构相同：添加监听，返回清理函数。',
     faded: `import { useState, useEffect, useId } from 'react';
 import * as ReactDOM from 'react-dom';
 
