@@ -177,10 +177,16 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 
 ### 缓存条目的生命周期
 
-`'use cache'` 缓存的内容有三个时间（`cacheLife` 的 `stale`、`revalidate`、`expire`）。本课只看服务器上的数据缓存会用到的两个：
+`'use cache'` 缓存的内容有三个时间（`cacheLife` 的 `stale`、`revalidate`、`expire`）。`stale` 管浏览器端的路由缓存，本课不展开。服务器上的数据缓存用另外两个：
 
-- `revalidate`：超过这个时间后，下一个请求先拿到旧内容，同时服务器在后台重新生成。
-- `expire`：超过这个时间，下一个请求要等新内容生成。
+- `revalidate`：条目的新鲜时长。超过它，条目就算过时。过时以后，下一个请求怎样拿到新内容，取决于缓存处理器。官方文档描述的是先给旧内容、后台重新生成（stale-while-revalidate）。但实测 Next.js 16.4.0 默认的内存缓存处理器不这样做：它把过了 `revalidate` 的条目当作不存在，下一个请求要等新内容生成。自己用 `next start` 部署时，用的就是这个默认处理器。
+- `expire`：最长保留时间，必须比 `revalidate` 长。超过它，下一个请求要等新内容生成。
+
+<CallBox kind="warn" label="常见坑">
+
+`next dev` 的行为和上面不同：为了刷新快，开发服务器会一直把旧内容给出去，直到 `expire`，同时在后台重新生成。想验证缓存的时间线，要先 `npm run build`，再 `npm run start`。
+
+</CallBox>
 
 数据被改动后，可以按标签（`cacheTag('posts')`）让缓存过期。按 Next.js 16.4 的文档：
 
@@ -188,25 +194,25 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 - `updateTag('posts')`：只能用在 Server Function 里。内容立刻失效，下一个请求等待新内容，不会拿到旧内容。适合用户刚提交完、马上要看到自己的修改的场景。
 
 ```jsx play title="模拟：缓存、过期与重新验证"
-// 模拟：一个 'use cache' 条目（cacheLife：revalidate 60 秒，expire 600 秒）的生命周期。时间靠手动拨快。
-// 依据 Next.js 16.4 文档：revalidate 到期后，下一个请求先拿旧内容，后台重新生成；
-// revalidateTag(tag, 'max') 标记过期，同样先拿旧内容；updateTag(tag) 立即失效，下一个请求等待新内容。
+// 模拟：一个 'use cache' 条目（cacheLife：revalidate 60 秒）的生命周期。时间靠手动拨快。
+// 依据 Next.js 16.4.0 实测（next build + next start，默认的内存缓存处理器）：
+// 过了 revalidate 的条目当作不存在，下一个请求等待新内容；
+// revalidateTag(tag, 'max') 标记过期，下一个请求先拿旧内容，后台重新生成；updateTag(tag) 立即失效，下一个请求等待新内容。
 // 与真实环境的差别：没有真实的服务器和渲染；只模拟服务器上的数据缓存，不含浏览器端路由缓存；
-// expire 简化为按条目的年龄计算；后台重新生成瞬间完成，新内容从下一次请求起可见。
+// 后台重新生成瞬间完成，新内容从下一次请求起可见；expire 在这里用不到（默认处理器在 revalidate 时就丢掉条目）。
 import { useState } from 'react';
 
 const REVALIDATE = 60;
-const EXPIRE = 600;
 
 function makeServer() {
   const s = { now: 0, version: 1, entry: null };
   s.request = () => {
     const e = s.entry;
-    if (!e || s.now - e.createdAt >= EXPIRE) {
+    if (!e || s.now - e.createdAt >= REVALIDATE) {
       s.entry = { value: 'v' + s.version, createdAt: s.now, stale: false };
       return { shown: s.entry.value, how: '没有可用的缓存，等待新内容' };
     }
-    if (e.stale || s.now - e.createdAt >= REVALIDATE) {
+    if (e.stale) {
       s.entry = { value: 'v' + s.version, createdAt: s.now, stale: false };
       return { shown: e.value, how: '先返回旧内容，后台重新生成' };
     }

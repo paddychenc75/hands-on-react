@@ -298,6 +298,9 @@ function App() {
       reset('u1');
       const longest = await attempt({ postId: 'p1', title: 'x'.repeat(50) });
       t.assert(!longest.rejected && db.posts.p1.title === 'x'.repeat(50), '正好 50 个字的标题是合法的');
+      reset('u1');
+      const padded = await attempt({ postId: 'p1', title: '  ' + 'x'.repeat(50) + '  ' });
+      t.assert(!padded.rejected && db.posts.p1.title === 'x'.repeat(50), '长度按去掉首尾空白之后算：前后各有空格的 50 个字，是合法的');
       reset('u3');
       const admin = await attempt({ postId: 'p2', title: '管理员改的' });
       t.assert(!admin.rejected && db.posts.p2.title === '管理员改的', 'role 为 admin 的用户可以修改别人的文章，却被拒绝了');

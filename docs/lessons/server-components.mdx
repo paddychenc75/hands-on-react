@@ -368,7 +368,7 @@ export async function deletePost(postId) {
 需要 Node.js 20.9 或更新的版本（Next.js 16 的要求，运行 `node -v` 查看）。按下面的步骤，亲眼看看代码在哪里运行（[Next.js App Router](/lessons/nextjs)一课有更完整的项目步骤）：
 
 1. 运行 `npx create-next-app@latest rsc-demo`，在提示“是否使用推荐的默认设置”时选第一项（Yes, use recommended defaults），再进入项目目录运行 `npm run dev`。
-2. 在 `app/page.tsx` 的组件里加一行 `console.log('在哪里打印？')`，刷新页面。这句话打印在运行 npm 的终端里：它在服务器上运行。开发模式下，浏览器控制台也会转发一份，前面带“Server”标记。
+2. 在 `app/page.tsx` 的组件里加一行 `console.log('在哪里打印？')`，刷新页面。这句话打印在运行 npm 的终端里：它在服务器上运行。开发模式下，浏览器控制台也会转发一份，前面带一个标签（Next.js 16.4 里实测是 `Prerender`），表示它是服务端日志。
 3. 新建 `app/LikeButton.tsx`，顶部写 `'use client'`，用 useState 做一个点赞按钮，在 onClick 里 console.log 一句话。在 page.tsx 里渲染它。点击按钮，这句话只出现在浏览器控制台里。
 4. 把 `'use client'` 删掉再刷新。框架会报错：服务端组件不能使用 useState。
 
