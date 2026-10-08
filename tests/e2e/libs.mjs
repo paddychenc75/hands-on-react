@@ -2,7 +2,9 @@
 //   按需加载（只用到 React 的课不请求库文件）、版本标记、两课的真库示例无错误且行为符合课文和预测题的答案、
 //   库文件被拦截时的失败提示（其余部分正常、可以重试）、tanstack-query 练习（参考答案、起始代码、常见错误、不同写法）。
 // 用法：node tests/e2e/libs.mjs      （先 npm run build）
-import { launch, openSite, lessonUrl, lessonData, checker } from './_site.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { launch, openSite, lessonUrl, lessonData, checker, ROOT } from './_site.mjs';
 
 const { site, close } = await openSite();
 const b = await launch();
@@ -79,6 +81,28 @@ const runCodeIn = (p, title, code, ms = 600) =>
   );
 const codeOf = (p, title) => inPg(p, title, pg => pg._editor.value);
 const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).test(u);
+
+/* 0. 站点主包不含这两个库，体积在预算内（课文里记录的数字：react-router 约 470 KB、react-query 约 155 KB，都不在主包里） */
+{
+  const dir = path.join(ROOT, 'doc_build/static/js');
+  const main = fs.readdirSync(dir).filter(f => /^index\..*\.js$/.test(f));
+  const text = main.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
+  const bytes = main.reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
+  const total = fs
+    .readdirSync(dir)
+    .filter(f => f.endsWith('.js'))
+    .reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
+  console.log(`     主包 ${main.join(',')}：${bytes} 字节；static/js 全部 ${total} 字节`);
+  ok(
+    !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn'),
+    '站点主包里没有 react-router 和 @tanstack/react-query 的代码',
+  );
+  ok(bytes < 1_000_000, '站点主包小于 1,000,000 字节（加库之前是 929,753，加库之后是 943,790）', String(bytes));
+  const rt = path.join(ROOT, 'doc_build/runtime');
+  const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query)-[\d.]+\.dev\.js$/.test(f));
+  ok(libs.length === 2, 'doc_build/runtime 里有两个库文件', libs.join(','));
+  for (const f of libs) console.log(`     ${f}：${fs.statSync(path.join(rt, f)).size} 字节`);
+}
 
 /* 1. 按需加载：只用到 React 的课不请求库文件；router 课只请求 react-router；tanstack-query 课只请求 @tanstack/react-query */
 {
