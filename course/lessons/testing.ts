@@ -33,7 +33,7 @@ export default {
   id: 'testing',
   stage: 4,
   title: '测试：Vitest + Testing Library',
-  mins: 27,
+  mins: 29,
   runtime: 19,
   summary: '像用户一样测试组件：按文字和角色找元素，模拟交互，断言结果。',
   goals: [
@@ -606,6 +606,22 @@ expect(screen.getByText('登录成功')).toBeInTheDocument();</code></pre></div>
       answer: 1,
       explain:
         'user.click 只等点击事件处理完，不会等请求返回。getBy… 立刻查找，找不到就抛错。findBy… 会反复查找，默认最多等 1 秒，适合异步出现的内容。getByLabelText 按 &lt;label&gt; 的文字查找，前提是 label 和输入框有关联（htmlFor 对上 id，或者 label 包住输入框）。',
+    },
+    {
+      q: `Counter 有个 bug：点“+1”实际加了 2。下面的测试能抓住它吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">test('点击后计数变化', async () =&gt; {
+  render(&lt;Counter /&gt;);
+  await user.click(screen.getByRole('button', { name: '+1' }));
+  expect(screen.queryByText('计数：0')).not.toBeInTheDocument();
+});</code></pre></div>`,
+      options: [
+        '能：点击后“计数：0”消失了',
+        '不能：加 2 以后“计数：0”同样消失，测试照样通过；应断言确切的“计数：1”',
+        '能：queryByText 找不到元素时会抛错',
+        '不能：click 没有 await，断言太早执行',
+      ],
+      answer: 1,
+      explain:
+        "这条断言只说“旧文字不见了”，加 1、加 2、加 100 都满足，所以抓不住 bug。好的断言写确切的结果：<code>expect(screen.getByText('计数：1')).toBeInTheDocument()</code>。“queryBy 会抛错”不对：queryBy 找不到时返回 null，这里的 not.toBeInTheDocument 正是利用这一点。题目里的 click 已经写了 await。",
     },
   ],
   plays: {
