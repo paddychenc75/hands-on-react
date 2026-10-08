@@ -335,7 +335,7 @@ function App() {
 
 要点：
 
-- 在 v5 里，选择器返回新对象（或新数组）不是“多渲染几次”，而是无限渲染。开发模式先警告 `The result of getSnapshot should be cached to avoid an infinite loop`，React 渲染到 50 次的上限后抛出 `Maximum update depth exceeded`。
+- 在 v5 里，选择器返回新对象（或新数组）不是“多渲染几次”，而是无限渲染。开发模式先警告 `The result of getSnapshot should be cached to avoid an infinite loop`（React 每个页面只警告一次），React 渲染到 50 次的上限后抛出 `Maximum update depth exceeded`。
 - 写法 B 里，“改 c”不会让 `PairB` 重新渲染：选出的 a、b 没变。“改 a”才会。
 - 只需要几个字段时，还有一个不用 `useShallow` 的办法：每个字段写一个 `useStore(s => s.字段)`，每次返回的都是原始值。
 
