@@ -13,7 +13,7 @@ const { site, close } = await openSite();
 const b = await launch();
 const { ok, done } = checker();
 const SHOTS = path.join(ROOT, 'tests/screenshots');
-const { LESSONS, lessonNo } = await import(pathToFileURL(path.join(ROOT, 'course/registry.ts')).href);
+const { LESSONS } = await import(pathToFileURL(path.join(ROOT, 'course/registry.ts')).href);
 const { STAGES } = await import(pathToFileURL(path.join(ROOT, 'course/stages.ts')).href);
 const withDrills = LESSONS.filter(l => l.nDrills > 0);
 const totalDrills = LESSONS.reduce((s, l) => s + l.nDrills, 0);

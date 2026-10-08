@@ -108,7 +108,7 @@ describe('第三方库：从 import 语句判断要加载哪些库', () => {
     ]);
   });
   it('libDeps：resolvers 依赖 react-hook-form（要先加载）；其余库没有依赖', () => {
-    const by = (n: string) => LIBS.find(l => l.name === n)!;
+    const by = (n: string) => LIBS.find(l => l.name === n) as (typeof LIBS)[number];
     expect(libDeps(by('@hookform/resolvers')).map(l => l.name)).toEqual(['react-hook-form']);
     expect(libDeps(by('react-hook-form'))).toEqual([]);
     expect(libDeps(by('zod'))).toEqual([]);

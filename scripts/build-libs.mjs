@@ -7,13 +7,11 @@
 // 产物不提交，由 predev / prebuild 生成。
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 import { LIBS, libPath, libDeps } from '../course/engine/logic/runtime.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const require_ = createRequire(path.join(root, 'package.json'));
 
 // 外部依赖 → 实验台 React 的哪个对象
 const EXTERNAL = {
