@@ -3,8 +3,9 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'form-architecture',
   stage: 5,
+  runtime: 19,
   title: '表单与校验架构',
-  mins: 41,
+  mins: 47,
   summary: '大表单要回答五个问题：数据放哪里、规则写在哪里、错误什么时候显示、异步检查怎样不乱序、提交怎样不重复。',
   goals: [
     '能判断一个表单该用受控、非受控还是 FormData，并说出性能上的原因',
@@ -17,7 +18,7 @@ export default {
     '校验规则写成一份 schema，客户端用它给即时反馈，服务器用同一份规则再校验一次。客户端校验只是体验，不是安全措施。',
     '错误一直算，但只在字段被触碰（touched）或提交过（submitted）后才显示。错误显示后，用户一改对就立刻消失。',
     '异步校验要只采用最后一次请求的结果。防抖只能减少请求数，不能消除乱序。',
-    '防重复提交：按钮禁用给用户看，ref 标记挡住同一时刻的第二次调用。state 是快照，挡不住。',
+    '防重复提交：按钮禁用给用户看，ref 标记挡住同一时刻的第二次调用，state 是快照挡不住。React 19 的 Action 让重复提交排队，不会丢弃；它结束后还会重置非受控字段，失败时要把 values 一起返回。',
   ],
   quiz: [
     {
@@ -79,6 +80,18 @@ export default {
       answer: 0,
       explain:
         '问题的根源是“一个 state 对象保存所有字段”，任何字段变化都让整个表单重新渲染。非受控或按需订阅，让打字时只有一个字段（或没有组件）重新渲染。只加 useCallback 不加 memo，子组件照样重新渲染；就算加了 memo，values 每次都是新对象。放进 Context 后所有读取它的字段一起更新，没有改善。useDeferredValue 能让输入框先响应，但每次仍要渲染 60 个字段，是在缓解症状。',
+    },
+    {
+      q: 'React 19 中，注册表单用 <code>&lt;form action={formAction}&gt;</code>，用户名输入框是非受控的，没有 defaultValue。用户名太短，Action 只返回了 errors。提交完成后，用户名输入框里是什么？',
+      options: [
+        '用户输入的内容还在：校验失败时 React 不重置表单',
+        '空的：Action 结束后，React 重置了表单里的非受控字段',
+        '空的：errors 变化让输入框被卸载重建',
+        '不确定，取决于浏览器',
+      ],
+      answer: 1,
+      explain:
+        'Action 结束后，React 会重置表单里的非受控字段，成功和失败都一样。所以失败时要把 values 一起返回，再用 defaultValue 填回去。“校验失败时不重置”是常见的误会。输入框没有被卸载：重置是 React 对表单做的，不是重建元素。',
     },
   ],
   exercise: {
@@ -651,6 +664,26 @@ async function handleSubmit(e) {
       explain:
         'setSubmitting(true) 写在 await 之后。两次点击都发生在检查返回之前，那时 submitting 还是 false，按钮也还没禁用。两次调用都通过了判断，各自等检查返回后调用 register。修法：在第一行用 ref 标记“正在提交”，并在 await 之前就设置。',
     },
+    {
+      q: `用户点“保存”后，按钮文字一直是“保存”，没有变成“保存中…”。原因是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function SaveForm() {
+  const [, formAction] = useActionState(save, null);
+  const { pending } = useFormStatus();
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;button&gt;{pending ? '保存中…' : '保存'}&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</code></pre></div>`,
+      options: [
+        'useFormStatus 在渲染 form 的同一个组件里调用，读不到这个 form 的状态，pending 一直是 false',
+        'save 是异步函数，pending 要等它 resolve 后才变成 true',
+        '按钮没有写 type="submit"，所以不会提交',
+        'useActionState 的第三个返回值才是 pending，useFormStatus 只能在 Server Component 里用',
+      ],
+      answer: 0,
+      explain:
+        'useFormStatus 读的是<b>外层</b> form 的状态：它必须在 form 内部的子组件里调用。写在渲染 form 的组件里，它上面没有 form，pending 永远是 false。修法：把按钮拆成 SubmitButton 子组件，在里面调用 useFormStatus。button 默认就是 submit；useActionState 的第三个返回值 isPending 是另一种办法，在同一个组件里也能用。',
+    },
   ],
   plays: {
     '每输入一个字，谁在重新渲染？': {
@@ -677,6 +710,33 @@ async function handleSubmit(e) {
           '两个请求都发出去了。anna 的请求 300ms 后返回“可用”，ann 的请求 600ms 后才返回“已被占用”，后到的结果覆盖了先到的。界面显示的是 ann 的结果，可输入框里是 anna。',
       },
       pkey: 'form-architecture|用户名检查的竞态',
+    },
+    'Action 表单：失败后输入框还剩什么？': {
+      note: '两个表单都在用户名里提交了“ab”。A 的 Action 只返回了 errors，Action 结束后 React 重置了表单，输入框变空。B 把 values 一起返回，用 <code>defaultValue={state.values.username}</code> 填回去，输入框里仍是“ab”。<br>提交期间两个按钮都显示“提交中…”：它们是 form 内部的子组件，用 useFormStatus 读到了 pending。',
+      predict: {
+        q: '在两个表单的用户名里都输入 ab，点各自的“注册”。服务器返回“用户名至少 3 个字符”后，两个输入框里分别是什么？',
+        options: ['都是 ab：校验失败时 React 不重置表单', 'A 是空的，B 是 ab', '都是空的：Action 结束后都被重置了', 'A 是 ab，B 是空的'],
+        answer: 1,
+        explain:
+          'Action 结束后，React 重置表单里的非受控字段。A 没有 defaultValue，重置后是空的。B 返回了 values，defaultValue 随新 state 更新为 ab，重置后恢复成 ab。所以 B 的输入框看上去“没丢”。',
+      },
+      pkey: 'form-architecture|Action 表单：失败后输入框还剩什么？',
+    },
+    'Action 排队：连点会提交几次？': {
+      note: '同一个 useActionState 的提交按顺序排队：第 1 次结束，第 2 次才开始，所以“同时在途”始终是 1 个。React 没有丢弃任何一次提交，也没有取消前一次。<br>如果每次提交都会创建订单，这就是重复下单。要禁用按钮（isPending），服务器端再用幂等键兜底。',
+      predict: {
+        q: '这个按钮没有禁用。在 1 秒内点击 3 次。register 被调用几次？它们是同时执行，还是依次执行？',
+        options: [
+          '1 次：React 忽略了提交期间的点击',
+          '3 次，同时执行，同时在途 3 个',
+          '3 次，依次执行：前一次结束，后一次才开始',
+          '1 次：后面的提交取消了前面的',
+        ],
+        answer: 2,
+        explain:
+          'Action 在过渡更新里运行，同一个 useActionState 的 Action 排成队列，依次执行，一次也不丢。所以连点 3 次就是 3 次 register，每次都读到上一次返回的 state。React 不会替你去重。',
+      },
+      pkey: 'form-architecture|Action 排队：连点会提交几次？',
     },
   },
 } satisfies Lesson;

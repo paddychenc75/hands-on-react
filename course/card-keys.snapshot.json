@@ -277,10 +277,12 @@
     "form-architecture#2": "575b8b88",
     "form-architecture#3": "2179e4de",
     "form-architecture#4": "9eb2f82a",
+    "form-architecture#5": "8096defb",
     "form-architecture#c0": "87913e34",
     "form-architecture#c1": "fc15fd72",
     "form-architecture#c2": "e1403f60",
     "form-architecture#c3": "3620d63a",
+    "form-architecture#c4": "a6020cfd",
     "error-handling#0": "7bc7b642",
     "error-handling#1": "d017dda2",
     "error-handling#2": "b18bae50",
@@ -368,6 +370,8 @@
     "error-handling|根级回调：谁收到错误？",
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？"
+    "perf-clinic|memo 挡得住 Context 吗？",
+    "form-architecture|Action 表单：失败后输入框还剩什么？",
+    "form-architecture|Action 排队：连点会提交几次？"
   ]
 }
