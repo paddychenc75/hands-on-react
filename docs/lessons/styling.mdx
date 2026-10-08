@@ -12,19 +12,217 @@ title: "样式：给组件穿上外观"
 
 <LessonProse>
 
-【待写】正文用普通 Markdown：段落、列表、表格、围栏代码块。每个新概念第一次出现时给一句定义。
+## 样式写在哪里
 
-## 【待写】小节标题
+React 不规定你怎样写样式。浏览器最终只认两样东西：元素上的 **类名**（`class` 属性）和元素上的 **内联样式**（`style` 属性）。React 的工作，是让这两样东西随 props 和 state 变化。
 
-```jsx play title="第一个示例"
+JSX 里的对应写法：
+
+| HTML | JSX | 值的类型 |
+|---|---|---|
+| `class="card"` | `className="card"` | 字符串 |
+| `style="color: red"` | `style={{ color: 'red' }}` | 对象 |
+
+`class` 是 JavaScript 的保留字，所以 JSX 里写 `className`。`style` 要传对象，所以有两层花括号：外层是 JSX 的表达式，内层是对象字面量。
+
+本课先讲这两样东西的写法和常见错误，再讲项目里组织样式的几种方案。
+
+## 类名：让 state 决定加不加
+
+**条件类名**：某个类名只在条件成立时才出现。最直接的写法是三元表达式：
+
+```jsx
+<span className={active ? 'tab tab-on' : 'tab'}>首页</span>
+```
+
+类名一多，就容易拼字符串。拼字符串有两个常见错误：
+
+- `'tab ' + (active && 'tab-on')`：`active` 为 `false` 时，`false` 被拼进字符串，得到 `"tab false"`。
+- `'tab ' + (active ? 'tab-on' : undefined)`：得到 `"tab undefined"`。
+
+浏览器不会报错。它只是多认了两个没人定义的类名。所以样式看不出问题，但 DOM 里留着脏类名，调试时很难发现。
+
+稳妥的做法是写一个小函数，把假值过滤掉再用空格连起来：
+
+```jsx
+function cx(...parts) {
+  return parts.filter(Boolean).join(' ');
+}
+// cx('tab', active && 'tab-on')  →  active 为 false 时得到 "tab"
+```
+
+`filter(Boolean)` 会去掉 `false`、`undefined`、`null` 和空字符串。很多项目用 `clsx` 这个小库做同样的事，原理一样。
+
+```jsx play title="类名拼接：false 和 undefined 会混进去"
+function cx(...parts) {
+  return parts.filter(Boolean).join(' ');
+}
+
+function Tab({ label, active }) {
+  const a = 'tab ' + (active && 'tab-on');
+  const b = 'tab ' + (active ? 'tab-on' : '');
+  const c = cx('tab', active && 'tab-on');
+  return (
+    <div style={{ margin: '6px 0' }}>
+      <span className={c}>{label}</span>
+      <code style={{ marginLeft: 8, fontSize: 12 }}>
+        a = {JSON.stringify(a)}　b = {JSON.stringify(b)}　c = {JSON.stringify(c)}
+      </code>
+    </div>
+  );
+}
+
 function App() {
-  return <p>【待写】可运行的示例</p>;
+  return (
+    <div>
+      <style>{`
+        .tab { display: inline-block; padding: 4px 12px; border: 1px solid #b7c4ca; border-radius: 6px; }
+        .tab-on { background: #087ea4; color: white; border-color: #087ea4; }
+      `}</style>
+      <Tab label="首页" active={true} />
+      <Tab label="设置" active={false} />
+    </div>
+  );
 }
 ```
 
+## 内联 style：只放“跟着数据变”的值
+
+内联 `style` 的对象有三条规则：
+
+1. **属性名用驼峰**：`backgroundColor`，不是 `background-color`（后者在对象里是语法错误）。
+2. **数字会自动加 `px`**：`width: 120` 就是 `120px`。要用百分比等其他单位，写成字符串：`width: '50%'`。
+3. **有些属性的数字没有单位**：`lineHeight`、`opacity`、`zIndex`、`flex`、`fontWeight` 这类属性，数字照原样写出，React 不加 `px`。
+
+第 3 条最容易漏。`lineHeight: 2` 的意思是“字号的 2 倍”，不是 2 像素。
+
+```jsx play title="style 对象：数字什么时候变成 px"
+import { useEffect, useRef, useState } from 'react';
+
+function Boxes() {
+  const ref = useRef(null);
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => {
+    const rect = ref.current.getBoundingClientRect();
+    setInfo({ width: rect.width, height: rect.height });
+  }, []);
+
+  return (
+    <div>
+      <div
+        ref={ref}
+        style={{ fontSize: 20, lineHeight: 2, width: 120, backgroundColor: '#dbeafe' }}
+      >
+        一行字
+      </div>
+      <p>
+        盒子宽度：{info && info.width}px　高度：{info && info.height}px
+      </p>
+    </div>
+  );
+}
+
+function App() {
+  return <Boxes />;
+}
+```
+
+内联 `style` 有两个限制：不能写 `:hover`、`::before` 这样的伪类和伪元素，也不能写 `@media`。所以它适合的场景很窄：**值本身由数据决定**，例如进度条的宽度、拖动元素的坐标、用户选的颜色。固定的外观放进类名。
+
+需要把一个动态值交给 CSS 时，可以传 **CSS 变量**。变量名以 `--` 开头，在 `style` 里要写成带引号的字符串键：
+
+```jsx title="用 style 传 CSS 变量，样式表里用 var() 读取"
+<div className="swatch" style={{ '--accent': color }} />
+// .swatch { background: var(--accent); }
+// 伪类、媒体查询仍然写在样式表里，动态值通过变量传进去
+```
+
+<CallBox kind="warn" label="常见坑">
+
+不要把 `style` 写成字符串：`style="color: red"` 会报错，`style` 只接受对象。也不要把整张样式表都搬进对象里：这样没法用伪类、媒体查询，也没法复用。
+
+</CallBox>
+
+## 同名类谁覆盖谁
+
+一个元素可以同时有多个类名。如果两个类设置了同一个属性，谁生效？
+
+规则是：**选择器的优先级相同时，样式表里写在后面的规则生效**。类名在 `class` 属性里的先后顺序不起作用。内联 `style` 的优先级比类选择器高，会盖住它们。
+
+```jsx play title="同名类谁覆盖谁"
+function App() {
+  return (
+    <div>
+      <style>{`
+        .note-red { color: crimson; }
+        .note-blue { color: royalblue; }
+      `}</style>
+      <p className="note-blue note-red">第一段文字</p>
+      <p className="note-red note-blue">第二段文字</p>
+      <p className="note-red note-blue" style={{ color: 'seagreen' }}>第三段文字</p>
+    </div>
+  );
+}
+```
+
+这条规则在组件里很重要。组件接收 `className` prop 想覆盖自己的默认样式时，不能只靠“把外部类名拼在后面”。要么让外部类的规则写在样式表更靠后的位置，要么提高选择器的优先级。
+
+## 样式文件怎么组织
+
+写在全局 CSS 里的类名是 **全局的**：整个页面只有一个命名空间。项目大了，两个文件各写一个 `.title`，就会互相覆盖。下面几种方案都在回答这个问题。
+
+| 方案 | 怎么写 | 冲突怎么避免 | 代价 |
+|---|---|---|---|
+| 全局 CSS | `import './app.css'`，用 `className="card"` | 靠命名约定（例如 BEM：`card__title`） | 项目大了难以删除，不知道哪个类还在用 |
+| **CSS Modules** | 文件名以 `.module.css` 结尾，`import styles from './Card.module.css'`，用 `styles.title` | 构建时把类名改成唯一的名字 | 要写 `styles.` 前缀；动态值仍要靠 `style` 或变量 |
+| **原子类（Tailwind）** | 在 `className` 里组合小类：`p-4 text-lg font-bold` | 几乎不写自定义类名，就没有重名 | 类名串很长；要记一套命名 |
+| 运行时 CSS-in-JS | 在组件里用 JS 写样式，库在渲染时生成类名并插入 `<style>` | 库生成唯一类名 | 浏览器要多做一轮工作；不能用在服务端组件里 |
+
+**CSS Modules** 的核心是一次“改名”：构建工具读 `.module.css`，把每个类名换成带文件信息的唯一名字，再让 `import` 得到“原名 → 新名”的对象。下面用一个函数模拟这一步。真实项目里这一步由 Vite 完成，生成的名字形如 `_title_1agl6_1`，建项目的细节见[项目搭建与工具链](/lessons/engineering)。
+
+```jsx play title="CSS Modules：两个 title 互不干扰"
+// 模拟：构建工具为每个 .module.css 里的类名加上文件名，得到唯一名字。
+// 真实项目里是 import styles from './Card.module.css'，这里用函数代替。
+function makeModule(file, names) {
+  const styles = {};
+  for (const name of names) styles[name] = file + '_' + name;
+  return styles;
+}
+
+const cardStyles = makeModule('Card', ['title']);
+const pageStyles = makeModule('Page', ['title']);
+
+function App() {
+  return (
+    <div>
+      <style>{`
+        .${cardStyles.title} { color: crimson; margin: 4px 0; }
+        .${pageStyles.title} { color: royalblue; margin: 4px 0; }
+      `}</style>
+      <h3 className={cardStyles.title}>卡片标题</h3>
+      <h3 className={pageStyles.title}>页面标题</h3>
+      <pre>{JSON.stringify({ cardStyles, pageStyles }, null, 2)}</pre>
+    </div>
+  );
+}
+```
+
+**原子类**的思路是反过来的：不给每个组件起名字、写一份专属的 CSS，而是预先提供一批只做一件事的小类（`p-4` 是内边距，`font-bold` 是粗体），组件用 `className` 把它们组合起来。Tailwind 在构建时扫描你的源码，只生成用到的类。因为它扫描的是源码里的完整字符串，类名不能拼出来：`` `text-${color}-500` `` 扫描不到，要写成完整的 `'text-red-500'` 再按条件选择。安装方式随大版本变化，以[官方文档](https://tailwindcss.com/docs/installation)为准。
+
+**运行时 CSS-in-JS**（styled-components、Emotion 一类）把样式写在组件文件里，样式能直接读 props。代价是渲染时多做一轮计算，并且依赖在浏览器里插入样式，所以不能用在服务端组件里。也有在构建时就生成静态 CSS 的方案（例如 vanilla-extract），用法接近 CSS Modules。选它之前，先确认它支持你用的框架。
+
+## 怎样选
+
+- **刚开始、小项目**：全局 CSS 加 CSS Modules。Vite 开箱即用，不用学新工具。
+- **团队已经用 Tailwind**，或者希望外观只能取预设的值：原子类。
+- **用现成的组件库**：跟着它自己的方案走，别再叠一套。
+- **值由数据决定**（进度、坐标、用户选色）：无论选哪种，都用内联 `style` 或 CSS 变量传进去。
+- **条件类名**：无论选哪种，都用 `cx` 这样的小函数，不要手拼字符串。
+
 <CallBox kind="tip" label="要点">
 
-【待写】提示框内容。kind 有 tip 要点 / warn 常见坑 / like 打个比方 / deep 深入一点。
+样式分两类：**固定的外观**写进样式表（类名），**随数据变的值**用 `style` 或 CSS 变量。state 的作用是决定“加哪个类名、传什么值”，而不是直接去改元素。
 
 </CallBox>
 

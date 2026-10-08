@@ -146,11 +146,7 @@ function App() {
 
 ## 给组件加样式
 
-用 `className` 指定 CSS 类名，样式写在 CSS 文件里。`className` 接收一个字符串。常见做法是让组件的 prop 决定类名：
-
-- `variant` 这样的 prop 对应一个类名，例如 `className={'button button-' + variant}`。
-- 条件类名：用模板字符串，或者把类名放进数组再 `filter(Boolean).join(' ')`。
-- 内联 `style` 只用于随数据变化的数值，例如进度条的宽度。固定样式放进 CSS。
+用 `className` 指定 CSS 类名，样式写在 CSS 里。让组件的 prop 决定类名，例如 `variant` 对应 `button-primary`、`button-danger`。条件类名、内联 `style` 和 CSS Modules 等写法，[后面的“样式”一课](/lessons/styling)会专门讲。
 
 ```jsx play title="用 className 和 variant 加样式"
 function Button({ variant = 'primary', disabled, children }) {
