@@ -166,6 +166,170 @@ Context 适合**变化不频繁的“全局”数据**：主题、语言、当�
 
 </CallBox>
 
+<details className="optional">
+<summary><span className="opt-tag">选读</span>多语言：Context 的典型用途<small>约 10 分钟，可以先跳过，需要时再展开</small></summary>
+
+当前语言是典型的“跨层级共享、很少变化”的数据：几乎每个组件都要显示文字，用户却很少切换语言。这正是 Context 最合适的场景。多语言（国际化，常缩写成 i18n）要做的事分两半：**文案**由你的字典提供，**数字、日期、复数**这类格式由浏览器自带的 `Intl` 提供。
+
+### 最小实现：语言 Context、字典和 t()
+
+三件东西：
+
+- 字典：每种语言一份，键相同。
+- 语言 Context：保存当前语言和切换它的函数。
+- `t(key, params)`：按当前语言取文案，再把 `{name}` 这样的占位符换成参数。
+
+```jsx play title="语言 Context 与 t()"
+import { createContext, useContext, useRef, useState } from 'react';
+
+// 文案字典：每种语言一份，键相同
+const messages = {
+  'zh-CN': { greeting: '你好，{name}！', switch: '切换语言' },
+  'en-US': { greeting: 'Hello, {name}!', switch: 'Switch language' },
+};
+
+const LangContext = createContext({ lang: 'zh-CN', setLang: () => {} });
+
+function LangProvider({ children }) {
+  const [lang, setLang] = useState('zh-CN');
+  return <LangContext value={{ lang, setLang }}>{children}</LangContext>;
+}
+
+// t(key, params)：按当前语言取文案，再把 {name} 这样的占位符换成参数
+function useT() {
+  const { lang } = useContext(LangContext);
+  return (key, params = {}) =>
+    (messages[lang][key] ?? key).replace(/\{(\w+)\}/g, (_, name) => params[name] ?? '{' + name + '}');
+}
+
+function useRenders() {
+  const n = useRef(0);
+  n.current++;
+  return n.current;
+}
+
+function Greeting({ name }) {
+  const t = useT();
+  const n = useRenders();
+  return <p>{t('greeting', { name })}（渲染 {n} 次）</p>;
+}
+
+function LangButton() {
+  const { lang, setLang } = useContext(LangContext);
+  const t = useT();
+  return <button onClick={() => setLang(lang === 'zh-CN' ? 'en-US' : 'zh-CN')}>{t('switch')}</button>;
+}
+
+function Unrelated() {
+  const n = useRenders();
+  return <p>不读语言 Context 的组件（渲染 {n} 次）</p>;
+}
+
+function App() {
+  return (
+    <LangProvider>
+      <LangButton />
+      <Greeting name="小陈" />
+      <Unrelated />
+    </LangProvider>
+  );
+}
+```
+
+点“切换语言”：读了 Context 的 `Greeting` 和 `LangButton` 重新渲染，没读 Context 的 `Unrelated` 渲染次数不变。因为 `LangProvider` 通过 `children` 接收子树，子树的元素是 `App` 创建的，`LangProvider` 的 state 变化时，React 复用它们，只更新读了 Context 的组件。
+
+### 用平台自带的 Intl
+
+数字、日期、相对时间、复数、列表的格式因语言而异，不要自己拼字符串。浏览器的 `Intl` 已经内置了这些规则。每个都是“创建格式化器，再调用 `format`”：
+
+| 对象 | 示例 | zh-CN | en-US |
+|---|---|---|---|
+| `Intl.NumberFormat`（货币） | `{ style: 'currency', currency: 'CNY' }`，1234.5 | ¥1,234.50 | CN¥1,234.50 |
+| `Intl.NumberFormat`（百分比） | `{ style: 'percent' }`，0.256 | 26% | 26% |
+| `Intl.DateTimeFormat` | `{ dateStyle: 'long', timeZone: 'UTC' }` | 2026年10月8日 | October 8, 2026 |
+| `Intl.RelativeTimeFormat` | `{ numeric: 'auto' }`，`format(-1, 'day')` | 昨天 | yesterday |
+| `Intl.RelativeTimeFormat` | 同上，`format(-3, 'day')` | 3天前 | 3 days ago |
+| `Intl.PluralRules` | `select(1)`、`select(2)`、`select(0)` | other、other、other | one、other、other |
+| `Intl.ListFormat` | `{ type: 'conjunction' }`，三项 | 苹果、香蕉和橘子 | apples, bananas, and oranges |
+
+上表是在 Chromium 153 里实测的。不同浏览器的输出可能略有不同（标点、空格、缩写），所以不要在测试里写死这些字符串。
+
+重点是 `PluralRules`。中文没有复数变化，任何数量都是 `other`。英文有 `one` 和 `other`，而且 0 属于 `other`：“0 items”，不是“0 item”。别的语言还有更多类别，例如阿拉伯语实测 0 是 `zero`、1 是 `one`、2 是 `two`、5 是 `few`。复数规则属于语言，不属于你的代码。用字符串拼接（`n > 1 ? 's' : ''`）把规则写死在代码里，换一种语言就错。正确做法是：字典里每种语言写它自己有的形式，代码只问 `PluralRules` 属于哪一类。先预测，再运行。
+
+```jsx play title="Intl 与复数：拼接为什么不行？"
+import { useState } from 'react';
+
+const order = {
+  total: 1234.5,
+  discount: 0.256,
+  paidAt: new Date('2026-10-08T14:30:00Z'),
+  tags: { 'zh-CN': ['苹果', '香蕉', '橘子'], 'en-US': ['apples', 'bananas', 'oranges'] },
+};
+
+// 复数：每个语言只写它有的形式，键是 Intl.PluralRules 返回的类别
+const cartText = {
+  'zh-CN': { other: '购物车里有 {count} 件商品' },
+  'en-US': { one: '{count} item in your cart', other: '{count} items in your cart' },
+};
+
+function cartByPlural(lang, count) {
+  const category = new Intl.PluralRules(lang).select(count);
+  return cartText[lang][category].replace('{count}', count);
+}
+
+// 字符串拼接：中文、英文各写一个分支
+function cartByConcat(lang, count) {
+  if (lang === 'zh-CN') return '购物车里有 ' + count + ' 件商品';
+  return count + ' item' + (count > 1 ? 's' : '') + ' in your cart';
+}
+
+function App() {
+  const [lang, setLang] = useState('zh-CN');
+  const [count, setCount] = useState(1);
+  const money = new Intl.NumberFormat(lang, { style: 'currency', currency: 'CNY' });
+  const percent = new Intl.NumberFormat(lang, { style: 'percent' });
+  const date = new Intl.DateTimeFormat(lang, { dateStyle: 'long', timeZone: 'UTC' });
+  const relative = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  const list = new Intl.ListFormat(lang, { type: 'conjunction' });
+  return (
+    <div>
+      <button onClick={() => setLang(lang === 'zh-CN' ? 'en-US' : 'zh-CN')}>语言：{lang}</button>{' '}
+      <button onClick={() => setCount((c) => Math.max(0, c - 1))}>−</button> {count}{' '}
+      <button onClick={() => setCount((c) => c + 1)}>＋</button>
+      <ul>
+        <li>货币：{money.format(order.total)}</li>
+        <li>百分比：{percent.format(order.discount)}</li>
+        <li>日期：{date.format(order.paidAt)}</li>
+        <li>相对时间：{relative.format(-1, 'day')}、{relative.format(-3, 'day')}、{relative.format(2, 'hour')}</li>
+        <li>列表：{list.format(order.tags[lang])}</li>
+        <li>拼接：{cartByConcat(lang, count)}</li>
+        <li>PluralRules：{cartByPlural(lang, count)}</li>
+      </ul>
+    </div>
+  );
+}
+```
+
+### 真实项目里还要处理什么
+
+| 事项 | 要点 |
+|---|---|
+| 文案抽取与翻译流程 | 文案从代码里抽成字典文件，交给译员或翻译平台，CI 里检查缺少的键 |
+| 懒加载语言包 | 只加载当前语言的字典（动态 `import()`），切换语言时再请求 |
+| 服务端渲染 | 服务器按 URL 前缀、cookie 或 `Accept-Language` 选定语言；服务器和浏览器必须用同一种语言、同一份字典渲染首屏，否则水合不一致 |
+| 从右到左的语言 | 阿拉伯语、希伯来语要设 `<html dir="rtl">`；布局用 CSS 逻辑属性（`margin-inline-start`）代替 `left` / `right` |
+| `lang` 属性与无障碍 | `<html lang="zh-CN">` 告诉读屏软件用哪种发音，局部换语言的内容也要在元素上写 `lang` |
+
+这些事交给现成的库：
+
+- [react-i18next](https://react.i18next.com/)：基于 i18next 的 React 国际化框架。
+- [Lingui](https://lingui.dev/)：文案写在组件里，用命令行抽取成目录文件交给翻译，再编译供应用使用。
+- [React Intl](https://formatjs.github.io/docs/react-intl/)（FormatJS 的一部分）：用 Provider 模式把国际化 Context 提供给整棵组件树，文案采用 ICU 消息语法。
+
+它们的核心都是本节的结构：语言 Context、字典、`t()`，再加上 `Intl`。
+
+</details>
+
 </LessonProse>
 
 <Quiz />

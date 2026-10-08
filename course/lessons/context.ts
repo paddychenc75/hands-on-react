@@ -4,7 +4,7 @@ export default {
   id: 'context',
   stage: 1,
   title: 'Context：跨层级共享数据',
-  mins: 29,
+  mins: 39,
   summary: '不用层层传递 props，也能让深层组件读到数据。',
   goals: [
     '能用 createContext、<ThemeContext value> 和 useContext 三步，让深层组件读到数据',
@@ -392,6 +392,23 @@ function App() {
       explain:
         '给普通变量重新赋值，不会触发重新渲染。App 没有重新渲染，Provider 的 value 还是旧对象，Header 仍显示“游客”。Context 只负责把值传下去，它不会让普通变量变成 state。修复：<code>const [user, setUser] = useState(…)</code>，点击时调用 setUser。“报错”不对：value 可以是任何值，只是它不会自己变化。',
     },
+    {
+      q: `点“English”后，标题显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const messages = { 'zh-CN': { title: '欢迎' }, 'en-US': { title: 'Welcome' } };
+let currentLang = 'zh-CN';
+function t(key) { return messages[currentLang][key]; }
+
+const Title = memo(function Title() { return &lt;h1&gt;{t('title')}&lt;/h1&gt;; });
+
+function App() {
+  const [, setLang] = useState('zh-CN');
+  function change() { currentLang = 'en-US'; setLang('en-US'); }
+  return &lt;&gt;&lt;button onClick={change}&gt;English&lt;/button&gt;&lt;Title /&gt;&lt;/&gt;;
+}</code></pre></div>`,
+      options: ['Welcome', '欢迎', '空白：t 找不到键', '报错：模块变量不能在组件里读取'],
+      answer: 1,
+      explain:
+        'App 重新渲染了，但 Title 被 memo 包着，props 没变（没有 props），React 跳过它。Title 没有读任何 Context 或 state，React 不知道它依赖 currentLang，所以不会重新渲染，标题仍是“欢迎”。普通变量变了，React 不会通知任何组件。修法：把当前语言放进 Context，让 Title（通过 useT）读它。',
+    },
   ],
   plays: {
     主题切换: {
@@ -409,5 +426,24 @@ function App() {
       note: '点“显示备注”，ThemedNote 在提前 return 之后读取 Context，没有任何报错。use(ThemeContext) 读到的值和 useContext(ThemeContext) 一样：最近的 Provider 的 value，这里是 dark。',
     },
     '购物车 Context': {},
+    '语言 Context 与 t()': {
+      note: '点“切换语言”，Greeting 的渲染次数加 1，“不读语言 Context 的组件”不变：只有读了 Context 的组件会重新渲染。t 是一个普通函数，它用 useContext 拿到当前语言，再从字典里取文案并替换占位符。',
+    },
+    'Intl 与复数：拼接为什么不行？': {
+      note: "英文里 0 属于 other 类，正确的是“0 items”。拼接版只写了 n > 1 才加 s，0 被当成单数，得到“0 item”。PluralRules 版问的是 Intl.PluralRules('en-US').select(0)，返回 other，取字典里 other 那一条。中文字典只有 other，因为中文没有复数变化，数量 1 也走 other。<br>其余几行是 Intl 的输出，随语言切换。输出以 Chromium 实测为准，不同浏览器可能略有不同。",
+      predict: {
+        q: '点“语言”切换到 en-US，再把数量减到 0。“拼接”和“PluralRules”两行分别显示什么？',
+        options: [
+          '拼接：0 items in your cart；PluralRules：0 items in your cart',
+          '拼接：0 item in your cart；PluralRules：0 item in your cart',
+          '拼接：0 item in your cart；PluralRules：0 items in your cart',
+          '拼接：0 items in your cart；PluralRules：0 item in your cart',
+        ],
+        answer: 2,
+        explain:
+          '英文里 0 属于 other 类，正确的是复数。拼接版用 n > 1 判断，0 不大于 1，得到“0 item”。PluralRules 的 select(0) 返回 other，字典里 other 是复数形式。规则属于语言，不该写死在代码里：阿拉伯语的 0 是 zero 类，1 是 one，2 是 two，拼接版没法覆盖。',
+      },
+      pkey: 'context|Intl 与复数：拼接为什么不行？',
+    },
   },
 } satisfies Lesson;
