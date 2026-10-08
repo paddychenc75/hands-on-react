@@ -2,21 +2,23 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/custom-hooks.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'custom-hooks',
+  runtime: 19,
   stage: 1,
   title: '自定义 Hook：复用逻辑',
-  mins: 20,
+  mins: 26,
   summary: '把组件中的状态逻辑抽取成以 use 开头的函数，在多个组件间复用。',
   goals: [
     '能说出 Hooks 的两条规则，并找出违反规则的代码',
     '能把几个组件里重复的状态逻辑抽成一个自定义 Hook',
     '能解释两个组件调用同一个自定义 Hook 时，state 为什么互相独立',
-    '能为自定义 Hook 设计参数和返回值',
+    '能为自定义 Hook 设计参数和返回值，并让它在参数变化时重新同步',
   ],
   keyPoints: [
     '两条规则：只在最顶层调用 Hook；只在函数组件或自定义 Hook 里调用。React 按调用顺序识别每个 Hook。',
     '自定义 Hook 是名字以 use 加大写字母开头、内部调用其他 Hook 的函数。',
     '它共享的是逻辑，不是 state：每个组件每调用一次，都有一份独立的 state。',
     '常见用法：把 useState 和 useEffect 的组合（窗口宽度、请求数据、localStorage）封装起来，组件只拿结果。',
+    '参数会变时（例如 url），把它写进 Hook 内部 effect 的依赖数组，并用 ignore 标记忽略过期的响应。',
   ],
   quiz: [
     {
@@ -49,6 +51,18 @@ export default {
       answer: 0,
       explain:
         'React 运行时不看名字，但 lint 工具（以及 React Compiler）只靠名字认出 Hook。叫 getCounter 时，有人把它写进 if 里，lint 不会报错，运行时 Hook 顺序就会错乱。最迷惑的是第二项：今天能运行，不代表以后改代码时不出错。第三项也不对：改名不会改变“每次调用各有一份 state”。',
+    },
+    {
+      q: '<code>useFetch(url)</code> 里的 effect 调用了 <code>fakeFetch(url)</code>，依赖数组却写成 <code>[]</code>。App 里 <code>url</code> 从 "/api/users/1" 变成 "/api/users/3"，界面会怎样？',
+      options: [
+        '不会重新请求，仍显示用户 1 的数据',
+        '重新请求，显示用户 3 的数据',
+        '报错：Hook 的参数不能变',
+        '重新请求，但因为没有 ignore，可能先显示用户 3 再变回用户 1',
+      ],
+      answer: 0,
+      explain:
+        'effect 读了 url，却没把它写进依赖数组，React 认为没有东西变了，不会重新同步，界面一直停在第一次请求的结果。Hook 的参数和组件的 props 一样，会随渲染变化；effect 读到的每个会变的值都要写进依赖数组。最迷惑的是最后一项：它说的是依赖写对之后才会遇到的竞态，这里根本不会发第二次请求。',
     },
   ],
   exercise: {
@@ -158,6 +172,7 @@ function App() {
   return <div><Likes /><Stock /></div>;
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const useCounter = t.exports.useCounter;
       t.assert(typeof useCounter === 'function', '请保留名为 useCounter 的函数');
       // 单独测试 Hook 本身：在一个探针组件里调用它
@@ -266,6 +281,33 @@ function Header({ id }) {
   plays: {
     '三个实用的自定义 Hook': {
       note: '调整浏览器窗口大小试试看。',
+    },
+    '两个组件各调用一次 useToggle': {
+      note: '灯 A 和灯 B 各自调用了一次 useToggle()，每次调用都创建一份属于当前组件的 state，所以互不影响。灯 C 和灯 D 的状态来自父组件 App 里的同一次调用，所以一起开关。自定义 Hook 复用的是“怎么管理开关”这套逻辑，不是某一份开关的值。',
+      predict: {
+        q: '点一下“灯 A”。灯 B 会怎样？',
+        options: [
+          '灯 B 也变成“开”：两个灯调用的是同一个 useToggle',
+          '灯 B 不变：灯 A 和灯 B 各有自己的 state',
+          '灯 B 要等下一次渲染才变',
+          '报错：同一个 Hook 不能被两个组件调用',
+        ],
+        answer: 1,
+        explain:
+          'Hook 里的 useState 属于调用它的组件。灯 A 和灯 B 各调用一次 useToggle()，就各有一份 on。最迷惑的是第一项：两个组件用的是同一个函数，但函数只是“怎么做”的描述，每次调用都会产生新的 state。想共享，就把调用提到共同父组件。',
+      },
+      pkey: 'custom-hooks|两个组件各调用一次 useToggle',
+    },
+    '参数变化时重新请求：useFetch': {
+      note: '用户 2 的响应要 1.5 秒，用户 3 只要 0.3 秒。点用户 3 时，用户 2 的请求还没回来。url 变了，React 先运行上一次 effect 的清理函数，把用户 2 的那次请求标记为过期（ignore = true），再用新的 url 发出第二次请求。用户 2 的响应后到，却被忽略。想看没有 ignore 的结果，把 .then 里的 if (!ignore) 去掉再试一次。',
+      predict: {
+        q: '先点“用户 2”，不等它返回，马上点“用户 3”，等 2 秒。“结果”那一行显示什么？',
+        options: ['结果：小赵', '结果：小王', '加载中…', '先显示小赵，然后变成小王'],
+        answer: 0,
+        explain:
+          'url 变化时，清理函数把用户 2 的请求标记为过期，它 1.5 秒后返回，也不会写进 state。界面始终和当前选择一致。没有 ignore 才会出现最后一项：慢的响应后到，覆盖了正确的结果，选的是用户 3，显示的却是小王。',
+      },
+      pkey: 'custom-hooks|参数变化时重新请求：useFetch',
     },
   },
 } satisfies Lesson;

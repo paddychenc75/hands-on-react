@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/project-search.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'project-search',
+  runtime: 19,
   stage: 1,
   title: '实战二：异步搜索',
   mins: 41,
@@ -21,7 +22,7 @@ export default {
   quiz: [
     {
       q: '用户快速输入时，旧请求比新请求晚返回，会导致？',
-      options: ['请求自动排队，按发出顺序显示', '界面最终显示旧关键词的结果', '请求自动取消', 'React 18 会自动丢弃过期请求触发的 set 函数调用'],
+      options: ['请求自动排队，按发出顺序显示', '界面最终显示旧关键词的结果', '请求自动取消', 'React 会自动丢弃过期请求触发的 set 函数调用'],
       answer: 1,
       explain:
         '这就是竞态问题：旧请求的 then 回调照样会执行，把旧结果写进 state。React 不知道哪个结果“过期”，不会替你丢弃，所以最后一个选项不对。必须用 ignore 标记忽略，或用 AbortController 取消过期请求。',
@@ -141,6 +142,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const names = () => t.qa('li.user').map(li => li.textContent.trim());
       // 步骤 4：请求逻辑要真的在 Hook 里。先看 App 本身，再单独调用 Hook
       const useUserSearch = t.exports.useUserSearch;

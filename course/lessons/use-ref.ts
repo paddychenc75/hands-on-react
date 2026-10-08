@@ -2,12 +2,13 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/use-ref.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'use-ref',
+  runtime: 19,
   stage: 1,
   title: 'useRef：不触发渲染的“口袋”',
-  mins: 20,
+  mins: 26,
   summary: '用 ref 访问 DOM 元素，或保存不需要显示在界面上的可变值。',
   goals: [
-    '能用 ref 拿到 DOM 节点，完成聚焦、测量这类操作',
+    '能用 ref 拿到 DOM 节点（包括自己写的组件里的节点），完成聚焦、测量这类操作',
     '能用 ref 保存定时器 id 这类不需要显示的可变值',
     '能根据“改了之后界面要不要变”，在 ref 和 state 之间做选择',
     '能找出在渲染期间读写 ref.current 的问题',
@@ -15,7 +16,7 @@ export default {
   keyPoints: [
     '<code>useRef(初始值)</code> 返回 <code>{ current }</code>。每次渲染拿到的都是同一个对象。',
     '修改 <code>ref.current</code> 不会触发重新渲染。',
-    '用途一：把 ref 交给 JSX 的 <code>ref</code> 属性，React 会把 DOM 节点放进 <code>ref.current</code>。',
+    '用途一：把 ref 交给 JSX 的 <code>ref</code> 属性，React 会把 DOM 节点放进 <code>ref.current</code>。React 19 里 ref 是普通 prop，自己的组件取出它再交给 DOM 元素就行。ref 回调可以返回清理函数。',
     '用途二：跨渲染保存不需要显示的值，例如定时器 id。普通变量做不到：每次渲染它都会被重置。',
     '要显示在界面上的值用 state。不要在渲染期间读写 ref.current。',
   ],
@@ -45,6 +46,13 @@ export default {
       answer: 0,
       explain:
         '每次 setTime 都会重新渲染，组件函数重新执行，timerId 被重新声明。停止时拿到的是 undefined。最迷惑的是第三项：用 state 也能停下来，但每次存 id 都多一次无用的渲染；ref 正是为这种“幕后数据”准备的。',
+    },
+    {
+      q: "React 19 里，输入框带着 <code>ref={node => { console.log('挂载'); return () => console.log('清理'); }}</code>。输入框从页面上移除时，控制台打印什么？",
+      options: ['清理', '挂载', '什么也不打印：只有 useEffect 才有清理', '先打印“挂载”，再打印“清理”'],
+      answer: 0,
+      explain:
+        'React 19 允许 ref 回调返回清理函数。节点从页面移除时，React 调用这个清理函数，所以打印“清理”。React 18 没有这个能力：移除时会再用 null 调用一次 ref 回调。最迷惑的是第三项：ref 回调和 useEffect 一样，可以用返回的函数做清理。',
     },
   ],
   exercise: {
@@ -128,6 +136,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const b = t.byText('button', '聚焦');
       t.assert(b, '找不到“聚焦”按钮');
       const code = t.source.replace(/^\s*import.*$/gm, '');
@@ -240,6 +249,28 @@ const [, setTick] = useState(0);
   ],
   plays: {
     'ref 操作 DOM': {},
+    'ref 作为普通 prop': {
+      note: 'React 19 里，FancyInput 直接从 props 里取出 ref，再交给内部的 input。父组件的 inputRef.current 就是那个 input 节点，所以 tagName 是 INPUT。ref 不是 FancyInput 组件本身的什么“实例”，函数组件没有实例。',
+      predict: {
+        q: '点“ref.current 是什么？”，控制台打印的 tagName 是什么？',
+        options: ['INPUT', 'FANCYINPUT', 'null：ref 不能传给自己写的组件', 'undefined'],
+        answer: 0,
+        explain:
+          'FancyInput 把 ref 交给了 input，所以 inputRef.current 是 input 的 DOM 节点，tagName 是 INPUT（大写）。最迷惑的是“null”：那是 React 18 的行为之一，函数组件收不到 ref；React 19 里 ref 是普通 prop，可以直接传。',
+      },
+      pkey: 'use-ref|ref 作为普通 prop',
+    },
+    'ref 回调：挂载与清理': {
+      note: '输入框挂载时，ref 回调被调用，参数是 input 节点。隐藏输入框时，React 调用回调返回的清理函数，不再用 null 调用回调。点“重新渲染”再试一次：内联箭头函数每次渲染都是新函数，React 先清理旧的，再挂载新的。',
+      predict: {
+        q: '页面刚运行时，控制台有一行“挂载：INPUT”。点一次“隐藏输入框”，控制台新增什么？',
+        options: ['清理：节点离开页面', '挂载：null', '什么也不新增：ref 回调只在挂载时调用', '先“清理”，再“挂载：null”'],
+        answer: 0,
+        explain:
+          'React 19 里，ref 回调返回了清理函数，节点移除时只调用清理函数。最迷惑的是“挂载：null”：React 18 在移除时会用 null 再调用一次 ref 回调，所以那时回调里要判断 node 是否为空；回调返回清理函数之后，这个调用就没有了。',
+      },
+      pkey: 'use-ref|ref 回调：挂载与清理',
+    },
     '用 ref 保存定时器 id 的秒表': {
       note: '渲染次数跟着时间一起增加：每 0.1 秒调用一次 setTime，每次都重新渲染。存定时器 id 的 timerRef 不会触发渲染，点“开始”和“停止”本身也不改 state。',
       predict: {

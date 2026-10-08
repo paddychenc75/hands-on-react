@@ -2,12 +2,13 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/escape-hatches.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'escape-hatches',
+  runtime: 19,
   stage: 1,
   title: 'DOM 逃生舱：Portal、useLayoutEffect 与 useId',
-  mins: 35,
+  mins: 38,
   summary: '少数情况下，props 和 state 不够用。学会 5 个直接和 DOM 打交道的 API，也学会什么时候不用它们。',
   goals: [
-    '能写出用 forwardRef 和 useImperativeHandle 只暴露 focus() 等少数方法的组件',
+    '能写出接收 ref 这个 prop，并用 useImperativeHandle 只暴露 focus() 等少数方法的组件',
     '能判断“测量布局再修改位置”的代码该放进 useLayoutEffect 还是 useEffect',
     '能用 createPortal 把弹窗渲染到 body，并预测弹窗里的事件冒泡到哪里',
     '能用 useId 生成 id，关联 label、aria-labelledby 和 aria-describedby',
@@ -45,6 +46,18 @@ export default {
       answer: 0,
       explain:
         '能用 props 表达的状态，就用 props。这样父组件的 state 就是唯一数据源。最有迷惑性的是 useImperativeHandle 暴露 open()：它能工作，但“开着还是关着”就藏在 Dialog 内部，父组件不知道，也不能和其他 state 联动。useImperativeHandle 只适合聚焦、滚动这类命令式操作。直接改 DOM 会让 React 的 state 和页面不一致。',
+    },
+    {
+      q: 'React 19 里，父组件写 <code>&lt;FancyInput ref={r} /&gt;</code>。FancyInput 是函数组件，要接收这个 ref，函数应该怎么写？',
+      options: [
+        'function FancyInput({ ref })',
+        'function FancyInput(props, ref)',
+        'function FancyInput({ forwardedRef })',
+        '必须先用 forwardRef 包装，否则收不到',
+      ],
+      answer: 0,
+      explain:
+        'React 19 里 ref 是普通 prop，直接在 props 里解构。第二项是 forwardRef 的写法：函数组件的第二个参数不是 ref。最后一项是 React 18 的规则：19 里 forwardRef 不再必需，只在维护旧项目时才会遇到。',
     },
   ],
   exercise: {
@@ -170,6 +183,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       // 记录检查期间在 document 和 window 上添加、移除的 keydown 监听，用来确认清理函数真的移除了监听
       const live = new Set();
       const origAdd = EventTarget.prototype.addEventListener,
@@ -297,7 +311,7 @@ function App() {
       options: ['输入框获得焦点', 'inputRef.current 是 null，调用 focus 时报错', 'inputRef.current 是 MyInput 组件对象', 'focus 被调用，但没有效果'],
       answer: 1,
       explain:
-        'ref 没有被交给 <code>&lt;input&gt;</code>。在 React 18 中，函数组件收不到 ref，要用 forwardRef 转发。在 React 19 中，ref 是普通 prop，但这里没有用到它。两种情况下 inputRef.current 都是 null。修复：把 ref 传给 <code>&lt;input ref={ref} /&gt;</code>。',
+        'MyInput 没有把 ref 取出来交给 <code>&lt;input&gt;</code>。React 19 里 ref 是普通 prop，但组件不取用它，它就不会自己落到 input 上，所以 inputRef.current 一直是 null。修复：<code>function MyInput({ label, ref })</code>，再写 <code>&lt;input ref={ref} /&gt;</code>。维护 React 18 项目时，函数组件根本收不到 ref，要用 forwardRef 包装，结果同样是 null。',
     },
     {
       q: `点击“确定”按钮，控制台会打印“外层”吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;div onClick={() =&gt; console.log('外层')}&gt;
@@ -315,6 +329,14 @@ function App() {
   plays: {
     '只暴露 focus() 和 clear()': {
       note: '点第三个按钮，看控制台。父组件只能看到两个方法，看不到 DOM 节点。',
+      predict: {
+        q: '点“ref.current 里有什么？”，控制台打印的数组是什么？',
+        options: ['["focus", "clear"]', '["current"]', '["focus", "clear", "value", "style", "…"]：input 节点的全部属性', '[]'],
+        answer: 0,
+        explain:
+          'useImperativeHandle 返回的对象就是父组件的 ref.current，里面只有 focus 和 clear 两个方法。最迷惑的是第三项：没有 useImperativeHandle 时，ref 直接指向 input 节点，才能读到它的全部属性。',
+      },
+      pkey: 'escape-hatches|只暴露 focus() 和 clear()',
     },
     '提示框会不会闪一下？': {
       note: '把鼠标移到两个按钮上。左边先出现红色的错误位置，再跳到上方。右边稍等一下，直接出现在正确位置。手机上可以轻点按钮。',

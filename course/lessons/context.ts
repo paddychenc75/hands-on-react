@@ -2,26 +2,27 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/context.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'context',
+  runtime: 19,
   stage: 1,
   title: 'Context：跨层级共享数据',
-  mins: 20,
+  mins: 22,
   summary: '不用层层传递 props，也能让深层组件读到数据。',
   goals: [
-    '能用 createContext、Provider、useContext 三步，让深层组件读到数据',
+    '能用 createContext、<ThemeContext value> 和 useContext 三步，让深层组件读到数据',
     '能把 state 和修改它的函数放进 value，让深层组件既能读也能改',
     '能说出 useContext 读到的是哪个值：最近的 Provider，或默认值',
     '能判断一份数据该用 Context，还是直接通过 props 传入',
   ],
   keyPoints: [
     'Context 解决 prop drilling：父组件把数据“广播”给整棵子树，任何深度的后代都能直接读取。',
-    '三步：<code>createContext(默认值)</code> 创建；<code>&lt;Ctx.Provider value={…}&gt;</code> 提供；<code>useContext(Ctx)</code> 读取。',
-    'useContext 读的是离它最近的上层 Provider 的 value。找不到 Provider 时，才用默认值。',
+    '三步：<code>createContext(默认值)</code> 创建；<code>&lt;Ctx value={…}&gt;</code> 提供（React 19 里 Context 本身就是 Provider）；<code>useContext(Ctx)</code> 读取。',
+    'useContext 读的是离它最近的上层 Provider 的 value。找不到 Provider 时，才用默认值。React 19 的 <code>use(Ctx)</code> 读到的值一样，还能放在提前 return 之后。',
     '把 state 和修改它的函数一起放进 value，后代组件就既能读也能改。',
     '代价：value 变化时，所有读取它的组件都会重新渲染。适合主题、语言、当前用户这类不常变的数据。',
   ],
   quiz: [
     {
-      q: '两个 ThemeContext.Provider 嵌套：外层 value="light"，内层 value="dark"。内层里面的组件调用 useContext(ThemeContext)，读到什么？',
+      q: '两个 <code>&lt;ThemeContext value&gt;</code> 嵌套：外层 value="light"，内层 value="dark"。内层里面的组件调用 useContext(ThemeContext)，读到什么？',
       options: ['"light"：最外层的 Provider 说了算', '"dark"：离它最近的 Provider 说了算', 'createContext 时写的默认值', '报错：同一个 Context 不能嵌套提供'],
       answer: 1,
       explain:
@@ -40,14 +41,26 @@ export default {
         'value 变了，所有读取这个 Context 的组件都会重新渲染，不管它用的是哪个字段。最迷惑的是最后一项：React 不按字段追踪。解决方法：拆成两个 Context。',
     },
     {
-      q: '<code>const UserContext = createContext(\'游客\')</code>。App 渲染 <code>&lt;Welcome /&gt;</code> 和 <code>&lt;UserContext.Provider value="小李"&gt;…&lt;/UserContext.Provider&gt;</code>，第一个 Welcome 在 Provider 外面。它读到什么？',
+      q: '<code>const UserContext = createContext(\'游客\')</code>。App 渲染 <code>&lt;Welcome /&gt;</code> 和 <code>&lt;UserContext value="小李"&gt;…&lt;/UserContext&gt;</code>，第一个 Welcome 在 Provider 外面。它读到什么？',
       options: ['"游客"', '"小李"', 'undefined', '报错：找不到 Provider'],
       answer: 0,
       explain: '它上面没有 Provider，所以用默认值。最迷惑的是“小李”：Provider 只对它包住的子树生效，兄弟组件读不到。',
     },
+    {
+      q: 'ThemedNote 组件在 <code>visible</code> 为 false 时提前 <code>return null</code>。在 React 19 里，想在这个提前 return 之后读取 ThemeContext，并且不违反 Hooks 规则，应该用哪个？',
+      options: [
+        'useContext(ThemeContext)：Hook 写在哪里都行',
+        'use(ThemeContext)：规则允许它出现在条件分支和提前 return 之后',
+        '先 useState 存一份 Context 的值',
+        '不可能，必须把提前 return 挪到读取 Context 之后',
+      ],
+      answer: 1,
+      explain:
+        'Hooks 规则要求 useContext 写在组件顶层，不能放在提前 return 之后；lint 会报错，即使运行时恰好没出问题。use 是例外，可以出现在条件分支、循环和提前 return 之后。最迷惑的是第一项：它在实验里能跑，但依靠的是实现细节，不是规则允许的写法。',
+    },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>用 <code>createContext</code> 创建 <code>UserContext</code>。默认值写 <b>游客</b>。</li><li>在 <code>App</code> 中用 Provider 提供值 <code>"小李"</code>。</li><li>在深层组件 <code>Welcome</code> 中，用 <code>useContext</code> 读取用户名。</li><li>渲染 <code>&lt;p id="welcome"&gt;欢迎，小李&lt;/p&gt;</code>。不要通过 props 传递用户名。</li></ol>',
+    task: '<ol class="task-steps"><li>用 <code>createContext</code> 创建 <code>UserContext</code>。默认值写 <b>游客</b>。</li><li>在 <code>App</code> 中用 <code>&lt;UserContext value="小李"&gt;</code> 包住 Layout，提供值 <code>"小李"</code>。</li><li>在深层组件 <code>Welcome</code> 中，用 <code>useContext</code> 读取用户名。</li><li>渲染 <code>&lt;p id="welcome"&gt;欢迎，小李&lt;/p&gt;</code>。不要通过 props 传递用户名。</li></ol>',
     starter: `import { createContext, useContext } from 'react';
 
 // ① 创建 UserContext
@@ -80,9 +93,9 @@ function Layout() {
 
 function App() {
   return (
-    <UserContext.Provider value="小李">
+    <UserContext value="小李">
       <Layout />
-    </UserContext.Provider>
+    </UserContext>
   );
 }`,
     hint: '回到正文的“三步使用 Context”：创建、提供、消费。你缺的是哪一步？',
@@ -102,10 +115,11 @@ function Layout() {
 
 function App() {
   return (
-    /* ✏️ 用 UserContext 的 Provider 包住 Layout，提供 "小李" */
+    /* ✏️ 用 <UserContext value="小李"> 包住 Layout */
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       t.assert(t.text('#welcome').replace(/\s/g, '') === '欢迎，小李', `应显示“欢迎，小李”，实际是“${t.text('#welcome')}”`);
       t.assert(!/<Welcome\s+[\w{]/.test(t.source), '不要通过 props 传给 Welcome。用户名要从 Context 里读');
       t.assert(!/createContext\(\s*['"`]小李/.test(t.source), '默认值不要写“小李”。默认值是“游客”，“小李”要由 App 里的 Provider 提供');
@@ -127,11 +141,12 @@ function App() {
       // 再把 Welcome 放进另一个 Provider：它应读到这个 Provider 的值
       const Ctx = t.exports.UserContext;
       t.assert(Ctx && Ctx.Provider, "找不到 UserContext。请用 const UserContext = createContext('游客') 创建它");
+      // React 19 里 Context 本身就是 Provider（Ctx.Provider === Ctx），写 <UserContext value> 或 <UserContext.Provider value> 都行
       const box2 = document.createElement('div');
       const root2 = ReactDOM.createRoot(box2);
       let inner = '';
       try {
-        ReactDOM.flushSync(() => root2.render(React.createElement(Ctx.Provider, { value: '小王' }, React.createElement(t.exports.Welcome))));
+        ReactDOM.flushSync(() => root2.render(React.createElement(Ctx, { value: '小王' }, React.createElement(t.exports.Welcome))));
         inner = box2.textContent.replace(/\s/g, '');
       } finally {
         root2.unmount();
@@ -150,9 +165,9 @@ function App() {
   const [theme, setTheme] = useState('dark');
   return (
     &lt;&gt;
-      &lt;ThemeCtx.Provider value={theme}&gt;
+      &lt;ThemeCtx value={theme}&gt;
         &lt;Toolbar /&gt;
-      &lt;/ThemeCtx.Provider&gt;
+      &lt;/ThemeCtx&gt;
       &lt;Footer /&gt;
     &lt;/&gt;
   );
@@ -166,12 +181,12 @@ function App() {
       q: `Header 用 <code>useContext(UserCtx)</code> 显示用户名。点击“登录”后，Header 显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function App() {
   let user = { name: '游客' };
   return (
-    &lt;UserCtx.Provider value={user}&gt;
+    &lt;UserCtx value={user}&gt;
       &lt;button onClick={() =&gt; { user = { name: '小明' }; }}&gt;
         登录
       &lt;/button&gt;
       &lt;Header /&gt;
-    &lt;/UserCtx.Provider&gt;
+    &lt;/UserCtx&gt;
   );
 }</code></pre></div>`,
       options: ['小明：Provider 的 value 变了，Header 会更新', 'null：变量被重新赋值后 Context 丢失', '游客', '报错：value 必须是 state'],
@@ -191,6 +206,9 @@ function App() {
           "卡片 C 在 Provider 外面。useContext 找不到上层的 Provider，就用 createContext 的默认值 'light'。切换主题只改变 Provider 的 value，影响不到它。最迷惑的是“报错”：没有 Provider 不会报错，只会读到默认值。",
       },
       pkey: 'context|主题切换',
+    },
+    '用 use 读取 Context': {
+      note: '点“显示备注”，ThemedNote 在提前 return 之后读取 Context，没有任何报错。use(ThemeContext) 读到的值和 useContext(ThemeContext) 一样：最近的 Provider 的 value，这里是 dark。',
     },
     '购物车 Context': {},
   },
