@@ -62,15 +62,48 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js、Relay、TanStack Query 和 React 19 的 `use()`。使用它们时，组件会“暂停”，直到数据准备好。你不需要在每个组件里写 `if (loading)`。注意：在 effect 或事件处理函数里请求数据，不会触发 Suspense。传给 `use()` 的 Promise 要缓存，不能在渲染时新建。
+Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js、Relay、TanStack Query 和 React 19 的 `use()`。使用它们时，组件会“暂停”，直到数据准备好。你不需要在每个组件里写 `if (loading)`。注意：在 effect 或事件处理函数里请求数据，不会触发 Suspense。
 
 </CallBox>
 
-<CallBox kind="deep" label="深入一点">
+## 用 use() 读取数据
 
-已经显示的内容再次挂起时（例如切换到一个还没加载的懒加载标签页），默认会被 fallback 替换。把这次 set 函数调用放进 `startTransition`，React 会保留旧界面，等新内容准备好再切换。下一课会讲 startTransition。
+`lazy` 等待的是组件的代码。`use()` 让组件等待数据。`use(promise)` 读取一个 Promise：没完成时，组件挂起，最近的 Suspense 显示 fallback。完成后，组件拿到结果，继续渲染。先看代码，再预测：
 
-</CallBox>
+```jsx play title="use() 读取 Promise"
+import { Suspense, use, useState } from 'react';
+
+// 模拟网络请求：1 秒后返回。同一个 id 只创建一次 Promise
+const cache = new Map();
+function loadUser(id) {
+  if (!cache.has(id)) {
+    console.log('请求用户 ' + id);
+    cache.set(id, new Promise(resolve => setTimeout(() => resolve('用户 ' + id + ' 的资料'), 1000)));
+  }
+  return cache.get(id);
+}
+
+function Profile({ id }) {
+  const info = use(loadUser(id)); // Promise 没完成时，组件在这里挂起
+  return <p>{info}</p>;
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  return (
+    <div>
+      {[1, 2].map(n => <button key={n} onClick={() => setId(n)}>用户 {n}</button>)}
+      <Suspense fallback={<p>⏳ 加载中…</p>}>
+        <Profile id={id} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+`use()` 要求 Promise 在多次渲染之间是**同一个对象**。示例用 `Map` 缓存，同一个 id 只创建一次 Promise。如果在组件里直接写 `use(new Promise(…))` 或 `use(fetch(…))`，每次渲染都会得到新的 Promise，组件会一直挂起。
+
+缓存的 Promise 完成以后，再读它不会挂起，所以点回“用户 1”能立刻显示。缓存怎么设计、出错怎么重试、怎样避免请求排成瀑布，见[Suspense 数据获取](/lessons/suspense-data)一课。
 
 ## 边界包在哪一层
 
@@ -137,7 +170,131 @@ function App() {
 - 可以晚到的内容（评论、推荐）单独包一层。
 - 错误边界同理：一个模块坏了，不该影响的部分，就不要和它放在同一个边界里。
 
-两个版本的细节略有不同。React 18 会先把同一边界里的兄弟组件都渲染一遍，再显示 fallback。React 19 先显示 fallback，再回头渲染兄弟组件，提前发起它们的加载。两者的加载都是同时开始的，所以共用一个边界时都是等 3 秒，不是 4 秒。
+在 React 19 中，组件挂起时，React 先让这个边界显示 fallback，再回头渲染同一边界里的兄弟组件，提前发起它们的加载。所以共用一个边界时，是同时开始加载，共等 3 秒，不是 4 秒。
+
+<CallBox kind="deep" label="维护 React 18 项目时">
+
+React 18 的顺序相反：先把同一边界里的兄弟组件都渲染一遍，再显示 fallback。加载也是同时开始的，所以等待时间相同，区别只在组件函数被调用的先后。
+
+</CallBox>
+
+## 挂起时用户看到什么
+
+边界决定“哪一块显示 fallback”。这一节看三个细节：没有边界会怎样，fallback 显示多久，已经显示的内容再次挂起时怎样保持旧界面。
+
+### 没有 Suspense 边界时
+
+下面的 `Chart` 要 1.5 秒才加载完，它外面**没有** Suspense。先预测，再点“显示图表”：
+
+```jsx play title="没有 Suspense 边界"
+import { lazy, useState } from 'react';
+
+// 模拟网络加载：1.5 秒后组件才到
+const Chart = lazy(() => new Promise(resolve => {
+  setTimeout(() => resolve({ default: () => <p>📊 图表加载完成</p> }), 1500);
+}));
+
+function App() {
+  const [show, setShow] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setShow(true)}>显示图表</button>
+      <p>页面的其他内容</p>
+      {show && <Chart />}
+    </div>
+  );
+}
+```
+
+在 React 19 中，点击引起的更新挂起，又找不到 Suspense 时，React 保持旧界面不变，等组件加载完再更新。用户在这 1.5 秒里看不到任何反馈，会以为点击没有反应。
+
+如果是**首次挂载**时挂起，又没有 Suspense，整棵树什么也不显示，直到加载完成。所以懒加载组件外面总要包一个 Suspense，给用户一个等待提示。
+
+<CallBox kind="deep" label="维护 React 18 项目时">
+
+React 18 中，点击这类同步更新引起的挂起，如果没有 Suspense，会报错 “A component suspended while responding to synchronous input”，并清空界面。
+
+</CallBox>
+
+### fallback 至少显示约 300 毫秒
+
+数据很快就到了，fallback 是不是一闪而过？先看代码：数据 50 毫秒就返回。控制台会打印每个阶段的时刻。
+
+```jsx play title="fallback 的最短显示时间"
+import { Suspense, use, useEffect } from 'react';
+
+const t0 = performance.now();
+const ms = () => Math.round(performance.now() - t0);
+
+// 模拟请求：50 毫秒就返回
+const promise = new Promise(resolve => setTimeout(() => resolve('数据到了'), 50));
+
+function Loading() {
+  useEffect(() => {
+    console.log('fallback 显示出来 @' + ms() + ' ms');
+    return () => console.log('fallback 被替换 @' + ms() + ' ms');
+  }, []);
+  return <p>⏳ 加载中…</p>;
+}
+
+function Content() {
+  const text = use(promise);
+  useEffect(() => { console.log('内容显示出来 @' + ms() + ' ms'); }, []);
+  return <p>{text}</p>;
+}
+
+function App() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <Content />
+    </Suspense>
+  );
+}
+```
+
+fallback 一旦显示出来，React 会让它至少停留约 300 毫秒，再换成内容。这是为了避免界面一闪而过。数据比这更晚到，就一到就显示。
+
+### 切换时保留旧界面：startTransition
+
+已经显示的内容再次挂起时（例如切到一个还没加载的页面），默认会被 fallback 替换。把这次 set 函数调用放进 `startTransition`，React 会保留旧界面，等新内容准备好再切换，同时 `isPending` 为 true。`startTransition` 的详细用法见[并发特性](/lessons/concurrent)一课。
+
+```jsx play title="切换时保留旧界面"
+import { Suspense, use, useState, useTransition } from 'react';
+
+// 模拟请求：每页 1 秒，同一页只请求一次
+const cache = new Map();
+function loadPage(id) {
+  if (!cache.has(id)) {
+    cache.set(id, new Promise(resolve => setTimeout(() => resolve('第 ' + id + ' 页的内容'), 1000)));
+  }
+  return cache.get(id);
+}
+
+function Page({ id }) {
+  return <p>{use(loadPage(id))}</p>;
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  const [useT, setUseT] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  function next() {
+    if (useT) startTransition(() => setId(id + 1));
+    else setId(id + 1);
+  }
+
+  return (
+    <div>
+      <label><input type="checkbox" checked={useT} onChange={e => setUseT(e.target.checked)} /> 用 startTransition 切换</label>
+      <p><button onClick={next}>下一页</button> {isPending && <small>切换中…</small>}</p>
+      <Suspense fallback={<p>⏳ 加载中…</p>}>
+        <Page id={id} />
+      </Suspense>
+    </div>
+  );
+}
+```
 
 ## 错误边界：防止一个组件崩溃拖垮整个页面
 
@@ -212,9 +369,44 @@ function App() {
 3. 服务端渲染中的错误。
 4. 错误边界自身的错误。
 
-它捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：传给 `useTransition` 返回的 `startTransition` 的函数抛出的错误（包括它返回的 Promise 被拒绝），以及 `use()` 读取的被拒绝的 Promise，会被错误边界捕获。从 react 直接导入的 `startTransition` 没有这个行为。
+它捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：传给 `useTransition` 返回的 `startTransition` 的函数抛出的错误（包括它返回的 Promise 被拒绝），以及 `use()` 读取的被拒绝的 Promise，会被错误边界捕获。从 react 直接导入的 `startTransition` 没有这个行为：错误成为未捕获的错误。下面的示例对比这两种写法。
 
 </CallBox>
+
+```jsx play title="过渡里抛出的错误"
+import { Component, useTransition, startTransition } from 'react';
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) return <p>🛟 边界接住了：{this.state.error.message}</p>;
+    return this.props.children;
+  }
+}
+
+function Actions() {
+  const [isPending, start] = useTransition();
+  return (
+    <p>
+      <button onClick={() => start(() => { throw new Error('来自 Hook 的 start'); })}>按钮 A：Hook 返回的 start</button>
+      <button onClick={() => startTransition(() => { throw new Error('来自直接导入的 startTransition'); })}>按钮 B：直接导入的</button>
+    </p>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <Actions />
+    </ErrorBoundary>
+  );
+}
+```
+
+用 `use()` 读取的 Promise 被拒绝时，错误同样交给最近的错误边界。所以“请求失败”也可以和渲染错误一样，用一个边界统一处理。
 
 <CallBox kind="like" label="打个比方">
 

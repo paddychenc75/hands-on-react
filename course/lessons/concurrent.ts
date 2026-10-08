@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/concurrent.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'concurrent',
+  runtime: 19,
   stage: 2,
   title: '并发特性：useTransition 与 useDeferredValue',
   mins: 26,
