@@ -4,21 +4,21 @@ export default {
   id: 'engineering',
   stage: 4,
   title: '项目搭建与交付',
-  mins: 40,
+  mins: 32,
   runtime: 19,
   summary: '在本机用 Vite 建项目、把单文件拆成模块、选样式方案、管好环境变量，再部署到网上并接上持续集成。',
   goals: [
     '能在本机用 Vite 创建 React + TypeScript 项目，说出各目录和三条命令的作用，并判断什么时候该用框架',
-    '能把单文件示例拆成多个文件，写对默认导出、具名导出和 import 路径，并按场景选择样式方案',
+    '能把单文件示例拆成多个文件，写对默认导出、具名导出和 import 路径（选读：按场景选择样式方案）',
     '能说出 VITE_ 变量为什么是公开的，并给出保密值的处理办法',
-    '能写出单页应用的路由回退配置和一份最小的 CI 工作流，把项目部署到静态托管',
+    '能写出单页应用的路由回退配置，把项目部署到静态托管（选读：写一份最小的 CI 工作流）',
   ],
   keyPoints: [
     '纯客户端应用用 Vite 创建，需要 SEO、服务端渲染或 Server Components 时用框架。Create React App 已被弃用。<code>npm run dev</code> 开发，<code>npm run build</code> 生成 <code>dist/</code>，<code>npm run preview</code> 本机看产物。',
     '一个文件是一个模块。默认导出导入时不带花括号，名字随便取；具名导出要带花括号，名字必须一致。实验台会处理 react 的 import 并忽略其他 import，真实项目里一切都要自己导入。',
-    '样式：全局 CSS 靠命名约定；CSS Modules 在构建时把类名改写成唯一名字，导入得到“原名 → 新名”的对象；Tailwind 直接写原子类；运行时 CSS-in-JS 要在浏览器里多做一轮工作。',
+    '（选读）样式：全局 CSS 靠命名约定；CSS Modules 在构建时把类名改写成唯一名字，导入得到“原名 → 新名”的对象；Tailwind 直接写原子类；运行时 CSS-in-JS 要在浏览器里多做一轮工作。',
     '只有 <code>VITE_</code> 开头的变量会在构建时被换成字面量，写进前端包，任何访客都能读到。密钥不能用这个前缀，要让服务端转发请求。改了变量要重新构建。',
-    '交付：单页应用的服务器要把找不到的路径回退到 index.html（Vercel 用 rewrites，Netlify 用 _redirects）。CI 里依次跑 <code>npm ci</code>、类型检查、lint、测试、构建。',
+    '交付：单页应用的服务器要把找不到的路径回退到 index.html（Vercel 用 rewrites，Netlify 用 _redirects）。（选读）CI 里依次跑 <code>npm ci</code>、类型检查、lint、测试、构建。',
   ],
   quiz: [
     {

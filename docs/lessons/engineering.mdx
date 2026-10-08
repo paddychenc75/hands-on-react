@@ -16,7 +16,7 @@ title: "项目搭建与交付"
 
 <CallBox kind="tip" label="这一课怎样学">
 
-课文里带“**在本机终端里做**”标记的命令和配置，只能在你自己的电脑上运行，实验台做不了，所以用普通代码块展示。站内有 3 个可运行示例和 1 道练习，用来练习其中最容易搞混的几个机制。课末有一份“本机任务清单”，请照着在自己的电脑上做完，并对照“应该看到”自查。
+课文里带“**在本机终端里做**”标记的命令和配置，只能在你自己的电脑上运行，实验台做不了，所以用普通代码块展示。站内有 3 个可运行示例和 1 道练习，用来练习其中最容易搞混的几个机制。“样式方案”和“持续集成”两节是选读，先学主线也可以。课末有一份“本机任务清单”，请照着在自己的电脑上做完，并对照“应该看到”自查。
 
 </CallBox>
 
@@ -180,7 +180,8 @@ src/
 
 改一个功能时，只需要打开一个目录。
 
-## 样式方案怎么选
+<details className="optional">
+<summary><span className="opt-tag">选读</span>样式方案怎么选<small>可以先跳过，需要时再展开</small></summary>
 
 第 3 课已经讲了 `className`、条件类名和内联 `style`。那是写法。这里讲的是：**样式写在哪里、怎样不互相冲突**。常用的有四种。
 
@@ -269,6 +270,8 @@ function App() {
 - **用现成的组件库**：先看它自己的样式方案，跟着它走。
 - **运行时 CSS-in-JS**：新项目一般不首选。已有的项目继续用即可。
 - 切换主题（浅色、深色）：用 CSS 变量（`--bg`、`--text`）。改变量的值，页面就换主题，React 不需要重新渲染任何组件。
+
+</details>
 
 ## 代码质量：类型检查、ESLint、格式化与 React Compiler
 
@@ -400,7 +403,8 @@ Netlify 用 `public/_redirects` 文件（构建时会复制到 `dist/`）：
 
 GitHub Pages 没有这种回退配置，所以有多级路由的应用不适合放在它上面，优先选 Vercel 或 Netlify。（变通办法是把 `index.html` 复制成 `404.html`，或者改用 hash 路由；都不如真正的回退规则干净。）
 
-### 最小的持续集成
+<details className="optional">
+<summary><span className="opt-tag">选读</span>最小的持续集成<small>可以先跳过，需要时再展开</small></summary>
 
 **持续集成**（CI）是每次推送代码，由服务器自动把检查跑一遍。有了它，没通过检查的代码不会悄悄进入 `main`。先在 `package.json` 里准备好命令：
 
@@ -443,6 +447,8 @@ jobs:
 
 逐行看：`on` 表示什么时候运行；`actions/checkout` 取出代码；`actions/setup-node` 安装 Node 并缓存依赖；`npm ci` 严格按 `package-lock.json` 安装，比 `npm install` 更适合服务器；后面四步依次是类型检查、lint、测试、构建，任何一步失败，整个检查就变红。
 
+</details>
+
 <CallBox kind="warn" label="常见坑">
 
 1. 改了环境变量，页面没变化：开发服务器要重启；线上要重新构建。
@@ -454,6 +460,33 @@ jobs:
 
 下面是这一课的收尾：在你的电脑上把它们全部做一遍。
 
+<details className="optional">
+<summary><span className="opt-tag">选读</span>维护 React 18 项目：升级到 React 19<small>可以先跳过，需要时再展开</small></summary>
+
+本站的示例都是 React 19 的写法。你接手的旧项目可能还在 React 18。官方推荐的升级路线是三步：
+
+1. 先升到 **React 18.3.1**。它和 18.2 行为相同，但会对 19 将移除的 API 打印弃用警告。把这些警告清掉。
+2. 运行官方 codemod：`npx codemod@latest react/19/migration-recipe`。它会自动改写其中大部分写法。用 TypeScript 的项目，还要升级类型包，并运行类型的 codemod：`npx types-react-codemod@latest preset-19 ./src`。
+3. 再升到 React 19：`npm install react@19 react-dom@19`，类型包用 `@types/react@19`、`@types/react-dom@19`。
+
+React 19 移除了下面这些 API：
+
+| 被移除的 API | 替代写法 |
+|---|---|
+| 函数组件的 `defaultProps` | 参数默认值：`function Heading({ text = '你好' })` |
+| 函数组件的 `propTypes` | TypeScript 类型 |
+| 字符串 ref：`ref="input"` | ref 回调或 `useRef` |
+| `ReactDOM.render`、`ReactDOM.hydrate` | `createRoot`、`hydrateRoot` |
+| `ReactDOM.findDOMNode` | 用 ref 拿 DOM 节点 |
+| `react-dom/test-utils` 里的 `act` | 从 `react` 导入 `act` |
+| 全局的 `JSX` 类型命名空间 | `React.JSX.Element` |
+
+`forwardRef` 和 `<Context.Provider>` 在 19 中仍然能用，只是函数组件现在可以直接把 `ref` 当 prop 接收，Context 对象也可以直接当 Provider，通常不再需要它们。具体步骤和已知的变化，以 [React 19 升级指南](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) 为准。
+
+升级后的自查：`npm run build` 通过；`npx tsc -b` 零错误；`npm run lint` 里没有新增的警告；打开开发服务器，控制台没有红色报错。
+
+</details>
+
 ## 本机任务清单
 
 用第 9 课的待办应用，或任何一个小应用。照着做，对照“应该看到”自查。
@@ -463,12 +496,12 @@ jobs:
 | 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-ts --eslint`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
 | 2. 搬代码并拆文件 | 把第 9 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件） | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错 |
 | 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红，终端或浏览器报“没有名为 Counter 的导出”；改回后恢复 |
-| 4. 样式 | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
+| 4. 样式（选读） | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
 | 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
 | 6. 环境变量 | 新建 `.env`，写 `VITE_API_BASE=...` 和 `SECRET_TOKEN=abc`，在代码里分别读取并显示，再 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索这两个值 | 能搜到 `VITE_API_BASE` 的值；搜不到 `SECRET_TOKEN` 的值，代码里读到 `undefined` |
 | 7. 部署 | 推送到 GitHub，在 Vercel 导入项目 | 得到一个网址，用手机也能打开 |
 | 8. 路由回退 | 如果应用有多个路由，在线上网址直接打开一个子路径，再刷新 | 不出现 404；没有 `vercel.json` 时对比一下 |
-| 9. CI | 加上 `.github/workflows/ci.yml`，推送，在 GitHub 仓库的 Actions 页面查看 | 出现绿色的对勾；故意让一个测试失败再推送，变成红色 |
+| 9. CI（选读） | 加上 `.github/workflows/ci.yml`，推送，在 GitHub 仓库的 Actions 页面查看 | 出现绿色的对勾；故意让一个测试失败再推送，变成红色 |
 
 全部做完，你就有了一个“从空文件夹到线上网址”的完整流程。后面的路由、数据请求、测试都可以在这个项目里继续练。毕业设计的验收清单里“交付”那几行，也是这里的内容。
 
