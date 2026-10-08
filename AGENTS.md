@@ -40,7 +40,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就九个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query、state-architecture、form-architecture 四课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就九个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 49 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -304,15 +304,18 @@ export default {
 - 加载失败：实验台显示“运行环境加载失败，请检查网络后刷新页面。”，页面其余部分正常；之后再进入有实验台的页面会重试（`tests/e2e/runtime.mjs` 用 route 拦截验证）。
 - 界面：实验台标题栏有一行不抢眼的灰字 `React 19.3.0`。
 
-### 第三方库（react-router、@tanstack/react-query、zustand）
+### 第三方库（react-router、@tanstack/react-query、zustand、react-hook-form、zod、@hookform/resolvers）
 
-实验台的示例里可以 `import` 三个真库，其余的包不行（`import` 别的包会被悄悄忽略）：
+实验台的示例里可以 `import` 六个真库，其余的包不行（`import` 别的包会被悄悄忽略）：
 
 | 库 | 版本 | 示例里的写法 | 说明 |
 |---|---|---|---|
 | react-router | 8.4.0 | `from 'react-router'`、`from 'react-router/dom'` | 路径 `react-router/dom` 里是 `RouterProvider`，和真实项目的写法一致 |
 | @tanstack/react-query | 5.104.1 | `from '@tanstack/react-query'` | |
 | zustand | 5.0.15 | `from 'zustand'`、`'zustand/middleware'`、`'zustand/react/shallow'`、`'zustand/shallow'`、`'zustand/vanilla'` | 暴露这五个子路径。`persist` 示例只写自己的键（`hoc-demo-zustand`），不碰 `hands-on-react-v1`；localStorage 不可用时用 `try/catch` 退回内存存储 |
+| react-hook-form | 7.89.0 | `from 'react-hook-form'` | 表单库，见 form-architecture 一课。校验示例用 `zodResolver` |
+| zod | 4.6.5 | `from 'zod'` | Zod 4 写法（`z.email()`、`z.flattenError`）。文件较大（见下），因为 `z.locales` 带了全部语言包 |
+| @hookform/resolvers | 5.9.1 | `from '@hookform/resolvers/zod'` | 只暴露 zod 这一个适配器。**依赖 react-hook-form**（`LibInfo.deps`）：打包时对 `react-hook-form` 的 import 解析到那个库已加载的同一份模块，加载时先加载它 |
 
 **三条约定**：
 1. **路由用内存路由**：实验台不能改动页面的真实地址。示例用 `createMemoryRouter`（或 `MemoryRouter`），预览区里要显示当前的内存地址（`useLocation().pathname`），课文里写明“真实项目里用 `createBrowserRouter`，这里为了不改动页面地址用内存路由”。示例里不要用 `BrowserRouter`、`createBrowserRouter`、`createHashRouter`。
@@ -320,19 +323,20 @@ export default {
 3. **存储只用自己的键**：zustand 的 `persist` 示例用独立的键（例如 `hoc-demo-zustand`），提供“清除”按钮（先 `setState` 重置，再 `persist.clearStorage()`）；不要读写 `hands-on-react-v1`。
 
 **怎么实现**：
-- 版本的唯一来源：`course/engine/logic/runtime.ts` 的 `LIBS`（包名、版本、打包文件名里的短名、可以 import 的路径）。`package.json` 的 `devDependencies` 里同名包写**精确版本**（不带 `^`），`tests/unit/runtime.test.ts` 和 `scripts/build-libs.mjs` 都会核对两处一致。`esbuild`（也是精确版本）只用来打包这三个库，不进站点。
-- `scripts/build-libs.mjs`（`predev`、`prebuild` 在 `build-react19.mjs` 之后自动跑）用 esbuild 把每个库的**开发版**（`development` 条件）打成一个自包含的 IIFE：`docs/public/runtime/<短名>-<版本>.dev.js`（不提交；react-router 约 470 KB，gzip 约 97 KB；react-query 约 155 KB，gzip 约 33 KB；zustand 约 24 KB，gzip 约 6 KB）。`react`、`react-dom`、`react-dom/client`、`react/jsx-runtime` 标成外部依赖，加载时解析到 `window.__hocReact19` 里实验台那一份 React（`React`、`ReactDOM`、`jsxRuntime`）：库**不自带第二份 React**，Hook 才不会报错。产物登记在 `window.__hocLibs[包名] = { version, modules }`，不写别的全局变量。库里的 `console.warn` / `console.error` 经 `window.__hocLibConsole` 显示在当前实验台的控制台里（前缀 `react-router 提示：` / `报告：`）。
+- 版本的唯一来源：`course/engine/logic/runtime.ts` 的 `LIBS`（包名、版本、打包文件名里的短名、可以 import 的路径）。`package.json` 的 `devDependencies` 里同名包写**精确版本**（不带 `^`），`tests/unit/runtime.test.ts` 和 `scripts/build-libs.mjs` 都会核对两处一致。`esbuild`（也是精确版本）只用来打包这些库，不进站点。
+- `scripts/build-libs.mjs`（`predev`、`prebuild` 在 `build-react19.mjs` 之后自动跑）用 esbuild 把每个库的**开发版**（`development` 条件）打成一个自包含的 IIFE：`docs/public/runtime/<短名>-<版本>.dev.js`（不提交；react-router 约 470 KB，gzip 约 97 KB；react-query 约 155 KB，gzip 约 33 KB；zustand 约 24 KB，gzip 约 6 KB；react-hook-form 约 121 KB，gzip 约 24 KB；zod 约 782 KB，gzip 约 115 KB；@hookform/resolvers 约 8 KB，gzip 约 3 KB）。`react`、`react-dom`、`react-dom/client`、`react/jsx-runtime` 标成外部依赖，加载时解析到 `window.__hocReact19` 里实验台那一份 React（`React`、`ReactDOM`、`jsxRuntime`）：库**不自带第二份 React**，Hook 才不会报错。产物登记在 `window.__hocLibs[包名] = { version, modules }`，不写别的全局变量。库里的 `console.warn` / `console.error` 经 `window.__hocLibConsole` 显示在当前实验台的控制台里（前缀 `react-router 提示：` / `报告：`）。
 - 按需加载：`logic/runtime.ts` 的 `libsInSource(代码)` 按 `import` 语句判断需要哪些库（注释和字符串里的不算）；`zustand/middleware` 这类子路径也算 zustand。`theme/lib/useSlot.ts` 在创建实验台前先 `loadLibs`；`Playground` 传 `[code]`，`Exercise` 传起始代码和参考答案。没有 `import` 这些库的课不请求任何库文件，用到哪个库的课只请求哪个库的文件。学习者在编辑器里新加 `import` 时，`makePlayground` 的 `run` 会先加载再运行。
 - `prepare`（`exec.ts`）把这些包名和子路径的 `import` 解析到加载好的模块对象：具名导入写成 `const { … } = __libs["包名"]`，`import * as X` 和默认导入得到整个模块；`import type` 被忽略；库还没加载就 `import` 会报“还没有加载”。`Runner` 把 `runtime.libs` 作为 `__libs` 传进沙箱。
 - 加载失败：该实验台显示“运行环境加载失败（react-router），请检查网络后刷新页面。”，课文、测验、不用库的示例都正常；之后再进入有这个库的页面会重试。
 - 界面：实验台标题栏在 `React 19.3.0` 旁再显示一行同样风格的灰字，例如 `react-router 8.4.0`、`zustand 5.0.15`（`.pg-lib`，没用到库就隐藏；用到几个库就并列几个，用 `·` 隔开）。
-- 练习检查：`t.libs['react-router']`、`t.libs['@tanstack/react-query']`、`t.libs['zustand']` 是加载好的模块对象（练习的代码 `import` 了才有）。键是 `import` 的路径，所以子路径是 `t.libs['zustand/middleware']`、`t.libs['react-router/dom']`。
+- **库之间的依赖**：`LibInfo.deps` 写本库 import 了哪些别的库。`build-libs.mjs` 把对它们的 import 打成 `window.__hocLibs[包名].modules[路径]` 的引用（被依赖库的 `specifiers` 必须包含这个路径），并在打完后检查文件里没有被依赖库的代码（有就报错，说明悄悄打进了第二份实例）。`loadLibs` 先加载 `libDeps(lib)` 再加载本库；任何一个失败，提示的是失败的那个库的名字。标题栏只显示示例 `import` 到的库。
+- 练习检查：`t.libs['react-router']`、`t.libs['@tanstack/react-query']`、`t.libs['zustand']`、`t.libs['react-hook-form']`、`t.libs['zod']`、`t.libs['@hookform/resolvers/zod']` 是加载好的模块对象（练习的代码 `import` 了才有）。键是 `import` 的路径，所以子路径是 `t.libs['zustand/middleware']`、`t.libs['react-router/dom']`。
 
 **升级版本**：改 `package.json` 里的精确版本和 `LIBS` 里的 `version`（两处一致），`npm install`，重新跑 `npm run build` 和 `npm run test:e2e -- libs`，并重新实测用到它的课（router、tanstack-query、state-architecture）所有示例、预测题的答案和课文里对库行为的描述（课文里写了版本号的地方一起改）。
 
 **再加一个库**（例如另一个状态库）：
 1. `npm install -D -E <包名>@<版本>`，在 `LIBS` 里加一项（包名、版本、短名、可以 import 的路径）。
-2. 如果库引用了 `build-libs.mjs` 里 `EXTERNAL` 没有的 React 子路径，先在那里登记，否则打包会报错。
+2. 如果库引用了 `build-libs.mjs` 里 `EXTERNAL` 没有的 React 子路径，先在那里登记，否则打包会报错。如果它 import 了已经在 `LIBS` 里的另一个库，在它的 `LibInfo` 里写 `deps`（见上）。
 3. 在 `tests/unit/runtime.test.ts` 加 `libsInSource` 和 `prepare` 的断言；在 `tests/e2e/libs.mjs` 加按需加载、标记和示例行为的测试，并确认其余的课不会请求新库。
 4. 在用到它的课里按“迷你实现 → 真库示例 → 本机任务”组织，示例里的网络请求一律模拟；在本节的表里补一行。
 5. 看一下主包和库文件的体积，写进提交说明。

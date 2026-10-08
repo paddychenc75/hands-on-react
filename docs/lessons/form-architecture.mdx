@@ -14,7 +14,7 @@ title: "表单与校验架构"
 
 第 8 课写了受控表单，第 27 课给字段加了 label 和错误提示，第 29 课看了表单 Actions。这些都是单个技巧。真实的注册、下单、设置页面要把它们组合起来，还会遇到新的问题：字段多了会卡；规则在客户端和服务器各写一遍，慢慢就不一致；用户名检查的结果乱序返回；用户连点两次，订单提交了两次。
 
-本课把一个表单拆成五个决策，最后看 React 19 的 Actions 怎样接管其中几个。每个决策都有默认答案，也有不适用的情况。
+本课把一个表单拆成五个决策，再看 React 19 的 Actions 怎样接管其中几个，最后看表单库 React Hook Form 把这些决策打包成什么样。每个决策都有默认答案，也有不适用的情况。
 
 ## 一、数据放在哪里：受控、非受控与 FormData
 
@@ -76,16 +76,16 @@ function App() {
 }
 ```
 
-|  | 受控 | 非受控 + FormData |
-|---|---|---|
-| 值在哪里 | state | DOM |
-| 输入时重新渲染 | 保存 state 的组件及其子树 | 没有 |
-| 适合 | 输入时就要格式化、字段之间联动、实时预览 | 字段多、只在提交时用值 |
-| 难点 | 大表单的性能 | 联动和“边输入边校验”要另外处理 |
+|  | 受控 | 非受控 + FormData | 表单库（React Hook Form） |
+|---|---|---|---|
+| 值在哪里 | state | DOM | DOM，库内部另存一份 |
+| 输入时重新渲染 | 保存 state 的组件及其子树 | 没有 | 只有订阅了对应状态的组件 |
+| 适合 | 输入时就要格式化、字段之间联动、实时预览 | 字段多、只在提交时用值 | 字段多、规则多、有动态字段 |
+| 难点 | 大表单的性能 | 联动和“边输入边校验”要另外处理 | 订阅粒度要自己设计；多一个依赖 |
 
 React 19 的 `<form action={fn}>` 就建立在这个思路上：提交时 React 把 FormData 直接交给 `fn`（第七节）。
 
-两者可以混用：大部分字段非受控，少数需要联动的字段受控。React Hook Form 的思路更进一步：字段默认非受控，用 ref 注册；打字不触发 React 渲染；错误、是否提交中这类表单状态要读取了才订阅，没读的状态变化不会引起渲染（见本课最后的选读）。
+两者可以混用：大部分字段非受控，少数需要联动的字段受控。React Hook Form 的思路更进一步：字段默认非受控，用 ref 注册；打字不触发 React 渲染；错误、是否提交中这类表单状态，组件读了才订阅（第八节）。
 
 ## 二、一份规则，两端共用：schema
 
@@ -441,7 +441,7 @@ export default function App() {
 
 所以按钮仍然要用 `isPending`（或 `useFormStatus` 的 `pending`）禁用。真正防重复靠服务器的幂等键。
 
-Actions 没有替你做的事：错误什么时候显示（它只在提交后返回错误）、异步检查的竞态、多步表单。把 Action 接进真实项目，有两处和本页的模拟不同：
+Actions 没有替你做的事：错误什么时候显示（它只在提交后返回错误）、异步检查的竞态、多步表单。其中一部分正是第八节表单库做的事。把 Action 接进真实项目，有两处和本页的模拟不同：
 
 ```tsx title="真实项目：Server Function（需要 Next.js 这类框架，实验台不能运行）"
 // actions.js
@@ -466,14 +466,320 @@ React 18 的 `<form>` 不接受函数作为 `action`，也没有 `useActionState
 
 </CallBox>
 
-<details className="optional">
-<summary><span className="opt-tag">选读</span>React Hook Form 为什么快<small>可以先跳过，需要时再展开</small></summary>
+## 八、表单库：React Hook Form
 
-React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 45 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
+前七节自己搭了一个表单。字段多、规则多、字段要动态增减时，这些代码会在每个表单里重复。**表单库**把它们打包好。本节用 React Hook Form（简称 RHF，版本 7.89.0），校验用 Zod 4.6.5 和 `@hookform/resolvers` 5.9.1。实验台里跑的是这三个真库，不是模拟。
 
-需要显示的东西（某个字段的错误、是否提交中）通过订阅读取。`formState` 是一个 Proxy：组件读了 `formState.errors`，才会在错误变化时重新渲染；没读 `isDirty`，它变化就不渲染。注意粒度是“哪一种状态”，不是“哪一个字段”：任何字段的错误变化，读了 `errors` 的组件都会渲染，而且渲染的是调用 `useForm` 的那个组件。想让一个字段的错误只重新渲染这个字段，把它拆成子组件，在里面用 `useFormState({ control, name: 'email' })`。拆出去的子组件所在的父组件自己不要再读 `formState`，否则父组件一渲染，子组件照样跟着渲染。校验交给 resolver，传入 Zod schema 即可：`useForm({ resolver: zodResolver(schema), mode: 'onTouched' })`。`mode: 'onTouched'` 就是本课第三节推荐的“离开时显示，显示后输入时更新”。
+RHF 的取舍和第一节的“非受控”一脉相承：字段默认非受控，值留在 DOM 里，库内部另存一份；打字不触发 React 渲染。组件要显示什么状态，就订阅什么状态。
 
-</details>
+### 最小用法：register、handleSubmit、errors
+
+- `useForm(选项)` 创建一个表单实例，返回 `register`、`handleSubmit`、`formState` 等。
+- `register('username', 规则)` 返回 `{ name, ref, onChange, onBlur }`，展开到原生输入框上。这是 [prop getter](/lessons/headless-components)：库把需要的属性一次递给你。
+- `handleSubmit(onValid)` 返回提交处理函数。校验全部通过才调用 `onValid(values)`；有错误时不调用，并把焦点移到第一个出错的字段。`onValid` 返回 Promise 时，`formState.isSubmitting` 在它结束前一直是 `true`。
+- `formState.errors` 的形状是 `{ 字段名: { type, message } }`。
+- `mode: 'onTouched'` 就是第三节推荐的时机：第一次离开字段时校验，之后每次输入都重新校验。
+
+```jsx play title="真库：register、handleSubmit 与 errors"
+import { useForm } from 'react-hook-form';
+
+// 模拟服务器：600ms 后返回
+const saveOnServer = (values) => new Promise((r) => setTimeout(r, 600));
+
+function App() {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    mode: 'onTouched',
+    defaultValues: { username: '', email: '', password: '' },
+  });
+
+  async function onValid(values) {
+    await saveOnServer(values);
+    console.log('提交：' + JSON.stringify(values));
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onValid)} noValidate>
+      <div>
+        <input
+          placeholder="用户名"
+          aria-invalid={errors.username ? true : undefined}
+          aria-describedby="username-error"
+          {...register('username', {
+            required: '请填写用户名',
+            minLength: { value: 3, message: '用户名至少 3 个字符' },
+          })}
+        />{' '}
+        <small id="username-error" style={{ color: '#c0392b' }}>{errors.username?.message}</small>
+      </div>
+      <div>
+        <input
+          placeholder="邮箱"
+          aria-invalid={errors.email ? true : undefined}
+          aria-describedby="email-error"
+          {...register('email', {
+            required: '请填写邮箱',
+            pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确' },
+          })}
+        />{' '}
+        <small id="email-error" style={{ color: '#c0392b' }}>{errors.email?.message}</small>
+      </div>
+      <div>
+        <input
+          type="password"
+          placeholder="密码"
+          aria-invalid={errors.password ? true : undefined}
+          aria-describedby="password-error"
+          {...register('password', { minLength: { value: 8, message: '密码至少 8 位' } })}
+        />{' '}
+        <small id="password-error" style={{ color: '#c0392b' }}>{errors.password?.message}</small>
+      </div>
+      <button disabled={isSubmitting}>{isSubmitting ? '提交中…' : '注册'}</button>
+    </form>
+  );
+}
+```
+
+试一试：什么都不填就点“注册”，三个字段的错误同时出现，焦点落在第一个出错的“用户名”上。填对后再点，控制台出现提交的值。
+
+### 订阅粒度：按状态种类，不按字段
+
+`formState` 里有很多种状态：`errors`、`isDirty`、`touchedFields`、`isSubmitting`……组件读了哪一种，就订阅哪一种。注意粒度是**状态的种类**，不是**字段**：读 `errors.email`，订阅的是整个 `errors`，别的字段出错也会让它渲染。
+
+想隔离到单个字段，有三个办法：
+
+- `useFormState({ control, name: 'email' })`：只订阅这个字段的状态。
+- `useWatch({ control, name: 'username' })`：只订阅这个字段的值。
+- `Controller`：每个字段是一个独立的订阅单元（见下一小节）。
+
+下面的示例有两个子组件，都只显示邮箱的错误，也都用 `memo` 包着，所以它们的渲染次数只来自自己的订阅。写法的区别只有一处：A 调用 `useFormState({ control })`，B 多传了 `name: 'email'`。先预测，再运行。
+
+```jsx play title="真库：谁订阅了别的字段的错误？"
+import { memo, useRef } from 'react';
+import { useForm, useFormState } from 'react-hook-form';
+
+function useRenderCount() {
+  const n = useRef(0);
+  n.current++;
+  return n.current;
+}
+
+// A：显示邮箱的错误
+const ErrorsA = memo(function ErrorsA({ control }) {
+  const { errors } = useFormState({ control });
+  const n = useRenderCount();
+  return <p>A　邮箱错误：{errors.email?.message ?? '无'}　渲染 {n} 次</p>;
+});
+
+// B：显示邮箱的错误
+const ErrorsB = memo(function ErrorsB({ control }) {
+  const { errors } = useFormState({ control, name: 'email' });
+  const n = useRenderCount();
+  return <p>B　邮箱错误：{errors.email?.message ?? '无'}　渲染 {n} 次</p>;
+});
+
+function App() {
+  const { register, control, handleSubmit } = useForm({
+    mode: 'onTouched',
+    defaultValues: { username: '', email: '' },
+  });
+  const n = useRenderCount();
+  return (
+    <form onSubmit={handleSubmit(() => {})}>
+      <p>表单组件（调用 useForm）　渲染 {n} 次</p>
+      <input placeholder="用户名" {...register('username', { minLength: { value: 3, message: '用户名至少 3 个字符' } })} />{' '}
+      <input placeholder="邮箱" {...register('email', { pattern: { value: /^\S+@\S+\.\S+$/, message: '邮箱格式不正确' } })} />
+      <ErrorsA control={control} />
+      <ErrorsB control={control} />
+    </form>
+  );
+}
+```
+
+两条使用规则：
+
+- 调用 `useForm` 的组件自己不要读 `formState.errors`。否则每次错误变化，它和没有 `memo` 的子组件都跟着渲染。
+- 要在界面上显示某个字段的值，别在调用 `useForm` 的组件里写 `watch('username')`：它会让整个表单组件在每次输入时重新渲染。把显示放进子组件，用 `useWatch`。
+
+### 校验：同一份 Zod schema
+
+`resolver` 选项把校验交给 schema 库。`zodResolver(schema)` 来自 `@hookform/resolvers/zod`，它把 Zod 的错误转成 RHF 的 `errors`。这样第二节说的“一份规则，两端共用”就完整了：浏览器里由 resolver 给即时反馈，服务器用同一份 `schema.safeParse` 再校验一次。
+
+Zod 4 的写法和迷你版相比，有三点要记：
+
+- 邮箱这类格式是顶层函数：`z.email('信息')`。旧写法 `z.string().email()` 仍可用，但已标为弃用。
+- 真 Zod 的 `safeParse` 失败时返回 `{ success: false, error }`。`z.flattenError(error).fieldErrors` 得到 `{ 字段名: [信息, …] }`，适合直接返回给页面。
+- 类型从 schema 推导：`z.infer<typeof signupSchema>`。
+
+```jsx play title="真库：zodResolver 与同一份 schema"
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// 同一份 schema：浏览器里给即时反馈，服务器再校验一次
+const signupSchema = z.object({
+  username: z.string().min(3, '用户名至少 3 个字符'),
+  email: z.email('邮箱格式不正确'),
+  password: z.string().min(8, '密码至少 8 位'),
+});
+
+// 模拟服务器（真实项目里是 Server Function 或 fetch）
+function signupOnServer(data) {
+  const result = signupSchema.safeParse(data);
+  if (!result.success) return { ok: false, errors: z.flattenError(result.error).fieldErrors };
+  return { ok: true };
+}
+
+function App() {
+  const [reply, setReply] = useState('（还没有提交）');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({ resolver: zodResolver(signupSchema), mode: 'onTouched' });
+
+  return (
+    <div>
+      <form
+        noValidate
+        onSubmit={handleSubmit((data) => setReply('页面校验通过。服务器：' + JSON.stringify(signupOnServer(data))))}
+      >
+        <div><input placeholder="用户名" {...register('username')} /> <small>{errors.username?.message}</small></div>
+        <div><input placeholder="邮箱" {...register('email')} /> <small>{errors.email?.message}</small></div>
+        <div><input type="password" placeholder="密码" {...register('password')} /> <small>{errors.password?.message}</small></div>
+        <button>注册</button>
+      </form>
+      <button
+        onClick={() =>
+          setReply('绕过页面。服务器：' + JSON.stringify(signupOnServer({ username: 'ab', email: 'x', password: '12345678' })))
+        }
+      >
+        绕过页面，直接发给服务器
+      </button>
+      <p>{reply}</p>
+    </div>
+  );
+}
+```
+
+<CallBox kind="warn" label="常见坑">
+
+对象级的规则（例如“两次密码一致”）要写在 `z.object({…}).refine(…)` 上，并用 `path` 指定错误挂在哪个字段，否则 RHF 找不到该把错误显示在哪里。
+
+</CallBox>
+
+### 受控组件：Controller
+
+评分星、日期选择器这类自定义输入不是原生 `input`：它们没有 `ref` 可挂，只认 `value` 和 `onChange(新值)`。用 `register` 展开会出错，要用 `Controller`（或 hook 版本 `useController`）：它把 `field.value`、`field.onChange` 递给你，你再交给自己的组件。
+
+```jsx play title="真库：Controller 接入自定义输入"
+import { useForm, Controller, useWatch } from 'react-hook-form';
+
+// 自定义输入：只认 value 和 onChange(新值)
+function StarRating({ value, onChange }) {
+  return (
+    <span>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button type="button" key={n} aria-pressed={n <= value} onClick={() => onChange(n)}>
+          {n <= value ? '★' : '☆'}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function App() {
+  const { control, register, handleSubmit } = useForm({ defaultValues: { rating: 0, note: '' } });
+  const rating = useWatch({ control, name: 'rating' });
+  return (
+    <form onSubmit={handleSubmit((data) => console.log('提交：' + JSON.stringify(data)))}>
+      <Controller
+        name="rating"
+        control={control}
+        rules={{ min: { value: 1, message: '请先打分' } }}
+        render={({ field, fieldState }) => (
+          <div>
+            评分 <StarRating value={field.value} onChange={field.onChange} />
+            <small> {fieldState.error?.message}</small>
+          </div>
+        )}
+      />
+      <input placeholder="备注" {...register('note')} />
+      <button>提交</button>
+      <p>当前评分：{rating}</p>
+    </form>
+  );
+}
+```
+
+`Controller` 是受控方式：值通过 `field.value` 回到组件，`field.onChange` 把新值写回表单。它自己订阅这个字段，所以在别的字段里打字，不会让它重新渲染。
+
+### 动态字段：useFieldArray
+
+标签、联系人、订单行这类“数量不定”的字段用 `useFieldArray({ control, name })`。它返回 `fields`、`append`、`remove` 等。`fields` 里每一项带一个库生成的 `id`，**`key` 必须用这个 `id`，不能用下标**。
+
+不用 `id` 会怎样？输入框里的值不会错，因为 `register` 会按名字把值填回去。错的是每一行自己的 state：React 按 key 对应组件，用下标当 key，删掉第一行之后，原来属于“甲”的 state 就留在了第一个位置，现在这个位置是“乙”。先预测，再运行。
+
+```jsx play title="真库：useFieldArray 的 key"
+import { useState } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+
+function Row({ index, register, onRemove }) {
+  const [open, setOpen] = useState(false); // 这一行自己的界面状态，不在表单数据里
+  return (
+    <div>
+      <input {...register(`tags.${index}.text`)} />{' '}
+      <button type="button" onClick={() => setOpen((o) => !o)}>{open ? '收起' : '展开'}</button>{' '}
+      <button type="button" onClick={onRemove}>删除</button>
+      {open && <small> 详情：这是第 {index + 1} 行的备注</small>}
+    </div>
+  );
+}
+
+function Panel({ title, byId }) {
+  const { register, control } = useForm({
+    defaultValues: { tags: [{ text: '甲' }, { text: '乙' }, { text: '丙' }] },
+  });
+  const { fields, remove } = useFieldArray({ control, name: 'tags' });
+  return (
+    <fieldset style={{ marginBottom: 12 }}>
+      <legend>{title}</legend>
+      {fields.map((field, index) => (
+        <Row key={byId ? field.id : index} index={index} register={register} onRemove={() => remove(index)} />
+      ))}
+    </fieldset>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <Panel title="key = field.id" byId />
+      <Panel title="key = 下标" />
+    </>
+  );
+}
+```
+
+### 用原生 Action，还是引入表单库？
+
+第七节的 `<form action>` + `useActionState` 是默认选择。表单库在下面这些情况下才值得引入：
+
+| 需求 | 原生 Action | 表单库（RHF） |
+|---|---|---|
+| 字段少，只在提交时校验，错误由服务器返回 | 够用 | 多余 |
+| 离开字段时校验、错误按字段显示 | 自己写 touched（第三节） | `mode: 'onTouched'` |
+| 几十个字段，打字要流畅 | 非受控，打字本来就不渲染 | 同样不渲染，还能按字段订阅状态 |
+| 动态增减的字段、嵌套对象 | 自己管 key 和字段名 | `useFieldArray` |
+| 自定义输入组件（评分、日期选择器） | 自己写受控状态 | `Controller` |
+| 一份 schema 前后端共用 | 自己把 FormData 转成对象再 `safeParse` | `zodResolver` 一行接入，服务器仍要再校验 |
+| 页面脚本没加载完也能提交 | 配合服务端框架的 Server Function 可以（渐进增强） | 校验和提交都在 JavaScript 里，不行 |
+
+出现表中靠右的两三行，再引入库。两者也能一起用：RHF 管字段和校验，`handleSubmit` 的回调里调用你的 Action 或 Server Function。
 
 <details className="optional">
 <summary><span className="opt-tag">选读</span>浏览器原生校验<small>可以先跳过，需要时再展开</small></summary>
@@ -487,6 +793,8 @@ React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`
 <Quiz />
 
 <Exercise />
+
+<Drills />
 
 <SelfExplain />
 

@@ -4,16 +4,16 @@ export default {
   id: 'form-architecture',
   stage: 5,
   title: '表单与校验架构',
-  mins: 47,
+  mins: 65,
   summary: '大表单要回答五个问题：数据放哪里、规则写在哪里、错误什么时候显示、异步检查怎样不乱序、提交怎样不重复。',
   goals: [
-    '能判断一个表单该用受控、非受控还是 FormData，并说出性能上的原因',
+    '能判断一个表单该用受控、非受控、FormData 还是表单库，并说出性能上的原因',
     '能写出一份客户端和服务器共用的校验 schema，并把字段错误用 aria-invalid 和 aria-describedby 关联到输入框',
     '能用 touched 和 submitted 控制错误的显示时机，并解释 touched 和 dirty 的区别',
     '能诊断并修复异步校验的竞态和重复提交',
   ],
   keyPoints: [
-    '受控表单每输入一个字，整个表单组件都重新渲染。字段多、校验重时，改用非受控加 FormData，或用按需订阅的库。',
+    '受控表单每输入一个字，整个表单组件都重新渲染。字段多、校验重时，改用非受控加 FormData，或用 React Hook Form 这类按需订阅的库。它按状态种类订阅，想隔离到单个字段要用 useFormState({ name }) 或 useWatch。',
     '校验规则写成一份 schema，客户端用它给即时反馈，服务器用同一份规则再校验一次。客户端校验只是体验，不是安全措施。',
     '错误一直算，但只在字段被触碰（touched）或提交过（submitted）后才显示。错误显示后，用户一改对就立刻消失。',
     '异步校验要只采用最后一次请求的结果。防抖只能减少请求数，不能消除乱序。',
@@ -91,6 +91,18 @@ export default {
       answer: 1,
       explain:
         'Action 结束后，React 会重置表单里的非受控字段，成功和失败都一样。所以失败时要把 values 一起返回，再用 defaultValue 填回去。“校验失败时不重置”是常见的误会。输入框没有被卸载：重置是 React 对表单做的，不是重建元素。',
+    },
+    {
+      q: '一个登录页只有邮箱和密码两个字段，只在点“登录”时校验，错误由服务器返回，不需要边输入边校验。要不要引入 React Hook Form？',
+      options: [
+        '要：只有表单库才能避免打字时整个表单重新渲染',
+        '要：<code>&lt;form action&gt;</code> 不能校验字段，校验一定要靠表单库',
+        '不用：<code>&lt;form action&gt;</code> 加 <code>useActionState</code> 够用。字段是非受控的，服务器返回的错误直接作为下一个 state',
+        '不用：表单库只能配合受控组件使用，而这个表单没有字段联动',
+      ],
+      answer: 2,
+      explain:
+        '原生 Action 的字段本来就是非受控的，打字不会让表单重新渲染，所以第一项的理由不成立。校验可以放在服务器的 Action 里，错误作为返回值回到页面，所以第二项也不对。表单库在“离开字段时校验、动态字段、自定义输入、几十个字段按字段订阅”这类需求出现时才值得引入。最后一项把事实说反了：React Hook Form 默认就是非受控的。',
     },
   ],
   exercise: {
@@ -592,6 +604,283 @@ function App() {
       t.assert(regs.length === 1, 'api.register 只应被调用一次，实际 ' + regs.length + ' 次');
     },
   },
+  drillMins: 11,
+  drills: [
+    {
+      title: '用 Controller 接入自定义输入',
+      task: '<ol class="task-steps"><li><code>StarRating</code> 是自定义输入，只认 <code>value</code> 和 <code>onChange(新值)</code>。现在用 <code>register(\'rating\')</code> 展开到它上面，点星星没有任何效果。</li><li>改用 <code>Controller</code> 接入：<code>name</code> 是 <code>rating</code>，把 <code>field.value</code> 和 <code>field.onChange</code> 交给 <code>StarRating</code>。</li><li>评分是 0 时提交，在星星旁显示“请先打分”，并且不调用 <code>api.save</code>。</li><li>打分后提交，<code>api.save</code> 收到 <code>{ rating: 星数, note: 备注 }</code>，错误信息消失。备注输入框保持原样，仍用 <code>register</code>。</li></ol>',
+      starter: `import { useForm } from 'react-hook-form';
+
+// 模拟服务器。检查程序会替换 api.save，所以提交时一定要调用 api.save(...)
+const api = {
+  save(data) {
+    return new Promise((r) => setTimeout(r, 200));
+  },
+};
+
+// 自定义输入：只认 value 和 onChange(新值)，不是原生 input
+function StarRating({ value = 0, onChange }) {
+  return (
+    <span>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button type="button" key={n} aria-label={n + ' 星'} aria-pressed={n <= value} onClick={() => onChange(n)}>
+          {n <= value ? '★' : '☆'}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function App() {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: { rating: 0, note: '' },
+  });
+  return (
+    <form onSubmit={handleSubmit((data) => api.save(data))}>
+      <div>
+        评分 <StarRating {...register('rating')} />
+        <small>{errors.rating?.message}</small>
+      </div>
+      <input placeholder="备注" {...register('note')} />
+      <button>提交</button>
+    </form>
+  );
+}`,
+      solution: `import { useForm, Controller } from 'react-hook-form';
+
+// 模拟服务器。检查程序会替换 api.save，所以提交时一定要调用 api.save(...)
+const api = {
+  save(data) {
+    return new Promise((r) => setTimeout(r, 200));
+  },
+};
+
+// 自定义输入：只认 value 和 onChange(新值)，不是原生 input
+function StarRating({ value = 0, onChange }) {
+  return (
+    <span>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button type="button" key={n} aria-label={n + ' 星'} aria-pressed={n <= value} onClick={() => onChange(n)}>
+          {n <= value ? '★' : '☆'}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function App() {
+  const { control, register, handleSubmit } = useForm({
+    defaultValues: { rating: 0, note: '' },
+  });
+  return (
+    <form onSubmit={handleSubmit((data) => api.save(data))}>
+      <Controller
+        name="rating"
+        control={control}
+        rules={{ min: { value: 1, message: '请先打分' } }}
+        render={({ field, fieldState }) => (
+          <div>
+            评分 <StarRating value={field.value} onChange={field.onChange} />
+            <small>{fieldState.error?.message}</small>
+          </div>
+        )}
+      />
+      <input placeholder="备注" {...register('note')} />
+      <button>提交</button>
+    </form>
+  );
+}`,
+      hint: "register 返回的 onChange 是给原生输入框用的，它期望收到事件对象。自定义组件要用 <code>Controller</code>：<code>render={({ field, fieldState }) => …}</code>，field.value 和 field.onChange 交给组件，fieldState.error 是这个字段的错误。规则写在 <code>rules</code> 里：<code>min: { value: 1, message: '请先打分' }</code>。",
+      exports: ['api'],
+      test: async t => {
+        const api = t.exports.api;
+        t.assert(api && typeof api.save === 'function', '请保留 api 对象和它的 save 函数');
+        t.assert(t.libs['react-hook-form'], '请继续使用 react-hook-form');
+        const saved = [];
+        api.save = data => {
+          saved.push(data);
+          return Promise.resolve();
+        };
+        const stars = () => t.qa('button[aria-label$="星"]');
+        const lit = () => stars().filter(b => b.getAttribute('aria-pressed') === 'true').length;
+        t.assert(stars().length === 5, '请保留 StarRating 的五颗星（aria-label 是“1 星”到“5 星”）');
+        const form = stars()[0].closest('form');
+        t.assert(form, '星星应在 form 里面');
+        const submit = [...form.querySelectorAll('button')].find(b => b.type === 'submit');
+        t.assert(submit, '找不到提交按钮');
+        const note = t.q('input[placeholder="备注"]');
+        t.assert(note, '请保留“备注”输入框');
+
+        await t.click(submit);
+        await t.wait(120);
+        t.assert(saved.length === 0, '评分是 0 时不应调用 api.save。给评分字段写校验规则：Controller 的 rules，或 validate');
+        t.assert(t.root.textContent.includes('请先打分'), '评分是 0 时提交，应在星星旁显示“请先打分”');
+
+        await t.click(stars()[3]);
+        await t.wait(80);
+        t.assert(
+          lit() === 4,
+          '点第 4 颗星后，应有 4 颗星亮起，实际是 ' +
+            lit() +
+            ' 颗。register 给的 onChange 期望收到事件对象，自定义组件传的是数字。改用 Controller，把 field.value 和 field.onChange 交给 StarRating',
+        );
+        t.assert(!t.root.textContent.includes('请先打分'), '打分以后，“请先打分”应该消失');
+
+        await t.type(note, 'hi');
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(saved.length === 1, '打分后提交，api.save 应被调用一次，实际 ' + saved.length + ' 次');
+        t.assert(saved[0].rating === 4 && saved[0].note === 'hi', 'api.save 应收到 { rating: 4, note: "hi" }，实际是 ' + JSON.stringify(saved[0]));
+        t.assert(t.libs['react-hook-form'] && /\b(Controller|useController)\b/.test(t.source), '这道题练习的是 Controller（或 useController）');
+      },
+    },
+    {
+      title: '一份 Zod schema 接进表单，加一条跨字段规则',
+      task: '<ol class="task-steps"><li>在 <code>signupSchema</code> 里用 Zod 4 写规则：<code>email</code> 用 <code>z.email</code>，错误信息“邮箱格式不正确”；<code>password</code> 至少 8 位，“密码至少 8 位”；<code>confirm</code> 是字符串。</li><li>跨字段规则：<code>password</code> 和 <code>confirm</code> 不一致时，错误信息“两次密码不一致”，挂在 <code>confirm</code> 字段上（用 <code>refine</code> 的 <code>path</code>）。</li><li>给 <code>useForm</code> 传 <code>resolver: zodResolver(signupSchema)</code>，让三个字段的错误显示在各自旁边。</li><li>校验不通过时不调用 <code>api.save</code>；通过后调用一次。</li></ol>',
+      starter: `import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// 模拟服务器。检查程序会替换 api.save，所以提交时一定要调用 api.save(...)
+const api = {
+  save(data) {
+    return new Promise((r) => setTimeout(r, 200));
+  },
+};
+
+// 第 1 步：用 Zod 4 写出 schema
+const signupSchema = z.object({});
+
+function App() {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    // 第 2 步：用 zodResolver 接入 signupSchema
+    mode: 'onTouched',
+  });
+  return (
+    <form noValidate onSubmit={handleSubmit((data) => api.save(data))}>
+      <div>
+        <input placeholder="邮箱" {...register('email')} />{' '}
+        <small>{errors.email?.message}</small>
+      </div>
+      <div>
+        <input type="password" placeholder="密码" {...register('password')} />{' '}
+        <small>{errors.password?.message}</small>
+      </div>
+      <div>
+        <input type="password" placeholder="确认密码" {...register('confirm')} />{' '}
+        <small>{errors.confirm?.message}</small>
+      </div>
+      <button>注册</button>
+    </form>
+  );
+}`,
+      solution: `import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+
+// 模拟服务器。检查程序会替换 api.save，所以提交时一定要调用 api.save(...)
+const api = {
+  save(data) {
+    return new Promise((r) => setTimeout(r, 200));
+  },
+};
+
+const signupSchema = z
+  .object({
+    email: z.email('邮箱格式不正确'),
+    password: z.string().min(8, '密码至少 8 位'),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, { error: '两次密码不一致', path: ['confirm'] });
+
+function App() {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(signupSchema),
+    mode: 'onTouched',
+  });
+  return (
+    <form noValidate onSubmit={handleSubmit((data) => api.save(data))}>
+      <div>
+        <input placeholder="邮箱" {...register('email')} />{' '}
+        <small>{errors.email?.message}</small>
+      </div>
+      <div>
+        <input type="password" placeholder="密码" {...register('password')} />{' '}
+        <small>{errors.password?.message}</small>
+      </div>
+      <div>
+        <input type="password" placeholder="确认密码" {...register('confirm')} />{' '}
+        <small>{errors.confirm?.message}</small>
+      </div>
+      <button>注册</button>
+    </form>
+  );
+}`,
+      hint: "Zod 4 的邮箱是顶层函数 <code>z.email('信息')</code>。跨字段规则写在整个对象上：<code>z.object({…}).refine(检查函数, { error: '信息', path: ['confirm'] })</code>，不写 path，错误就挂不到字段上。",
+      exports: ['signupSchema', 'api'],
+      test: async t => {
+        const api = t.exports.api;
+        const schema = t.exports.signupSchema;
+        const zod = t.libs.zod;
+        t.assert(api && typeof api.save === 'function', '请保留 api 对象和它的 save 函数');
+        t.assert(schema && typeof schema.safeParse === 'function', '请保留 signupSchema，并导出它');
+        t.assert(zod && schema instanceof zod.z.ZodType, 'signupSchema 应是 Zod 创建的 schema（z.object({…})）');
+        const fields = r => (r.success ? {} : zod.z.flattenError(r.error).fieldErrors);
+        const bad = fields(schema.safeParse({ email: 'x', password: '123', confirm: '123' }));
+        t.assert(
+          bad.email && bad.email[0] === '邮箱格式不正确',
+          'email 为“x”时，signupSchema 应给出“邮箱格式不正确”，实际：' + JSON.stringify(bad.email) + '（步骤 1）',
+        );
+        t.assert(
+          bad.password && bad.password[0] === '密码至少 8 位',
+          'password 只有 3 位时，应给出“密码至少 8 位”，实际：' + JSON.stringify(bad.password) + '（步骤 1）',
+        );
+        const mismatch = fields(schema.safeParse({ email: 'a@b.co', password: '12345678', confirm: '1234567' }));
+        t.assert(
+          mismatch.confirm && mismatch.confirm.includes('两次密码不一致'),
+          'password 与 confirm 不一致时，错误“两次密码不一致”应挂在 confirm 字段上。实际 fieldErrors：' +
+            JSON.stringify(mismatch) +
+            '（步骤 2，refine 要写 path）',
+        );
+        t.assert(
+          schema.safeParse({ email: 'a@b.co', password: '12345678', confirm: '12345678' }).success,
+          '三个字段都正确时，signupSchema 应该通过（步骤 1、2）',
+        );
+
+        const saved = [];
+        api.save = data => {
+          saved.push(data);
+          return Promise.resolve();
+        };
+        const inp = n => t.q('input[placeholder="' + n + '"]');
+        ['邮箱', '密码', '确认密码'].forEach(n => t.assert(inp(n), '请保留“' + n + '”输入框'));
+        const form = inp('邮箱').closest('form');
+        const submit = [...form.querySelectorAll('button')].find(b => b.type === 'submit');
+        const shown = msg => t.root.textContent.includes(msg);
+
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(saved.length === 0, '表单是空的，不应调用 api.save。把 resolver: zodResolver(signupSchema) 传给 useForm（步骤 3）');
+        t.assert(shown('邮箱格式不正确') && shown('密码至少 8 位'), '提交后，邮箱和密码的错误应显示在表单里。useForm 要用 zodResolver 接入 schema（步骤 3）');
+
+        await t.type(inp('邮箱'), 'a@b.co');
+        await t.type(inp('密码'), '12345678');
+        await t.type(inp('确认密码'), '1234567');
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(saved.length === 0, '两次密码不一致时，不应调用 api.save（步骤 2）');
+        t.assert(shown('两次密码不一致'), '两次密码不一致时，应在表单里显示“两次密码不一致”（步骤 2、3）');
+        t.assert(!shown('邮箱格式不正确') && !shown('密码至少 8 位'), '邮箱和密码都对了，它们的错误应该消失');
+
+        await t.type(inp('确认密码'), '12345678');
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(saved.length === 1, '三个字段都正确，api.save 应被调用一次，实际 ' + saved.length + ' 次（步骤 4）');
+        t.assert(saved[0].email === 'a@b.co' && saved[0].password === '12345678', 'api.save 收到的数据不对，实际是 ' + JSON.stringify(saved[0]));
+        t.assert(/zodResolver/.test(t.source), '这道题练习的是用 zodResolver 把 schema 接进 useForm');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `注册页用这个 Field 渲染了“邮箱”和“备用邮箱”两个字段，两个都填错了。读屏用户聚焦“备用邮箱”时，听到的错误是哪一个？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Field({ label, name, error }) {
@@ -683,6 +972,50 @@ async function handleSubmit(e) {
       explain:
         'useFormStatus 读的是<b>外层</b> form 的状态：它必须在 form 内部的子组件里调用。写在渲染 form 的组件里，它上面没有 form，pending 永远是 false。修法：把按钮拆成 SubmitButton 子组件，在里面调用 useFormStatus。button 默认就是 submit；useActionState 的第三个返回值 isPending 是另一种办法，在同一个组件里也能用。',
     },
+    {
+      q: `用户点第 3 颗星，再点“提交”。控制台输出什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function StarRating({ value = 0, onChange }) {
+  return [1, 2, 3].map(n =&gt; (
+    &lt;button type="button" key={n} onClick={() =&gt; onChange(n)}&gt;
+      {n &lt;= value ? '★' : '☆'}
+    &lt;/button&gt;
+  ));
+}
+
+function App() {
+  const { register, handleSubmit } = useForm({ defaultValues: { rating: 0 } });
+  return (
+    &lt;form onSubmit={handleSubmit(data =&gt; console.log(data.rating))}&gt;
+      &lt;StarRating {...register('rating')} /&gt;
+      &lt;button&gt;提交&lt;/button&gt;
+    &lt;/form&gt;
+  );
+}</code></pre></div>`,
+      options: [
+        '3：onChange(3) 把 3 写进了表单',
+        '0：register 给的 onChange 要收到事件对象，收到数字 3 时在库里报错，值没有写入',
+        'undefined：register 没有给 rating 注册值',
+        'NaN：数字被当成字符串处理了',
+      ],
+      answer: 1,
+      explain:
+        'register 返回的 onChange 是给原生输入框用的，它从事件对象的 target 上读 name 和值。自定义组件调用 onChange(3) 传的是数字，库在读 target 时报错，表单里的 rating 保持默认值 0。StarRating 也没有拿到 value，星星不会亮。修法：用 Controller（或 useController），把 field.value 和 field.onChange 交给自定义组件。',
+    },
+    {
+      q: `用户在输入框里依次输入 a、b、c 三个字符。输入完成后，App 比输入前多渲染了几次？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function App() {
+  const { register, watch } = useForm({ defaultValues: { username: '' } });
+  const username = watch('username');
+  return (
+    &lt;form&gt;
+      &lt;input {...register('username')} /&gt;
+      &lt;p&gt;你好，{username || '陌生人'}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</code></pre></div>`,
+      options: ['0 次：字段是非受控的，打字不触发渲染', '1 次：只有输入结束才渲染', '3 次：每输入一个字符渲染一次', '6 次：每个字符渲染两次'],
+      answer: 2,
+      explain:
+        "watch 写在调用 useForm 的组件里，等于订阅了这个字段的值：每次输入，整个 App 重新渲染一次。字段非受控只说明输入框本身不靠 state，不代表别处读它不渲染。想只让显示“你好”的那一小块更新，把它拆成子组件，在里面用 useWatch({ control, name: 'username' })。",
+    },
   ],
   plays: {
     '每输入一个字，谁在重新渲染？': {
@@ -736,6 +1069,55 @@ async function handleSubmit(e) {
           'Action 在过渡更新里运行，同一个 useActionState 的 Action 排成队列，依次执行，一次也不丢。所以连点 3 次就是 3 次 register，每次都读到上一次返回的 state。React 不会替你去重。',
       },
       pkey: 'form-architecture|Action 排队：连点会提交几次？',
+    },
+    '真库：register、handleSubmit 与 errors': {
+      note: '什么都不填就点“注册”：handleSubmit 先校验，有错误就不调用 onValid，并把焦点移到第一个出错的字段。三个字段的错误同时出现。填对以后再点：onValid 运行，期间 isSubmitting 为 true，按钮显示“提交中…”，结束后控制台打印提交的值。<br>mode 是 onTouched：第一次离开字段时才校验，之后每次输入都重新校验，错误一改对就消失。',
+    },
+    '真库：谁订阅了别的字段的错误？': {
+      note: "表单组件（调用 useForm）不读 formState，所以输入和出错都不会让它渲染；它的 2 次是挂载时库更新了一次内部的 isReady 状态。A 订阅整个 errors：用户名出错，A 就渲染。B 加了 name: 'email'，只订阅邮箱，用户名的错误跟它无关。邮箱自己出错时，A 和 B 都渲染。<br>所以“只读 errors.email 的组件”在别的字段出错时也会渲染：订阅的是 errors 这一种状态，不是 email 这个字段。",
+      predict: {
+        q: '页面刚打开时三行分别是 2、1、1 次。在“用户名”里输入 ab，再点一下“邮箱”输入框（用户名离开，校验出错）。三行的渲染次数变成多少？',
+        options: ['表单组件 4 次，A 2 次，B 1 次', '表单组件 2 次，A 2 次，B 2 次', '表单组件 2 次，A 1 次，B 1 次', '表单组件 2 次，A 2 次，B 1 次'],
+        answer: 3,
+        explain:
+          '输入 ab 时没有校验（mode 是 onTouched，要等第一次离开）。离开用户名后校验失败，errors 里多了 username：A 订阅整个 errors，渲染 1 次；B 只订阅 email，不渲染。表单组件没读 formState，不渲染。最迷惑的是第二项：B 写了读 errors.email，但 name: email 让它只关心邮箱。',
+      },
+      pkey: 'form-architecture|真库：谁订阅了别的字段的错误？',
+    },
+    '真库：zodResolver 与同一份 schema': {
+      note: "页面里的 resolver 和“服务器”用的是同一个 signupSchema。绕过页面发送 { username: 'ab', email: 'x', password: '12345678' } 时，服务器同样拒绝：z.flattenError(error).fieldErrors 把每个出错的字段变成一个信息数组，密码合法，所以没有 password。<br>在页面里填对三个字段再点“注册”，handleSubmit 才调用回调，服务器也返回 ok。客户端校验只是体验，服务器必须自己再校验一次。",
+      predict: {
+        q: "点“绕过页面，直接发给服务器”，发送的数据是 { username: 'ab', email: 'x', password: '12345678' }。服务器返回的 errors 是什么？",
+        options: [
+          '{}：服务器没有 resolver，不会校验',
+          '{ username: [信息], email: [信息], password: [信息] }',
+          '{ username: [信息], email: [信息] }：每个出错的字段一个信息数组',
+          '{ username: [信息] }：遇到第一个错误就停止',
+        ],
+        answer: 2,
+        explain:
+          'safeParse 会检查所有字段，不是遇到第一个错误就停。username 太短、email 格式不对，password 有 8 位，合法，所以只有前两个字段。flattenError 的 fieldErrors 把每个字段的错误整理成数组。服务器用的就是页面的 signupSchema，不需要 resolver：resolver 只是把 schema 接进 React Hook Form 的适配器。',
+      },
+      pkey: 'form-architecture|真库：zodResolver 与同一份 schema',
+    },
+    '真库：Controller 接入自定义输入': {
+      note: '不点星直接提交：rules 里的 min 规则不通过，显示“请先打分”，handleSubmit 不调用回调。点第 4 颗星：field.onChange(4) 把新值写进表单，field.value 变成 4，星星亮起；useWatch 订阅的同一个值也变成 4。再提交，控制台是 {"rating":4,"note":""}。<br>备注输入框仍用 register：同一个表单里，原生输入框和 Controller 可以混用。',
+    },
+    '真库：useFieldArray 的 key': {
+      note: '两个面板里，输入框的值在删除后都正确（乙、丙）：register 按字段名把值填回去。不同的是每一行自己的 state（展开 / 收起）。React 按 key 对应组件：key 是 field.id 时，“甲”这一行连同它的 state 一起被删掉；key 是下标时，被删掉的是最后一个组件，第一个位置的组件和它的 state 留了下来，现在显示“乙”。',
+      predict: {
+        q: '在两个面板里，都先点“甲”那一行的“展开”，再点“甲”那一行的“删除”。“乙”那一行现在的状态是什么？',
+        options: [
+          '都是展开：state 跟着“乙”这个人走',
+          '都是收起：删除会重置所有行的 state',
+          '上面（key = field.id）展开，下面（key = 下标）收起',
+          '上面（key = field.id）收起，下面（key = 下标）展开',
+        ],
+        answer: 3,
+        explain:
+          'state 属于组件在树中的位置，由 key 决定。key 是 field.id，“甲”的组件被卸载，“乙”的组件还是原来那个，保持收起。key 是下标，删除后第一个位置的组件继续存在，它的 open 是 true，只是 props 换成了“乙”的数据，所以“乙”显示为展开。输入框的值不会错，因为 register 用字段名重新填值。',
+      },
+      pkey: 'form-architecture|真库：useFieldArray 的 key',
     },
   },
 } satisfies Lesson;

@@ -1,4 +1,4 @@
-// 第三方库（react-router、@tanstack/react-query、zustand）在实验台里的浏览器测试：
+// 第三方库（react-router、@tanstack/react-query、zustand、react-hook-form、zod、@hookform/resolvers）在实验台里的浏览器测试：
 //   按需加载（只用到 React 的课不请求库文件）、版本标记、三课的真库示例无错误且行为符合课文和预测题的答案、
 //   库文件被拦截时的失败提示（其余部分正常、可以重试）、tanstack-query 练习（参考答案、起始代码、常见错误、不同写法）。
 // 用法：node tests/e2e/libs.mjs      （先 npm run build）
@@ -13,7 +13,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ROUTER = 'react-router 8.4.0';
 const QUERY = '@tanstack/react-query 5.104.1';
 const ZUSTAND = 'zustand 5.0.15';
-const ALL_SLUGS = ['react-router', 'tanstack-query', 'zustand'];
+const RHF = 'react-hook-form 7.89.0';
+const ZOD = 'zod 4.6.5';
+const RESOLVERS = '@hookform/resolvers 5.9.1';
+const ALL_SLUGS = ['react-router', 'tanstack-query', 'zustand', 'react-hook-form', 'zod', 'hookform-resolvers'];
 
 async function open(ctx, id) {
   const p = await ctx.newPage();
@@ -96,8 +99,13 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     .reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
   console.log(`     主包 ${main.join(',')}：${bytes} 字节；static/js 全部 ${total} 字节`);
   ok(
-    !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn') && !text.includes('zustand persist middleware'),
-    '站点主包里没有 react-router、@tanstack/react-query 和 zustand 的代码',
+    !text.includes('element provided to render during initial hydration') &&
+      !text.includes('Missing queryFn') &&
+      !text.includes('zustand persist middleware') &&
+      !text.includes('shouldUnregister') &&
+      !text.includes('toNestErrors') &&
+      !text.includes('$ZodError'),
+    '站点主包里没有 react-router、@tanstack/react-query、zustand、react-hook-form、zod 和 resolvers 的代码',
   );
   ok(bytes < 215_000, '站点主包小于 215,000 字节（课程数据按课拆成异步 chunk 之前是 1,187,918；拆分后约 194,000，再留约 10% 余量）', String(bytes));
   // 主包里不含任何一课的测验题：每课的数据在自己的 chunk（lesson-<id>.*.js）里，打开那一课才加载
@@ -111,9 +119,21 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     ok(snippet && !text.includes(snippet), `主包里不含 ${id} 的测验题文字`, String(snippet));
   }
   const rt = path.join(ROOT, 'doc_build/runtime');
-  const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query|zustand)-[\d.]+\.dev\.js$/.test(f));
-  ok(libs.length === 3, 'doc_build/runtime 里有三个库文件', libs.join(','));
+  const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query|zustand|react-hook-form|zod|hookform-resolvers)-[\d.]+\.dev\.js$/.test(f));
+  ok(libs.length === 6, 'doc_build/runtime 里有六个库文件', libs.join(','));
   for (const f of libs) console.log(`     ${f}：${fs.statSync(path.join(rt, f)).size} 字节`);
+  // resolvers 不自带第二份 react-hook-form
+  const resolversText = fs.readFileSync(
+    path.join(
+      rt,
+      libs.find(f => f.startsWith('hookform-resolvers')),
+    ),
+    'utf8',
+  );
+  ok(
+    !resolversText.includes('useFieldArray') && resolversText.includes('__hocLibs["react-hook-form"]'),
+    'resolvers 的文件里没有 react-hook-form 的代码，只引用已加载的那一份',
+  );
 }
 
 /* 1. 按需加载：只用到 React 的课不请求库文件；每个库的课只请求自己的库文件 */
@@ -179,6 +199,8 @@ for (const [id, want, name, minMini] of [
         typeof window.ReactRouter === 'undefined' &&
         typeof window.ReactQuery === 'undefined' &&
         typeof window.zustand === 'undefined' &&
+        typeof window.z === 'undefined' &&
+        typeof window.ReactHookForm === 'undefined' &&
         typeof window.Zustand === 'undefined',
     ),
     `${id} 一课：页面全局没有被库写入 React、ReactRouter、ReactQuery、zustand`,
@@ -599,6 +621,168 @@ for (const [id, want, name, minMini] of [
   await ctx.close();
 }
 
+/* 3c. form-architecture 一课：react-hook-form + zod + resolvers 真库示例 */
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await open(ctx, 'form-architecture');
+  await reveal(p);
+  const wait = ms => sleep(ms);
+  ok(
+    p.reqs.some(u => isLib(u, 'react-hook-form')) && p.reqs.some(u => isLib(u, 'zod')) && p.reqs.some(u => isLib(u, 'hookform-resolvers')),
+    'form-architecture 一课请求了三个新库的文件',
+  );
+  const order = p.reqs
+    .filter(u => /\/runtime\/(react-hook-form|hookform-resolvers)-/.test(u))
+    .map(u => (u.includes('hookform-resolvers') ? 'resolvers' : 'rhf'));
+  ok(order.indexOf('rhf') >= 0 && order.indexOf('rhf') < order.indexOf('resolvers'), 'resolvers 的文件在 react-hook-form 之后才加载', order.join(','));
+  ok(!p.reqs.some(u => ['react-router', 'tanstack-query', 'zustand'].some(slug => isLib(u, slug))), 'form-architecture 一课没有请求别的库');
+  const info = await p.evaluate(() =>
+    [...document.querySelectorAll('.pg')].map(x => [
+      x.querySelector('.pg-title').textContent,
+      x.querySelector('.pg-lib')?.hidden ? '' : x.querySelector('.pg-lib')?.textContent,
+    ]),
+  );
+  const real = info.filter(i => i[0].includes('真库'));
+  ok(real.length === 5, 'form-architecture 一课有 5 个真库示例', String(real.length));
+  const tagOf = t => real.find(i => i[0].includes(t))?.[1];
+  ok(tagOf('register、handleSubmit') === RHF, '示例 1 的标题栏只显示 ' + RHF, tagOf('register、handleSubmit'));
+  ok(tagOf('zodResolver') === [RHF, ZOD, RESOLVERS].join(' · '), '示例 3 的标题栏显示三个库', tagOf('zodResolver'));
+  const bad = await p.evaluate(() => [...document.querySelectorAll('.pg .pv-err,.pg .console .err,.pg .console .warn')].map(e => e.textContent.slice(0, 120)));
+  ok(bad.length === 0, 'form-architecture 一课的全部示例运行无错误、无警告', bad.join(' | '));
+  // 通用：在示例里给 input 赋值并触发事件
+  const typeIn = (title, placeholder, v) =>
+    inPg(
+      p,
+      title,
+      (pg, { placeholder, v }) => {
+        const el = [...pg.querySelectorAll('.preview input')].find(i => i.placeholder === placeholder);
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, v);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      },
+      { placeholder, v },
+    );
+  const blurIn = (title, placeholder) =>
+    inPg(
+      p,
+      title,
+      (pg, { placeholder }) => {
+        const el = [...pg.querySelectorAll('.preview input')].find(i => i.placeholder === placeholder);
+        el.focus();
+        el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+        el.blur();
+      },
+      { placeholder },
+    );
+
+  const T1 = '真库：register、handleSubmit';
+  await clickIn(p, T1, '注册', 200);
+  const f1 = await inPg(p, T1, pg => ({ text: pg.querySelector('.preview').innerText.replace(/\n+/g, '|'), focus: document.activeElement.placeholder }));
+  ok(
+    f1.text.includes('请填写用户名') && f1.text.includes('请填写邮箱') && f1.focus === '用户名',
+    '示例 1：空表单提交，错误同时出现，焦点移到第一个出错的字段',
+    JSON.stringify(f1),
+  );
+  await typeIn(T1, '用户名', 'anna');
+  await typeIn(T1, '邮箱', 'a@b.co');
+  await typeIn(T1, '密码', '12345678');
+  await wait(100);
+  const v1 = await clickIn(p, T1, '注册', 100);
+  ok(v1.includes('提交中…'), '示例 1：提交期间按钮显示“提交中…”', v1);
+  await wait(800);
+  ok(
+    (await consoleOf(p, T1)).includes('提交：{"username":"anna","email":"a@b.co","password":"12345678"}'),
+    '示例 1：控制台打印提交的值',
+    await consoleOf(p, T1),
+  );
+
+  const T2 = '真库：谁订阅了别的字段的错误';
+  const counts = async () => {
+    const t = (await preview(p, T2)).split('|');
+    return t
+      .map(x => (x.match(/渲染 (\d+) 次/) || [])[1])
+      .filter(Boolean)
+      .join(',');
+  };
+  ok((await counts()) === '2,1,1', '订阅粒度：初始渲染次数 表单 2、A 1、B 1', await counts());
+  await typeIn(T2, '用户名', 'ab');
+  await wait(100);
+  ok((await counts()) === '2,1,1', '订阅粒度：输入 ab 时谁都不渲染（还没校验）', await counts());
+  await blurIn(T2, '用户名');
+  await wait(150);
+  ok((await counts()) === '2,2,1', '订阅粒度（预测题答案）：用户名离开出错后，表单 2、A 2、B 1', await counts());
+  await typeIn(T2, '邮箱', 'x');
+  await blurIn(T2, '邮箱');
+  await wait(150);
+  ok((await counts()) === '2,3,2', '订阅粒度：邮箱自己出错后，A 和 B 都多渲染一次', await counts());
+
+  const T3 = '真库：zodResolver 与同一份 schema';
+  let v = await clickIn(p, T3, '绕过页面，直接发给服务器', 100);
+  ok(
+    v.includes('{"ok":false,"errors":{"username":["用户名至少 3 个字符"],"email":["邮箱格式不正确"]}}'),
+    'zod（预测题答案）：服务器返回 username 和 email 的信息数组，没有 password',
+    v,
+  );
+  await clickIn(p, T3, '注册', 300);
+  v = await preview(p, T3);
+  ok(v.includes('用户名至少 3 个字符') && v.includes('邮箱格式不正确') && v.includes('密码至少 8 位'), 'zod：空表单提交，三条中文错误由 resolver 给出', v);
+  await typeIn(T3, '用户名', 'anna');
+  await typeIn(T3, '邮箱', 'a@b.co');
+  await typeIn(T3, '密码', '12345678');
+  await wait(100);
+  v = await clickIn(p, T3, '注册', 300);
+  ok(v.includes('页面校验通过。服务器：{"ok":true}') && !v.includes('邮箱格式不正确'), 'zod：填对后 handleSubmit 调用回调，服务器也通过', v);
+
+  const T4 = '真库：Controller';
+  await clickIn(p, T4, '提交', 200);
+  v = await preview(p, T4);
+  ok(v.includes('请先打分') && !(await consoleOf(p, T4)).includes('提交：'), 'Controller：评分为 0 时显示“请先打分”，不提交', v);
+  await inPg(p, T4, pg => pg.querySelectorAll('.preview button')[3].click());
+  await wait(150);
+  v = await clickIn(p, T4, '提交', 200);
+  ok(v.includes('★★★★☆') && v.includes('当前评分：4') && !v.includes('请先打分'), 'Controller：点第 4 颗星，星星亮起、useWatch 显示 4、错误消失', v);
+  ok((await consoleOf(p, T4)).includes('提交：{"rating":4,"note":""}'), 'Controller：提交 { rating: 4, note: "" }', await consoleOf(p, T4));
+
+  const T5 = '真库：useFieldArray 的 key';
+  const r5 = await inPg(p, T5, async pg => {
+    const fs_ = [...pg.querySelectorAll('.preview fieldset')];
+    fs_.forEach(f => [...f.querySelectorAll('button')].find(x => x.textContent === '展开').click());
+    await new Promise(r => setTimeout(r, 100));
+    fs_.forEach(f => [...f.querySelectorAll('button')].find(x => x.textContent === '删除').click());
+    await new Promise(r => setTimeout(r, 200));
+    return fs_.map(f =>
+      [...f.querySelectorAll('input')].map((i, k) => i.value + (f.querySelectorAll(':scope > div')[k].querySelector('small') ? '(开)' : '')).join(' '),
+    );
+  });
+  ok(r5[0] === '乙 丙' && r5[1] === '乙(开) 丙', 'useFieldArray（预测题答案）：key=id 时乙收起，key=下标时乙展开；输入框的值两边都对', JSON.stringify(r5));
+  ok(p.errs.length === 0, 'form-architecture 一课没有页面错误', p.errs.join('|'));
+  // 只 import zod：只请求 zod 的文件
+  const ctx2 = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p2 = await ctx2.newPage();
+  const reqs2 = [];
+  p2.on('request', r => reqs2.push(r.url()));
+  await p2.goto(lessonUrl(site, 'context'));
+  await p2.waitForFunction(() => [...document.querySelectorAll('.pg')].some(x => x._editor), null, { timeout: 60000 });
+  await inPg(p2, '用 use 读取 Context', async pg => {
+    pg.scrollIntoView();
+    await new Promise(r => setTimeout(r, 600));
+  });
+  reqs2.length = 0;
+  const only = await runCodeIn(
+    p2,
+    '用 use 读取 Context',
+    "import { z } from 'zod';\nfunction App(){ return <p>{z.email().safeParse('a@b.co').success ? 'ok' : 'bad'}</p> }",
+    2500,
+  );
+  ok(only.text === 'ok', '在别的示例里新加 import zod：自动加载后运行', JSON.stringify(only));
+  ok(
+    reqs2.some(u => isLib(u, 'zod')) && !reqs2.some(u => isLib(u, 'react-hook-form') || isLib(u, 'hookform-resolvers')),
+    '只 import zod 时，只请求 zod 的文件',
+    reqs2.filter(u => /runtime/.test(u)).join(','),
+  );
+  await ctx2.close();
+  await ctx.close();
+}
+
 /* 4. 库文件被拦截：真库示例显示加载失败提示，其余部分（课文、测验、迷你示例、练习）正常；放开后离开再回来可以重试 */
 {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
@@ -684,6 +868,33 @@ for (const [id, want, name, minMini] of [
   ok(r.prose > 1000, '拦截 zustand 时课文正常显示');
   ok(r.mini, '拦截 zustand 时迷你示例和练习照常运行');
   ok(errs.length === 0, '拦截 zustand 期间没有页面错误', errs.join('|'));
+  await ctx.close();
+}
+
+/* 4c. react-hook-form 库文件被拦截：用到它的 5 个真库示例都显示加载失败（resolvers 依赖它），其余正常 */
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.route('**/runtime/react-hook-form-*.js', r => r.abort());
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto(lessonUrl(site, 'form-architecture'));
+  await p.evaluate(() => localStorage.clear());
+  await p.reload();
+  await p.waitForSelector('.selfx', { timeout: 60000 });
+  await p.waitForFunction(() => document.querySelectorAll('.pv-err').length >= 5, null, { timeout: 30000 });
+  await sleep(1000);
+  const r = await p.evaluate(() => ({
+    errs: [...document.querySelectorAll('.pv-err')].map(e => e.textContent),
+    prose: document.querySelector('.prose').textContent.length,
+  }));
+  ok(
+    r.errs.length >= 5 && r.errs.every(e => e.includes('运行环境加载失败（react-hook-form），请检查网络后刷新页面')),
+    '库文件被拦截：所有用到的示例（5 个真库示例和变式练习）都显示“运行环境加载失败（react-hook-form）…”（resolvers 示例也一样）',
+    r.errs.join('|'),
+  );
+  ok(r.prose > 1000, '拦截 react-hook-form 时课文正常显示');
+  ok(errs.length === 0, '拦截 react-hook-form 期间没有页面错误', errs.join('|'));
   await ctx.close();
 }
 
