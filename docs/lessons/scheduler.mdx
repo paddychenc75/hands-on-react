@@ -347,7 +347,7 @@ function App() {
 
 想在 react-dom 19.3 的开发版源码（`react-dom-client.development.js`）里跟一遍流程，可以按下面的函数名搜索：
 
-1. `requestUpdateLane`：set 函数被调用时，按“是否在 transition 中”“当前事件类型”决定 lane。
+1. `requestUpdateLane`：set 函数被调用时，按“是否在过渡更新中”“当前事件类型”决定 lane。
 2. `scheduleUpdateOnFiber` → `ensureRootIsScheduled`：登记根节点上有更新，稍后在微任务里挑出最高优先级的 lane，交给调度器。
 3. `performWorkOnRootViaSchedulerTask` → `performWorkOnRoot`：按 lane 决定用 `renderRootSync`（同步）还是 `renderRootConcurrent`（可切片）。
 4. `workLoopConcurrentByScheduler`：`for (; workInProgress !== null && !shouldYield(); ) performUnitOfWork(workInProgress)`。

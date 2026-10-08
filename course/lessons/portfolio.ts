@@ -5,6 +5,7 @@ export default {
   stage: 5,
   title: '毕业设计：从练习到作品集',
   mins: 24,
+  localMins: 3000,
   summary: '在自己的电脑上做三个真正的项目，把这门课学到的一切用起来。本课约 24 分钟读完；三个项目在课外完成，合计约 50–80 小时。',
   goals: [
     '能用 Vite 在本地创建并运行一个 React + TypeScript 项目',

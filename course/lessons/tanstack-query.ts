@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '数据请求：TanStack Query',
   mins: 56,
+  localMins: 60,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
     '能写出 useQuery：queryKey 包含查询用到的每个变量，按加载中、出错、成功渲染，并区分 status 和 fetchStatus',

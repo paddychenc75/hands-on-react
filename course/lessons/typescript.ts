@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: 'TypeScript + React',
   mins: 42,
+  localMins: 40,
   summary: '给组件、状态、事件和 Hook 加上类型，让编辑器替你找 bug。',
   goals: [
     '能写出 props 的类型：必填、可选（?）和字面量联合类型',

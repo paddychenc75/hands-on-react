@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '项目搭建与工具链',
   mins: 47,
+  localMins: 60,
   summary: '在本机用 Vite 建项目、把单文件拆成模块、用类型检查和 lint 把关、启用 React Compiler、管好环境变量。',
   goals: [
     '能在本机用 Vite 创建 React + TypeScript 项目，说出各目录和三条命令的作用，并判断什么时候该用框架',

@@ -5,6 +5,7 @@ export default {
   stage: 4,
   title: '实战四：城市天气应用',
   mins: 63,
+  localMins: 300,
   summary:
     '在本机自己写一个小应用：搜索城市、查看天气、收藏城市。Vite、TypeScript、React Router、TanStack Query 和测试接在一起，用一组下载的验收测试判断是否做对。',
   goals: [
