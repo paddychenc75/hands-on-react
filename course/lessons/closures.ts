@@ -2,21 +2,22 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/closures.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'closures',
+  runtime: 19,
   stage: 2,
   title: '闭包陷阱与 Effect 依赖',
-  mins: 29,
+  mins: 33,
   summary: '为什么定时器里的 state 总是旧值？彻底理解渲染、闭包与依赖。',
   goals: [
     '能解释为什么每次渲染都有自己的 props、state 和函数',
     '能找出 effect 和定时器回调里的“过期闭包”',
-    '能用补全依赖、函数式更新、useEffectEvent 或 ref 修复过期闭包',
+    '能用补全依赖或函数式更新修复过期闭包，并能用 useEffectEvent 读到最新值而不重启 effect',
     '能修改代码让 effect 少依赖一个值，而不是直接删掉依赖',
   ],
   keyPoints: [
     '组件每次渲染都会新建一批变量和函数。函数通过闭包记住的是创建它的那次渲染里的值。',
     '过期闭包：effect 只在挂载时运行，它里面的回调就一直读第一次渲染的 state 和 props。',
     '依赖数组要写上 effect 用到的所有 props、state，以及由它们算出的变量和函数。不想依赖某个值，就改代码：用函数式更新、把函数移进 effect，或把常量移到组件外。',
-    '长期存在的回调要读最新值，又不想重启 effect：React 19.2 用 useEffectEvent，React 18 用 ref 保存最新值。',
+    '长期存在的回调要读最新值，又不想重启 effect：用 <code>useEffectEvent</code>。它只能在 effect 里调用，不能放进依赖数组。19.2 之前的项目用 ref 手写同样的效果。',
     '常见坑：把组件内定义的对象或函数写进依赖。它每次渲染都是新引用，effect 每次都会重新执行。',
   ],
   quiz: [
@@ -132,7 +133,7 @@ function App() {
     </div>
   );
 }`,
-    hint: '两个 bug 都是过期闭包。1. 消息回调里的 <code>messages</code> 来自哪一次渲染？能不能不读它就追加一条？2. effect 用到了 <code>roomId</code>，依赖数组写了吗？依赖变化时，React 会先运行上一次的清理函数，再运行新的 effect。',
+    hint: '两个 bug 都是过期闭包。1. 消息回调里的 <code>messages</code> 来自哪一次渲染？能不能不读它就追加一条？（用 <code>useEffectEvent</code> 读最新的 messages 也可以。）2. effect 用到了 <code>roomId</code>，依赖数组写了吗？依赖变化时，React 会先运行上一次的清理函数，再运行新的 effect。',
     faded: `import { useState, useEffect } from 'react';
 
 // —— 模拟聊天服务器（不用修改）：连接后每 0.2 秒推送一条本房间的消息 ——
@@ -232,7 +233,7 @@ useEffect(() =&gt; {
       options: ['hi', "''（空字符串）", 'undefined', '每按一个键打印一次'],
       answer: 1,
       explain:
-        'effect 只在挂载时运行一次，onKey 是第一次渲染创建的。它记住的 text 永远是空字符串。修复方式：把 text 加入依赖数组，让 effect 重新注册监听；或者用 ref 保存最新值，在 onKey 中读 ref.current。',
+        'effect 只在挂载时运行一次，onKey 是第一次渲染创建的。它记住的 text 永远是空字符串。修复方式：把 text 加入依赖数组，让 effect 重新注册监听；或者把读 text 的那段逻辑放进 useEffectEvent，在 onKey 中调用它，这样 effect 不必重新注册。',
     },
     {
       q: `这个计数器运行起来会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useEffect(() =&gt; {
@@ -272,15 +273,40 @@ useEffect(() =&gt; {
       explain:
         'roomId 变了必须重连，所以留在依赖里。theme 只用在 Effect Event 里，它读到的总是最新值，不需要依赖。Effect Event 本身也不放进依赖数组。写成 [roomId, theme] 会让切换主题时重连。写成 [] 会漏掉 roomId，切换房间时仍连着旧房间：不能为了少依赖就把真正的依赖删掉。',
     },
+    {
+      q: `点击按钮两次，控制台一共打印几次“effect run”（包括挂载时那一次）？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [n, setN] = useState(0);
+const onTick = useEffectEvent(() =&gt; console.log('读到', n));
+
+useEffect(() =&gt; {
+  console.log('effect run');
+  onTick();
+}, [onTick]);
+
+&lt;button onClick={() =&gt; setN(n + 1)}&gt;{n}&lt;/button&gt;</code></pre></div>`,
+      options: ['1 次：Effect Event 的引用是稳定的', '2 次', '3 次', '报错：Effect Event 不能放进依赖数组'],
+      answer: 2,
+      explain:
+        'Effect Event 每次渲染都是新函数。把它写进依赖数组，每次渲染都会让 effect 重新运行：挂载 1 次，两次点击各渲染一次，共 3 次。这违背了 useEffectEvent 的目的。React 运行时不会报错，但 ESLint 的 react-hooks 规则会警告。想让 effect 少运行，就不要把它写进依赖。',
+    },
   ],
   plays: {
+    主题写进依赖会怎样: {
+      note: '每次 theme 变化，依赖变了，React 先运行清理函数“断开”，再重新运行 effect“连接”。聊天室只是想换个主题的提示色，却断开又重连。下一个示例用 useEffectEvent 避免这件事。',
+      predict: {
+        q: '先观察控制台的“连接”。点“切换主题”，等 2 秒。控制台会怎样？',
+        options: ['没有“断开”和“连接”，之后每秒显示新主题', '先“断开”再“连接”，然后每秒显示新主题', '没有“断开”和“连接”，之后仍显示旧主题', '报错'],
+        answer: 1,
+        explain: 'theme 在依赖数组里。它变了，React 先清理上一次的 effect（断开），再运行新的 effect（连接），新的回调读到的是新主题。',
+      },
+      pkey: 'closures|主题写进依赖会重连',
+    },
     '聊天室：读到最新主题': {
-      note: '切换房间会重连，切换主题不会重连，但每秒的消息总是用当前主题。切换主题时没有“断开”和“连接”，但之后每秒的消息里已经是新主题。切换房间才会断开旧房间、连接新房间。ref 在这里扮演的就是 useEffectEvent。',
+      note: '切换房间会重连，切换主题不会重连，但每秒的消息总是用当前主题。切换主题时没有“断开”和“连接”，之后每秒的消息里已经是新主题。切换房间才会断开旧房间、连接新房间。onTick 是 Effect Event：它每次渲染都读到最新的 theme，却不是 effect 的依赖。',
       predict: {
         q: '先观察控制台的“连接”。点“切换主题”，等 2 秒。控制台会怎样？',
         options: ['先“断开”再“连接”，然后显示新主题', '没有“断开”和“连接”，之后每秒显示新主题', '没有“断开”和“连接”，之后仍显示旧主题', '报错'],
         answer: 1,
-        explain: 'effect 的依赖只有 roomId，切换主题不会重新运行它。回调读的是 latestTheme.current，每次渲染后都同步成了最新的主题，所以显示新主题。',
+        explain: 'effect 的依赖只有 roomId，切换主题不会重新运行它。回调调用的 onTick 是 Effect Event，每次渲染都能读到最新的 theme，所以显示新主题。',
       },
       pkey: 'closures|聊天室：读到最新主题',
     },

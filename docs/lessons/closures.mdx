@@ -61,13 +61,14 @@ function App() {
 
 effect 只在挂载时运行一次。所以 interval 回调中的 `count` 永远是第一次渲染时的 0。回调每秒都执行 `setCount(0 + 1)`。
 
-## 三种修复方式
+## 四种修复方式
 
 | 方法 | 代码 | 评价 |
 |---|---|---|
 | ① 补全依赖 | `}, [count])` | 能用，但每秒都要清理并重建定时器 |
 | ② 函数式更新 | `setCount(c => c + 1)` | **最佳**：不再读取 count，依赖可以为空 |
 | ③ useReducer | `dispatch({ type: 'tick' })` | 适合逻辑依赖多个状态时，dispatch 引用永远稳定 |
+| ④ useEffectEvent | 在 effect 里调用 `onTick()`，`onTick` 读最新值 | 回调要读最新的 state，但值变化时不该重启 effect（见下一节） |
 
 <CallBox kind="tip" label="要点">
 
@@ -83,72 +84,24 @@ effect 只在挂载时运行一次。所以 interval 回调中的 `count` 永远
 
 ## 把事件逻辑从 effect 中分开：useEffectEvent
 
-有时，effect 里有一段逻辑，需要读最新的值，但这个值变化时不该让 effect 重新运行。例如聊天室：切换房间要重新连接，切换主题不该重新连接。可是“连接成功”后的提示要用当前主题。
+有时，effect 里有一段逻辑要读最新的值，但这个值变化时不该让 effect 重新运行。例如聊天室：切换房间要重新连接，切换主题不该重新连接。可是连接期间每秒的提示，要用当前的主题。
 
-如果把 `theme` 写进依赖，切换主题就会断开再重连。如果不写，就是过期闭包。
+第一种写法是老老实实把 `theme` 写进依赖。先看代码里 effect 的依赖数组，再预测：
 
-**Effect Event** 解决这个问题。React 19.2 起，`useEffectEvent` 把这段逻辑提取出来。它总能读到最新的 props 和 state，而且不是 effect 的依赖。下面的代码用到了 React 19 才有的 API，**只能阅读**，实验台运行不了：
-
-```jsx title="只读：React 19.2 的 useEffectEvent"
-import { useEffect, useEffectEvent } from 'react';
+```jsx play title="主题写进依赖会怎样"
+import { useState, useEffect } from 'react';
 
 function ChatRoom({ roomId, theme }) {
-  // 读最新的 theme，但它自己不是依赖
-  const onConnected = useEffectEvent(() => {
-    showToast('已连接 ' + roomId, theme);
-  });
-
-  useEffect(() => {
-    const conn = createConnection(roomId);
-    conn.on('connected', () => onConnected());
-    conn.connect();
-    return () => conn.disconnect();
-  }, [roomId]); // 只有 roomId 变化才重连
-}
-```
-
-它有两条限制：
-
-1. 只能在 effect 内部（或另一个 Effect Event 里）调用，不要在渲染时调用。
-2. 不要把它传给别的组件，也不要放进依赖数组。
-
-它不是“绕过依赖检查”的工具。只有逻辑本来就属于“事件”（发生了某件事，要做点什么），而且你不希望它的值引起重新同步，才用它。如果 `roomId` 变了就该重连，它就必须留在依赖里。
-
-## React 18 中的写法：用 ref 读取最新值
-
-实验台运行的是 React 18.3.1，没有 `useEffectEvent`。在 React 18，以及 19.2 之前的版本，用 ref 保存最新值。它就是 `useEffectEvent` 的手写版：
-
-```jsx
-const latestCount = useRef(count);
-useEffect(() => { latestCount.current = count; }); // 每次渲染后同步
-
-useEffect(() => {
-  const id = setInterval(() => {
-    console.log('最新的 count:', latestCount.current);
-  }, 1000);
-  return () => clearInterval(id);
-}, []); // 依赖为空，但能读到最新值
-```
-
-用同样的办法改写上面的聊天室。先看代码里两个 effect 的依赖数组，再预测：
-
-```jsx play title="聊天室：读到最新主题"
-import { useState, useEffect, useRef } from 'react';
-
-function ChatRoom({ roomId, theme }) {
-  const latestTheme = useRef(theme);
-  useEffect(() => { latestTheme.current = theme; }); // 每次渲染后同步
-
   useEffect(() => {
     console.log('连接 ' + roomId);
     const id = setInterval(() => {
-      console.log('[' + roomId + '] 当前主题：' + latestTheme.current);
+      console.log('[' + roomId + '] 当前主题：' + theme);
     }, 1000);
     return () => {
       clearInterval(id);
       console.log('断开 ' + roomId);
     };
-  }, [roomId]);
+  }, [roomId, theme]);
 
   return <p>房间：{roomId}，主题：{theme}</p>;
 }
@@ -165,6 +118,76 @@ function App() {
   );
 }
 ```
+
+依赖写得没错：effect 用了 `theme`，就必须依赖它。问题出在设计上：`theme` 在这里只是被“读取”，它不是“要不要重新连接”的理由。
+
+**Effect Event** 解决这个问题。`useEffectEvent`（React 19.2 起稳定）把“读最新值”的那段逻辑提取成一个函数。这个函数总能读到最新的 props 和 state，而且不是 effect 的依赖。
+
+```jsx play title="聊天室：读到最新主题"
+import { useState, useEffect, useEffectEvent } from 'react';
+
+function ChatRoom({ roomId, theme }) {
+  // 读最新的 roomId 和 theme，但它自己不是 effect 的依赖
+  const onTick = useEffectEvent(() => {
+    console.log('[' + roomId + '] 当前主题：' + theme);
+  });
+
+  useEffect(() => {
+    console.log('连接 ' + roomId);
+    const id = setInterval(() => onTick(), 1000);
+    return () => {
+      clearInterval(id);
+      console.log('断开 ' + roomId);
+    };
+  }, [roomId]); // 只有 roomId 变化才重连
+
+  return <p>房间：{roomId}，主题：{theme}</p>;
+}
+
+function App() {
+  const [roomId, setRoomId] = useState('综合');
+  const [theme, setTheme] = useState('浅色');
+  return (
+    <div>
+      <button onClick={() => setTheme(theme === '浅色' ? '深色' : '浅色')}>切换主题</button>
+      <button onClick={() => setRoomId(roomId === '综合' ? '旅行' : '综合')}>切换房间</button>
+      <ChatRoom roomId={roomId} theme={theme} />
+    </div>
+  );
+}
+```
+
+Effect Event 有三条限制：
+
+1. 只在 effect 内部（或另一个 Effect Event 里）调用。在渲染期间调用，React 会报错：`A function wrapped in useEffectEvent can't be called during rendering.`
+2. 不要把它传给别的组件。
+3. 不要把它写进依赖数组。它每次渲染都是新函数，写进去会让 effect 每次渲染都重新运行。
+
+<CallBox kind="warn" label="常见坑">
+
+`useEffectEvent` 不是“绕过依赖检查”的工具。只有逻辑本来就属于“事件”（发生了某件事，要做点什么），而且你不希望它读到的值引起重新同步，才用它。如果 `roomId` 变了就该重连，它就必须留在依赖里。
+
+</CallBox>
+
+<CallBox kind="deep" label="维护 19.2 之前的项目时">
+
+19.2 之前没有 `useEffectEvent`。老项目用 ref 保存最新值，效果相同：
+
+```jsx
+const latestTheme = useRef(theme);
+useEffect(() => { latestTheme.current = theme; }); // 每次渲染后同步
+
+useEffect(() => {
+  const id = setInterval(() => {
+    console.log('当前主题：', latestTheme.current);
+  }, 1000);
+  return () => clearInterval(id);
+}, []); // 依赖为空，但能读到最新值
+```
+
+`useEffectEvent` 就是这种手写版的官方形式。有了它，新代码不需要自己写这套 ref 的同步。
+
+</CallBox>
 
 ## 对象和函数作为依赖
 

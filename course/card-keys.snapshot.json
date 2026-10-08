@@ -94,6 +94,7 @@
     "rendering#1": "66635bce",
     "rendering#2": "4100ec6b",
     "rendering#3": "a10e7579",
+    "rendering#4": "a9c2cd26",
     "rendering#c0": "7f5f4b2a",
     "rendering#c1": "28762b05",
     "rendering#c2": "d8538ff6",
@@ -114,6 +115,7 @@
     "closures#c1": "f8760338",
     "closures#c2": "085e047a",
     "closures#c3": "21f98b20",
+    "closures#c4": "664eb706",
     "suspense#0": "f7d106ff",
     "suspense#1": "1d4fcf3c",
     "suspense#2": "c9e19ea1",
@@ -365,6 +367,8 @@
     "perf-clinic|memo 挡得住 Context 吗？",
     "react-19|useFormStatus：按钮写在哪里",
     "react-19|use() 读取 Promise，配合 Suspense",
-    "react-19|Activity：隐藏界面，保留 state"
+    "react-19|Activity：隐藏界面，保留 state",
+    "rendering|三种隐藏方式",
+    "closures|主题写进依赖会重连"
   ]
 }

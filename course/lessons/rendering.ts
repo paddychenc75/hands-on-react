@@ -2,15 +2,17 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/rendering.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'rendering',
+  runtime: 19,
   stage: 2,
   title: '渲染机制：React 到底做了什么',
-  mins: 27,
+  mins: 32,
   summary: '理解触发、渲染、提交三个阶段，以及虚拟 DOM 与协调算法。',
   goals: [
     '能解释“渲染”和“更新 DOM”的区别',
     '能判断一次更新会让哪些组件重新渲染',
     '能根据位置、类型和 key 预测 state 是保留还是丢失',
     '能用“把 state 下移”减少不必要的渲染',
+    '能用 <code>&lt;Activity&gt;</code> 隐藏一块界面并保留它的 state，并说出它和条件渲染、CSS 隐藏的区别',
     '能说出严格模式在开发环境多做了什么，以及为什么渲染必须是纯的',
   ],
   keyPoints: [
@@ -19,6 +21,7 @@ export default {
     'React 按“树中的位置 + 元素类型”保存 state。位置和类型不变，state 保留；类型变了或 key 变了，state 被丢弃。',
     '最常见的坑：在组件内部定义组件。每次渲染它都是新类型，state 和焦点都会丢失。',
     '先试结构性优化：把 state 下移到真正用它的小组件里，其他组件就不会跟着重新渲染。',
+    '想隐藏界面又保留 state，用 <code>&lt;Activity mode="hidden"&gt;</code>：state 和 DOM 都留着，effect 被清理，显示时重新运行。条件渲染会丢 state，CSS 隐藏不会清理 effect。',
     '严格模式只在开发环境生效：多调用一次组件函数、初始化函数和更新函数，并让 effect 多做一轮。它用来暴露渲染里的副作用。',
   ],
   quiz: [
@@ -48,6 +51,18 @@ export default {
       answer: 1,
       explain:
         '自动批处理：同一个事件中的多次 set 函数调用合并为一次渲染，三个更新都生效。最后一项是 React 17 的行为。React 18 起，setTimeout 和 Promise 回调里也会批处理。',
+    },
+    {
+      q: '标签页 B 的内容放在 &lt;Activity mode={tab === "b" ? "visible" : "hidden"}&gt; 里，里面有一个输入框和一个订阅消息的 effect。用户在输入框里打了字，然后切到标签页 A。B 里的输入框和 effect 分别怎样？',
+      options: [
+        '输入框的文字保留，effect 被清理；切回 B 时 effect 重新运行',
+        '输入框的文字丢失，effect 被清理',
+        '输入框的文字保留，effect 继续运行，和 CSS 隐藏一样',
+        '输入框的文字丢失，effect 继续运行',
+      ],
+      answer: 0,
+      explain:
+        'Activity 隐藏时保留 state 和 DOM，所以文字还在，但会清理 effect，订阅就不会在后台继续占资源。切回 visible 时，effect 重新运行。最迷惑的是第三项：它描述的是 CSS 隐藏（display: none）。CSS 只改样式，React 不知道界面被隐藏，effect 一直在运行。',
     },
   ],
   exercise: {
@@ -235,6 +250,16 @@ function Page() {
         explain: 'state 属于 Counter，更新只会让 Counter 和它的后代重新渲染。父组件和兄弟组件不受影响。',
       },
       pkey: 'rendering|谁被重新渲染了？',
+    },
+    三种隐藏方式: {
+      note: '条件渲染的输入框在隐藏时被卸载，文字丢失，effect 被清理，显示时重新开始。CSS 隐藏的输入框保留文字，但 effect 没有任何日志：React 不知道它被隐藏，effect 一直在运行。Activity 里的输入框保留文字，同时 effect 被清理，显示时又运行一次。',
+      predict: {
+        q: '在三个输入框里各打几个字，点“隐藏”，再点“显示”。哪些输入框里的字还在？',
+        options: ['三个都在', '只有条件渲染的丢了，另外两个还在', '只有 Activity 里的还在', '三个都丢了'],
+        answer: 1,
+        explain: '条件渲染把组件卸载了，state 随之丢失。CSS 隐藏只改样式，组件一直挂载着。Activity 隐藏时保留 state 和 DOM，只清理 effect。',
+      },
+      pkey: 'rendering|三种隐藏方式',
     },
     严格模式下的组件函数: {
       note: '控制台里“Demo 函数被调用”会成对出现：严格模式把组件函数多调用一次。去掉 &lt;StrictMode&gt; 再运行，每次只打印一行。生产环境没有这次额外调用。',
