@@ -4,21 +4,21 @@ export default {
   id: 'react-19',
   runtime: 19,
   stage: 3,
-  title: 'React 19 新特性',
-  mins: 53,
-  summary: 'Actions、useActionState、useOptimistic、use()、ref 作为 prop 等新能力。',
+  title: 'Actions：异步提交、表单与乐观更新',
+  mins: 55,
+  summary: 'Action、form action、useActionState、useFormStatus、useOptimistic：把异步提交的 pending、错误、重置和乐观值交给 React。',
   goals: [
     '能说出一次异步提交要管理的 4 件事，以及 React 19 用哪个 API 接管每一件',
-    '能把一个 React 18 的提交处理函数改写成 useActionState + form action',
-    '能读懂 useOptimistic 代码，并预测成功和失败时界面的变化',
-    '能判断 use() 和 useFormStatus 该在哪个组件里调用',
+    '能把手写 pending、错误和重置的提交处理函数改写成 useActionState + form action',
+    '能读懂 useOptimistic 代码，并预测成功、失败和连续点击时界面的变化',
+    '能判断 useFormStatus 该在哪个组件里调用，以及一次失败该返回错误值还是抛错',
   ],
   keyPoints: [
-    '一次异步提交要管 4 件事：提交中（pending）、错误和结果、成功后重置表单、乐观值。React 18 要自己写 state；React 19 用 Action 统一接管。',
-    '<code>startTransition</code> 可以接收异步函数，这类函数叫 Action。React 自动追踪它的 pending，提前 return 或抛错时也会结束 pending。',
-    '<code>useActionState(action, 初始 state)</code> 返回 <code>[state, formAction, isPending]</code>。Action 的形状是 <code>(上一次的 state, formData) =&gt; 新的 state</code>。',
-    '<code>useOptimistic</code> 在 Action 进行中显示预期结果。Action 结束后，乐观值自动丢弃，界面回到真实 state。',
-    '常见坑：在渲染 form 的组件里调用 <code>useFormStatus</code>，读不到这个 form 的状态；在渲染时新建 Promise 传给 <code>use()</code>，组件会反复挂起。',
+    '一次异步提交要管 4 件事：提交中（pending）、错误和结果、成功后重置表单、乐观值。手写要自己写 state；Action 统一接管。',
+    '<code>startTransition</code> 可以接收异步函数，这类函数叫 Action。React 自动追踪它的 pending，提前 return 或抛错时也会结束 pending。注意：<code>await</code> 之后的 set 函数调用已不在这个 transition 里，要再包一层 <code>startTransition</code>。',
+    '<code>useActionState(action, 初始 state)</code> 返回 <code>[state, formAction, isPending]</code>。Action 的形状是 <code>(上一次的 state, formData) =&gt; 新的 state</code>。Action 结束后，React 重置表单里的非受控字段，出错返回时也一样。',
+    '<code>useOptimistic</code> 在 Action 进行中显示预期结果。Action 结束后，乐观值自动丢弃，界面回到真实 state。<code>addOptimistic</code> 必须在 Action 或 <code>startTransition</code> 里调用。',
+    '常见坑：在渲染 form 的组件里调用 <code>useFormStatus</code>，读不到这个 form 的状态；预期内的失败（如“邮箱已订阅”）抛错，而不是返回错误值，整块界面会被错误边界换掉。',
   ],
   quiz: [
     {
@@ -36,16 +36,28 @@ export default {
         '乐观值只在 Action 进行中有效。Action 结束后，React 丢弃它，界面显示真实值 42。真实值从来没变，所以不用自己回滚，这正是 useOptimistic 省掉的工作。不会变成 41：React 不会“减 1”，它只是不再叠加乐观值。',
     },
     {
-      q: "客户端组件里写 const user = use(fetch('/api/user').then(r =&gt; r.json()))，页面一直显示 Suspense 的 fallback。怎样修？",
+      q: '订阅表单用 useActionState。服务器返回“这个邮箱已经订阅过了”。Action 应该怎样表达这个失败？',
       options: [
-        '用 useMemo 包住这个 Promise，依赖写 []',
-        '在组件外创建 Promise 并缓存（例如由服务端组件或数据请求库提供），通过 props 传入',
-        '用 try/catch 包住 use()，出错时返回默认值',
-        '把组件改成 async 函数，写 await fetch(…)',
+        '在 Action 里 throw new Error(…)，界面会显示这段错误文字',
+        '什么都不用做，React 会自动发现请求失败',
+        '调用 window.alert，然后返回 undefined',
+        '返回 { error: "…" }，组件用 state.error 显示',
       ],
-      answer: 1,
+      answer: 3,
       explain:
-        '每次渲染都新建一个 Promise，use() 每次都等新的 Promise，组件就反复挂起。Promise 要在渲染之外创建并缓存。最有迷惑性的是 useMemo：组件第一次挂载就挂起时，React 会丢掉这次渲染的 Hook 数据，useMemo 存不住它。use() 不能放进 try/catch；客户端组件也不能是 async 函数。',
+        '“邮箱已订阅”是预期内的失败，用返回值表达，组件从 state 里读出来显示。Action 抛出的错误不会变成 state：它交给最近的错误边界，整块界面会被边界的 fallback 换掉。React 不会替你判断业务上的失败，也不会自动发现。',
+    },
+    {
+      q: '点赞按钮的 onClick 里直接调用 addOptimistic(1)。这次调用没有放进 startTransition，也不在表单的 action 里。会怎样？',
+      options: [
+        '数字加 1 并一直保持，要自己写代码回滚',
+        '抛出错误，页面崩溃',
+        '开发模式下控制台警告：乐观更新发生在 transition 或 action 之外；界面上的数字没有变',
+        '照常工作，Action 结束时自动回滚',
+      ],
+      answer: 2,
+      explain:
+        'useOptimistic 的乐观值依附在 Action 上：Action 结束，它才知道什么时候丢弃。没有 Action，乐观值没有“生命周期”，React 在开发模式下警告“An optimistic state update occurred outside a transition or action”，并且不显示乐观值。修法：把调用放进 startTransition，或者放进表单的 action 函数。',
     },
   ],
   exercise: {
@@ -243,21 +255,27 @@ function App() {
         'useActionState 调用 action 时，传入 <code>(previousState, formData)</code>。这里第一个参数其实是上一次的 state（第一次是 null）。改成 <code>async (prev, formData) =&gt; …</code> 即可。',
     },
     {
-      q: `评论区一直显示 fallback，不停地重新请求。哪种改法是对的？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">'use client';
+      q: `提交返回后，有一次渲染里 name 已经是“新名字”，isPending 却仍是 true，按钮还显示“提交中…”。怎样让 name 的更新和 Action 的结束一起提交？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Rename() {
+  const [name, setName] = useState('旧名字');
+  const [isPending, startTransition] = useTransition();
 
-function Comments({ postId }) {
-  const comments = use(fetchComments(postId)); // 返回新的 Promise
-  return comments.map(c =&gt; &lt;p key={c.id}&gt;{c.text}&lt;/p&gt;);
+  function save() {
+    startTransition(async () =&gt; {
+      await api.rename('新名字');
+      setName('新名字');
+    });
+  }
+  …
 }</code></pre></div>`,
       options: [
-        '在服务端组件里调用 fetchComments(postId)，把 Promise 作为 prop 传给 Comments，再 use 它',
-        '改成 use(useMemo(() => fetchComments(postId), [postId]))',
-        '把 use(fetchComments(postId)) 移进 useEffect 里调用',
-        '用 try/catch 包住 use(…)，出错时返回空列表',
+        '把 setName 移到 await 之前',
+        '把 isPending 改成自己用 useState 管理',
+        'await 之后，用 startTransition(() => setName(…)) 再包一层',
+        '去掉 async，改成普通函数',
       ],
-      answer: 0,
+      answer: 2,
       explain:
-        '问题在于每次渲染都新建 Promise。Promise 完成后 React 重新渲染 Comments，又得到一个未完成的新 Promise，于是再次挂起。Promise 要在渲染之外创建，并且保持同一个对象：由服务端组件创建后传入，或者用按 postId 缓存请求的函数。最迷惑的是 useMemo：组件第一次挂载就挂起，这次渲染没有提交，useMemo 记住的值会被丢掉，重试时又新建一个 Promise。use 也不能在 effect 里调用，也不能放在 try/catch 里。',
+        '<code>await</code> 之后，这个函数已经不在 transition 里了，setName 成了普通的紧急更新，所以会比 Action 的结束更早渲染。再包一层 <code>startTransition</code>，它就重新成为 transition 更新，和 Action 的结束一起提交。把 setName 移到 await 之前，会在服务器确认之前就显示新名字，失败时也不会回滚。自己管 pending 等于放弃 Action。去掉 async 就没有 await 可等了。',
     },
     {
       q: `在 React 19 中，输入“买菜”并提交，saveTodo 成功完成后，输入框里是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">async function add(formData) {
@@ -275,15 +293,18 @@ function Comments({ postId }) {
     },
   ],
   plays: {
-    'useOptimistic：先显示，失败再回滚': {
-      note: '① 点击时立刻调用 addOptimistic(1)，界面马上显示 43。② 服务器成功时，把真实值 likes 加 1。③ Action 结束时，React 自动丢弃乐观值，不用自己写。失败时真实值没变，数字回到 42，这就是“回滚”。',
+    'Action：异步函数当 transition': {
+      note: '点“保存（再包一层）”：控制台里，name 变成“新名字”的那一次渲染，isPending 同时变回 false。点“重置”后再点“保存（不再包）”：服务器返回后，会先出现一次 isPending 仍为 true、name 已是“新名字”的渲染，然后 isPending 才变回 false。原因：await 之后的 setName 不在 transition 里，是普通的紧急更新，比 Action 的结束更早渲染。',
+    },
+    'useActionState 与 form action': {
+      note: '输入不含 @ 的内容提交，出错信息显示后，输入框被清空：Action 结束时，React 会重置表单里的非受控字段，出错返回时也一样。成功时同理。要保留用户的输入，把它放进返回的 state，用 defaultValue 填回去。',
       predict: {
-        q: '点击“点赞（会失败）”。点击后立刻和 1.2 秒后，数字分别是？',
-        options: ['42，42', '43，然后回到 42', '43，43', '42，然后变成 43'],
+        q: '输入 abc（没有 @）并点“订阅”。0.8 秒后出现“邮箱格式不对”。此时输入框里是什么？',
+        options: ['还是 abc', '空的', '红色的 abc', '输入框消失了'],
         answer: 1,
-        explain: '乐观值立刻加 1。服务器失败后，Action 结束，React 丢弃乐观值，界面回到真实值 42。',
+        explain: 'Action 结束后，React 重置表单里的非受控字段，出错返回时也一样。输入框被清空，用户要重新输入。',
       },
-      pkey: 'react-19|用 React 18 模拟乐观更新的效果',
+      pkey: 'react-19|useActionState 与 form action',
     },
     'useFormStatus：按钮写在哪里': {
       note: 'useFormStatus 读取的是“上层最近的 form”的状态。按钮 B 在 SubmitB 里，SubmitB 渲染在 form 内部，所以 pending 为 true。App 本身渲染 form，它的上层没有 form，所以按钮 A 读到的 pending 始终是 false，也不会报错。修法：把按钮拆成 form 内部的子组件。',
@@ -295,8 +316,45 @@ function Comments({ postId }) {
       },
       pkey: 'react-19|useFormStatus：按钮写在哪里',
     },
+    '手写版乐观更新（对照用）': {
+      note: '这是不用 useOptimistic 的写法：多存一个 pending 数字，显示 likes + pending。成功时 likes 加 1，失败时只显示错误；两种情况下，finally 里都要手动把 pending 减 1。漏写 finally，数字就会一直停在 43。',
+      predict: {
+        q: '点击“点赞（会失败）”。点击后立刻和 1.2 秒后，数字分别是？',
+        options: ['42，42', '43，然后回到 42', '43，43', '42，然后变成 43'],
+        answer: 1,
+        explain: 'pending 立刻加 1，界面显示 43。服务器失败后，finally 把 pending 减回 0，真实值 likes 没变，界面回到 42。',
+      },
+      pkey: 'react-19|用 React 18 模拟乐观更新的效果',
+    },
+    'useOptimistic：先显示，失败再回滚': {
+      note: '① 点击时立刻调用 addOptimistic(1)，界面马上显示 43。② 服务器成功时，把真实值 likes 加 1。③ Action 结束时，React 自动丢弃乐观值，不用自己写。失败时真实值没变，数字回到 42，这就是“回滚”。连续点击时，多个 Action 会一起结束、一起提交：第二个 Action 结束之前，真实值不变，乐观值保持叠加。',
+      predict: {
+        q: '先点一次“点赞（会成功）”，约 0.6 秒后再点一次。从第一次点击算起约 1.4 秒时（第一次的请求已经返回，第二次的还没有），数字是？',
+        options: ['42', '43', '44', '先变成 43，再变回 44'],
+        answer: 2,
+        explain:
+          '两个 Action 同时在进行。React 要等它们都结束，才一起提交真实值，所以第一次请求返回时，界面没有变化：乐观值仍然叠加，显示 44。两个 Action 都结束后，真实值才变成 44。',
+      },
+      pkey: 'react-19|useOptimistic：先显示，失败再回滚',
+    },
+    'Action 抛错与返回错误值': {
+      note: '输入 bad：Action 返回 { error }，错误文字显示在表单下面，表单还在。输入 boom：Action 抛出的错误不会存进 state，而是交给最近的错误边界，整个表单被边界的 fallback 换掉。所以预期内的失败要用返回值表达。',
+      predict: {
+        q: '输入 boom 并点“保存”。0.4 秒后，界面是什么？',
+        options: [
+          '表单还在，下面显示红色的“服务器崩溃了”',
+          '表单被换成错误边界的内容：“错误边界接住了：服务器崩溃了”',
+          '界面不变，只有控制台报错',
+          '按钮一直显示“提交中…”',
+        ],
+        answer: 1,
+        explain:
+          'Action 抛出的错误不会变成 state。React 把它交给最近的错误边界，边界渲染它的 fallback，整个表单被换掉。想让错误显示在表单下面，要在 Action 里返回错误值，就像输入 bad 那样。',
+      },
+      pkey: 'react-19|Action 抛错与返回错误值',
+    },
     'use() 读取 Promise，配合 Suspense': {
-      note: '同一个 id 的 Promise 缓存在组件外面，所以是同一个对象。React 记住了它已经完成，再次 use 它时直接返回结果，不会再暂停。第一次读取 Bob 的 Promise 还没完成，所以显示 fallback。如果 fetchUser 每次都新建 Promise，切回 Alice 也要再等 1 秒，甚至反复挂起。',
+      note: '同一个 id 的 Promise 缓存在组件外面，所以是同一个对象。React 记住了它已经完成，再次 use 它时直接返回结果，不会再暂停。第一次读取 Bob 的 Promise 还没完成，所以显示 fallback。这一项的完整讲解在《Suspense 数据获取与资源模式》。',
       predict: {
         q: '页面打开后等 Alice 出现，点“看 Bob”，等 Bob 出现，再点“看 Alice”。最后这一次点击后，页面会显示“加载中…”吗？',
         options: ['不会，Alice 的内容立刻出现', '会，要再等 1 秒', '会，但只闪一下', '报错'],
@@ -306,7 +364,7 @@ function Comments({ postId }) {
       pkey: 'react-19|use() 读取 Promise，配合 Suspense',
     },
     'Activity：隐藏界面，保留 state': {
-      note: '条件渲染的标签 A 在切走时被卸载，state 丢失，effect 被清理。Activity 隐藏的标签 B 只是被隐藏：state 保留，effect 被清理，切回来时 effect 重新运行。看下面的控制台：B 的 effect 在隐藏时被清理，显示时又运行。',
+      note: '条件渲染的标签 A 在切走时被卸载，state 丢失，effect 被清理。Activity 隐藏的标签 B 只是被隐藏：state 保留，effect 被清理，切回来时 effect 重新运行。看下面的控制台：B 的 effect 在隐藏时被清理，显示时又运行。这一项的完整讲解在《渲染机制》。',
       predict: {
         q: '在标签 A 的输入框输入“甲”，切到标签 B，在它的输入框输入“乙”，再依次切回 A、切回 B。此时 A 和 B 的输入框里分别是什么？',
         options: ['A：甲，B：乙', 'A：空，B：乙', 'A：空，B：空', 'A：甲，B：空'],
@@ -316,16 +374,16 @@ function Comments({ postId }) {
       pkey: 'react-19|Activity：隐藏界面，保留 state',
     },
     'ref 作为普通 prop': {
-      note: 'FancyInput 是函数组件，直接从 props 里取 ref，没有用 forwardRef。点“卸载方框”，看控制台：卸载时 React 调用的是 ref 回调返回的清理函数。React 18 中卸载时会以 null 再调用回调，上面的 node.tagName 就会报错。',
+      note: 'FancyInput 是函数组件，直接从 props 里取 ref，没有用 forwardRef。点“卸载方框”，看控制台：卸载时 React 调用的是 ref 回调返回的清理函数。维护 React 18 项目时：18 要用 forwardRef，卸载时 ref 回调会以 null 再调用一次。这一项的完整讲解在《DOM 逃生舱》。',
     },
     'Context 直接当 Provider': {
-      note: '这里写的是 <ThemeContext value={theme}>，没有 .Provider。React 18 里这样写不会生效。',
+      note: '这里写的是 <ThemeContext value={theme}>，没有 .Provider。React 18 要写 .Provider。这一项的完整讲解在《Context》。',
     },
     'useEffectEvent：读最新值但不重启 effect': {
-      note: '点“换房间”：控制台出现“断开”和“连接到”。点“换主题”：什么也不重启，但下一次连接完成时，onConnected 读到的是最新的主题。不用 useEffectEvent 的话，theme 要写进依赖数组，换主题就会断开重连。',
+      note: '点“换房间”：控制台出现“断开”和“连接到”。点“换主题”：什么也不重启，但下一次连接完成时，onConnected 读到的是最新的主题。不用 useEffectEvent 的话，theme 要写进依赖数组，换主题就会断开重连。这一项的完整讲解在《闭包陷阱与 Effect 依赖》。',
     },
     'ViewTransition：进入和离开的动画': {
-      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。',
+      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。这一项的完整讲解在《并发特性》。',
     },
   },
 } satisfies Lesson;

@@ -38,13 +38,13 @@ function App() {
   const box = { display: 'inline-block', padding: '6px 12px', margin: 4, border: '1px solid #888', borderRadius: 6, cursor: 'pointer' };
   return (
     <div>
+      <p style={{ fontSize: 13 }}>提示：先点击这一行文字，再按 Tab。</p>
       {/* ① 只有 onClick 的 div */}
       <div style={box} onClick={() => setA(a + 1)}>① div：{a}</div>
       {/* ② 加了 role 和 tabIndex 的 div */}
       <div style={box} role="button" tabIndex={0} onClick={() => setB(b + 1)}>② div + role：{b}</div>
       {/* ③ 真正的 button */}
       <button style={box} onClick={() => setC(c + 1)}>③ button：{c}</button>
-      <p style={{ fontSize: 13 }}>提示：先点击这一行文字，再按 Tab。</p>
     </div>
   );
 }
@@ -78,7 +78,7 @@ function App() {
 
 每个输入框都要有一个关联的 `<label>`。关联后，点击标签文字也能聚焦输入框。读屏软件进入输入框时会读出标签。
 
-关联方法：`<label htmlFor={id}>` 指向 `<input id={id}>`。id 要在整个页面唯一。组件可能被渲染多次，所以不要写死 id。用 `useId` 生成（在“DOM 逃生舱”一课学过）。
+关联方法：`<label htmlFor={id}>` 指向 `<input id={id}>`。id 要在整个页面唯一。组件可能被渲染多次，所以不要写死 id。用 `useId` 生成（在“DOM 逃生舱”一课学过）。它返回的字符串形如 `_r_0_`。格式在不同的 React 版本里变过，不要依赖它的具体样子，也不要自己解析它。
 
 ```jsx play title="label、useId 与 aria-describedby"
 import { useState, useId } from 'react';

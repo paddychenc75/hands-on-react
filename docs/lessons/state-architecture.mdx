@@ -65,7 +65,7 @@ title: "状态管理架构"
 
 ## 外部 Store 的原理
 
-Redux、Zustand 这类库把状态存在 React **外部**的一个普通 JS 对象里。组件需要：① 读取当前值；② 订阅变化，在变化时重新渲染。React 18 为此提供了专用 Hook：`useSyncExternalStore`。它还能避免并发渲染中的“撕裂”问题。撕裂指同一时刻不同组件读到不同的值。
+Redux、Zustand 这类库把状态存在 React **外部**的一个普通 JS 对象里。组件需要：① 读取当前值；② 订阅变化，在变化时重新渲染。React 为此提供了专用 Hook：`useSyncExternalStore`（React 18 引入）。它还能避免并发渲染中的“撕裂”问题。撕裂指同一时刻不同组件读到不同的值。
 
 ```jsx
 const value = useSyncExternalStore(
@@ -130,7 +130,7 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-`getSnapshot` 必须在 store 没变化时返回**同一个引用**。如果 selector 每次都返回新对象（如 `s => ({ a: s.a, b: s.b })`），React 会认为值一直在变。在本课的迷你实现和 Zustand v5 中，结果是无限渲染（Zustand v4 只是多渲染几次，行为不同）。Zustand 为此提供了 `useShallow`。
+`getSnapshot` 必须在 store 没变化时返回**同一个引用**。如果 selector 每次都返回新对象（如 `s => ({ a: s.a, b: s.b })`），React 会认为值一直在变。在本课的迷你实现和 Zustand v5 中，结果是无限渲染：开发模式先警告 `The result of getSnapshot should be cached to avoid an infinite loop`，随后报错 `Maximum update depth exceeded`（Zustand v4 只是多渲染几次，行为不同）。Zustand 为此提供了 `useShallow`。
 
 </CallBox>
 
