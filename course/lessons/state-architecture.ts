@@ -5,6 +5,7 @@ export default {
   stage: 3,
   title: '状态管理架构',
   mins: 40,
+  localMins: 30,
   summary: '区分服务端状态与客户端状态，理解外部 store 的原理，亲手实现一个，再用真的 Zustand 做持久化。',
   goals: [
     '能把一个 state 归类（局部、服务端、全局客户端、URL、表单），并选出合适的工具',
