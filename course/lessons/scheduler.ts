@@ -3,34 +3,35 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'scheduler',
   stage: 5,
+  runtime: 19,
   title: '调度、优先级与撕裂',
   mins: 40,
   summary: '看清 React 怎样把渲染切成小片、给更新排优先级、打断再重来，以及外部 store 为什么会在并发渲染中“撕裂”。',
   goals: [
     '能解释调度器为什么用 MessageChannel 每约 5ms 让出一次主线程，而不用微任务（选读：偏原理）',
-    '能判断一个更新属于哪一档优先级，并预测它在 React 18 中会不会被切片',
+    '能判断一个更新属于哪一档优先级，并预测它会不会被切片',
     '能诊断“过渡更新被打断后从头重来”带来的重复计算和渲染期副作用',
     '能写出一个带两档优先级、可打断并重新开始的迷你调度器，并用 useSyncExternalStore 消除撕裂',
   ],
   keyPoints: [
     '时间切片：渲染拆成很多小片，每片约 5ms。片与片之间，调度器用 MessageChannel 预约一个宏任务，浏览器趁机处理输入和绘制。微任务不会让出主线程。',
-    '每个更新带一个 lane（优先级）。档位从高到低：同步/离散事件 → 连续事件 → 默认 → 过渡 → 空闲。React 18 只切片过渡、重试和空闲这几档，其余同步完成。',
+    '每个更新带一个 lane（优先级）。档位从高到低：同步/离散事件 → 连续事件 → 默认 → 过渡 → 空闲。React 只切片过渡、重试和空闲这几档，其余同步完成。',
     '同步档或连续事件档的更新到来时，React 丢弃过渡渲染的进度，先提交紧急更新，再从根开始重新渲染过渡更新。默认档更新不打断过渡渲染。所以渲染函数可能执行多次而只提交一次。',
     '提交阶段一口气完成，不能被打断。否则用户会看到一半新、一半旧的 DOM。',
     '撕裂：同一次提交里，界面不同部分显示了同一数据源的不同版本。useSyncExternalStore 在提交前再读一次快照，不一致就同步重新渲染，代价是这部分更新失去并发能力。',
   ],
   quiz: [
     {
-      q: '“导出报表”按钮先请求数据，在请求回调里调用 <code>setReport(data)</code>。这次渲染需要 300ms，期间页面卡住。同事说：“React 18 有并发渲染，应该会自动切片，卡顿一定另有原因。”哪个判断正确？',
+      q: '“导出报表”按钮先请求数据，在请求回调里调用 <code>setReport(data)</code>。这次渲染需要 300ms，期间页面卡住。同事说：“React 有并发渲染，应该会自动切片，卡顿一定另有原因。”哪个判断正确？',
       options: [
-        '同事说得对：React 18 的所有更新都会被切片',
-        '请求回调里的更新属于默认档，React 18 不会切片它；把 setReport 放进 startTransition 才会切片',
+        '同事说得对：所有更新都会被切片',
+        '请求回调里的更新属于默认档，React 不会切片它；把 setReport 放进 startTransition 才会切片',
         '应该用 flushSync 包住 setReport，同步渲染就不会卡',
         '应该把 report 放进外部 store，用 useSyncExternalStore 读取',
       ],
       answer: 1,
       explain:
-        'React 18 只切片过渡、重试和空闲几档。请求回调中的更新是 DefaultLane，按同步方式一次渲染完，所以是一个 300ms 的长任务。最有迷惑性的是第一项：“并发渲染”是能力，不是默认行为，需要用 startTransition 或 useDeferredValue 开启。flushSync 和 useSyncExternalStore 都只会让渲染更同步。',
+        'React 只切片过渡、重试和空闲几档。请求回调中的更新是 DefaultLane，按同步方式一次渲染完，所以是一个 300ms 的长任务。最有迷惑性的是第一项：“并发渲染”是能力，不是默认行为，需要用 startTransition 或 useDeferredValue 开启。flushSync 和 useSyncExternalStore 都只会让渲染更同步。',
     },
     {
       q: '你写了一个把 1 万条数据分批处理的函数。每批处理后，要让浏览器有机会响应点击。下面哪种“让出”写法有效？',
@@ -57,7 +58,7 @@ export default {
         '紧急更新可能改了过渡渲染读过的 state，旧进度可能已经过期。所以 React 丢弃没有提交的 Fiber 树，从根重新开始。过渡更新本身还在队列里，不会被放弃。最有迷惑性的是“继续做”：它看起来更省，但会把基于新旧两份 state 算出的结果拼在一起。提交一半更不可能：提交阶段不能被打断。',
     },
     {
-      q: '团队自己写的购物车 store 是一个模块级的可变对象。组件在渲染时直接读 <code>cart.count</code>。升级到 React 18 并给商品列表加上 startTransition 后，偶尔看到页头和列表的数量不一致。最合适的修法是？',
+      q: '团队自己写的购物车 store 是一个模块级的可变对象。组件在渲染时直接读 <code>cart.count</code>。给商品列表加上 startTransition 后，偶尔看到页头和列表的数量不一致。最合适的修法是？',
       options: [
         '去掉 startTransition，回到同步渲染',
         '在每个组件里用 useEffect 订阅 store，把 count 存进 useState',
@@ -471,7 +472,7 @@ function createScheduler() {
   },
   checkOnly: [
     {
-      q: `用户点击一次按钮。React 18 会进行几次渲染并提交？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function handleClick() {
+      q: `用户点击一次按钮。React 会进行几次渲染并提交？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function handleClick() {
   setA(1);
   startTransition(() =&gt; {
     setB(1);

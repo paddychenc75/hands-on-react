@@ -3,29 +3,30 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'suspense-data',
   stage: 5,
+  runtime: 19,
   title: 'Suspense 数据获取与资源模式',
-  mins: 38,
-  summary: '亲手写出一个能配合 Suspense 的数据层：资源缓存、并行预取、用过渡更新保留旧界面、出错后重试。',
+  mins: 46,
+  summary: '用 React 19 的 use() 读取 Promise，亲手写出一个能配合 Suspense 的数据层：Promise 缓存、并行预取、用过渡更新保留旧界面、出错后重试。',
   goals: [
-    '能写出带缓存的 read(key, load)：同一个 key 只请求一次，按状态返回数据、抛出 Promise 或抛出错误',
+    '能用 use() 读取 Promise 和 Context，并写出带缓存的 getPromise(key, load)：同一个 key 只请求一次',
     '能诊断一个页面的请求瀑布，并用“先发请求，再渲染”把串行请求改成并行',
     '能用 startTransition 让已经显示的内容在切换时保留，而不是闪回 fallback',
     '能设计 Suspense 与错误边界的位置，并实现“清掉失败的缓存，再重置边界”的重试',
   ],
   keyPoints: [
-    '机制：组件在渲染时读取数据。数据没到，就抛出一个 Promise。最近的 Suspense 显示 fallback；Promise 完成后，React 重新渲染这一部分。',
-    '缓存必须放在组件外。第一次挂载就挂起的组件，它的 state、ref、useMemo 都会被丢弃。在组件里创建 Promise，每次重试都是一个新请求。',
+    '机制：组件在渲染时调用 use(promise)。Promise 没完成，组件挂起，最近的 Suspense 显示 fallback；完成后 React 重新渲染这一部分；被拒绝则抛给错误边界。use 可以写在条件里，也能读 Context。',
+    'Promise 必须在组件外创建和缓存。第一次挂载就挂起的组件，它的 state、ref、useMemo 都会被丢弃。在组件里创建 Promise，每次重试都是一个新请求，永远挂起。',
     'Suspense 不会自动消除瀑布：子组件要等父组件不再挂起才会渲染。在点击或路由切换时就把所有请求发出去（render-as-you-fetch）。',
     '已经显示内容的边界再次挂起时，默认换成 fallback。把 set 函数调用放进 startTransition，React 会保留旧界面，并让 isPending 为 true。',
-    '请求失败时，read 抛出错误，交给错误边界。重试要做两件事：从缓存中删掉失败的记录，再重置边界。',
+    '请求失败时，use 抛出错误，交给错误边界。重试要做两件事：从缓存中删掉失败的 Promise，再重置边界。React 19 会给 fallback 之后的内容提交节流，约 300ms。',
   ],
   quiz: [
     {
-      q: '同事写了一个支持 Suspense 的 Hook：<code>function useUser(id) { const [p] = useState(() =&gt; fetchUser(id)); return readPromise(p); }</code>。页面第一次打开时一直显示 fallback，网络面板里请求不断重复。原因是？',
+      q: '同事写了一个支持 Suspense 的 Hook：<code>function useUser(id) { const [p] = useState(() =&gt; fetchUser(id)); return use(p); }</code>。页面第一次打开时一直显示 fallback，网络面板里请求不断重复。原因是？',
       options: [
         'useState 的初始化函数每次渲染都会执行',
         '组件第一次挂载就挂起，没有被提交，useState 保存的 Promise 随这次渲染一起被丢弃，重试时又创建新请求',
-        'readPromise 应该返回 Promise，而不是抛出 Promise',
+        'use 只能读 Context，不能读 Promise',
         'fetchUser 要放进 useEffect 里调用',
       ],
       answer: 1,
@@ -60,13 +61,13 @@ export default {
       q: '文章区请求失败，错误边界显示“重试”按钮。点击后，边界只执行了 <code>this.setState({ error: null })</code>。会怎样？',
       options: [
         '重新发出请求，成功后显示文章',
-        '立刻又显示错误：缓存里仍是失败的记录，read 再次抛出同一个错误',
+        '立刻又显示错误：缓存里仍是被拒绝的 Promise，use 再次抛出同一个错误',
         '一直显示 fallback',
         'React 报错：错误边界不能重置自己的 state',
       ],
       answer: 1,
       explain:
-        '重置边界只是让 children 重新渲染。read 在缓存里找到 status 为 error 的记录，直接抛出同一个错误，不会发新请求。正确的重试先删掉这条缓存记录，再重置边界。第一项是最常见的误解：它假设“重新渲染”就等于“重新请求”。',
+        '重置边界只是让 children 重新渲染。缓存里还是那个被拒绝的 Promise，use 读到它，直接抛出同一个错误，不会发新请求。正确的重试先删掉这个缓存项，再重置边界。第一项是最常见的误解：它假设“重新渲染”就等于“重新请求”。',
     },
     {
       q: '个人主页有三块：用户信息（必需）、最近文章、推荐关注。推荐关注的接口经常超时。Suspense 和错误边界怎样放置最合适？',
@@ -80,10 +81,22 @@ export default {
       explain:
         '三块内容互不依赖，用户可以单独使用其中任何一块。各包一对边界后，推荐关注超时或失败，只影响它自己，也能单独重试。整页一个边界会让最慢、最不稳定的接口拖住整页。第三项看似省事，但用户信息和文章没有自己的边界，它们挂起或失败会影响更大的范围。每一项都包会导致布局不停跳动。',
     },
+    {
+      q: '组件只在 <code>isLoggedIn</code> 为真时才需要读取收藏列表的 Promise，请求失败时要显示“暂时无法加载”。哪种写法符合 use 的规则？',
+      options: [
+        '<code>try { const list = use(favoritesPromise); … } catch { return &lt;p&gt;暂时无法加载&lt;/p&gt;; }</code>',
+        'use 不能写在 if 里，必须改用 useContext 再读取',
+        '把组件写成 async 函数，用 await 读取 favoritesPromise',
+        '<code>if (isLoggedIn) { const list = use(favoritesPromise); … }</code>，失败交给外层的错误边界',
+      ],
+      answer: 3,
+      explain:
+        'use 可以写在 if 里，失败时抛出的错误由最近的错误边界接住，所以是最后一项。最有迷惑性的是 try/catch：use 不能放在 try/catch 里，挂起本身也是靠抛出实现的，自己捕获会破坏它；要提供失败时的界面，用错误边界，或者在创建 Promise 时用 .catch() 给出默认值。useContext 读取的是 Context，不是 Promise。浏览器里的客户端组件不能写成 async 函数。',
+    },
   ],
   exercise: {
-    task: '<p>个人主页现在先加载用户信息（400ms），再加载文章（800ms），共约 1.2 秒。<code>read</code> 也还没有缓存。按下面的要求修改，不要修改模拟接口 <code>api</code>：</p><ol class="task-steps"><li>实现带缓存的 <code>read(key, load)</code>：同一个 key 只请求一次；按状态返回数据、抛出 Promise 或抛出错误。</li><li>消除瀑布：用户和文章的两个请求要同时发出（相差小于 50ms）。</li><li>用户信息和文章各用一个 Suspense。文章的 fallback 是 <code>&lt;p className="fallback"&gt;加载文章…&lt;/p&gt;</code>。用户信息先到，就先显示。</li><li>点“下一位用户”时，用过渡更新保留旧内容，不要闪出任何 <code>.fallback</code>。切换期间显示 <code>&lt;small id="pending"&gt;切换中…&lt;/small&gt;</code>。</li><li>文章请求失败时，只有文章区显示错误，用户信息照常显示。点“重试”要重新请求，并显示文章。错误边界已经写好，想一想它的 <code>onRetry</code> 该做什么。</li></ol>',
-    starter: `import { Suspense, useState, useTransition, Component } from 'react';
+    task: '<p>个人主页现在先加载用户信息（400ms），再加载文章（800ms），共约 1.2 秒。组件用 <code>use</code> 读取 <code>getPromise</code> 返回的 Promise，但 <code>getPromise</code> 还没有缓存。按下面的要求修改，不要修改模拟接口 <code>api</code>：</p><ol class="task-steps"><li>实现带缓存的 <code>getPromise(key, load)</code>：同一个 key 只请求一次，每次返回同一个 Promise；失败的 Promise 也留在缓存里。</li><li>消除瀑布：用户和文章的两个请求要同时发出（相差小于 50ms）。</li><li>用户信息和文章各用一个 Suspense。文章的 fallback 是 <code>&lt;p className="fallback"&gt;加载文章…&lt;/p&gt;</code>。用户信息先到，就先显示。</li><li>点“下一位用户”时，用过渡更新保留旧内容，不要闪出任何 <code>.fallback</code>。切换期间显示 <code>&lt;small id="pending"&gt;切换中…&lt;/small&gt;</code>。</li><li>文章请求失败时，只有文章区显示错误，用户信息照常显示。点“重试”要重新请求，并显示文章。错误边界已经写好，想一想它的 <code>onRetry</code> 该做什么。</li></ol>',
+    starter: `import { Suspense, use, useState, useTransition, Component } from 'react';
 
 // ---- 模拟接口（不要修改）----
 const NAMES = ['阿青', '小林', '老周', '美玲', '大伟', '思思', '阿杰', '晓燕', '国强', '小米'];
@@ -99,12 +112,12 @@ const api = {
   },
 };
 
-// ---- 资源缓存 ----
+// ---- Promise 缓存 ----
 const cache = new Map();
 
-// 现在的 read 没有缓存：每次调用都发一个新请求，然后挂起
-function read(key, load) {
-  throw load();
+// 现在的 getPromise 没有缓存：每次调用都发一个新请求
+function getPromise(key, load) {
+  return load();
 }
 
 // ---- 错误边界（已经写好）----
@@ -132,7 +145,7 @@ class ErrorBoundary extends Component {
 
 // ---- 页面 ----
 function UserInfo({ userId }) {
-  const user = read('user:' + userId, () => api.fetchUser(userId));
+  const user = use(getPromise('user:' + userId, () => api.fetchUser(userId)));
   return (
     <section>
       <h2 id="user">{user.name}</h2>
@@ -142,7 +155,7 @@ function UserInfo({ userId }) {
 }
 
 function Posts({ userId }) {
-  const posts = read('posts:' + userId, () => api.fetchPosts(userId));
+  const posts = use(getPromise('posts:' + userId, () => api.fetchPosts(userId)));
   return <ul id="posts">{posts.map(p => <li key={p}>{p}</li>)}</ul>;
 }
 
@@ -170,7 +183,7 @@ function App() {
     </div>
   );
 }`,
-    solution: `import { Suspense, useState, useTransition, Component } from 'react';
+    solution: `import { Suspense, use, useState, useTransition, Component } from 'react';
 
 // ---- 模拟接口（不要修改）----
 const NAMES = ['阿青', '小林', '老周', '美玲', '大伟', '思思', '阿杰', '晓燕', '国强', '小米'];
@@ -186,28 +199,13 @@ const api = {
   },
 };
 
-// ---- 资源缓存 ----
+// ---- Promise 缓存 ----
 const cache = new Map();
 
-// 取得（必要时创建）一条缓存记录。不抛出，所以也能用来预取
-function getRecord(key, load) {
-  let record = cache.get(key);
-  if (!record) {
-    record = { status: 'pending', value: undefined };
-    record.promise = load().then(
-      value => { record.status = 'done'; record.value = value; },
-      error => { record.status = 'error'; record.value = error; }
-    );
-    cache.set(key, record);
-  }
-  return record;
-}
-
-function read(key, load) {
-  const record = getRecord(key, load);
-  if (record.status === 'pending') throw record.promise;
-  if (record.status === 'error') throw record.value;
-  return record.value;
+// 同一个 key 只创建一次 Promise；失败的 Promise 也留在缓存里。不读取、不挂起，所以也能用来预取
+function getPromise(key, load) {
+  if (!cache.has(key)) cache.set(key, load());
+  return cache.get(key);
 }
 
 const userKey = (id) => 'user:' + id;
@@ -215,8 +213,8 @@ const postsKey = (id) => 'posts:' + id;
 
 // 先发请求，再渲染
 function preloadProfile(id) {
-  getRecord(userKey(id), () => api.fetchUser(id));
-  getRecord(postsKey(id), () => api.fetchPosts(id));
+  getPromise(userKey(id), () => api.fetchUser(id));
+  getPromise(postsKey(id), () => api.fetchPosts(id));
 }
 
 // ---- 错误边界（已经写好）----
@@ -244,12 +242,12 @@ class ErrorBoundary extends Component {
 
 // ---- 页面 ----
 function UserInfo({ userId }) {
-  const user = read(userKey(userId), () => api.fetchUser(userId));
+  const user = use(getPromise(userKey(userId), () => api.fetchUser(userId)));
   return <h2 id="user">{user.name}</h2>;
 }
 
 function Posts({ userId }) {
-  const posts = read(postsKey(userId), () => api.fetchPosts(userId));
+  const posts = use(getPromise(postsKey(userId), () => api.fetchPosts(userId)));
   return <ul id="posts">{posts.map(p => <li key={p}>{p}</li>)}</ul>;
 }
 
@@ -289,31 +287,18 @@ function App() {
   );
 }`,
     exports: ['ProfilePage', 'api'],
-    hint: '分三块想：1. 缓存记录要在第一次 read 时就存进去，并记下 pending、done、error 三种状态。2. 为什么文章要等用户到了才请求？看看 Posts 渲染在谁的里面。3. 重试时，缓存里那条失败的记录还在吗？',
+    hint: '分三块想：1. getPromise 要把第一次创建的 Promise 存进缓存，之后每次返回同一个。2. 为什么文章要等用户到了才请求？看看 Posts 渲染在谁的里面。3. 重试时，缓存里那个失败的 Promise 还在吗？',
     faded: `// （模拟接口、错误边界与起始代码相同，这里省略）
 
 const cache = new Map();
 
-function getRecord(key, load) {
-  let record = cache.get(key);
-  if (!record) {
-    record = { status: 'pending', value: undefined };
-    record.promise = load().then(
-      value => { record.status = 'done'; record.value = value; },
-      /* ✏️ 失败时也要记下状态和错误 */
-    );
-    /* ✏️ 先把记录存进缓存，再返回 */
-  }
-  return record;
-}
-
-function read(key, load) {
-  const record = getRecord(key, load);
-  /* ✏️ pending 时抛出 record.promise；error 时抛出错误；否则返回数据 */
+function getPromise(key, load) {
+  /* ✏️ 缓存里没有这个 key，就调用 load() 创建 Promise 并存进去 */
+  /* ✏️ 返回缓存里的 Promise（每次都是同一个） */
 }
 
 function UserInfo({ userId }) {
-  const user = read('user:' + userId, () => api.fetchUser(userId));
+  const user = use(getPromise('user:' + userId, () => api.fetchUser(userId)));
   return <h2 id="user">{user.name}</h2>;   // Posts 不再放在这里
 }
 
@@ -349,6 +334,7 @@ function App() {
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const { ProfilePage, api } = t.exports;
       t.assert(typeof ProfilePage === 'function', '请保留名为 ProfilePage 的组件，它接收 userId');
       t.assert(api && typeof api.fetchUser === 'function' && typeof api.fetchPosts === 'function', '请保留模拟接口 api，以及它的 fetchUser 和 fetchPosts');
@@ -420,7 +406,7 @@ function App() {
         t.assert(nu > 0, '渲染 ProfilePage 后，没有调用 api.fetchUser。请通过 api.fetchUser(id) 请求用户信息');
         t.assert(
           nu === 1,
-          '同一个用户的信息被请求了 ' + nu + ' 次。read 要把记录存进缓存：同一个 key 只请求一次，之后按状态返回数据或抛出同一个 Promise（步骤 1）',
+          '同一个用户的信息被请求了 ' + nu + ' 次。getPromise 要把 Promise 存进缓存：同一个 key 只请求一次，之后每次返回同一个 Promise（步骤 1）',
         );
         t.assert(
           np === 1,
@@ -460,7 +446,7 @@ function App() {
         const retryBtn = findRetry();
         t.assert(
           retryBtn || reqs('posts', bad).length < 2,
-          '文章请求失败后，read 又发出了新请求，错误一直没有交给错误边界。失败也要记进缓存：status 为 error 时抛出这个错误（步骤 1、5）',
+          '文章请求失败后，又发出了新请求，错误一直没有交给错误边界。失败的 Promise 也要留在缓存里，use 才能每次都抛出同一个错误（步骤 1、5）',
         );
         t.assert(retryBtn, '文章请求失败后，找不到“重试”按钮。文章区要有自己的错误边界（步骤 5）');
         t.assert(userOk(), '文章请求失败时，用户信息也不见了。错误边界只包住文章区，用户信息才能照常显示（步骤 5）');
@@ -468,7 +454,7 @@ function App() {
         const t2 = performance.now();
         while (performance.now() - t2 < 1500 && visible('#posts li').length !== 3) await t.wait(20);
         const tries = reqs('posts', bad).length;
-        t.assert(tries >= 2, '点“重试”后没有重新请求文章：缓存里还留着失败的记录，read 又抛出了同一个错误。onRetry 要先删掉这条缓存记录（步骤 5）');
+        t.assert(tries >= 2, '点“重试”后没有重新请求文章：缓存里还留着失败的 Promise，use 又抛出了同一个错误。onRetry 要先删掉这个缓存项（步骤 5）');
         t.assert(visible('#posts li').length === 3, '点“重试”后，文章没有显示出来（步骤 5）');
         t.assert(!findRetry(), '重试成功后，错误提示应该消失');
         root.unmount();
@@ -521,7 +507,7 @@ function App() {
   checkOnly: [
     {
       q: `fetchUser 和 fetchOrders 各需要 300ms。页面完整显示大约需要多久？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Page({ id }) {
-  const user = read('user:' + id, () =&gt; fetchUser(id));
+  const user = use(getPromise('user:' + id, () =&gt; fetchUser(id)));
   return (
     &lt;Suspense fallback={&lt;Spinner /&gt;}&gt;
       &lt;h1&gt;{user.name}&lt;/h1&gt;
@@ -530,7 +516,7 @@ function App() {
   );
 }
 function Orders({ id }) {
-  const orders = read('orders:' + id, () =&gt; fetchOrders(id));
+  const orders = use(getPromise('orders:' + id, () =&gt; fetchOrders(id)));
   return &lt;List items={orders} /&gt;;
 }</code></pre></div>`,
       options: [
@@ -544,7 +530,7 @@ function Orders({ id }) {
         'Page 读取用户时挂起，它返回的 JSX（包括 Orders）根本没有生成，所以 Orders 的请求要等用户数据到了才发出。这是父子瀑布。注意 Page 在自己的 Suspense 之外读取数据，挂起时由更上层的边界显示 fallback，不会“永远不显示”。修法：在 Page 开头或更早的地方同时发出两个请求。',
     },
     {
-      q: `这个 read 有什么问题？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const cache = new Map();
+      q: `这个手写的 read（抛出 Promise 的资源模式）有什么问题？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const cache = new Map();
 function read(key, load) {
   if (cache.has(key)) return cache.get(key);
   const promise = load().then(data =&gt; {
@@ -595,9 +581,9 @@ function read(key, load) {
   ],
   plays: {
     '资源在哪里创建？': {
-      note: '写法 A 约 0.8 秒后显示句子，只请求 1 次。<br>写法 B 一直显示“加载中…”，请求次数每 0.8 秒加 1。QuoteB 第一次渲染就挂起了，从没被提交过。Promise 完成后 React 重新渲染它，useMemo 没有可以复用的上一次结果，于是又创建一个新请求，又挂起……',
+      note: '写法 A 约 0.8 秒后显示句子，只请求 1 次。<br>写法 B 和写法 C 都一直显示“加载中…”，请求次数不断增加。组件第一次渲染就挂起了，从没被提交过。Promise 完成后 React 重新渲染它，useMemo 没有可以复用的上一次结果，于是又创建一个新 Promise，又挂起……写法 C 同理，每次渲染都新建 Promise。',
       predict: {
-        q: '点“写法 B”。QuoteB 用 useMemo 创建资源，依赖数组是空的。会发生什么？',
+        q: '点“写法 B”。QuoteB 用 useMemo 创建 Promise，依赖数组是空的，再交给 use 读取。会发生什么？',
         options: ['约 0.8 秒后显示句子，和写法 A 一样', '一直显示“加载中…”，请求次数不断增加', '报错：挂起的组件里不能调用 useMemo', '请求 2 次后显示句子'],
         answer: 1,
         explain:
@@ -605,11 +591,57 @@ function read(key, load) {
       },
       pkey: 'suspense-data|资源在哪里创建？',
     },
+    'use 可以写在条件里，也能读 Context': {
+      note: '点“展开”：Panel 在 open 为 false 时提前 return，没有调用 use；变成 true 后才第一次调用 use(ThemeContext)，读到“深色”。两次渲染调用的 Hook 数量不同，如果换成 useState、useContext，React 会报错。use 不是 Hook，没有这个限制。',
+      predict: {
+        q: 'Panel 在 open 为 false 时提前 return，open 变成 true 后才调用 use(ThemeContext)。点“展开”会怎样？',
+        options: [
+          '正常显示“当前主题：深色”',
+          '报错：渲染的 Hook 比上一次多',
+          '显示“当前主题：浅色”（Context 的默认值）',
+          '什么都不显示，因为 use 只能读 Promise',
+        ],
+        answer: 0,
+        explain:
+          'use 可以写在 if、循环和提前 return 之后。它读到最近的 ThemeContext.Provider 提供的值“深色”，而不是 createContext 的默认值。换成 useContext 就会违反 Hook 的调用规则。选项 B 是对 Hook 的惯性记忆：use 不属于 Hook，不要求每次渲染以相同顺序调用。',
+      },
+      pkey: 'suspense-data|use 可以写在条件里，也能读 Context',
+    },
     '请求时间线：瀑布与并行': {
       note: '“瀑布”：文章请求在约 400ms 才开始，全部完成约 1200ms。<br>“并行”：两个请求都在 0ms 开始，约 800ms 全部完成。组件代码一行没改，只是请求提前发出了。',
     },
+    兄弟组件何时渲染: {
+      note: '控制台里 A 先渲染并挂起，“加载提示已显示”之后，React 又渲染了一次 A（预热），紧接着渲染 B，B 的请求也发出了，和 A 只差几毫秒。所以兄弟之间的请求是并行的，约 500ms 后两个同时完成。',
+      predict: {
+        q: 'A 和 B 在同一个 Suspense 里，A 先渲染并挂起。B 的请求什么时候发出？',
+        options: [
+          '几乎同时（相差几毫秒）：React 很快会继续渲染 B',
+          '约 500ms 之后：要等 A 完成，才会渲染 B',
+          'B 先于 A 发出',
+          '不会发出：挂起的边界里不渲染任何组件',
+        ],
+        answer: 0,
+        explain:
+          'React 19 渲染到挂起的组件就先提交加载提示，随后继续渲染（预热）这个边界里剩下的兄弟组件，让它们的请求尽早发出。所以兄弟之间不会串行。选项 B 描述的是父子关系：子组件在父组件挂起时根本没有被创建。',
+      },
+      pkey: 'suspense-data|兄弟组件何时渲染',
+    },
     '切换时：闪回 fallback，还是保留旧界面': {
       note: '等第一位用户出现后，勾选状态下点“下一位用户”：旧卡片变暗，约 1 秒后直接换成新卡片。取消勾选再点：卡片先消失，换成“加载用户…”。',
+    },
+    'Suspense 回退的节流': {
+      note: '点“数据 100 ms”：加载提示在几毫秒内出现，内容要到约 300ms 才出现，虽然数据 100ms 就到了。点“数据 600 ms”：内容在约 600ms 出现，没有额外等待。React 19 让 fallback 之后的内容提交至少间隔约 300ms，避免加载提示一闪而过。多点几次，数字会有几毫秒的波动。',
+      predict: {
+        q: '点“数据 100 ms”。加载提示出现后，内容大约在点击后多久显示？',
+        options: ['约 100 ms：数据一到就显示', '约 300 ms', '约 1000 ms', '不显示加载提示，直接显示内容'],
+        answer: 1,
+        explain:
+          '数据在 100ms 就到了，但 React 19 会给 fallback 之后的内容提交节流，约 300ms。这是为了避免加载提示闪一下就消失。当数据比节流间隔更慢（例如 600ms），内容一到就显示。',
+      },
+      pkey: 'suspense-data|Suspense 回退的节流',
+    },
+    '手写资源：抛出 Promise': {
+      note: '点“加载”：先显示“加载中…”，约 0.8 秒后显示数据。手写的资源和 use 的规则一致：资源在组件外创建。',
     },
   },
 } satisfies Lesson;

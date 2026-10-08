@@ -213,7 +213,7 @@ function App() {
 第 34 课的乐观更新是：先保存快照并改界面，失败时回滚到快照。只有一个请求时没问题。用户快速点了两次时，就会出错：
 
 ```jsx play title="两个请求并发时的回滚"
-import { useState, useRef } from 'react';
+import { useState, useRef, useOptimistic, startTransition } from 'react';
 
 // 模拟服务器：第 1 个请求 1.5 秒后失败，第 2 个请求 0.5 秒后成功
 function fakeRequest(n) {
@@ -252,16 +252,36 @@ function QueueLikes() {
   return <Row title="B 待定队列" value={confirmed + pending.length} onTwice={() => { like(1); like(2); }} />;
 }
 
+// 策略 C：useOptimistic。显示值 = 已确认的值 + 仍在应用的乐观操作
+function OptimisticLikes() {
+  const [confirmed, setConfirmed] = useState(0);
+  const [likes, addOptimistic] = useOptimistic(confirmed, (current, delta) => current + delta);
+  function like(n) {
+    startTransition(async () => {
+      addOptimistic(1);
+      try {
+        await fakeRequest(n);
+        setConfirmed(c => c + 1);
+      } catch {
+        console.log('C：第 ' + n + ' 个赞失败');
+      }
+    });
+  }
+  return <Row title="C useOptimistic" value={likes} onTwice={() => { like(1); like(2); }} />;
+}
+
 function Row({ title, value, onTwice }) {
   return <p>{title}：<b>{value}</b> 赞 <button onClick={onTwice}>连点两次赞</button></p>;
 }
 
 function App() {
-  return <div><SnapshotLikes /><QueueLikes /><p><small>服务器上的真实结果：1 赞</small></p></div>;
+  return <div><SnapshotLikes /><QueueLikes /><OptimisticLikes /><p><small>服务器上的真实结果：1 赞</small></p></div>;
 }
 ```
 
-B 的做法可以推广：`显示的 state = 待定操作.reduce(reducer, 已确认的 state)`。服务器每确认或拒绝一个操作，就更新已确认的 state 并从队列里删掉它，再重新计算。React 19 的 `useOptimistic` 就是这样工作的：过渡更新结束前，它把待定的乐观操作重新应用到最新的基础 state 上（只能阅读，本页是 React 18）。
+B 的做法可以推广：`显示的 state = 待定操作.reduce(reducer, 已确认的 state)`。服务器每确认或拒绝一个操作，就更新已确认的 state 并从队列里删掉它，再重新计算。React 19 的 `useOptimistic` 就是这样工作的：乐观操作结束前，它把待定的操作重新应用到最新的基础 state 上。上面的策略 C 是它的用法。
+
+有一个细节要注意：并发的多个异步 Action 会合并成一批，乐观操作要等**整批**都结束才撤销。策略 C 里，第 2 个请求在约 0.5 秒成功，已确认值变成 1，可是第 1 个请求还在等待，两个乐观操作仍然有效，界面暂时显示 3 个赞，约 1.5 秒后才回到 1。乐观值写成“增量”会在这段时间里重复计算；写成“目标状态”（例如 `liked: true`）则重复应用结果相同，不受影响。
 
 还有两点。请求的**返回顺序**不一定等于发出顺序，要以服务器返回的版本号或时间为准。多人编辑同一条数据时，服务器要检测冲突（例如比较版本号），并告诉客户端“你的修改基于旧版本”。
 

@@ -33,7 +33,7 @@ React 用一个独立的**调度器**（scheduler 包）做这件事。渲染每
 | `Promise.then`、`queueMicrotask` | 微任务 | 不能 | 当前任务结束前，所有微任务都会执行完。浏览器根本插不进来 |
 | `setTimeout(fn, 0)` | 宏任务 | 能 | 嵌套多层后，浏览器强制至少等 4ms。100 片就白等 400ms |
 | `requestAnimationFrame` | 帧回调 | 能 | 每帧只调用一次（约 16ms）；页面在后台时会暂停 |
-| `MessageChannel` | 宏任务 | 能 | 没有 4ms 下限。React 18 的调度器在浏览器里用它 |
+| `MessageChannel` | 宏任务 | 能 | 没有 4ms 下限。React 的调度器在浏览器里用它 |
 
 下面的示例把 300 个 1ms 的工作单元用三种方式执行。另有一个每 10ms 跳一次的“心跳”定时器。心跳次数越多，说明浏览器在中间越有机会做别的事。先预测，再运行。
 
@@ -102,7 +102,7 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-调度器内部用最小堆保存任务，按过期时间排序。每片的长度是常量 `frameYieldMs = 5`。5ms 是一个折中：太短，调度本身的开销变大；太长，输入的延迟变大。这些都是 React 18.3.1 的实现细节，版本之间可能变化。
+调度器内部用最小堆保存任务，按过期时间排序。scheduler 包里每片的长度是变量 `frameInterval`，默认值是 5（毫秒）。5ms 是一个折中：太短，调度本身的开销变大；太长，输入的延迟变大。这些都是 React 19.3 的实现细节，版本之间可能变化。
 
 </CallBox>
 
@@ -110,17 +110,17 @@ function App() {
 
 React 给每个更新分配一个 **lane**（车道）。lane 是一个 31 位二进制数中的某一位。位越低，优先级越高。用位运算，React 可以一次合并或比较很多组更新。
 
-你不必记住 31 条车道。记住下面 5 档，以及每档在 React 18 中会不会被切片：
+你不必记住 31 条车道。记住下面 5 档，以及每档会不会被切片：
 
-| 档位（从高到低） | 谁会产生 | 18.3.1 中的 lane | 会被切片吗 |
+| 档位（从高到低） | 谁会产生 | 源码中的 lane | 会被切片吗 |
 |---|---|---|---|
 | 同步 / 离散事件 | click、keydown、input 等事件里的 set 函数；`flushSync` | `SyncLane` | 不会。当前事件结束后立刻同步完成 |
 | 连续事件 | pointermove、scroll、wheel 等事件里的 set 函数 | `InputContinuousLane` | 不会 |
 | 默认 | setTimeout、请求回调、effect 里的 set 函数 | `DefaultLane` | 不会 |
-| 过渡 | `startTransition`、`useDeferredValue` | `TransitionLanes`（16 条） | 会，可以被打断 |
-| 空闲 | 18 没有公开 API；隐藏的屏幕外内容 | `IdleLane`、`OffscreenLane` | 会 |
+| 过渡 | `startTransition`、`useDeferredValue` | `TransitionLanes`（十几条） | 会，可以被打断 |
+| 空闲 | 没有公开 API；隐藏的屏幕外内容 | `IdleLane`、`OffscreenLane` | 会 |
 
-表里最容易被忽略的是第三行。在 React 18 中，setTimeout 或请求回调触发的更新**不会被切片**。一次 300ms 的“默认”渲染，就是一个 300ms 的长任务。想让它可以被打断，必须明确地放进 startTransition。
+表里最容易被忽略的是第三行。在 React 中，setTimeout 或请求回调触发的更新**不会被切片**。一次 300ms 的“默认”渲染，就是一个 300ms 的长任务。想让它可以被打断，必须明确地放进 startTransition。
 
 低优先级的更新可能一直被高优先级的更新插队，这叫**饥饿**。React 给每个 lane 记一个过期时间：过渡更新等待超过约 5 秒，就被标为“已过期”，改用同步方式渲染完。输入类的更新约 250ms 就过期。
 
@@ -140,7 +140,7 @@ lane 的名字、数量和过期时间都是内部实现，不同版本会变。
 4. React 同步渲染并提交紧急更新。用户马上看到输入框里的新字。
 5. React 从根开始，用最新的 state **重新**渲染过渡更新。
 
-并不是档位表里排在前面的更新都会打断过渡渲染。React 18 和 19 都是：只有同步档和连续事件档会打断。默认档的更新（定时器、请求回调）不打断，它等这次过渡渲染做完再处理。下面示例里的 `Stats` 每 200ms 用定时器更新一次，这是默认档更新，不会打断正在进行的列表渲染。
+并不是档位表里排在前面的更新都会打断过渡渲染。只有同步档和连续事件档会打断。默认档的更新（定时器、请求回调）不打断，它等这次过渡渲染做完再处理。下面示例里的 `Stats` 每 200ms 用定时器更新一次，这是默认档更新，不会打断正在进行的列表渲染。
 
 为什么不接着做？紧急更新可能修改了过渡渲染读过的 state。旧进度建立在过期的数据上，接着做会得到前后矛盾的结果。从头再来更简单，也一定正确。
 
@@ -209,7 +209,7 @@ StrictMode 在开发环境故意把组件渲染两次，就是在模拟“渲染
 
 ## 四、批处理与 flushSync
 
-调用 set 函数时，React 不会马上渲染。它把更新放进组件的更新队列，标上 lane，再请求调度器“稍后渲染一次”。同一个任务里的多次 set 函数调用，共用这一次渲染。这就是**自动批处理**。在 React 18 中，用 createRoot 创建的根对事件、setTimeout 和 Promise 回调都自动批处理。
+调用 set 函数时，React 不会马上渲染。它把更新放进组件的更新队列，标上 lane，再请求调度器“稍后渲染一次”。同一个任务里的多次 set 函数调用，共用这一次渲染。这就是**自动批处理**。用 createRoot 创建的根对事件、setTimeout 和 Promise 回调都自动批处理。
 
 批处理按 lane 分组。同一个事件里，紧急更新和过渡更新不会合并：React 先渲染并提交紧急的那一组，再单独渲染过渡的那一组。
 
@@ -244,7 +244,7 @@ React 自己的 state 不会撕裂。更新先进队列，一次渲染中所有�
 3. 下一片继续渲染第 11 行之后，读到的是 6。
 4. 提交后，同一个列表的前后两段显示不同的值。
 
-同步渲染中间不让出主线程，外部代码没机会修改变量，所以不会撕裂。撕裂是并发渲染才有的问题。下面在 React 18.3.1 中复现它。先预测，再运行。
+同步渲染中间不让出主线程，外部代码没机会修改变量，所以不会撕裂。撕裂是并发渲染才有的问题。下面复现它。先预测，再运行。
 
 ```jsx play title="在过渡更新中读可变的外部变量"
 import { useState, useRef, useLayoutEffect, useTransition, useSyncExternalStore } from 'react';
@@ -345,15 +345,15 @@ function App() {
 <details className="optional">
 <summary><span className="opt-tag">选读</span>六、读源码的路线<small>可以先跳过，需要时再展开</small></summary>
 
-想在 react-dom 18.3.1 的开发版源码里跟一遍流程，可以按下面的函数名搜索：
+想在 react-dom 19.3 的开发版源码（`react-dom-client.development.js`）里跟一遍流程，可以按下面的函数名搜索：
 
 1. `requestUpdateLane`：set 函数被调用时，按“是否在 transition 中”“当前事件类型”决定 lane。
-2. `scheduleUpdateOnFiber` → `ensureRootIsScheduled`：把根节点上最高优先级的 lane 交给调度器。
-3. `performConcurrentWorkOnRoot`：按 lane 决定用 `workLoopSync` 还是 `workLoopConcurrent`。
-4. `workLoopConcurrent`：`while (workInProgress !== null && !shouldYield()) performUnitOfWork(workInProgress)`。
+2. `scheduleUpdateOnFiber` → `ensureRootIsScheduled`：登记根节点上有更新，稍后在微任务里挑出最高优先级的 lane，交给调度器。
+3. `performWorkOnRootViaSchedulerTask` → `performWorkOnRoot`：按 lane 决定用 `renderRootSync`（同步）还是 `renderRootConcurrent`（可切片）。
+4. `workLoopConcurrentByScheduler`：`for (; workInProgress !== null && !shouldYield(); ) performUnitOfWork(workInProgress)`。
 5. `prepareFreshStack`：丢弃进度、从根重新开始的地方。
 6. `isRenderConsistentWithExternalStores`：useSyncExternalStore 在提交前的一致性检查。
-7. `markStarvedLanesAsExpired`：把等待太久的 lane 标为过期。
+7. `computeExpirationTime`：给每个 lane 算过期时间（输入类约 250ms，过渡类约 5 秒）；等待太久的 lane 被标为已过期，改用同步渲染。
 
 读源码时，先用一个最小示例在这些函数里打断点，比从头通读有效得多。
 
