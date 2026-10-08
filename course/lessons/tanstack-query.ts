@@ -13,10 +13,8 @@ export default {
     '能用 keepPreviousData 做分页，用 useInfiniteQuery 做“加载更多”，并说明 getNextPageParam 返回什么值表示没有下一页',
   ],
   keyPoints: [
-    '问题：服务端数据需要缓存、去重、过期刷新和重试。用 useEffect 手写，每个组件都要重复这些代码。',
-    "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
-    '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。',
-    '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
+    "服务端数据需要缓存、去重、过期刷新和重试，用 useEffect 手写要重复很多代码。<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
+    '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
     '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的耗时，所以要等很久才报错。',
     '分页：页码写进 <code>queryKey</code>，加 <code>placeholderData: keepPreviousData</code>，换页时先显示上一页。加载更多：<code>useInfiniteQuery</code> 配 <code>initialPageParam</code> 和 <code>getNextPageParam</code>，返回 <code>undefined</code> 或 <code>null</code> 表示没有下一页。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
