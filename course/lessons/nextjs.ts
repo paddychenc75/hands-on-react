@@ -54,7 +54,7 @@ export default {
   id: 'nextjs',
   stage: 4,
   title: 'Next.js App Router',
-  mins: 30,
+  mins: 40,
   summary: '用文件夹定义路由，在服务端取数据，用 Server Function 处理表单。',
   goals: [
     '能根据 app/ 目录说出一个 URL 对应哪个 page.tsx、套着哪几层 layout.tsx、params 是什么',
@@ -115,6 +115,18 @@ export default {
       answer: 3,
       explain:
         '/shop/42 对应 app/shop/[id]/page.tsx。layout 按“页面所在文件夹和它的每一层上级文件夹”收集：app 和 shop 里各有一个，[id] 里没有。reviews/layout.tsx 只属于 /shop/42/reviews 这类页面，访问 /shop/42 时不会用到它。没有 layout 的文件夹不会让外层布局失效。',
+    },
+    {
+      q: '移动端 App 和第三方合作方都要读取商品列表的 JSON。商品页自己也要显示同样的数据。接口放在哪里最合适？',
+      options: [
+        '在客户端组件里用 TanStack Query 请求，别人也照着请求页面',
+        '写成 Server Function，让别的程序直接调用',
+        '在 app/api/products/route.ts 里写 Route Handler；商品页自己直接调用同一个数据层函数，不用请求这个接口',
+        '在 layout.tsx 里把数据写进全局变量，别人读这个变量',
+      ],
+      answer: 2,
+      explain:
+        '给第三方或移动端提供接口，用 Route Handler（route.ts），它有稳定的 URL 和 HTTP 语义。页面自己在服务端组件里直接调用数据层函数，少一次网络往返。Server Function 是给你自己的界面提交数据用的，URL 和调用格式不是公开约定。TanStack Query 用在客户端高频交互里，不能替别人提供接口。',
     },
   ],
   exercise: {
@@ -359,6 +371,66 @@ export default async function Page() {
       explain:
         "新模型里，没缓存的数据和运行时数据（cookies、headers、searchParams）必须放在 Suspense 里，请求时流式返回；loading.tsx 就是一层 Suspense。cookie 因人而异，不能用 'use cache' 缓存给所有人。“改成客户端组件”会放弃服务端取数据，是本课讲的最常见错误。具体报错和选项以所用版本的官方文档为准。",
     },
+    {
+      q: `用户在评论区提交评论，Server Function 写库之后，页面要<b>马上</b>显示这条新评论（评论列表用 <code>'use cache'</code> 缓存，打了 <code>cacheTag('comments')</code> 标签）。应该怎么调用？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">'use server';
+export async function addComment(formData) {
+  // ……校验、写库
+  // ← 这里调用哪个？
+}</code></pre></div>`,
+      options: [
+        "revalidateTag('comments', 'max')：下一个请求先拿到旧列表，后台再重新生成",
+        '什么都不用调：缓存会自己感知数据库变化',
+        "updateTag('comments')：内容立刻失效，下一个请求等待新内容",
+        '在 proxy.ts 里调用 updateTag',
+      ],
+      answer: 2,
+      explain:
+        "updateTag 只能在 Server Function 里用，专门处理“提交后马上要看到自己的修改”：条目立刻失效，下一个请求等新内容。revalidateTag(tag, 'max') 是先给旧内容、后台刷新，适合稍有延迟也没关系的内容，提交者可能看到旧列表。缓存不会自己感知数据库变化，要么等 revalidate 到期，要么主动让它失效。Proxy 里不能调用这两个函数。",
+    },
+    {
+      q: `目录如下。访问 <code>/about</code> 时，<code>about/page.tsx</code> 外面套着哪些 layout？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">app/
+  layout.tsx
+  (marketing)/
+    layout.tsx
+    about/
+      page.tsx
+  (shop)/
+    layout.tsx
+    cart/
+      page.tsx</code></pre></div>`,
+      options: [
+        '只有 app/layout.tsx：圆括号文件夹里的 layout 不参与',
+        'app/layout.tsx 和 app/(marketing)/layout.tsx',
+        '三层：app、(marketing) 和 (shop) 的 layout',
+        '没有匹配：URL 里没有 (marketing)，所以 /about 找不到页面',
+      ],
+      answer: 1,
+      explain:
+        '路由组（圆括号文件夹）不出现在 URL 里，所以 /about 对应 app/(marketing)/about/page.tsx。但它仍然是一层文件夹：它里面的 layout.tsx 会套在页面外面，由此可以让一组页面共用布局。(shop) 是另一个分支，和 /about 无关。',
+    },
   ],
-  plays: {},
+  plays: {
+    '模拟：layout 保留 state，template 重新挂载': {
+      note: 'layout 里的搜索框保持“报表”：在共用 layout 的页面之间导航时，layout 不会重新挂载，只有 page 被换掉。template 每次导航都创建新实例，里面的 state 重置，搜索框被清空。示例里用 key 随 url 变化来表示这一点。',
+      predict: {
+        q: '在两个搜索框里都输入“报表”，再点“去 /dashboard/b”。两个搜索框里分别是什么？',
+        options: ['layout 的搜索框保留“报表”，template 的被清空', '两个都被清空', '两个都保留“报表”', 'layout 的被清空，template 的保留“报表”'],
+        answer: 0,
+        explain:
+          'layout 在导航时保留，它里面的 state 不丢；template 每次导航都重新创建，state 重置。想要“每次进入新页面都重新开始”（例如重新触发进入动画、重置表单），用 template。',
+      },
+      pkey: 'nextjs|模拟：layout 保留 state，template 重新挂载',
+    },
+    '模拟：缓存、过期与重新验证': {
+      note: '第 70 秒距离第一次生成已经过了 60 秒（revalidate），所以那次访问先拿到旧的 v1，同时后台重新生成了 v2；第 80 秒才看到 v2。revalidateTag 之后，下一次访问仍先拿到旧的 v2；updateTag 之后，下一次访问等待新内容，直接显示 v4。时间线是简化的：真实环境还有浏览器端的路由缓存，页面可能比这里更晚才更新。',
+      predict: {
+        q: '数据库在第 0 秒之后被改成了 v2。控制台里“第 70 秒，访问”这一行显示什么？',
+        options: ['v2：数据库已经是新的了', '等待重新生成后显示 v2', 'v1：先返回旧内容，后台重新生成', '报错：缓存已经过期'],
+        answer: 2,
+        explain:
+          'revalidate（60 秒）到期后，下一个请求先拿到缓存里的旧内容，同时服务器在后台重新生成；新内容从再下一个请求起可见。要等新内容的情况只发生在没有缓存，或超过 expire 时。',
+      },
+      pkey: 'nextjs|模拟：缓存、过期与重新验证',
+    },
+  },
 } satisfies Lesson;

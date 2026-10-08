@@ -16,7 +16,7 @@ Next.js 是使用最广的 React 全栈框架。Server Components 主要就用�
 
 <CallBox kind="tip" label="要点">
 
-Next.js 需要 Node.js 服务器，实验台跑不了，所以本课的代码块都是只读的，站内练习实现的是它最核心的一条规则（文件夹就是路由）。课末的“本机任务”带你在自己的电脑上亲手跑一遍。创建项目只需一行：`npx create-next-app@latest my-app`，选 `Yes, use recommended defaults`（推荐的默认设置）即可（需要 Node.js 20.9 以上）。本课的描述按 Next.js 16.4.0 实测。
+Next.js 需要 Node.js 服务器，实验台跑不了，所以本课展示 Next.js 代码的代码块都是只读的。站内的两个示例和练习用普通的 React 与函数模拟它的规则，每个示例开头写明模拟什么、和真实环境差在哪；练习实现的是最核心的一条规则（文件夹就是路由）。课末的“本机任务”带你在自己的电脑上亲手跑一遍。创建项目只需一行：`npx create-next-app@latest my-app`，选 `Yes, use recommended defaults`（推荐的默认设置）即可（需要 Node.js 20.9 以上）。本课的描述按 Next.js 16.4.0 实测。
 
 </CallBox>
 
@@ -25,6 +25,41 @@ Next.js 需要 Node.js 服务器，实验台跑不了，所以本课的代码块
 <Raw tag="figure" className="fig wide" html={"<div class=\"filetree\"><div><b>app/</b></div>\n<div class=\"i1\">layout.tsx <span>根布局：&lt;html&gt;、导航栏，所有页面共享</span></div>\n<div class=\"i1\">page.tsx <span>→ <code>/</code></span></div>\n<div class=\"i1\"><b>blog/</b></div>\n<div class=\"i2\">page.tsx <span>→ <code>/blog</code></span></div>\n<div class=\"i2\">loading.tsx <span>加载中界面（自动包一层 Suspense）</span></div>\n<div class=\"i2\">error.tsx <span>出错界面（自动包一层错误边界；必须是客户端组件）</span></div>\n<div class=\"i2\"><b>[slug]/</b></div>\n<div class=\"i3\">page.tsx <span>→ <code>/blog/hello-world</code>，动态参数 slug</span></div>\n<div class=\"i1\"><b>api/</b><b>hello/</b></div>\n<div class=\"i2\">route.ts <span>→ API 接口 <code>GET /api/hello</code></span></div></div><figcaption>特殊文件名：page、layout、loading、error、not-found、route</figcaption>"} />
 
 注意 `loading.tsx` 和 `error.tsx`：它们就是第 24 课学的 Suspense 和错误边界。框架按约定自动帮你加上。
+
+`layout.tsx` 还有一个性质：在共用它的页面之间导航时，layout 不会重新挂载，只有 `children`（页面）被换掉，所以 layout 里客户端组件的 state 会保留。需要每次导航都重置时，用 `template.tsx`。下面的示例模拟这个区别。
+
+```jsx play title="模拟：layout 保留 state，template 重新挂载"
+// 模拟：在 /dashboard/a 和 /dashboard/b 之间导航时，layout.tsx 与 template.tsx 里的客户端组件各自怎样变化。
+// 与真实环境的差别：真实的 Next.js 由文件夹生成这棵树，导航时请求新的 RSC payload；
+// 这里用一个 url 状态当作“当前页面”，用 React 的 key 表示 template “每次导航创建新实例”。
+import { useState } from 'react';
+
+function SearchBox({ label }) {
+  const [text, setText] = useState('');
+  return (
+    <p>
+      <label>
+        {label}：<input value={text} onChange={e => setText(e.target.value)} />
+      </label>
+    </p>
+  );
+}
+
+function App() {
+  const [url, setUrl] = useState('/dashboard/a');
+  return (
+    <div>
+      <button onClick={() => setUrl('/dashboard/a')}>去 /dashboard/a</button>{' '}
+      <button onClick={() => setUrl('/dashboard/b')}>去 /dashboard/b</button>
+      <SearchBox label="layout.tsx 里的搜索框" />
+      <div key={url}>
+        <SearchBox label="template.tsx 里的搜索框" />
+      </div>
+      <p>page.tsx：当前页面是 <b>{url}</b></p>
+    </div>
+  );
+}
+```
 
 ## 在页面之间跳转
 
@@ -139,6 +174,107 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 | 没缓存的数据，或 `cookies()`、`headers()`、`params`、`searchParams` 这类运行时数据 | 必须包在 `<Suspense>` 里，请求时流式返回 |
 
 在新模型里，数据默认不缓存。在 Suspense 之外读取没缓存的数据，开发时会报错：`fetch(...)` 报 `Next.js encountered uncached data during prerendering`，读 `params`、`cookies()` 这类运行时数据报 `Next.js encountered runtime data during prerendering`。页面仍然能显示，浏览器右下角出现红色的 `1 Issue`。`loading.tsx` 就是一层 Suspense。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
+
+### 缓存条目的生命周期
+
+`'use cache'` 缓存的内容有三个时间（`cacheLife` 的 `stale`、`revalidate`、`expire`）。本课只看服务器上的数据缓存会用到的两个：
+
+- `revalidate`：超过这个时间后，下一个请求先拿到旧内容，同时服务器在后台重新生成。
+- `expire`：超过这个时间，下一个请求要等新内容生成。
+
+数据被改动后，可以按标签（`cacheTag('posts')`）让缓存过期。按 Next.js 16.4 的文档：
+
+- `revalidateTag('posts', 'max')`：把带标签的内容标记为过期。下一个请求先拿到旧内容，同时后台重新生成。它能用在 Server Function 和 Route Handler 里。
+- `updateTag('posts')`：只能用在 Server Function 里。内容立刻失效，下一个请求等待新内容，不会拿到旧内容。适合用户刚提交完、马上要看到自己的修改的场景。
+
+```jsx play title="模拟：缓存、过期与重新验证"
+// 模拟：一个 'use cache' 条目（cacheLife：revalidate 60 秒，expire 600 秒）的生命周期。时间靠手动拨快。
+// 依据 Next.js 16.4 文档：revalidate 到期后，下一个请求先拿旧内容，后台重新生成；
+// revalidateTag(tag, 'max') 标记过期，同样先拿旧内容；updateTag(tag) 立即失效，下一个请求等待新内容。
+// 与真实环境的差别：没有真实的服务器和渲染；只模拟服务器上的数据缓存，不含浏览器端路由缓存；
+// expire 简化为按条目的年龄计算；后台重新生成瞬间完成，新内容从下一次请求起可见。
+import { useState } from 'react';
+
+const REVALIDATE = 60;
+const EXPIRE = 600;
+
+function makeServer() {
+  const s = { now: 0, version: 1, entry: null };
+  s.request = () => {
+    const e = s.entry;
+    if (!e || s.now - e.createdAt >= EXPIRE) {
+      s.entry = { value: 'v' + s.version, createdAt: s.now, stale: false };
+      return { shown: s.entry.value, how: '没有可用的缓存，等待新内容' };
+    }
+    if (e.stale || s.now - e.createdAt >= REVALIDATE) {
+      s.entry = { value: 'v' + s.version, createdAt: s.now, stale: false };
+      return { shown: e.value, how: '先返回旧内容，后台重新生成' };
+    }
+    return { shown: e.value, how: '命中缓存' };
+  };
+  s.revalidateTag = () => {
+    if (s.entry) s.entry.stale = true;
+  };
+  s.updateTag = () => {
+    s.entry = null;
+  };
+  s.editDatabase = () => {
+    s.version += 1;
+  };
+  s.wait = seconds => {
+    s.now += seconds;
+  };
+  return s;
+}
+
+// 一段脚本化的时间线
+const s = makeServer();
+const visit = () => {
+  const r = s.request();
+  console.log('第 ' + s.now + ' 秒，访问：显示 ' + r.shown + '（' + r.how + '）');
+};
+visit();
+s.editDatabase(); // 数据库改成 v2
+s.wait(30);
+visit();
+s.wait(40);
+visit();
+s.wait(10);
+visit();
+s.editDatabase(); // 数据库改成 v3
+s.revalidateTag();
+console.log('Server Function 调用了 revalidateTag');
+visit();
+visit();
+s.editDatabase(); // 数据库改成 v4
+s.updateTag();
+console.log('Server Function 调用了 updateTag');
+visit();
+
+function App() {
+  const [srv] = useState(makeServer);
+  const [lines, setLines] = useState([]);
+  const [, rerender] = useState(0);
+  const act = (text, fn) => {
+    const r = fn();
+    setLines(l => [...l, r ? text + '：显示 ' + r.shown + '（' + r.how + '）' : text]);
+    rerender(n => n + 1);
+  };
+  return (
+    <div>
+      <p>
+        现在是第 {srv.now} 秒　数据库：v{srv.version}　缓存：{srv.entry ? srv.entry.value + (srv.entry.stale ? '（已标记过期）' : '') : '（空）'}
+      </p>
+      <button onClick={() => act('访问页面', () => srv.request())}>访问页面</button>{' '}
+      <button onClick={() => act('过了 30 秒', () => srv.wait(30))}>过 30 秒</button>{' '}
+      <button onClick={() => act('数据库被改动', () => srv.editDatabase())}>改数据库</button>{' '}
+      <button onClick={() => act('revalidateTag', () => srv.revalidateTag())}>revalidateTag</button>{' '}
+      <button onClick={() => act('updateTag', () => srv.updateTag())}>updateTag</button>
+      <ul>{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+    </div>
+  );
+}
+```
 
 ### 旧模型（没有开启 Cache Components 的项目）
 
