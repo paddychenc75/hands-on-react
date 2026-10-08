@@ -22,7 +22,7 @@ export default {
     "条件类名不要手拼字符串：<code>false</code> 和 <code>undefined</code> 会变成文字。用 <code>filter(Boolean).join(' ')</code> 的小函数。",
     '固定的外观写进样式表，随数据变化的值（进度、坐标、用户选色）才用内联 <code>style</code> 或 CSS 变量。',
     '优先级相同的同名属性，样式表里写在后面的规则生效；内联 <code>style</code> 比类选择器优先。',
-    'CSS Modules 在构建时把类名改成唯一名字；原子类用小类组合；运行时 CSS-in-JS 在渲染时生成样式，不能用在服务端组件里。',
+    'CSS Modules 在构建时把类名改成唯一名字；原子类用小类组合；运行时 CSS-in-JS 在渲染时生成样式，多数库不能直接用在服务端组件里。',
   ],
   quiz: [
     {
@@ -213,10 +213,11 @@ function App() {
     '类名拼接：false 和 undefined 会混进去': {
       note: '<code>active</code> 为 false 时，<code>&&</code> 的结果是 false，被拼成文字 "false"。三元表达式配空字符串会留下多余的空格。<code>cx</code> 先 <code>filter(Boolean)</code> 去掉假值，再 <code>join</code>，得到干净的 "tab"。',
       predict: {
-        q: "“设置”这一项的 <code>active</code> 是 false。用写法 a（<code>'tab ' + (active &amp;&amp; 'tab-on')</code>）得到的类名字符串是什么？",
+        title: '类名拼接',
+        q: "“设置”这一项的 <code>active</code> 是 false。写法 b（<code>'tab ' + (active ? 'tab-on' : '')</code>）得到的类名字符串是什么？",
         options: ['"tab"', '"tab false"', '"tab "（末尾有空格）', '"tab undefined"'],
-        answer: 1,
-        explain: '<code>false</code> 被转成字符串 "false" 拼在后面。三元写法 b 得到末尾带空格的 "tab "，<code>cx</code> 得到 "tab"。',
+        answer: 2,
+        explain: '<code>\'tab \'</code> 后面拼了一个空字符串，所以末尾留着一个空格。写法 a 拼出的是 "tab false"，<code>cx</code> 得到干净的 "tab"。',
       },
       pkey: 'styling|类名拼接：false 和 undefined 会混进去',
     },

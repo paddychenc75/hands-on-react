@@ -653,7 +653,9 @@ function App() {
         t.assert(!card('写 reducer'), '点“删除”后卡片没有消失');
         // 再单独渲染 Card 和 Column：它们必须只靠 Context 拿 dispatch
         const calls = [];
-        const spy = a => calls.push(JSON.stringify(a));
+        // 键的书写顺序不同也算同一个 action：按键名排序后再比较
+        const norm = a => JSON.stringify(Object.fromEntries(Object.entries(a || {}).sort(([x], [y]) => (x < y ? -1 : 1))));
+        const spy = a => calls.push(norm(a));
         const host = document.createElement('div');
         document.body.appendChild(host);
         const rt = ReactDOM.createRoot(host);
@@ -683,12 +685,12 @@ function App() {
               calls.length +
               ' 次。Card 不应再依赖 props 传来的回调',
           );
-          t.assert(calls[0] === JSON.stringify({ type: 'move', id: 7, dir: 1 }), 'Card 点 → 应派发 move，带 id 和 dir: 1，实际是 ' + calls[0]);
-          t.assert(calls[1] === JSON.stringify({ type: 'move', id: 7, dir: -1 }), 'Card 点 ← 应派发 move，带 id 和 dir: -1，实际是 ' + calls[1]);
-          t.assert(calls[2] === JSON.stringify({ type: 'remove', id: 7 }), 'Card 点“删除”应派发 remove，带 id，实际是 ' + calls[2]);
+          t.assert(calls[0] === norm({ type: 'move', id: 7, dir: 1 }), 'Card 点 → 应派发 move，带 id 和 dir: 1，实际是 ' + calls[0]);
+          t.assert(calls[1] === norm({ type: 'move', id: 7, dir: -1 }), 'Card 点 ← 应派发 move，带 id 和 dir: -1，实际是 ' + calls[1]);
+          t.assert(calls[2] === norm({ type: 'remove', id: 7 }), 'Card 点“删除”应派发 remove，带 id，实际是 ' + calls[2]);
           await click(cards[1], '→');
           t.assert(
-            calls.length === 4 && calls[3] === JSON.stringify({ type: 'move', id: 8, dir: 1 }),
+            calls.length === 4 && calls[3] === norm({ type: 'move', id: 8, dir: 1 }),
             'Column 里的卡片点 → 没有派发 move。Column 不需要再接收 onMove、onRemove：Card 自己从 Context 取 dispatch',
           );
         } finally {

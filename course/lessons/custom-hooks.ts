@@ -204,7 +204,8 @@ function App() {
         const m = new RegExp('^[ \\t]*(?:export\\s+)?(?:function\\s+' + name + '\\b|(?:const|let|var)\\s+' + name + '\\s*=)', 'm').exec(t.source);
         if (!m) return null;
         const rest = t.source.slice(m.index + m[0].length);
-        const end = rest.search(/^(?:export\s+)?(?:function|const|let|var|class)\s/m);
+        // 到下一个已知的顶层声明为止（不依赖缩进：学习者的代码可能没有缩进）
+        const end = rest.search(/^[ \t]*(?:export\s+)?(?:function|const|let|var|class)\s+(?:useLocalStorage|Nickname|Theme|App)\b/m);
         return end < 0 ? rest : rest.slice(0, end);
       };
       for (const [name, init] of [
@@ -365,7 +366,8 @@ function App() {
             const m = new RegExp('^[ \\t]*(?:export\\s+)?(?:function\\s+' + name + '\\b|(?:const|let|var)\\s+' + name + '\\s*=)', 'm').exec(t.source);
             if (!m) return null;
             const rest = t.source.slice(m.index + m[0].length);
-            const end = rest.search(/^(?:export\s+)?(?:function|const|let|var|class)\s/m);
+            // 到下一个已知的顶层声明为止（不依赖缩进：学习者的代码可能没有缩进）
+            const end = rest.search(/^[ \t]*(?:export\s+)?(?:function|const|let|var|class)\s+(?:useLocalStorage|Nickname|Theme|App)\b/m);
             return end < 0 ? rest : rest.slice(0, end);
           };
           for (const name of ['Nickname', 'Theme']) {
@@ -464,6 +466,28 @@ function App() {
             t.timing(
               out === 'abc',
               `'abc' 稳定超过 delay 之后，返回值应更新为 'abc'，实际是 ${JSON.stringify(out)}。delay 是不是被写死了，或者 effect 没有随 value 重新计时？`,
+            );
+          } finally {
+            root.unmount();
+          }
+        });
+        // 换一个很短的 delay：delay 要真的是参数，不能写死成 300
+        await t.retry(async () => {
+          const box = document.createElement('div');
+          const root = ReactDOM.createRoot(box);
+          let out: any;
+          const Probe = ({ v }: any) => {
+            out = useDebounce(v, 40);
+            return null;
+          };
+          const set = v => ReactDOM.flushSync(() => root.render(h(Probe, { v })));
+          try {
+            set('x');
+            set('xy');
+            for (let i = 0; i < 10 && out !== 'xy'; i++) await t.wait(20);
+            t.timing(
+              out === 'xy',
+              `delay 传 40 时，约 40 毫秒后返回值就该更新成 'xy'，等了 200 毫秒，实际是 ${JSON.stringify(out)}。delay 是不是被写死了？计时用的应是参数 delay`,
             );
           } finally {
             root.unmount();
