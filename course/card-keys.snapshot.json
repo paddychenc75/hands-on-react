@@ -244,6 +244,7 @@
     "tanstack-query#c4": "5aa4cc6e",
     "tanstack-query#c5": "de47a49c",
     "tanstack-query#c6": "f5f1a890",
+    "tanstack-query#c7": "4e8171c5",
     "testing#0": "99fa2539",
     "testing#1": "b14328a7",
     "testing#2": "20b894b2",
@@ -459,6 +460,8 @@
     "error-handling|根级回调：谁收到错误？",
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？"
+    "perf-clinic|memo 挡得住 Context 吗？",
+    "tanstack-query|真库：分页与 keepPreviousData",
+    "tanstack-query|真库：useInfiniteQuery 加载更多"
   ]
 }

@@ -407,6 +407,68 @@ for (const [id, want, notWant, name] of [
     '查询 5：服务器拒绝时，新项先出现，随后回滚并提示',
     JSON.stringify(r5),
   );
+  const T6 = '真库：分页与 keepPreviousData';
+  v = await preview(p, T6);
+  ok(v.includes('文章 1|文章 2|文章 3|文章 4|文章 5') && v.includes('第 1 页 / 共 5 页'), '查询 6：第 1 页加载完成', v);
+  v = await clickIn(p, T6, '下一页', 150);
+  ok(
+    v.includes('文章 1|') && v.includes('第 2 页 / 共 5 页') && v.includes('请求中') && !v.includes('首次加载中'),
+    '查询 6（预测题答案）：换页等待时，仍显示第 1 页的文章，页码已是 2',
+    v,
+  );
+  await sleep(900);
+  v = await preview(p, T6);
+  ok(v.includes('文章 6|文章 7|文章 8|文章 9|文章 10') && !v.includes('请求中'), '查询 6：第 2 页回来后换成文章 6 到 10', v);
+  v = await clickIn(p, T6, '上一页', 100);
+  ok(v.includes('文章 1|') && !v.includes('首次加载中'), '查询 6：回到看过的第 1 页，立刻显示缓存', v);
+  await sleep(900);
+  for (let i = 0; i < 4; i++) {
+    await clickIn(p, T6, '下一页', 100);
+    await sleep(900);
+  }
+  v = await preview(p, T6);
+  ok(
+    v.includes('文章 21|文章 22|文章 23') &&
+      v.includes('第 5 页 / 共 5 页') &&
+      (await inPg(p, T6, pg => [...pg.querySelectorAll('.preview button')].find(x => x.textContent === '下一页').disabled)) === true,
+    '查询 6：最后一页只有 3 篇，“下一页”被禁用',
+    v,
+  );
+  const code6 = await codeOf(p, T6);
+  await runCodeIn(p, T6, code6.replace(/ *placeholderData: keepPreviousData,[^\n]*\n/, ''), 1200);
+  v = await clickIn(p, T6, '下一页', 150);
+  ok(v.includes('首次加载中') && !v.includes('文章 1|'), '查询 6（课文说的改写）：去掉 keepPreviousData，换页时闪回“首次加载中…”', v);
+
+  const T7 = '真库：useInfiniteQuery 加载更多';
+  v = await preview(p, T7);
+  ok(v.includes('动态 1|动态 2|动态 3|动态 4') && v.includes('已加载 1 页，共 4 条') && v.includes('加载更多'), '查询 7：第一页加载完成', v);
+  v = await clickIn(p, T7, '加载更多', 100);
+  ok(v.includes('加载中…') && v.includes('已加载 1 页'), '查询 7：请求下一页期间按钮显示“加载中…”', v);
+  await sleep(800);
+  v = await clickIn(p, T7, '加载更多', 900);
+  const c7 = await consoleOf(p, T7);
+  ok(
+    v.includes('已加载 3 页，共 10 条') && v.includes('没有更多了') && (c7.match(/请求 cursor/g) || []).length === 3,
+    '查询 7（预测题答案）：3 行请求、10 条，按钮变成“没有更多了”',
+    v + ' / ' + c7,
+  );
+  const code7 = await codeOf(p, T7);
+  const falsy = await runCodeIn(p, T7, code7.replace('next < ALL.length ? next : undefined', 'next < ALL.length ? next : false'), 800);
+  void falsy;
+  await clickIn(p, T7, '加载更多', 800);
+  await clickIn(p, T7, '加载更多', 800);
+  v = await clickIn(p, T7, '加载更多', 100);
+  ok(v.includes('加载中…') || v.includes('已加载 4 页'), '查询 7（checkOnly 的答案）：getNextPageParam 返回 false 时 hasNextPage 仍为 true，还能继续请求', v);
+  const withInv7 = code7.replace('<p>已加载', "<button onClick={() => queryClient.invalidateQueries({ queryKey: ['feed'] })}>刷新</button><p>已加载");
+  await runCodeIn(p, T7, withInv7, 800);
+  await clickIn(p, T7, '加载更多', 800);
+  await clickIn(p, T7, '刷新', 2500);
+  const c7b = await consoleOf(p, T7);
+  ok(
+    /cursor=0[\s\S]*cursor=4[\s\S]*cursor=0[\s\S]*cursor=4/.test(c7b.replace(/\n/g, ' ')) && (c7b.match(/请求 cursor/g) || []).length === 4,
+    '查询 7（课文说的）：数据失效后，按顺序重新请求已加载的每一页',
+    c7b,
+  );
   ok(p.errs.length === 0, 'tanstack-query 一课没有页面错误', p.errs.join('|'));
   await ctx.close();
 }
