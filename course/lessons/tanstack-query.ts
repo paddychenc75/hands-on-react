@@ -4,19 +4,21 @@ export default {
   id: 'tanstack-query',
   stage: 4,
   title: '数据请求：TanStack Query',
-  mins: 34,
+  mins: 46,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
     '能列出 useEffect 手写请求没有解决的三个问题：重复请求、没有缓存、数据过期',
     '能写出 useQuery：queryKey 包含查询用到的每个变量，并按加载中、出错、成功渲染',
     '能预测 staleTime 不同时，切回页面会不会发请求',
     '能用 useMutation 加 invalidateQueries，在修改数据后刷新列表',
+    '能区分 useQuery 的 status 和 fetchStatus，并预测两个组件用同一个 queryKey 时发出几次请求',
   ],
   keyPoints: [
     '问题：服务端数据需要缓存、去重、过期刷新和重试。用 useEffect 手写，每个组件都要重复这些代码。',
     "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
     '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。',
     '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
+    '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，约 7 秒后才报错。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
   ],
   quiz: [
@@ -60,45 +62,12 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>不要修改“迷你 Query 缓存”和 <code>fetchUser</code>。<code>fetchUser</code> 每次约 300 毫秒，用户 4 会失败。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
-    starter: `import { useSyncExternalStore, useEffect, useState } from 'react';
-
-// ===== 迷你 Query 缓存（不要修改） =====
-// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致（真库失败会先重试，见课文“常见坑”）。
-const cache = new Map();      // key -> { data, updatedAt, fetching, promise, error }
-const listeners = new Set();
-const notify = () => listeners.forEach(l => l());
-const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
-
-function fetchQuery(key, fn) {
-  const entry = cache.get(key) || {};
-  if (entry.promise) return entry.promise;                  // 去重：同一个 key 只发一次
-  const promise = fn().then(
-    data => { cache.set(key, { data, updatedAt: Date.now() }); notify(); },
-    error => { cache.set(key, { ...cache.get(key), error, fetching: false, promise: null }); notify(); }
-  );
-  cache.set(key, { ...entry, error: null, fetching: true, promise }); notify();
-  return promise;
-}
-
-function useQuery({ queryKey, queryFn, staleTime = 0 }) {
-  const key = JSON.stringify(queryKey);
-  const entry = useSyncExternalStore(subscribe, () => cache.get(key));
-  useEffect(() => {
-    const e = cache.get(key);
-    const stale = !e || !e.updatedAt || Date.now() - e.updatedAt > staleTime;
-    if (stale) fetchQuery(key, queryFn);
-  }, [key]); // 只写 key：queryFn 用到的变量都已在 key 里（见课文）
-  return {
-    data: entry && entry.data,
-    isPending: !entry || (entry.data === undefined && !entry.error),
-    isFetching: !!(entry && entry.fetching),
-    isError: !!(entry && entry.error),
-    error: entry && entry.error,
-  };
-}
+    task: '<ol class="task-steps"><li>不要修改“模拟后端”（<code>fetchUser</code>）。它不发真实请求，每次约 300 毫秒，用户 4 会失败。<code>QueryClient</code> 和 <code>QueryClientProvider</code> 已经写好。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>真库在请求失败后默认重试 3 次，约 7 秒后才显示错误。给 <code>useQuery</code> 加 <code>retry: false</code>（也可以写在 <code>new QueryClient</code> 的 <code>defaultOptions</code> 里），用户 4 才会立刻显示 <code>#error</code>。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
+    starter: `import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
 // ===== 模拟后端（不要修改） =====
+// 不发真实请求：fetchUser 返回 Promise，约 300 毫秒后成功；用户 4 不存在，会失败。
 const stats = { calls: 0 };   // 请求次数
 function fetchUser(id) {
   return new Promise((resolve, reject) => setTimeout(() => {
@@ -110,10 +79,13 @@ function fetchUser(id) {
   }, 300));
 }
 
+const queryClient = new QueryClient();
+
 // ===== 你的代码 =====
 function UserCard({ id }) {
   // 步骤 2：调用 useQuery。queryKey 要包含 id；queryFn 调用 fetchUser(id)。
   // 步骤 3：设置 staleTime，例如 60_000（1 分钟）。
+  // 步骤 5：真库失败后默认重试 3 次，约 7 秒后才报错。给它加 retry: false，用户 4 才会立刻出错。
 
   // 步骤 4：按状态渲染：
   //   加载中 → <p id="loading">加载中…</p>
@@ -125,52 +97,19 @@ function UserCard({ id }) {
 function App() {
   const [id, setId] = useState(1);
   return (
-    <div>
+    <QueryClientProvider client={queryClient}>
       {[1, 2, 3, 4].map(n => (
         <button key={n} data-id={n} onClick={() => setId(n)} disabled={n === id}>用户 {n}</button>
       ))}
       <UserCard id={id} />
-    </div>
+    </QueryClientProvider>
   );
 }`,
-    solution: `import { useSyncExternalStore, useEffect, useState } from 'react';
-
-// ===== 迷你 Query 缓存（不要修改） =====
-// useQuery({ queryKey, queryFn, staleTime }) 的用法和 TanStack Query 一致（真库失败会先重试，见课文“常见坑”）。
-const cache = new Map();      // key -> { data, updatedAt, fetching, promise, error }
-const listeners = new Set();
-const notify = () => listeners.forEach(l => l());
-const subscribe = (l) => { listeners.add(l); return () => listeners.delete(l); };
-
-function fetchQuery(key, fn) {
-  const entry = cache.get(key) || {};
-  if (entry.promise) return entry.promise;                  // 去重：同一个 key 只发一次
-  const promise = fn().then(
-    data => { cache.set(key, { data, updatedAt: Date.now() }); notify(); },
-    error => { cache.set(key, { ...cache.get(key), error, fetching: false, promise: null }); notify(); }
-  );
-  cache.set(key, { ...entry, error: null, fetching: true, promise }); notify();
-  return promise;
-}
-
-function useQuery({ queryKey, queryFn, staleTime = 0 }) {
-  const key = JSON.stringify(queryKey);
-  const entry = useSyncExternalStore(subscribe, () => cache.get(key));
-  useEffect(() => {
-    const e = cache.get(key);
-    const stale = !e || !e.updatedAt || Date.now() - e.updatedAt > staleTime;
-    if (stale) fetchQuery(key, queryFn);
-  }, [key]); // 只写 key：queryFn 用到的变量都已在 key 里（见课文）
-  return {
-    data: entry && entry.data,
-    isPending: !entry || (entry.data === undefined && !entry.error),
-    isFetching: !!(entry && entry.fetching),
-    isError: !!(entry && entry.error),
-    error: entry && entry.error,
-  };
-}
+    solution: `import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
 // ===== 模拟后端（不要修改） =====
+// 不发真实请求：fetchUser 返回 Promise，约 300 毫秒后成功；用户 4 不存在，会失败。
 const stats = { calls: 0 };   // 请求次数
 function fetchUser(id) {
   return new Promise((resolve, reject) => setTimeout(() => {
@@ -182,12 +121,15 @@ function fetchUser(id) {
   }, 300));
 }
 
+const queryClient = new QueryClient();
+
 // ===== 你的代码 =====
 function UserCard({ id }) {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ['user', id],
     queryFn: () => fetchUser(id),
     staleTime: 60_000,
+    retry: false,
   });
 
   if (isPending) return <p id="loading">加载中…</p>;
@@ -198,33 +140,35 @@ function UserCard({ id }) {
 function App() {
   const [id, setId] = useState(1);
   return (
-    <div>
+    <QueryClientProvider client={queryClient}>
       {[1, 2, 3, 4].map(n => (
         <button key={n} data-id={n} onClick={() => setId(n)} disabled={n === id}>用户 {n}</button>
       ))}
       <UserCard id={id} />
-    </div>
+    </QueryClientProvider>
   );
 }`,
-    faded: `// （迷你 Query 缓存、fetchUser 和 App 与起始代码相同，这里省略）
+    faded: `// （QueryClient、fetchUser 和 App 与起始代码相同，这里省略）
 
 function UserCard({ id }) {
   const { data, isPending, isError, error } = useQuery({
     /* ✏️ queryKey：缓存的名字，要包含 id */
     /* ✏️ queryFn：调用 fetchUser(id) */
     /* ✏️ staleTime：新鲜期，例如 1 分钟 */
+    /* ✏️ retry：失败后不重试，错误才会立刻显示 */
   });
 
   if (isPending) return <p id="loading">加载中…</p>;
   /* ✏️ 出错时：显示 #error，内容包含 error.message */
   return <p id="user">{data.name}</p>;
 }`,
-    hint: '课文里的 <code>User</code> 组件就是这样用 <code>useQuery</code> 的。想一想：如果 key 里没有 <code>id</code>，所有用户会共用哪一条缓存？',
+    hint: '课文里“真库：相同的 queryKey 共享请求”的 <code>UserName</code> 组件就是这样用 <code>useQuery</code> 的。想一想：如果 key 里没有 <code>id</code>，所有用户会共用哪一条缓存？用户 4 的错误迟迟不出现，是因为真库在重试。',
     exports: ['stats'],
     test: async t => {
       const stats = t.exports.stats;
       t.assert(stats && typeof stats.calls === 'number', '找不到 stats。不要修改模拟后端');
-      t.assert(/useQuery\s*\(/.test(t.source.replace(/function\s+useQuery\s*\(/, '')), '要在 UserCard 中调用 useQuery（步骤 2）');
+      t.assert(/useQuery\s*\(/.test(t.source), '要在 UserCard 中调用 useQuery（步骤 2）');
+      t.assert(/QueryClientProvider/.test(t.source), '不要删掉 App 里的 QueryClientProvider：useQuery 要从它拿到缓存');
       const btn = n => t.q('button[data-id="' + n + '"]');
       const shows = () => ({ loading: !!t.q('#loading'), error: t.text('#error'), user: t.text('#user') });
       await t.wait(60);
@@ -254,9 +198,12 @@ function UserCard({ id }) {
       await t.wait(450);
       t.assert(
         shows().error.includes('用户 4 不存在'),
-        '用户 4 请求失败，#error 应显示 error.message（“用户 4 不存在”），实际是“' + shows().error + '”（步骤 4）',
+        '用户 4 请求失败后，#error 应在约 0.5 秒内显示 error.message（“用户 4 不存在”），实际是“' +
+          shows().error +
+          '”。真库默认重试 3 次，要加 retry: false（步骤 4、5）',
       );
       t.assert(!shows().user && !shows().loading, '出错时不应显示 #user 或 #loading');
+      t.assert(stats.calls === 3, '用户 4 失败后不应重试，共应请求 3 次，实际 ' + stats.calls + ' 次（步骤 5）');
 
       await t.click(btn(3));
       await t.wait(450);
@@ -334,8 +281,69 @@ const { data: posts } = useQuery({
       explain:
         "缓存按 queryKey 存取，Query 只看 key 是否变化来决定要不要换一份数据。queryFn 用到的每个变量都要写进 key，这里应写成 ['todos', filter]。把 staleTime 设为 0 只会让同一个 key 更频繁地刷新，不会让 key 不同的数据分开。",
     },
+    {
+      q: `列表页在用户点开详情之前，先把已有的数据写进缓存。点进 <code>/users/1</code> 时，详情页会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">// 列表页（user.id 是数字 1）
+queryClient.setQueryData(['user', user.id], user);
+
+// 详情页（useParams 返回的 id 是字符串 '1'）
+const { id } = useParams();
+const { data } = useQuery({ queryKey: ['user', id], queryFn: () =&gt; fetchUser(id) });</code></pre></div>`,
+      options: ['立刻显示缓存里的用户，不发请求', '先显示缓存，再在后台请求', '缓存不命中：显示加载中，并请求用户', '报错：两个 key 的类型不一致'],
+      answer: 2,
+      explain:
+        "queryKey 按内容比较，数字 <code>1</code> 和字符串 <code>'1'</code> 是两个不同的 key，所以 <code>['user', 1]</code> 和 <code>['user', '1']</code> 是两份缓存。不会报错，只是白白多一次请求。修复：用 <code>Number(id)</code> 转成同一种类型。另外两点：对象里属性的顺序不影响 key（<code>{ a: 1, b: 2 }</code> 和 <code>{ b: 2, a: 1 }</code> 相同），数组里元素的顺序会影响。",
+    },
+    {
+      q: `下面两种 <code>onSuccess</code> 的写法，区别只有花括号。表单里的按钮写了 <code>disabled={mutation.isPending}</code>。哪种写法会让按钮一直禁用，直到列表重新获取完成？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">// 写法 A
+onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['todos'] }),
+
+// 写法 B
+onSuccess: () =&gt; { queryClient.invalidateQueries({ queryKey: ['todos'] }); },</code></pre></div>`,
+      options: ['写法 B', '两种都会：invalidateQueries 总是让 mutation 等它', '写法 A', '两种都不会：isPending 只表示 mutationFn 在运行'],
+      answer: 2,
+      explain:
+        '<code>onSuccess</code> 返回 Promise 时，mutation 会等它完成才结束。写法 A 的箭头函数把 <code>invalidateQueries</code> 返回的 Promise 交了出去，所以 <code>isPending</code> 一直是 true，直到列表重新获取完成。写法 B 加了花括号，没有 return，函数返回 undefined，<code>mutationFn</code> 一返回 mutation 就结束了。想让按钮等到列表更新，用 A；想让按钮马上恢复，用 B。',
+    },
   ],
   plays: {
+    '真库：useQuery 的状态字段': {
+      pkey: 'tanstack-query|真库：useQuery 的状态字段',
+      note: '用户 3 会失败。这个示例在 <code>QueryClient</code> 里关掉了重试（<code>retry: false</code>），所以错误立刻显示。真库默认失败后重试 3 次，间隔 1、2、4 秒，约 7 秒后 <code>status</code> 才变成 <code>error</code>。',
+    },
+    '真库：相同的 queryKey 共享请求': {
+      pkey: 'tanstack-query|真库：相同的 queryKey 共享请求',
+      predict: {
+        q: '页面上有三个 UserName：两个是用户 1，一个是用户 2。等它们都显示出名字，控制台里一共有几行“请求用户”？',
+        options: ['3 行：每个组件各请求一次', '2 行：用户 1 一次，用户 2 一次', '1 行', '4 行：三次请求，再加一次后台刷新'],
+        answer: 1,
+        explain:
+          "queryKey 相同的查询共享同一份缓存和同一个请求。两个 ['user', 1] 只发一次，['user', 2] 一次，共 2 行。点“再挂载一个用户 1”：名字立刻出现，控制台仍是 2 行，因为 staleTime 是 10 秒，缓存还新鲜。“3 行”是每个组件在 useEffect 里各自请求时的行为。",
+      },
+      note: '把 <code>staleTime: 10_000</code> 那一行删掉再运行，再点“再挂载一个用户 1”：名字仍然立刻出现，但控制台会多出一行请求。数据已经过期，新挂载的组件先显示缓存，同时在后台刷新。',
+    },
+    '真库：staleTime 决定重新挂载时请不请求': {
+      pkey: 'tanstack-query|真库：staleTime 决定重新挂载时请不请求',
+    },
+    '真库：mutation 成功后不失效缓存': {
+      pkey: 'tanstack-query|真库：mutation 成功后不失效缓存',
+      predict: {
+        q: '点一次“添加一条”，等 1 秒。列表显示几项？服务器里有几条？',
+        options: [
+          '列表 3 项，服务器 3 条：mutation 成功后列表自动刷新',
+          '列表 2 项，服务器 3 条：缓存没有被告知数据已经变了',
+          '列表 3 项，服务器 2 条：列表先显示，服务器稍后才保存',
+          '列表 2 项，服务器 2 条：这次添加失败了',
+        ],
+        answer: 1,
+        explain:
+          "mutation 只负责把修改发给服务器，不会自己去动查询缓存。控制台里“POST 添加”显示服务器已经有 3 条，但 ['todos'] 缓存里还是旧的 2 条，而且 staleTime 是 Infinity，没有别的时机触发刷新。把 onSuccess 里被注释掉的那行 invalidateQueries 取消注释，列表就会自动重新请求并变成 3 项。",
+      },
+      note: '取消注释 <code>client.invalidateQueries(...)</code> 再运行，点“添加一条”：控制台会在 POST 之后多出一行 GET，列表变成 3 项。',
+    },
+    '真库：乐观更新与回滚': {
+      pkey: 'tanstack-query|真库：乐观更新与回滚',
+      note: '<code>onMutate</code> 返回的对象，会作为 <code>onError</code> 的第 3 个参数传回来，所以能用它把旧数据写回去。无论成功还是失败，<code>onSettled</code> 里的 <code>invalidateQueries</code> 都让列表和服务器对齐。',
+    },
     '迷你 useQuery': {
       note: '对照控制台里的请求次数来观察：<ol class="task-steps"><li>两个组件请求同一数据，只发一次请求。第二个组件在 ① 处直接拿到进行中的 promise，这叫<b>请求去重</b>。</li><li>切回 5 秒内看过的用户，立刻显示，不发请求。</li><li>超过 5 秒再切回，先显示旧数据，同时在后台刷新。</li></ol>',
       predict: {

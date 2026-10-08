@@ -1,6 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { prepare } from '../../course/engine/exec.ts';
-import { REACT_VERSION, react19Path } from '../../course/engine/logic/runtime.ts';
+import { LIBS, REACT_VERSION, libPath, libsInSource, react19Path } from '../../course/engine/logic/runtime.ts';
 import { LESSONS } from '../../course/registry.ts';
 
 describe('运行时版本', () => {
@@ -51,5 +53,84 @@ describe('prepare：import 解析', () => {
     expect(out).not.toContain('import');
     expect(out).not.toMatch(/export default/);
     expect(out).toContain("return { App: typeof App !== 'undefined' ? App : undefined");
+  });
+});
+
+describe('第三方库：从 import 语句判断要加载哪些库', () => {
+  const names = (src: string) => libsInSource(src).map(l => l.name);
+  it('版本是具体的 x.y.z，文件名带库名和版本号', () => {
+    for (const l of LIBS) {
+      expect(l.version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(libPath(l)).toBe(`runtime/${l.slug}-${l.version}.dev.js`);
+    }
+  });
+  it('固定的版本和 package.json 里装的版本一致', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../../package.json'), 'utf8'));
+    for (const l of LIBS) expect(pkg.devDependencies[l.name], l.name).toBe(l.version);
+  });
+  it('只用到 React 的示例不需要任何库', () => {
+    expect(names("import { useState } from 'react';\nimport { createRoot } from 'react-dom/client';\nfunction App(){}")).toEqual([]);
+    expect(names('function App(){ return <p>没有 import</p> }')).toEqual([]);
+  });
+  it('import react-router、@tanstack/react-query 才需要对应的库，两个都 import 就两个都要', () => {
+    expect(names("import { Link } from 'react-router';")).toEqual(['react-router']);
+    expect(names('import { useQuery } from "@tanstack/react-query";')).toEqual(['@tanstack/react-query']);
+    expect(names("import { useQuery } from '@tanstack/react-query';\nimport { Link } from 'react-router';")).toEqual(['react-router', '@tanstack/react-query']);
+  });
+  it('react-router/dom 也算 react-router；react-router-dom 和别的包不算', () => {
+    expect(names("import { RouterProvider } from 'react-router/dom';")).toEqual(['react-router']);
+    expect(names("import { Link } from 'react-router-dom';\nimport x from 'lodash';")).toEqual([]);
+  });
+  it('多行 import 和只写路径的 import 都能识别', () => {
+    expect(names("import {\n  createMemoryRouter,\n  Link,\n} from 'react-router';")).toEqual(['react-router']);
+    expect(names("import 'foo';\nimport { Link } from 'react-router';")).toEqual(['react-router']);
+  });
+  it('注释里和字符串里的包名不算', () => {
+    expect(names("// import { Link } from 'react-router';\n/* import x from '@tanstack/react-query'; */\nconst s = \"from 'react-router'\";")).toEqual([]);
+  });
+});
+
+describe('prepare：第三方库的 import 解析到加载好的库对象', () => {
+  const Babel = { transform: (code: string) => ({ code }) };
+  const router = { createMemoryRouter() {}, Link() {} };
+  const rt = {
+    React: { useState() {} },
+    ReactDOM: { createRoot() {} },
+    libs: { 'react-router': router, 'react-router/dom': { RouterProvider() {} }, '@tanstack/react-query': { useQuery() {} } } as Record<string, unknown>,
+  };
+  const run = (src: string, r: any = rt) => {
+    (globalThis as any).window = { Babel };
+    try {
+      return prepare(src, [], r);
+    } finally {
+      delete (globalThis as any).window;
+    }
+  };
+  it('具名导入从 __libs 里取，import 语句本身被去掉', () => {
+    const out = run("import { createMemoryRouter, Link } from 'react-router';\nfunction App(){}");
+    expect(out).toContain('const { createMemoryRouter, Link } = __libs["react-router"];');
+    expect(out).not.toContain('import');
+  });
+  it('as 别名写成解构重命名；type 导入被忽略', () => {
+    expect(run("import { Link as L, type To } from 'react-router';\nfunction App(){}")).toContain('const { Link: L } = __libs["react-router"];');
+    expect(run("import type { To } from 'react-router';\nfunction App(){}")).not.toContain('__libs');
+  });
+  it('命名空间导入和默认导入得到整个模块对象', () => {
+    expect(run("import * as RR from 'react-router';\nfunction App(){}")).toContain('const RR = __libs["react-router"];');
+    expect(run("import RR, { Link } from 'react-router';\nfunction App(){}")).toContain('const RR = __libs["react-router"];');
+  });
+  it('react-router/dom 和 @tanstack/react-query 各取各的模块', () => {
+    const out = run("import { RouterProvider } from 'react-router/dom';\nimport { useQuery } from '@tanstack/react-query';\nfunction App(){}");
+    expect(out).toContain('const { RouterProvider } = __libs["react-router/dom"];');
+    expect(out).toContain('const { useQuery } = __libs["@tanstack/react-query"];');
+  });
+  it('和 react 的 import 混用时，两边都解析', () => {
+    const out = run("import { useState } from 'react';\nimport { Link } from 'react-router';\nfunction App(){}");
+    expect(out).toContain('const { useState } = React;');
+    expect(out).toContain('const { Link } = __libs["react-router"];');
+  });
+  it('库还没有加载就 import：给出提示，不是难懂的 undefined 报错', () => {
+    expect(() => run("import { Link } from 'react-router';\nfunction App(){}", { ...rt, libs: {} })).toThrow(/react-router 还没有加载/);
+    expect(() => run("import { Link } from 'react-router';\nfunction App(){}", { React: rt.React, ReactDOM: rt.ReactDOM })).toThrow(/还没有加载/);
   });
 });

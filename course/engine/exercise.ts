@@ -4,7 +4,9 @@ import { maybeComplete } from './completion.ts';
 import { explainError } from './logic/errors.ts';
 import { LADDER, fadedExample, isAttempt, isPastedSolution, ladderButton, normCode } from './logic/ladder.ts';
 import { esc } from './logic/text.ts';
+import { libsInSource } from './logic/runtime.ts';
 import { makePlayground } from './playground.ts';
+import { loadLibs } from './runtime.ts';
 import { lp, save } from './store.ts';
 import { TestFail, makeTester } from './tester.ts';
 import { el, highlight, sleep, smooth } from './util.ts';
@@ -73,6 +75,7 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
         show('hint', '这还是参考答案的原文。点“重置”，不看答案，自己从头写一遍再检查。写出来的过程才是练习本身。');
         return;
       }
+      await loadLibs(libsInSource(code)); // 学习者在编辑器里新加了库：先加载
       const res = pg._run();
       if (res.error) throw new TestFail('代码无法运行：' + explainError(res.error));
       await sleep(80);

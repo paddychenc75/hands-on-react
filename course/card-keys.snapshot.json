@@ -211,6 +211,8 @@
     "router#c4": "4cb58408",
     "router#c5": "ce0d8dbf",
     "router#c6": "e7db2548",
+    "router#c7": "ad8d8005",
+    "router#c8": "799ee98b",
     "tanstack-query#0": "09fb4591",
     "tanstack-query#1": "69e4c641",
     "tanstack-query#2": "6340ecd1",
@@ -220,6 +222,8 @@
     "tanstack-query#c2": "104ea418",
     "tanstack-query#c3": "677e3474",
     "tanstack-query#c4": "5aa4cc6e",
+    "tanstack-query#c5": "de47a49c",
+    "tanstack-query#c6": "f5f1a890",
     "testing#0": "99fa2539",
     "testing#1": "b14328a7",
     "testing#2": "20b894b2",
@@ -424,6 +428,11 @@
     "error-handling|根级回调：谁收到错误？",
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？"
+    "perf-clinic|memo 挡得住 Context 吗？",
+    "router|真库：动态段与嵌套路由里的 state",
+    "router|真库：loader 运行期间的导航状态",
+    "router|真库：errorElement 替换哪一块",
+    "tanstack-query|真库：相同的 queryKey 共享请求",
+    "tanstack-query|真库：mutation 成功后不失效缓存"
   ]
 }

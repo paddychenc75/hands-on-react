@@ -62,11 +62,12 @@ function Todos() {
 
 ## 自己动手：迷你 useQuery
 
-实验台里不安装第三方库，所以本课分三层：
+先自己写一个带缓存的**迷你版**，看清原理。实验台也能运行真的 TanStack Query，所以本课分四层：
 
 1. **迷你实现**（本节和下一节）：用 `useSyncExternalStore` 实现一个带缓存的迷你 useQuery，弄懂缓存、去重和过期刷新，并通过预测检验自己的理解。
-2. **本机任务**（课末）：在你的电脑上装真库，把同样的实验做一遍，并按清单自查。
-3. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库做依赖查询、错误处理和测试。
+2. **真库示例**（“用真的 TanStack Query”一节）：在实验台里运行 @tanstack/react-query 5.104.1，看状态字段、缓存共享、后台刷新、mutation 和乐观更新的真实行为。
+3. **本机任务**（课末）：在你的电脑上装真库，把同样的实验做一遍，并按清单自查。
+4. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库做依赖查询、错误处理和测试。
 
 注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：queryFn 每次渲染换成新函数，不会触发重新请求；它只认 queryKey。
 
@@ -221,6 +222,7 @@ function App() {
 ```
 
 这个示例同样没有 `invalidateQueries`、重试和垃圾回收。真库在窗口重新获得焦点时的行为，由 `refetchOnWindowFocus` 控制，默认开启。
+
 ## useMutation：修改数据
 
 ```jsx title="修改后让相关缓存失效，是最简单可靠的同步方式"
@@ -277,6 +279,257 @@ useMutation({
   onError: (err, title, result) => queryClient.setQueryData(['todos'], result?.prev),
   onSettled: () => queryClient.invalidateQueries({ queryKey: ['todos'] }),
 });
+```
+
+## 用真的 TanStack Query
+
+下面的示例运行 @tanstack/react-query 5.104.1 的开发版（本课对真库行为的描述都按这个版本实测）。它只在示例用到时才加载。示例里的“服务器”都是返回 Promise 的模拟函数，不发任何网络请求。上面几节的 `useQuery`、`useMutation` 代码是只读的，这里全部可以运行。
+
+### QueryClientProvider 与 useQuery 的状态字段
+
+`QueryClient` 保存所有缓存。`QueryClientProvider` 把它交给下面的所有组件。`useQuery` 返回的状态分成两组，不要混在一起：
+
+- `status` 回答“有没有数据”：`pending`（还没有数据）、`error`（请求失败）、`success`（有数据）。`isPending`、`isError`、`isSuccess` 是它的简写。
+- `fetchStatus` 回答“请求在不在进行”：`fetching`（正在请求）、`paused`（想请求但没有网络）、`idle`（没有请求）。`isFetching` 是它的简写。
+
+两组状态互相独立。依次点“用户 2”“用户 3”，再点回“用户 1”，对照表格看每个字段怎么变。
+
+```jsx play title="真库：useQuery 的状态字段"
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+
+// ===== 模拟后端：不发真实请求，只返回 Promise（800 毫秒后成功；用户 3 不存在，会失败） =====
+const fetchUser = id => new Promise((resolve, reject) => setTimeout(() => {
+  if (id === 3) reject(new Error('用户 3 不存在'));
+  else resolve({ id, name: ['张三', '李四'][id - 1] });
+}, 800));
+
+// 真库默认在失败后重试 3 次（约 7 秒后才报错）。这里关掉重试，让错误立刻显示。
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function UserCard({ id }) {
+  const q = useQuery({ queryKey: ['user', id], queryFn: () => fetchUser(id) });
+  return (
+    <table>
+      <tbody>
+        <tr><td>status</td><td>{q.status}</td></tr>
+        <tr><td>fetchStatus</td><td>{q.fetchStatus}</td></tr>
+        <tr><td>isPending</td><td>{String(q.isPending)}</td></tr>
+        <tr><td>isFetching</td><td>{String(q.isFetching)}</td></tr>
+        <tr><td>data</td><td>{q.data ? q.data.name : '（没有）'}</td></tr>
+        <tr><td>error</td><td>{q.error ? q.error.message : '（没有）'}</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+function App() {
+  const [id, setId] = useState(1);
+  return (
+    <QueryClientProvider client={queryClient}>
+      {[1, 2, 3].map(n => <button key={n} onClick={() => setId(n)} disabled={n === id}>用户 {n}</button>)}
+      <UserCard id={id} />
+    </QueryClientProvider>
+  );
+}
+```
+
+点回“用户 1”时，表格是 `success` 加 `fetching`：缓存里有数据，所以先显示它；`staleTime` 默认是 0，数据已经过期，所以同时在后台请求。`pending` 只在“还没有任何数据”时出现。
+
+### queryKey 与缓存共享
+
+相同的 `queryKey` 共享同一份缓存和同一个请求。先预测，再运行。
+
+```jsx play title="真库：相同的 queryKey 共享请求"
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+
+// ===== 模拟后端：每次调用都在控制台记一行 =====
+let calls = 0;
+const fetchUser = id => new Promise(resolve => {
+  calls++;
+  console.log('🌐 请求用户 ' + id + '（累计 ' + calls + ' 次）');
+  setTimeout(() => resolve({ id, name: ['张三', '李四'][id - 1] }), 600);
+});
+
+const queryClient = new QueryClient();
+
+function UserName({ id }) {
+  const { data, isPending } = useQuery({
+    queryKey: ['user', id],
+    queryFn: () => fetchUser(id),
+    staleTime: 10_000,                       // 10 秒内认为数据是新鲜的
+  });
+  return <li>用户 {id}：{isPending ? '加载中…' : data.name}</li>;
+}
+
+function App() {
+  const [extra, setExtra] = useState(false);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ul>
+        <UserName id={1} />
+        <UserName id={1} />
+        <UserName id={2} />
+        {extra && <UserName id={1} />}
+      </ul>
+      <button onClick={() => setExtra(true)} disabled={extra}>再挂载一个用户 1</button>
+    </QueryClientProvider>
+  );
+}
+```
+
+### staleTime 与后台刷新
+
+组件隐藏再显示，就是卸载再挂载。缓存不会随组件卸载而删除（没有组件使用的缓存默认保留 5 分钟，这个时间叫 `gcTime`）。重新挂载时，Query 看这份数据新不新鲜，决定要不要请求。按下面的顺序试：
+
+1. 保持 `staleTime` 为 0。点“隐藏时钟”，再点“显示时钟”。
+2. 选“30 秒”，再隐藏、显示。数据在 30 秒内，不会请求。
+
+```jsx play title="真库：staleTime 决定重新挂载时请不请求"
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+
+// ===== 模拟后端：返回“服务器时间”，每次调用在控制台记一行 =====
+let calls = 0;
+const fetchTime = () => new Promise(resolve => {
+  calls++;
+  console.log('🌐 请求服务器时间（累计 ' + calls + ' 次）');
+  setTimeout(() => resolve({ at: new Date().toLocaleTimeString('zh-CN'), n: calls }), 600);
+});
+
+const queryClient = new QueryClient();
+
+function Clock({ staleTime }) {
+  const { data, isPending, isFetching } = useQuery({ queryKey: ['time'], queryFn: fetchTime, staleTime });
+  if (isPending) return <p>⏳ 首次加载中…</p>;
+  return <p>服务器时间 {data.at}（第 {data.n} 次请求）{isFetching && <small>　后台刷新中…</small>}</p>;
+}
+
+function App() {
+  const [staleTime, setStaleTime] = useState(0);
+  const [shown, setShown] = useState(true);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <label>staleTime：
+        <select value={staleTime} onChange={e => setStaleTime(Number(e.target.value))}>
+          <option value={0}>0（默认）</option>
+          <option value={30000}>30 秒</option>
+        </select>
+      </label>
+      <button onClick={() => setShown(!shown)} style={{ marginLeft: 8 }}>{shown ? '隐藏' : '显示'}时钟</button>
+      {shown && <Clock staleTime={staleTime} />}
+    </QueryClientProvider>
+  );
+}
+```
+
+第 1 步里，旧时间先显示出来，旁边出现“后台刷新中…”，随后换成新时间。第 2 步里，控制台没有新的请求行。
+
+### useMutation 与 invalidateQueries
+
+`useMutation` 负责修改服务器上的数据。`mutate` 的参数会交给 `mutationFn`。修改成功后，缓存里的列表还是旧的，需要告诉 Query“这份数据过期了”：`invalidateQueries` 把匹配的缓存标为过期，正在显示的会立刻重新请求。先预测，再运行。
+
+```jsx play title="真库：mutation 成功后不失效缓存"
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+// ===== 模拟后端：数据只存在这个数组里，不发真实请求 =====
+const db = [{ id: 1, title: '读完这一课' }, { id: 2, title: '写一个 useQuery' }];
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function listTodos() {
+  await sleep(300);
+  console.log('🌐 GET 待办（服务器里有 ' + db.length + ' 条）');
+  return [...db];
+}
+async function addTodo(title) {
+  await sleep(300);
+  db.push({ id: Date.now(), title });
+  console.log('🌐 POST 添加“' + title + '”（服务器里有 ' + db.length + ' 条）');
+}
+
+const queryClient = new QueryClient();
+
+function Todos() {
+  const client = useQueryClient();
+  // staleTime 设成 Infinity：数据永远算新鲜，不会因为别的原因自己刷新，现象更干净
+  const { data = [] } = useQuery({ queryKey: ['todos'], queryFn: listTodos, staleTime: Infinity });
+  const add = useMutation({
+    mutationFn: addTodo,
+    onSuccess: () => {
+      // client.invalidateQueries({ queryKey: ['todos'] });
+    },
+  });
+  return (
+    <div>
+      <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+      <button disabled={add.isPending} onClick={() => add.mutate('新任务 ' + (data.length + 1))}>
+        {add.isPending ? '保存中…' : '添加一条'}
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  return <QueryClientProvider client={queryClient}><Todos /></QueryClientProvider>;
+}
+```
+
+### 乐观更新：先改缓存，失败再回滚
+
+下面的示例用缓存写法。点“添加一条”：新的一行立刻出现，1 秒后变成正式数据。勾选“服务器拒绝保存”再点一次：新的一行先出现，1 秒后消失，并显示回滚提示。
+
+```jsx play title="真库：乐观更新与回滚"
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+// ===== 模拟后端：数据只存在这个数组里。勾选“服务器拒绝保存”后，添加会失败 =====
+const db = [{ id: 1, title: '读完这一课' }];
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function listTodos() {
+  await sleep(300);
+  return [...db];
+}
+async function addTodo({ title, fail }) {
+  await sleep(1000);
+  if (fail) throw new Error('服务器拒绝保存');
+  db.push({ id: Date.now(), title });
+}
+
+const queryClient = new QueryClient();
+
+function Todos() {
+  const client = useQueryClient();
+  const [fail, setFail] = useState(false);
+  const [message, setMessage] = useState('');
+  const { data = [] } = useQuery({ queryKey: ['todos'], queryFn: listTodos });
+  const add = useMutation({
+    mutationFn: addTodo,
+    onMutate: async ({ title }) => {
+      setMessage('');
+      await client.cancelQueries({ queryKey: ['todos'] });   // 先取消进行中的请求，免得它回来盖掉乐观数据
+      const prev = client.getQueryData(['todos']);           // 保存旧数据
+      client.setQueryData(['todos'], old => [...(old ?? []), { id: 'temp', title: title + '（保存中）' }]);
+      return { prev };                                       // 返回值会交给 onError
+    },
+    onError: (err, vars, result) => {
+      client.setQueryData(['todos'], result.prev);           // 失败：把旧数据写回去
+      setMessage('已回滚：' + err.message);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ['todos'] }),   // 无论成败，都和服务器对齐
+  });
+  return (
+    <div>
+      <ul>{data.map(t => <li key={t.id}>{t.title}</li>)}</ul>
+      <button onClick={() => add.mutate({ title: '新任务 ' + (data.length + 1), fail })}>添加一条</button>
+      <label style={{ marginLeft: 8 }}><input type="checkbox" checked={fail} onChange={e => setFail(e.target.checked)} />服务器拒绝保存</label>
+      <p style={{ color: 'crimson' }}>{message}</p>
+    </div>
+  );
+}
+
+function App() {
+  return <QueryClientProvider client={queryClient}><Todos /></QueryClientProvider>;
+}
 ```
 
 ## 常见坑

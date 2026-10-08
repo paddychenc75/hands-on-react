@@ -2,9 +2,10 @@
 import type { Exercise, Predict } from '../types.ts';
 import { makeEditor, type Editor } from './editor.ts';
 import { seeded } from './logic/random.ts';
+import { libsInSource } from './logic/runtime.ts';
 import { esc, fmtOpt } from './logic/text.ts';
 import { Runner, getActiveRunner, installHooks, setActiveRunner } from './runner.ts';
-import { getRuntime, type Runtime } from './runtime.ts';
+import { getRuntime, loadLibs, type Runtime } from './runtime.ts';
 import { lp, progress, save } from './store.ts';
 import { el, smooth, toast } from './util.ts';
 
@@ -57,7 +58,16 @@ export function makePlayground({
   // 版本标记：全站同一个版本，用很淡的小字
   const rtTag = el('span', { class: 'pg-rt', title: '这个实验台运行的 React 版本' }, 'React ' + runtime.reactVersion);
   box.dataset.react = runtime.reactVersion;
-  head.append(rtTag, resetBtn, runBtn);
+  // 用到第三方库（react-router、@tanstack/react-query）时，再显示一个同样风格的淡色标记：库名和版本
+  const libTag = el('span', { class: 'pg-lib', title: '这个实验台加载的第三方库（固定版本的开发版）' });
+  libTag.hidden = true;
+  const updateLibTag = () => {
+    const used = libsInSource(editor.value).filter(l => runtime.libVersions[l.name]);
+    libTag.hidden = used.length === 0;
+    libTag.textContent = used.map(l => l.name + ' ' + runtime.libVersions[l.name]).join(' · ');
+    box.dataset.libs = used.map(l => l.name + '@' + runtime.libVersions[l.name]).join(',');
+  };
+  head.append(rtTag, libTag, resetBtn, runBtn);
 
   progress.__pred = progress.__pred || {};
   const preds = progress.__pred;
@@ -93,12 +103,30 @@ export function makePlayground({
   }
 
   const runner = new Runner(mount, cons, runtime);
+  updateLibTag();
   function run() {
     if (!revealed) return {};
     clearTimeout(timer);
     setActiveRunner(runner);
     box._ran = true;
-    return runner.run(editor.value, exercise && exercise.exports);
+    // 学习者在编辑器里新加了还没加载的库：先加载，再运行
+    const missing = libsInSource(editor.value).filter(l => !runtime.libVersions[l.name]);
+    if (missing.length) {
+      const gen = runner.gen;
+      mount.innerHTML = '<div class="pv-empty">正在加载 ' + missing.map(l => l.name).join('、') + '…</div>';
+      loadLibs(missing).then(
+        () => {
+          if (gen === runner.gen) run();
+        },
+        (e: Error) => {
+          mount.innerHTML = '<div class="pv-err">' + esc(e.message) + '</div>';
+        },
+      );
+      return {};
+    }
+    const res = runner.run(editor.value, exercise && exercise.exports);
+    updateLibTag();
+    return res;
   }
   function showVerdict() {
     const chosen = preds[predictKey];
