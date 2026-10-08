@@ -619,7 +619,7 @@ function App() {
       ],
       answer: 0,
       explain:
-        'role 只改变读屏软件读出的角色，不添加任何行为（第 26 课讲过）。ul 没有 tabIndex，就不能聚焦。keydown 只发给有焦点的元素，所以 handleKeyDown 永远不会执行。用鼠标点 li 也不会让 ul 获得焦点。修法：给 ul 加 tabIndex={0}。aria-activedescendant 方案里，容器必须是那个真正拿着焦点的元素。',
+        'role 只改变读屏软件读出的角色，不添加任何行为（第 27 课讲过）。ul 没有 tabIndex，就不能聚焦。keydown 只发给有焦点的元素，所以 handleKeyDown 永远不会执行。用鼠标点 li 也不会让 ul 获得焦点。修法：给 ul 加 tabIndex={0}。aria-activedescendant 方案里，容器必须是那个真正拿着焦点的元素。',
     },
   ],
   plays: {

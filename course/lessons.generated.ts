@@ -8,6 +8,7 @@ import l_concurrent from './lessons/concurrent.ts';
 import l_conditional from './lessons/conditional.ts';
 import l_context from './lessons/context.ts';
 import l_custom_hooks from './lessons/custom-hooks.ts';
+import l_delivery from './lessons/delivery.ts';
 import l_engineering from './lessons/engineering.ts';
 import l_error_handling from './lessons/error-handling.ts';
 import l_escape_hatches from './lessons/escape-hatches.ts';
@@ -39,6 +40,7 @@ import l_state_architecture from './lessons/state-architecture.ts';
 import l_state_at_scale from './lessons/state-at-scale.ts';
 import l_state from './lessons/state.ts';
 import l_streaming_ssr from './lessons/streaming-ssr.ts';
+import l_styling from './lessons/styling.ts';
 import l_suspense_data from './lessons/suspense-data.ts';
 import l_suspense from './lessons/suspense.ts';
 import l_tanstack_query from './lessons/tanstack-query.ts';
@@ -57,6 +59,7 @@ export const LESSON_MODULES: Record<string, Lesson> = {
   'conditional': l_conditional,
   'context': l_context,
   'custom-hooks': l_custom_hooks,
+  'delivery': l_delivery,
   'engineering': l_engineering,
   'error-handling': l_error_handling,
   'escape-hatches': l_escape_hatches,
@@ -88,6 +91,7 @@ export const LESSON_MODULES: Record<string, Lesson> = {
   'state-at-scale': l_state_at_scale,
   'state': l_state,
   'streaming-ssr': l_streaming_ssr,
+  'styling': l_styling,
   'suspense-data': l_suspense_data,
   'suspense': l_suspense,
   'tanstack-query': l_tanstack_query,

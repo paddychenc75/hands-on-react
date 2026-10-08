@@ -1,7 +1,7 @@
 // 逐课测试（由旧版 tests/lessons.mjs 移植）：打开每一课，滚动让每个实验台运行，回答预测题，
 // 把参考答案（solution）填进练习点“检查答案”，要求每道练习 PASS，且没有意外的 .pv-err / .err。
 // 用法：node tests/e2e/lessons.mjs [课 id ...]      （先 npm run build）
-// 期望最后一行：lessons 47 with issues 0。PAGEERR 行多数是课程示例故意抛出的错误（例如 suspense 课的 boom），不计入问题。
+// 期望最后一行：lessons 49 with issues 0。PAGEERR 行多数是课程示例故意抛出的错误（例如 suspense 课的 boom），不计入问题。
 import { launch, openSite, lessonUrl, lessonData, lessonOrder } from './_site.mjs';
 
 const only = process.argv.slice(2);

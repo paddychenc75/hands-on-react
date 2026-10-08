@@ -12,7 +12,7 @@ title: "表单与校验架构"
 
 <LessonProse>
 
-第 8 课写了受控表单，第 26 课给字段加了 label 和错误提示，第 28 课看了表单 Actions。这些都是单个技巧。真实的注册、下单、设置页面要把它们组合起来，还会遇到新的问题：字段多了会卡；规则在客户端和服务器各写一遍，慢慢就不一致；用户名检查的结果乱序返回；用户连点两次，订单提交了两次。
+第 8 课写了受控表单，第 27 课给字段加了 label 和错误提示，第 29 课看了表单 Actions。这些都是单个技巧。真实的注册、下单、设置页面要把它们组合起来，还会遇到新的问题：字段多了会卡；规则在客户端和服务器各写一遍，慢慢就不一致；用户名检查的结果乱序返回；用户连点两次，订单提交了两次。
 
 本课把一个表单拆成五个决策，最后看 React 19 的 Actions 怎样接管其中几个。每个决策都有默认答案，也有不适用的情况。
 
@@ -187,7 +187,7 @@ function App() {
 
 为什么用 touched 而不是 dirty？用户 Tab 经过一个必填字段、什么都没填就离开，dirty 是 false，错误不会出现。可这正是该提醒的时候。
 
-错误要能被读屏软件读到。第 26 课讲过三件套：`aria-invalid`、`aria-describedby` 指向错误文字、错误文字说明怎样改。表单级还要再做两件事：
+错误要能被读屏软件读到。第 27 课讲过三件套：`aria-invalid`、`aria-describedby` 指向错误文字、错误文字说明怎样改。表单级还要再做两件事：
 
 - 提交失败时，把焦点移到第一个出错的字段。否则键盘用户不知道问题在哪里。
 - 不要给每个字段的错误都加 `role="alert"`。用户离开一个字段就被打断一次。字段错误靠 aria-describedby，在聚焦时读出就够了。
@@ -263,7 +263,7 @@ function App() {
 
 注册分三步：账号、资料、确认。常见的错误是每一步的组件用自己的 useState 保存字段。切到下一步时，上一步的组件被卸载，state 随之丢失，点“上一步”看到的是空表单。
 
-解决办法是把所有步骤的数据和当前步数提升到父组件，用一个 reducer 管理（第 11 课）。每一步只负责收集和校验自己的字段。
+解决办法是把所有步骤的数据和当前步数提升到父组件，用一个 reducer 管理（第 12 课）。每一步只负责收集和校验自己的字段。
 
 ```jsx title="多步表单：数据在 reducer 里，步骤组件可以随意卸载"
 const initial = { step: 0, data: { account: {}, profile: {} } };
@@ -469,7 +469,7 @@ React 18 的 `<form>` 不接受函数作为 `action`，也没有 `useActionState
 <details className="optional">
 <summary><span className="opt-tag">选读</span>React Hook Form 为什么快<small>可以先跳过，需要时再展开</small></summary>
 
-React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 43 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
+React Hook Form 的 `register('email')` 返回 `{ name, ref, onChange, onBlur }`，展开到原生 input 上，这就是第 45 课讲的 prop getter。字段是非受控的，值存在 DOM 和库内部的对象里，打字不触发 React 渲染。
 
 需要显示的东西（某个字段的错误、是否提交中）通过订阅读取。`formState` 是一个 Proxy：组件读了 `formState.errors`，才会在错误变化时重新渲染；没读 `isDirty`，它变化就不渲染。注意粒度是“哪一种状态”，不是“哪一个字段”：任何字段的错误变化，读了 `errors` 的组件都会渲染，而且渲染的是调用 `useForm` 的那个组件。想让一个字段的错误只重新渲染这个字段，把它拆成子组件，在里面用 `useFormState({ control, name: 'email' })`。拆出去的子组件所在的父组件自己不要再读 `formState`，否则父组件一渲染，子组件照样跟着渲染。校验交给 resolver，传入 Zod schema 即可：`useForm({ resolver: zodResolver(schema), mode: 'onTouched' })`。`mode: 'onTouched'` 就是本课第三节推荐的“离开时显示，显示后输入时更新”。
 

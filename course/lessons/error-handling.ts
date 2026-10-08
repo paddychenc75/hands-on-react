@@ -94,7 +94,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>完成 <code>ErrorBoundary</code>。它接收三个 props：<code>fallbackRender</code>（必填，调用时传入 <code>{ error, reset }</code>）、<code>onError</code>（可选，在 componentDidCatch 中调用，传入 error 和 info）、<code>resetKeys</code>（可选的数组）。</li><li>reset 清除错误，重新渲染子组件。resetKeys 中的某一项变化时，边界也自动重置。要求：一次故障只调用一次 onError；父组件传入新数组但值没变时，不能重置。</li><li>完成 <code>useAsyncError()</code>：返回一个函数。把错误传给它，最近的错误边界就显示备用界面。</li><li>Weather 的“刷新”按钮请求失败时，现在错误无人处理。用 useAsyncError 把它交给边界。为了突出错误处理，这里没有处理竞态；真实代码要像第 44 课那样丢弃旧请求的结果和错误。</li><li>在 App 中放置边界：个人资料和天气各用一个，备用界面用现成的 <code>WidgetFallback</code>，用 <code>report</code> 上报。选好每个边界的 resetKeys：切换用户或城市后，出错的面板自动恢复。一个面板出错时，另一个面板和“备忘”输入框都不受影响。</li><li>试一试：选“用户 3”（坏数据）；点“模拟故障”再点“刷新”。看控制台的上报。</li></ol>',
+    task: '<ol class="task-steps"><li>完成 <code>ErrorBoundary</code>。它接收三个 props：<code>fallbackRender</code>（必填，调用时传入 <code>{ error, reset }</code>）、<code>onError</code>（可选，在 componentDidCatch 中调用，传入 error 和 info）、<code>resetKeys</code>（可选的数组）。</li><li>reset 清除错误，重新渲染子组件。resetKeys 中的某一项变化时，边界也自动重置。要求：一次故障只调用一次 onError；父组件传入新数组但值没变时，不能重置。</li><li>完成 <code>useAsyncError()</code>：返回一个函数。把错误传给它，最近的错误边界就显示备用界面。</li><li>Weather 的“刷新”按钮请求失败时，现在错误无人处理。用 useAsyncError 把它交给边界。为了突出错误处理，这里没有处理竞态；真实代码要像第 46 课那样丢弃旧请求的结果和错误。</li><li>在 App 中放置边界：个人资料和天气各用一个，备用界面用现成的 <code>WidgetFallback</code>，用 <code>report</code> 上报。选好每个边界的 resetKeys：切换用户或城市后，出错的面板自动恢复。一个面板出错时，另一个面板和“备忘”输入框都不受影响。</li><li>试一试：选“用户 3”（坏数据）；点“模拟故障”再点“刷新”。看控制台的上报。</li></ol>',
     starter: `import { Component, useState, useEffect, useCallback } from 'react';
 
 // 模拟接口：failures 大于 0 时，请求失败

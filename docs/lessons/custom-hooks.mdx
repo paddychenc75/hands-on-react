@@ -19,7 +19,7 @@ title: "自定义 Hook：复用逻辑"
 
 <CallBox kind="deep" label="深入一点">
 
-为什么不能放在 if 里？因为 React **按调用顺序**识别每个 Hook。第 1 个 useState 是 1 号，第 2 个是 2 号，依此类推。React 用一个链表，按顺序保存每个 Hook 的 state。如果某次渲染跳过了一个 Hook，后面所有 Hook 的顺序都会错位，读到别人的状态。第 30 课会亲手实现这个机制。
+为什么不能放在 if 里？因为 React **按调用顺序**识别每个 Hook。第 1 个 useState 是 1 号，第 2 个是 2 号，依此类推。React 用一个链表，按顺序保存每个 Hook 的 state。如果某次渲染跳过了一个 Hook，后面所有 Hook 的顺序都会错位，读到别人的状态。第 31 课会亲手实现这个机制。
 
 </CallBox>
 

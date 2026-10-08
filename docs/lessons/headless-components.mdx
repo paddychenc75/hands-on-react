@@ -12,7 +12,7 @@ title: "组件库 API 设计：Headless 组件"
 
 <LessonProse>
 
-第 25 课写了 Tabs 和 Toggle。它们的标记和样式都写死在组件里。使用者想把 Tab 换成链接，或者换一套视觉，就只能复制代码再改。
+第 26 课写了 Tabs 和 Toggle。它们的标记和样式都写死在组件里。使用者想把 Tab 换成链接，或者换一套视觉，就只能复制代码再改。
 
 组件库越大，这个问题越严重。不同产品的视觉差别很大，但键盘行为、焦点管理、ARIA 属性的要求是一样的，而且最难写对。**Headless 组件**（无头组件）就是把这两部分拆开：库负责状态、行为和无障碍属性，使用者负责标记和样式。React Aria、Downshift、Headless UI、Radix 的底层都是这个思路。
 
@@ -20,7 +20,7 @@ title: "组件库 API 设计：Headless 组件"
 
 ## 一、受控与非受控：抽成 useControllableState
 
-第 25 课的 Toggle 自己判断受控。每个组件都写一遍，就会有的组件用 `value !== undefined` 判断，有的用 `value != null`，有的看有没有 onChange。组件库应该把这个判断抽成一个 Hook，所有组件共用。
+第 26 课的 Toggle 自己判断受控。每个组件都写一遍，就会有的组件用 `value !== undefined` 判断，有的用 `value != null`，有的看有没有 onChange。组件库应该把这个判断抽成一个 Hook，所有组件共用。
 
 这个 Hook 的规则有三条：
 
@@ -230,7 +230,7 @@ export default function App() {
 
 ## 三、Hook 加 Context：复合组件
 
-prop getters 最灵活，但使用者要自己写很多展开。大多数使用者更想写 `<Listbox.Option>`。第 25 课学过用 Context 组合复合组件。把两者叠起来，就得到组件库常见的三层结构：
+prop getters 最灵活，但使用者要自己写很多展开。大多数使用者更想写 `<Listbox.Option>`。第 26 课学过用 Context 组合复合组件。把两者叠起来，就得到组件库常见的三层结构：
 
 | 层 | 使用者写什么 | 适合谁 |
 |---|---|---|
@@ -344,7 +344,7 @@ React 18 的函数组件不能直接接收 `ref` prop，要用 `forwardRef` 包�
 
 ## 四、键盘焦点的两种方案
 
-列表、菜单、工具栏、标签页都是“一组项目”。WAI-ARIA 编写实践指南（APG）规定：整组只占 **一个** Tab 停靠点，组内用方向键移动。第 26 课讲过 Tab 顺序。这里要决定的是：方向键移动时，**真实的焦点**在哪里。
+列表、菜单、工具栏、标签页都是“一组项目”。WAI-ARIA 编写实践指南（APG）规定：整组只占 **一个** Tab 停靠点，组内用方向键移动。第 27 课讲过 Tab 顺序。这里要决定的是：方向键移动时，**真实的焦点**在哪里。
 
 - **roving tabindex**（流动的 tabindex）：焦点真的移到当前项。当前项 `tabIndex={0}`，其他项 `tabIndex={-1}`，按方向键时调用 `element.focus()`。
 - **aria-activedescendant**：焦点一直留在容器上。容器的 `aria-activedescendant` 写当前项的 id，读屏软件据此读出当前项。当前项的高亮由你用样式画出来。

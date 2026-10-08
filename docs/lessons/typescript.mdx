@@ -185,9 +185,9 @@ function App() {
 
 ## 可辨识联合：让矛盾的状态写不出来
 
-第 16 课里的搜索状态有“加载中、成功、出错”几种。如果写成 `{ loading: boolean; data?: string[]; error?: Error }`，就可能出现“既加载中又出错”这种不可能的组合。可辨识联合给每种状态一个固定的标签字段（这里是 `status`），每种状态只带自己需要的数据。
+第 17 课里的搜索状态有“加载中、成功、出错”几种。如果写成 `{ loading: boolean; data?: string[]; error?: Error }`，就可能出现“既加载中又出错”这种不可能的组合。可辨识联合给每种状态一个固定的标签字段（这里是 `status`），每种状态只带自己需要的数据。
 
-```tsx title="第 16 课的搜索状态可以这样写（下一节的 action 也是）"
+```tsx title="第 17 课的搜索状态可以这样写（下一节的 action 也是）"
 type SearchState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -352,7 +352,7 @@ function App() {
 
 ## 本机任务：给待办应用加 5 处类型
 
-这一课的类型检查只能在本机做。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite + `react-ts` 项目里，用第 9 课的待办应用（或任何小应用）做下面 5 件事，每件事都要让 `npx tsc -b` 通过。
+这一课的类型检查只能在本机做。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite + `react-ts` 项目里，用第 10 课的待办应用（或任何小应用）做下面 5 件事，每件事都要让 `npx tsc -b` 通过。
 
 1. **props**：给 `TodoItem` 等组件的 props 写类型。
 2. **事件**：给输入框的 `onChange` 和表单的 `onSubmit` 处理函数写参数类型。

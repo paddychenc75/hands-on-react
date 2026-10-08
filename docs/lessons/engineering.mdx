@@ -43,7 +43,7 @@ npm run dev
 | 场景 | 推荐 |
 |---|---|
 | 纯客户端应用、后台管理系统、学习练手 | **Vite**（本课的主线） |
-| 需要 SEO、服务端渲染、Server Components | **Next.js**（App Router，第 37 课）或 **React Router** 框架模式 |
+| 需要 SEO、服务端渲染、Server Components | **Next.js**（App Router，第 39 课）或 **React Router** 框架模式 |
 | 移动端 App | **React Native** + Expo |
 
 Create React App 已于 2025 年 2 月被官方弃用，新项目不要再用。
@@ -65,7 +65,7 @@ my-app/
    └─ index.css        全局样式
 ```
 
-`main.tsx` 里的 `createRoot` 把根组件挂到页面上的 `<div id="root">`。根组件外面包着 `<StrictMode>`，这是第 18 课讲过的开发期检查。
+`main.tsx` 里的 `createRoot` 把根组件挂到页面上的 `<div id="root">`。根组件外面包着 `<StrictMode>`，这是第 19 课讲过的开发期检查。
 
 三条命令要记住：
 
@@ -279,10 +279,10 @@ function App() {
 
 | 工具 | 发现什么 | 怎么跑 |
 |---|---|---|
-| **TypeScript** | 类型对不上：传错 prop、拼错字段（第 33 课） | `npx tsc -b`（模板的 `npm run build` 已包含）。注意：`vite build` 本身只去掉类型，不做类型检查 |
+| **TypeScript** | 类型对不上：传错 prop、拼错字段（第 35 课） | `npx tsc -b`（模板的 `npm run build` 已包含）。注意：`vite build` 本身只去掉类型，不做类型检查 |
 | **ESLint** | 规则违反：Hook 用错、依赖数组缺项、导出方式不对 | `npm run lint` |
 | **格式化工具** | 缩进、引号、分号不统一 | Prettier 或 Biome，二选一，团队统一 |
-| **测试** | 行为改坏了（第 36 课） | `npx vitest run` |
+| **测试** | 行为改坏了（第 38 课） | `npx vitest run` |
 
 关于测试，这里只记一个原则：**测用户看到的和做的，不测实现细节**。把组件从 `useState` 改成 `useReducer`，界面行为没变，测试就不该失败。
 
@@ -299,9 +299,9 @@ export default defineConfig([
 ]);
 ```
 
-预设的名字和包含的规则随插件版本变化，**以 [插件的 README](https://github.com/facebook/react/tree/main/packages/eslint-plugin-react-hooks) 和 react.dev 为准**。遇到依赖数组警告，不要用 `eslint-disable` 让它闭嘴，要改代码。第 21 课讲过原因：它在提醒你过期闭包。
+预设的名字和包含的规则随插件版本变化，**以 [插件的 README](https://github.com/facebook/react/tree/main/packages/eslint-plugin-react-hooks) 和 react.dev 为准**。遇到依赖数组警告，不要用 `eslint-disable` 让它闭嘴，要改代码。第 22 课讲过原因：它在提醒你过期闭包。
 
-**React Compiler** 的原理在第 20 课讲过。在项目里启用它只需要两步（Vite，`@vitejs/plugin-react` 6 以上）：
+**React Compiler** 的原理在第 21 课讲过。在项目里启用它只需要两步（Vite，`@vitejs/plugin-react` 6 以上）：
 
 ```bash title="在本机终端里做：安装"
 npm install -D babel-plugin-react-compiler@latest @rolldown/plugin-babel
@@ -385,7 +385,7 @@ Netlify 的流程相同，识别的构建命令和输出目录也一样。GitHub
 
 ### 单页应用的路由回退
 
-如果你的应用用了 React Router（第 34 课），部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。解决办法：让服务器对找不到的路径一律返回 `index.html`，再由前端路由接管。
+如果你的应用用了 React Router（第 36 课），部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。解决办法：让服务器对找不到的路径一律返回 `index.html`，再由前端路由接管。
 
 ```json title="在本机项目里：vercel.json（放在项目根目录）"
 {
@@ -489,12 +489,12 @@ React 19 移除了下面这些 API：
 
 ## 本机任务清单
 
-用第 9 课的待办应用，或任何一个小应用。照着做，对照“应该看到”自查。
+用第 10 课的待办应用，或任何一个小应用。照着做，对照“应该看到”自查。
 
 | 任务 | 怎样做 | 应该看到 |
 |---|---|---|
 | 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-ts --eslint`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
-| 2. 搬代码并拆文件 | 把第 9 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件）。模板开启了严格的类型检查，原样搬进来的 JS 写法会让 `npm run build` 在 `tsc -b` 这一步失败（开发服务器不受影响，因为它只去掉类型）。先补上最少的类型：在类型文件里写 `export type Todo = { id: number; text: string; done: boolean }`，把 `useState([])` 改成 `useState<Todo[]>([])`，给函数参数标上类型，提交表单的处理函数参数写 `React.SubmitEvent<HTMLFormElement>`。类型的完整写法在[《TypeScript》](/lessons/typescript)里讲 | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错；`npx tsc -b` 和 `npm run build` 通过 |
+| 2. 搬代码并拆文件 | 把第 10 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件）。模板开启了严格的类型检查，原样搬进来的 JS 写法会让 `npm run build` 在 `tsc -b` 这一步失败（开发服务器不受影响，因为它只去掉类型）。先补上最少的类型：在类型文件里写 `export type Todo = { id: number; text: string; done: boolean }`，把 `useState([])` 改成 `useState<Todo[]>([])`，给函数参数标上类型，提交表单的处理函数参数写 `React.SubmitEvent<HTMLFormElement>`。类型的完整写法在[《TypeScript》](/lessons/typescript)里讲 | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错；`npx tsc -b` 和 `npm run build` 通过 |
 | 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红；`npx tsc -b` 报 `has no exported member`；浏览器页面变空白，控制台报 `does not provide an export named`；改回后恢复。（`Counter` 换成你自己的组件名。直接运行 `npx vite build` 会报 `Missing export`） |
 | 4. 样式（选读） | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
 | 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如先在组件里定义变量 `title`，再写 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |

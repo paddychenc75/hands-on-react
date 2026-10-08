@@ -138,7 +138,7 @@ function App() {
   );
 }`,
     exports: ['Modal'],
-    hint: '回看第四节的 createPortal 示例：它包住的是什么，第二个参数是什么？Esc 的监听和第 15 课 useWindowWidth 里的 effect 结构相同：添加监听，返回清理函数。',
+    hint: '回看第四节的 createPortal 示例：它包住的是什么，第二个参数是什么？Esc 的监听和第 16 课 useWindowWidth 里的 effect 结构相同：添加监听，返回清理函数。',
     faded: `import { useState, useEffect, useId } from 'react';
 import * as ReactDOM from 'react-dom';
 

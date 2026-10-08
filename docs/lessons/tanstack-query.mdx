@@ -12,7 +12,7 @@ title: "数据请求：TanStack Query"
 
 <LessonProse>
 
-第 14 课我们用 useEffect 请求数据。那时要自己处理 loading、error 和竞态。真实应用还会遇到更多问题：
+第 15 课我们用 useEffect 请求数据。那时要自己处理 loading、error 和竞态。真实应用还会遇到更多问题：
 
 - 两个组件请求同一个接口，发了两次请求
 - 切走再切回页面，又要重新等待加载
@@ -23,7 +23,7 @@ title: "数据请求：TanStack Query"
 
 ## useQuery：读取数据
 
-```jsx title="和第 14 课的手写版本对比一下"
+```jsx title="和第 15 课的手写版本对比一下"
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
 const queryClient = new QueryClient();
@@ -69,7 +69,7 @@ function Todos() {
 3. **本机任务**（课末）：在你的电脑上装真库，把同样的实验做一遍，并按清单自查。
 4. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库做依赖查询、错误处理和测试。
 
-注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 14 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：queryFn 每次渲染换成新函数，不会触发重新请求；它只认 queryKey。
+注意 effect 的依赖数组只写了 `key`，没写 `queryFn`。这看起来违反了第 15 课“依赖数组不要撒谎”。原因是：依赖规则没有消失，它**搬到了 queryKey 上**。queryFn 用到的每个变量都必须写进 queryKey。所以 key 不变时，新的 queryFn 和旧的请求同一份数据，不需要重新请求。反过来，queryFn 每次渲染都是新函数，写进依赖会让 effect 每次渲染都重新执行。真实的 TanStack Query 也是这样：queryFn 每次渲染换成新函数，不会触发重新请求；它只认 queryKey。
 
 ```jsx play title="迷你 useQuery"
 import { useSyncExternalStore, useEffect, useState } from 'react';
@@ -267,7 +267,7 @@ function AddTodo() {
 3. 在 `onError` 中把旧数据写回去，并提示用户。
 4. 在 `onSettled` 中调用 `invalidateQueries`，和服务器对齐。
 
-```jsx title="React 19 的 useOptimistic 是另一种写法（第 28 课）"
+```jsx title="React 19 的 useOptimistic 是另一种写法（第 29 课）"
 useMutation({
   mutationFn: addTodo,
   onMutate: async (title) => {

@@ -120,7 +120,7 @@ function ClearButton() {
 
 <CallBox kind="deep" label="深入一点">
 
-真实项目常再写一个 `useCart()` 函数：里面调用 `useContext(CartContext)`，找不到 Provider 时抛出错误，提醒“必须在 CartProvider 里使用”。这种以 use 开头、内部调用 Hook 的函数叫自定义 Hook。第 15 课会讲它，学完可以回来看这个写法。
+真实项目常再写一个 `useCart()` 函数：里面调用 `useContext(CartContext)`，找不到 Provider 时抛出错误，提醒“必须在 CartProvider 里使用”。这种以 use 开头、内部调用 Hook 的函数叫自定义 Hook。第 16 课会讲它，学完可以回来看这个写法。
 
 </CallBox>
 
@@ -154,7 +154,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-**Context 的 value 变化时，所有读取它的组件都会重新渲染**。不要把变化频繁、又互不相关的数据都塞进一个巨大的 Context。解决方法：拆成多个 Context。例如把数据和修改数据的函数分开；函数那一份的引用要保持不变，第 11 课的 `dispatch` 就满足这一点，普通函数要用第 20 课的 useCallback、useMemo。也可以使用专门的状态管理库。
+**Context 的 value 变化时，所有读取它的组件都会重新渲染**。不要把变化频繁、又互不相关的数据都塞进一个巨大的 Context。解决方法：拆成多个 Context。例如把数据和修改数据的函数分开；函数那一份的引用要保持不变，第 12 课的 `dispatch` 就满足这一点，普通函数要用第 21 课的 useCallback、useMemo。也可以使用专门的状态管理库。
 
 另外注意：`value={{ items, add }}` 每次渲染都是一个新对象，Provider 所在的组件一重新渲染，所有读取者都跟着渲染。
 
