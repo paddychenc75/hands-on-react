@@ -347,7 +347,7 @@ for (const id of LESSONS) {
   const r2 = await page.evaluate(() => ({
     cta: document.querySelector('.home .cta .btn.primary')?.textContent,
     done: document.querySelectorAll('.home .stage li.done').length,
-    stat: document.querySelectorAll('.home .stats b')[4].textContent,
+    stat: [...document.querySelectorAll('.home .stats div')].find(d => d.textContent.includes('课已完成'))?.querySelector('b').textContent,
     meter: document.querySelector('.home .stage .meter span')?.textContent,
   }));
   ok(

@@ -53,7 +53,7 @@ export function makePlayground({
     el(
       'div',
       { class: 'pg-title' },
-      `<span class="pg-badge${exercise ? ' ex' : predict ? ' pr' : ''}">${predict ? 'PREDICT' : badge}</span><span>${esc(title || '动手试试')}</span>`,
+      `<span class="pg-badge${exercise ? (badge === 'DRILL' ? ' dr' : ' ex') : predict ? ' pr' : ''}">${predict ? 'PREDICT' : badge}</span><span>${esc(title || '动手试试')}</span>`,
     ),
   );
   const runBtn = el('button', { class: 'btn small primary', type: 'button' }, '▶ 运行');

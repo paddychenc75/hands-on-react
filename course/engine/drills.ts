@@ -8,6 +8,7 @@ import { libsInSource } from './logic/runtime.ts';
 import { esc } from './logic/text.ts';
 import { makePlayground } from './playground.ts';
 import { loadLibs } from './runtime.ts';
+import { paintFinish } from './completion.ts';
 import { drillRec, emitProgress, lp, save } from './store.ts';
 import { EnvFail, TestFail, makeTester } from './tester.ts';
 import { el, sleep, smooth, toast } from './util.ts';
@@ -79,6 +80,7 @@ function makeDrill(lesson: Lesson, d: Drill, i: number): HTMLDivElement {
       gate();
       paintBadge();
       emitProgress();
+      paintFinish(lesson); // 课末的掌握标准条显示变式进度
       if (first) toast(`变式 ${i + 1}/${total} 通过`);
       show('ok', p.exHelp ? '🎉 通过了（借助了参考答案）。过几天不看答案再写一遍，才算真正会了。' : '🎉 通过了！');
     } catch (e) {

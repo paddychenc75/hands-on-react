@@ -134,7 +134,7 @@ for (const [id, title, pick] of [
   ],
   [
     'state-architecture',
-    '真库',
+    '真库：persist',
     async pg => {
       await pg.page().waitForTimeout(300);
     },

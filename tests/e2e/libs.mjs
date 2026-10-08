@@ -99,7 +99,11 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn') && !text.includes('zustand persist middleware'),
     '站点主包里没有 react-router、@tanstack/react-query 和 zustand 的代码',
   );
-  ok(bytes < 1_000_000, '站点主包小于 1,000,000 字节（加库之前是 929,753，加库之后是 943,790）', String(bytes));
+  ok(
+    bytes < 1_300_000,
+    '站点主包小于 1,300,000 字节（加库之前是 929,753，加 zustand 后是 943,790；之后课程数据里加了变式练习和新小节，增长到约 1,127,000）',
+    String(bytes),
+  );
   const rt = path.join(ROOT, 'doc_build/runtime');
   const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query|zustand)-[\d.]+\.dev\.js$/.test(f));
   ok(libs.length === 3, 'doc_build/runtime 里有三个库文件', libs.join(','));
@@ -506,7 +510,7 @@ for (const [id, want, name, minMini] of [
   v = await clickIn(p, T3, '挂载写法 A', 500);
   c = await consoleOf(p, T3);
   ok(
-    v.startsWith('捕获到：Maximum update depth exceeded') && c.includes('The result of getSnapshot should be cached'),
+    v.startsWith('捕获到：Maximum update depth exceeded'), // getSnapshot 的警告在 React 里每个页面只发一次，前面的示例可能已经触发过，所以不查控制台
     'zustand 3（预测题答案）：v5 里选择器返回新对象，无限渲染，超过上限报错，由 Box 接住',
     v + ' / ' + c.slice(0, 120),
   );

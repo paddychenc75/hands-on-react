@@ -351,4 +351,4 @@ html.dark .btn.sun, html.dark .rp-doc .btn.sun, html.dark a[data-hoc-due]::after
 .drills { display: grid; gap: 28px; }
 .drill-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 8px; font-size: 16px; }
 .drill-no { font: 600 12px var(--f-mono); letter-spacing: .06em; color: var(--sun); border: 1px solid var(--sun); border-radius: 99px; padding: 1px 9px; white-space: nowrap; }
-.drill .pg-badge.ex { color: var(--violet); border-color: var(--violet); }
+.pg-head .pg-badge.dr { color: var(--violet); border-color: var(--violet); }
