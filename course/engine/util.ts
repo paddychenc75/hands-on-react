@@ -46,3 +46,14 @@ export function toast(msg: string, ms = 2200, actionLabel?: string, onAction?: (
   toastTimer = setTimeout(hide, ms);
 }
 export const smooth = (): ScrollBehavior => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
+/** 加载状态：一行安静的提示。CSS 里延迟 0.15 秒才淡入，数据很快到达时不会闪一下 */
+export const loadingBox = (text = '内容加载中…'): HTMLElement =>
+  el('div', { class: 'hoc-loading', role: 'status' }, `<i aria-hidden="true"></i><span>${esc(text)}</span>`);
+/** 加载失败：说明原因，并给出“重试” */
+export function errorBox(message: string, onRetry: () => void): HTMLElement {
+  const box = el('div', { class: 'hoc-loaderr', role: 'alert' }, `<span>${esc(message)}</span>`);
+  const b = el('button', { class: 'btn small', type: 'button' }, '重试');
+  b.addEventListener('click', onRetry);
+  box.appendChild(b);
+  return box;
+}

@@ -1,7 +1,7 @@
 /* 引擎的对外出口：theme/ 里的 React 薄包装只从这里 import。 */
 export { loadRuntime, loadLibs, getRuntime, LibLoadError } from './runtime.ts';
 export { STORE_KEY, PROGRESS_EVENT, emitProgress, progress, lp, drillRec, isDone } from './store.ts';
-export { toast } from './util.ts';
+export { toast, loadingBox, errorBox } from './util.ts';
 export { makePlayground, disposePlayground } from './playground.ts';
 export { makeExercise } from './exercise.ts';
 export { makeDrills, drillProgress } from './drills.ts';
@@ -17,7 +17,8 @@ export { buildHeroTree } from './home.ts';
 export { offerResume, savePos } from './reading.ts';
 export { doneCount, stageCount, dueCount } from './counts.ts';
 export { quizPassed, maybeComplete, paintFinish } from './completion.ts';
-export { srsAll, srsRecord, cardOf, dueCards, learnedCards, srcLine } from './cards.ts';
+export { srsAll, srsRecord, cardRefOf, dueRefs, learnedRefs, resolveCards, srcLine } from './cards.ts';
+export { loadLesson, loadLessons, loadedLesson, LessonLoadError } from './lessonData.ts';
 export { DAY, SRS_DAYS } from './logic/srs.ts';
 export { shuffled, seeded } from './logic/random.ts';
 export { fmtOpt } from './logic/text.ts';

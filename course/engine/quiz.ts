@@ -26,8 +26,8 @@ export function makeQuiz(lesson: Lesson): HTMLDivElement {
         }
         state[qi] = oi;
         save();
-        maybeComplete(lesson);
-        paintFinish(lesson);
+        maybeComplete(lesson.id);
+        paintFinish(lesson.id);
       },
       onRetry: () => {
         delete state[qi];

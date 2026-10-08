@@ -12,6 +12,8 @@
       "!tests/screenshots",
       "!course/card-keys.snapshot.json",
       "!course/lessons.generated.ts",
+      "!course/lessons.catalog.generated.ts",
+      "!course/lessons.loaders.generated.ts",
       "!package-lock.json",
       "!**/*.mdx",
       "!docs/public/downloads", // 给学习者下载的文件，按学习者项目（模板）的风格写，不按本仓库的风格

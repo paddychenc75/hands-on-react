@@ -1,5 +1,5 @@
 // 由 scripts/gen-registry.mjs 生成，不要手改。运行 npm run gen 更新（dev、build 会自动运行；check:content 会检查它是否最新）。
-// 这里只"收集"course/lessons 里的所有课；课程顺序在 course/order.ts。
+// Node 端收集 course/lessons 里的所有课；课程顺序在 course/order.ts。浏览器代码不要 import 这个文件（见 course/lessons.loaders.generated.ts）。
 import type { Lesson } from './types.ts';
 import l_accessibility from './lessons/accessibility.ts';
 import l_closures from './lessons/closures.ts';

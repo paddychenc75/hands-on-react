@@ -1,6 +1,6 @@
 /* 变式练习：正式练习之外的小任务。每道有自己的实验台和“检查答案”，进度单独记在 LessonProgress.dr，
    不影响“本课完成”（completion.ts 只看随堂测验和正式练习）。提示规则见 logic/drills.ts：失败 1 次给提示，失败 2 次可看参考答案。 */
-import type { Drill, Lesson } from '../types.ts';
+import type { Drill, Lesson, LessonMeta } from '../types.ts';
 import { explainError } from './logic/errors.ts';
 import { DRILL_LADDER, drillStat, drillLadderButton } from './logic/drills.ts';
 import { isAttempt, isPastedSolution, normCode } from './logic/ladder.ts';
@@ -14,7 +14,7 @@ import { EnvFail, TestFail, makeTester } from './tester.ts';
 import { el, sleep, smooth, toast } from './util.ts';
 
 /** 变式练习的完成情况，供跳转条和课末显示 */
-export const drillProgress = (lesson: Lesson) => drillStat(lp(lesson.id).dr, (lesson.drills || []).length);
+export const drillProgress = (lesson: LessonMeta) => drillStat(lp(lesson.id).dr, lesson.nDrills);
 
 function makeDrill(lesson: Lesson, d: Drill, i: number): HTMLDivElement {
   const total = lesson.drills.length;
@@ -80,7 +80,7 @@ function makeDrill(lesson: Lesson, d: Drill, i: number): HTMLDivElement {
       gate();
       paintBadge();
       emitProgress();
-      paintFinish(lesson); // 课末的掌握标准条显示变式进度
+      paintFinish(lesson.id); // 课末的掌握标准条显示变式进度
       if (first) toast(`变式 ${i + 1}/${total} 通过`);
       show('ok', p.exHelp ? '🎉 通过了（借助了参考答案）。过几天不看答案再写一遍，才算真正会了。' : '🎉 通过了！');
     } catch (e) {

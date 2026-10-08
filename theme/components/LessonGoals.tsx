@@ -17,12 +17,12 @@ export default function LessonGoals() {
     const calc = () => {
       const p: any = progress[lesson.id] || {};
       setOk({
-        'sec-quiz': !!p.quiz && (lesson.quiz || []).every((q: any, i: number) => p.quiz[i] === q.answer),
+        'sec-quiz': !!p.quiz && lesson.quizAnswers.every((answer, i) => p.quiz[i] === answer),
         'sec-ex': !!p.ex,
         'sec-self': !!(p.note && p.note.trim()),
-        'sec-drills': !!lesson.drills && drillStat(p.dr, lesson.drills.length).done === lesson.drills.length,
+        'sec-drills': lesson.nDrills > 0 && drillStat(p.dr, lesson.nDrills).done === lesson.nDrills,
       });
-      setDr(lesson.drills ? drillStat(p.dr, lesson.drills.length).done : 0);
+      setDr(lesson.nDrills ? drillStat(p.dr, lesson.nDrills).done : 0);
     };
     calc();
     window.addEventListener(PROGRESS_EVENT, calc);
@@ -30,9 +30,9 @@ export default function LessonGoals() {
   }, [lesson?.id]);
   if (!lesson) return null;
   const jumps: [string, string][] = [['sec-read', '正文']];
-  if (lesson.quiz && lesson.quiz.length) jumps.push(['sec-quiz', '随堂测验']);
-  if (lesson.exercise) jumps.push(['sec-ex', '动手练习']);
-  if (lesson.drills?.length) jumps.push(['sec-drills', `变式练习 ${dr}/${lesson.drills.length}`]);
+  if (lesson.quizAnswers.length) jumps.push(['sec-quiz', '随堂测验']);
+  if (lesson.hasExercise) jumps.push(['sec-ex', '动手练习']);
+  if (lesson.nDrills) jumps.push(['sec-drills', `变式练习 ${dr}/${lesson.nDrills}`]);
   jumps.push(['sec-self', '用自己的话讲一遍']);
   return (
     <div className="hoc">

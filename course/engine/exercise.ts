@@ -86,7 +86,7 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
       p.ex = true;
       save();
       gate();
-      maybeComplete(lesson);
+      maybeComplete(lesson.id);
       show(
         'ok',
         p.exHelp === 'rewrite'

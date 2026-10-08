@@ -3,7 +3,7 @@ import { useSlot } from '../lib/useSlot';
 
 export default function Quiz() {
   const { ref, lesson } = useSlot(l => makeQuiz(l));
-  const n = lesson?.quiz?.length ?? 0;
+  const n = lesson?.quizAnswers.length ?? 0;
   return (
     <section className="hoc">
       <div className="block-title" id="sec-quiz">

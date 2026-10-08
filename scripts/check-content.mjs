@@ -7,7 +7,7 @@
 //
 // 检查项：
 //   1. 课程登记：docs/lessons/*.mdx、course/lessons/*.ts、course/order.ts 一一对应；课 id 唯一；stage 在 0–5 且同阶段连续；
-//      course/lessons.generated.ts 是最新的；每个阶段有 docs/check/N.mdx。
+//      course/lessons.generated.ts、lessons.catalog.generated.ts、lessons.loaders.generated.ts 是最新的；每个阶段有 docs/check/N.mdx。
 //   2. 课文与数据：MDX 里 play 代码块的键在本课内唯一；数据 plays 的每个键都能在 MDX 里找到；pkey 写对；
 //      MDX 的 <Quiz />、<Exercise /> 和数据里的 quiz、exercise 对得上；MDX 标题和数据 title 一致。
 //   3. 题目（含 drills 变式练习的字段、localMins）：每道 quiz / checkOnly / predict 题的 options ≥ 2、answer 是合法下标、explain 非空；有 exercise 的课有 starter、solution、test。
@@ -16,7 +16,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { GENERATED, LESSON_DIR, ROOT, readGenerated, renderRegistry } from './lib/registry-gen.mjs';
+import { LESSON_DIR, ROOT, staleFiles } from './lib/registry-gen.mjs';
 import { parsePlayMeta } from '../plugins/remark-play.mjs';
 
 const args = process.argv.slice(2);
@@ -90,7 +90,7 @@ for (const [file, l] of Object.entries(lessons)) {
   }
 }
 for (let s = 0; s < STAGES.length; s++) if (!fs.existsSync(path.join(DOCS, 'check', s + '.mdx'))) fail(`docs/check/${s}.mdx`, `阶段 ${s} 没有阶段测验页`);
-if (readGenerated() !== renderRegistry()) fail(rel(GENERATED), '不是最新的（course/lessons 里的文件变了）', '运行 npm run gen');
+for (const f of await staleFiles()) fail(rel(f), '不是最新的（course/lessons 里的文件变了）', '运行 npm run gen');
 
 // ---------- 2. 课文与数据 ----------
 /** 扫描 MDX 的围栏代码块，返回 play 块：{ key, title, line }。跳过代码块以外的内容 */

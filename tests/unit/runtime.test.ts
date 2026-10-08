@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { prepare } from '../../course/engine/exec.ts';
 import { LIBS, REACT_VERSION, libPath, libsInSource, react19Path } from '../../course/engine/logic/runtime.ts';
-import { LESSONS } from '../../course/registry.ts';
+import { LESSON_MODULES } from '../../course/lessons.generated.ts';
 
 describe('运行时版本', () => {
   it('版本是具体的 19.x.y，资源文件名带版本号', () => {
@@ -11,7 +11,11 @@ describe('运行时版本', () => {
     expect(react19Path()).toBe(`runtime/react-${REACT_VERSION}.dev.js`);
   });
   it('课的数据里不再有 runtime 字段', () => {
-    expect(LESSONS.filter(l => 'runtime' in l).map(l => l.id)).toEqual([]);
+    expect(
+      Object.values(LESSON_MODULES)
+        .filter(l => 'runtime' in l)
+        .map(l => l.id),
+    ).toEqual([]);
   });
 });
 

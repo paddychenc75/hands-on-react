@@ -1,6 +1,6 @@
 /* 间隔复习（Leitner 盒子）的纯逻辑。不碰 DOM、localStorage，也不读 Date.now()：当前时间由调用方传入（now）。
    存储和取题在 course/engine/cards.ts。 */
-import type { Lesson, QuizItem, SrsCard } from '../../types.ts';
+import type { LessonMeta, QuizItem, SrsCard } from '../../types.ts';
 
 export const DAY = 864e5;
 /** 盒子 0..5 对应的复习间隔（天）。盒子 0 的 0 只是占位，没有参与计算：答错固定"明天再出"（见 nextCard），否则答错的题当天又会到期 */
@@ -8,11 +8,15 @@ export const SRS_DAYS = [0, 1, 3, 7, 16, 35];
 /** 刚答过（12 小时内）的题不拿来热身，否则只是在考短期记忆 */
 export const WARMUP_COOLDOWN = 12 * 36e5;
 
-/** 一张可出的题：键是 `课id#N`（随堂测验）或 `课id#cN`（阶段测验读代码题） */
-export interface Card {
+/** 一张题的引用（还没取到题目内容）：键是 `课id#N`（随堂测验）或 `课id#cN`（阶段测验读代码题）。
+ *  选题（热身、阶段测验）只需要引用；选好之后才按课加载题目（course/engine/cards.ts 的 resolveCards） */
+export interface CardRef {
   key: string;
-  l: Lesson;
+  l: LessonMeta;
   qi: number;
+}
+/** 一张可出的题：引用加上题目内容 */
+export interface Card extends CardRef {
   item: QuizItem;
 }
 
@@ -49,7 +53,7 @@ export const shouldRecord = (ok: boolean, card: SrsCard | undefined, now: number
 export const gatedNextCard = (card: SrsCard | undefined, ok: boolean, now: number): SrsCard => (shouldRecord(ok, card, now) ? nextCard(card, ok, now) : card);
 
 /** 热身题库：只考已经学过（答过题）的内容，并去掉刚答过的 */
-export function warmupPool(pool: Card[], srs: Record<string, SrsCard>, now: number): Card[] {
+export function warmupPool<T extends CardRef>(pool: T[], srs: Record<string, SrsCard>, now: number): T[] {
   return pool.filter(c => {
     const s = srs[c.key];
     return !(!s || (s.last && now - s.last < WARMUP_COOLDOWN));
@@ -57,16 +61,22 @@ export function warmupPool(pool: Card[], srs: Record<string, SrsCard>, now: numb
 }
 
 /** 热身选 2 题：先到期的 1 道、上一课的 1 道，不够再从到期、更早的课、上一课里补 */
-export function pickWarmup(pool: Card[], srs: Record<string, SrsCard>, prevLesson: Lesson | undefined, rnd: () => number, now: number): Card[] {
-  const mix = (arr: Card[]) =>
+export function pickWarmup<T extends CardRef>(
+  pool: T[],
+  srs: Record<string, SrsCard>,
+  prevLesson: LessonMeta | undefined,
+  rnd: () => number,
+  now: number,
+): T[] {
+  const mix = (arr: T[]) =>
     arr
-      .map((c): [number, Card] => [rnd(), c])
+      .map((c): [number, T] => [rnd(), c])
       .sort((a, b) => a[0] - b[0])
       .map(x => x[1]);
   const due = mix(pool.filter(c => srs[c.key] && srs[c.key].due <= now));
   const prev = mix(pool.filter(c => c.l === prevLesson));
   const older = mix(pool.filter(c => c.l !== prevLesson));
-  const picks: Card[] = [];
+  const picks: T[] = [];
   [...due.slice(0, 1), ...prev.slice(0, 1), ...due.slice(1), ...older, ...prev].forEach(c => {
     if (picks.length < 2 && !picks.includes(c)) picks.push(c);
   });

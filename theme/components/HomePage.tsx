@@ -23,8 +23,8 @@ export default function HomePage() {
     l => l.mins + (l.localMins || 0),
   );
   const hours = (mins: number) => Math.round((mins / 60) * 10) / 10;
-  const exCount = LESSONS.filter((l: any) => l.exercise).length;
-  const playCount = LESSONS.reduce((s: number, l: any) => s + Object.keys(l.plays || {}).length, 0);
+  const exCount = LESSONS.filter(l => l.hasExercise).length;
+  const playCount = LESSONS.reduce((s, l) => s + l.nPlays, 0);
   const learned = mounted ? Object.keys(progress.__srs || {}).length : 0;
   const st = (mounted && progress.__stage) || {};
   return (

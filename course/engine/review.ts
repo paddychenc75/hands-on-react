@@ -1,16 +1,34 @@
 /* 复习页：到期的卡片，或没有到期时的混合练习。 */
 import { LESSONS } from '../registry.ts';
 import { HOME_HREF, lessonHref } from '../site.ts';
-import { dueCards, learnedCards, srcLine, srsAll, srsRecordGated } from './cards.ts';
-import { DAY, nextDueAfter, type Card } from './logic/srs.ts';
+import { dueRefs, learnedRefs, resolveCards, srcLine, srsAll, srsRecordGated } from './cards.ts';
+import { DAY, nextDueAfter, type Card, type CardRef } from './logic/srs.ts';
 import { shuffled } from './logic/random.ts';
 import { makeQuestion } from './question.ts';
 import { emitProgress } from './store.ts';
-import { el } from './util.ts';
+import { el, errorBox, loadingBox } from './util.ts';
 
 export function makeReview(): HTMLDivElement {
   const stageArea = el('div');
-  const learned = learnedCards();
+  const learned = learnedRefs();
+  /** 选好题之后才加载它们所属的课（只这几课，并行）；加载中显示状态，失败给出重试 */
+  const startLoaded = (refs: CardRef[], label: string, into: HTMLElement) => {
+    const status = loadingBox('题目加载中…');
+    into.appendChild(status);
+    resolveCards(refs).then(
+      queue => {
+        status.remove();
+        start(queue, label);
+      },
+      () => {
+        const err = errorBox('题目没能加载（可能是网络问题）。', () => {
+          err.remove();
+          startLoaded(refs, label, into);
+        });
+        status.replaceWith(err);
+      },
+    );
+  };
   const start = (queue: Card[], label: string) => {
     let i = 0,
       right = 0;
@@ -58,7 +76,7 @@ export function makeReview(): HTMLDivElement {
     };
     step();
   };
-  const due = dueCards();
+  const due = dueRefs();
   if (!learned.length) {
     stageArea.appendChild(
       el(
@@ -68,11 +86,12 @@ export function makeReview(): HTMLDivElement {
       ),
     );
   } else if (due.length) {
-    start(
+    startLoaded(
       shuffled(due.length)
         .map(i => due[i])
         .slice(0, 20),
       '今日复习',
+      stageArea,
     );
   } else {
     const box = el(
@@ -81,14 +100,16 @@ export function makeReview(): HTMLDivElement {
       `<b>今天该复习的都复习完了 🎉</b><span>你已学过 ${learned.length} 道题。想多练一会儿，可以做一组从所有学过的课里随机抽取的混合题，答错的题会重新安排；还没到期的题答对不改变复习间隔。</span>`,
     );
     const extra = el('button', { class: 'btn primary', type: 'button' }, '来 10 道混合练习');
-    extra.addEventListener('click', () =>
-      start(
+    extra.addEventListener('click', () => {
+      extra.disabled = true;
+      startLoaded(
         shuffled(learned.length)
           .slice(0, 10)
           .map(i => learned[i]),
         '混合练习',
-      ),
-    );
+        box,
+      );
+    });
     box.appendChild(extra);
     stageArea.appendChild(box);
   }

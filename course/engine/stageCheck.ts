@@ -3,14 +3,14 @@
 import { LESSONS } from '../registry.ts';
 import { checkHref, lessonHref, reviewHref } from '../site.ts';
 import { STAGES } from '../stages.ts';
-import type { Lesson, StageRecord } from '../types.ts';
-import { cardOf, srcLine, srsAll, srsRecordGated } from './cards.ts';
-import { DAY, type Card } from './logic/srs.ts';
+import type { LessonMeta, StageRecord } from '../types.ts';
+import { checkRefs, quizRefs, resolveCards, srcLine, srsAll, srsRecordGated } from './cards.ts';
+import { DAY } from './logic/srs.ts';
 import { cooldownLeft, isPass, needsRetest, percent, pickStageQuestions, settlePending, settleResult } from './logic/stageCheck.ts';
 import { esc } from './logic/text.ts';
 import { makeQuestion, type QuestionElement } from './question.ts';
 import { emitProgress, progress, save } from './store.ts';
-import { el } from './util.ts';
+import { el, errorBox, loadingBox } from './util.ts';
 
 export function makeCheck(si: number): HTMLDivElement {
   const s = STAGES[si];
@@ -66,41 +66,57 @@ export function makeCheck(si: number): HTMLDivElement {
     }
     area.appendChild(el('p', { class: 'check-rule' }, '交卷模式：每题选一次，全部答完后统一显示对错和解析。中途离开按未通过记录。'));
     // 一半是课内见过的题，一半是只在阶段测验出现的新题，检验能否迁移
-    const pool: Card[] = [],
-      fresh: Card[] = [];
-    ls.forEach(l => (l.quiz || []).forEach((_item, qi) => pool.push(cardOf(l.id + '#' + qi))));
-    ls.forEach(l => (l.checkOnly || []).forEach((_item, qi) => fresh.push(cardOf(l.id + '#c' + qi))));
+    // 选题只用目录和进度（同步）；选好的 12 题才按课加载（只加载这些题所属的课，并行）
+    const pool = ls.flatMap(quizRefs),
+      fresh = ls.flatMap(checkRefs);
     const picks = pickStageQuestions(pool, fresh, srsAll());
     let answered = 0,
       right = 0;
-    const wrong = new Set<Lesson>(),
+    const wrong = new Set<LessonMeta>(),
       wrongQ: number[] = [],
       qels: QuestionElement[] = [];
-    picks.forEach((c, i) => {
-      const qel = makeQuestion(c.item, String(i + 1), {
-        shuffle: true,
-        footer: srcLine(c),
-        defer: true,
-        onAnswer: (_oi, ok) => {
-          answered++;
-          if (ok) right++;
-          else {
-            wrong.add(c.l);
-            wrongQ.push(i);
-          }
-          srsRecordGated(c.key, ok);
-          if (answered === picks.length) {
-            finish();
-            return;
-          }
-          rec0.pending = { n: picks.length, answered, right, at: Date.now(), weak: [...wrong].map(l => l.id) };
-          save();
+    const status = loadingBox('题目加载中…');
+    area.appendChild(status);
+    const load = () => {
+      resolveCards(picks).then(
+        cards => {
+          status.remove();
+          cards.forEach((c, i) => {
+            const qel = makeQuestion(c.item, String(i + 1), {
+              shuffle: true,
+              footer: srcLine(c),
+              defer: true,
+              onAnswer: (_oi, ok) => {
+                answered++;
+                if (ok) right++;
+                else {
+                  wrong.add(c.l);
+                  wrongQ.push(i);
+                }
+                srsRecordGated(c.key, ok);
+                if (answered === picks.length) {
+                  finish();
+                  return;
+                }
+                rec0.pending = { n: picks.length, answered, right, at: Date.now(), weak: [...wrong].map(l => l.id) };
+                save();
+              },
+            });
+            qel.id = 'cq-' + i;
+            qels.push(qel);
+            area.appendChild(qel);
+          });
         },
-      });
-      qel.id = 'cq-' + i;
-      qels.push(qel);
-      area.appendChild(qel);
-    });
+        () => {
+          const err = errorBox('题目没能加载（可能是网络问题）。', () => {
+            err.replaceWith(status);
+            load();
+          });
+          status.replaceWith(err);
+        },
+      );
+    };
+    load();
     function finish() {
       qels.forEach(q => q._reveal());
       const pct = percent(right, picks.length);

@@ -6,10 +6,10 @@ import { useSlot } from '../lib/useSlot';
 /** 变式练习：正式练习之外的 2–3 道小任务。不影响“本课完成”。 */
 export default function Drills() {
   const lesson = useLesson();
-  const [stat, setStat] = useState({ done: 0, total: lesson?.drills?.length ?? 0 });
+  const [stat, setStat] = useState({ done: 0, total: lesson?.nDrills ?? 0 });
   // biome-ignore lint/correctness/useExhaustiveDependencies: 依赖是课 id
   useEffect(() => {
-    if (!lesson?.drills) return;
+    if (!lesson?.nDrills) return;
     const calc = () => setStat(drillProgress(lesson));
     calc();
     window.addEventListener(PROGRESS_EVENT, calc);

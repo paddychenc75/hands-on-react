@@ -146,6 +146,28 @@ export interface Lesson {
   plays: Record<string, PlayMeta>;
 }
 
+/** 轻量课程目录里的一课：进主包，各页面同步需要的字段（标题、摘要、目标、时长、计数）。
+ *  由 scripts/gen-registry.mjs 从 course/lessons/<id>.ts 算出（course/lessons.catalog.generated.ts），题目、练习、示例说明等重数据在每课自己的异步 chunk 里（Lesson）。 */
+export interface LessonMeta {
+  id: string;
+  stage: StageIndex;
+  title: string;
+  mins: number;
+  localMins?: number;
+  summary: string;
+  /** 学习目标（静态 HTML 里要有，所以留在目录里） */
+  goals: string[];
+  /** 随堂测验的正确答案下标：长度 = 题数，用来在不加载题目的情况下判断“测验是否全对” */
+  quizAnswers: number[];
+  /** 阶段测验读代码题（checkOnly）的数量 */
+  nCheck: number;
+  hasExercise: boolean;
+  /** 变式练习数 */
+  nDrills: number;
+  /** 可运行示例数（plays 的键数） */
+  nPlays: number;
+}
+
 /** 术语表条目 */
 export interface GlossaryEntry {
   term: string;
