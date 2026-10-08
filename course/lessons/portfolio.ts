@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'portfolio',
   stage: 5,
+  runtime: 19,
   title: '毕业设计：从练习到作品集',
   mins: 18,
   summary: '在自己的电脑上做三个真正的项目，把这门课学到的一切用起来。本课约 18 分钟读完；三个项目在课外完成，合计约 50–80 小时。',

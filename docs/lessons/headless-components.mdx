@@ -161,7 +161,72 @@ function App() {
 
 - <strong>先展开使用者的 props，再写自己的属性。</strong>这样 role、aria-\* 这类必须正确的属性不会被意外覆盖。需要合并的（事件处理函数、className、style、ref）单独合并。
 - <strong>事件按固定顺序调用。</strong>常见约定是先调用使用者的，再执行 Hook 的。Downshift 还允许使用者设置一个标记，跳过 Hook 的默认行为。
-- <strong>ref 也要合并。</strong>Hook 常常需要元素的 ref（例如聚焦、滚动）。使用者也可能传 ref。React 18 中要写一个 mergeRefs，依次给每个 ref 赋值。
+- <strong>ref 也要合并。</strong>Hook 常常需要元素的 ref（例如聚焦、滚动）。使用者也可能传 ref。要写一个 mergeRefs，依次给每个 ref 赋值。React 19 里 ref 是普通 prop，函数组件直接从 props 取，不需要 forwardRef。ref 回调还可以返回清理函数，所以 mergeRefs 要收集并转发这些清理函数。
+
+下面的 Field 把使用者的 ref 和 Hook 内部的 ref 合并到同一个输入框上。使用者的 ref 回调返回了一个清理函数。先预测，再运行。
+
+```jsx play title="合并 ref：卸载时调用谁？"
+import { useRef, useState } from 'react';
+
+// 把多个 ref 合并成一个 ref 回调。React 19 的 ref 回调可以返回清理函数
+function mergeRefs(...refs) {
+  return (node) => {
+    const cleanups = refs.map((ref) => {
+      if (typeof ref === 'function') return ref(node);
+      if (ref) ref.current = node;
+    });
+    // 返回了清理函数，React 卸载时就只调用它，不再用 null 调用 ref 回调
+    return () => {
+      refs.forEach((ref, i) => {
+        if (typeof cleanups[i] === 'function') cleanups[i]();
+        else if (typeof ref === 'function') ref(null);
+        else if (ref) ref.current = null;
+      });
+    };
+  };
+}
+
+// Hook 自己也要用到输入框，所以它有一个内部 ref
+function useFocusable() {
+  const innerRef = useRef(null);
+  return {
+    focus: () => innerRef.current?.focus(),
+    getInputProps: (props = {}) => ({ ...props, ref: mergeRefs(innerRef, props.ref) }),
+  };
+}
+
+// React 19：函数组件直接从 props 里取 ref，不需要 forwardRef
+function Field({ ref, label }) {
+  const f = useFocusable();
+  return (
+    <p>
+      <label>{label} <input {...f.getInputProps({ ref })} /></label>{' '}
+      <button onClick={f.focus}>Hook 聚焦</button>
+    </p>
+  );
+}
+
+export default function App() {
+  const outerRef = useRef(null);
+  const [show, setShow] = useState(true);
+  return (
+    <div>
+      {show && (
+        <Field
+          label="姓名"
+          ref={(node) => {
+            console.log('使用者的 ref 回调收到：' + (node ? node.tagName : 'null'));
+            return () => console.log('使用者的 ref 清理函数被调用');
+          }}
+        />
+      )}
+      <button onClick={() => setShow(!show)}>{show ? '卸载 Field' : '挂载 Field'}</button>
+    </div>
+  );
+}
+```
+
+合并后的回调每次渲染都是新函数，React 会先调用旧的清理函数，再用新回调重新挂上 ref。真实的库会用 `useCallback` 记忆化合并后的 ref。
 
 ## 三、Hook 加 Context：复合组件
 
@@ -175,38 +240,107 @@ prop getters 最灵活，但使用者要自己写很多展开。大多数使用�
 
 上层只用下层，不重复实现行为。使用者先用最上层；不够用时，往下退一层，而不是给上层再加一个配置 prop。
 
-```jsx title="复合组件内部调用 headless Hook"
+下面的示例把一个很小的 `useListbox` 放在复合组件里。`Listbox` 调用 Hook，用 Context 把结果交给 `Option`。React 19 可以直接把 Context 当 Provider 用：`<ListboxContext value={…}>`。示例里的选项是直接子元素。先预测，再运行。
+
+```jsx play title="复合组件：选项被包了一层"
+import { Children, createContext, useContext, useId, useState } from 'react';
+
+// 一个很小的 headless Hook：状态 + 键盘 + aria，不画任何元素
+function useListbox({ options, defaultValue }) {
+  const [value, setValue] = useState(defaultValue);
+  const [active, setActive] = useState(0);
+  const baseId = useId();
+  const optionId = (i) => baseId + '-opt-' + i;
+  return {
+    value,
+    getListboxProps: (props = {}) => ({
+      ...props,
+      role: 'listbox',
+      tabIndex: 0,
+      'aria-activedescendant': optionId(active),
+      onKeyDown(e) {
+        if (e.key === 'ArrowDown') setActive((a) => Math.min(a + 1, options.length - 1));
+        else if (e.key === 'ArrowUp') setActive((a) => Math.max(a - 1, 0));
+        else if (e.key === 'Enter') setValue(options[active].value);
+        else return;
+        e.preventDefault();
+      },
+    }),
+    getOptionProps: (index) => ({
+      id: optionId(index),
+      role: 'option',
+      'aria-selected': options[index]?.value === value,
+      onClick: () => {
+        setActive(index);
+        setValue(options[index].value);
+      },
+    }),
+  };
+}
+
+// 复合组件：Listbox 调用 Hook，用 Context 把结果交给 Option
 const ListboxContext = createContext(null);
 
-function Listbox({ value, defaultValue, onChange, children, ...rest }) {
-  // 从 children 收集选项：这里假设 Option 都是直接子元素
-  const options = Children.toArray(children).map(c => ({ value: c.props.value }));
-  const lb = useListbox({ options, value, defaultValue, onChange });
+function Listbox({ defaultValue, children, ...rest }) {
+  // 从 children 收集选项：假设 Option 都是直接子元素
+  const options = Children.toArray(children).map((c) => ({ value: c.props.value }));
+  const lb = useListbox({ options, defaultValue });
   return (
-    <ListboxContext.Provider value={{ lb, options }}>
-      <ul {...lb.getListboxProps(rest)}>{children}</ul>
-    </ListboxContext.Provider>
+    <ListboxContext value={{ lb, options }}>
+      <ul {...lb.getListboxProps(rest)} style={{ listStyle: 'none', padding: 4, border: '1px solid #999', width: 140 }}>
+        {children}
+      </ul>
+      <small>选中：{String(lb.value)}</small>
+    </ListboxContext>
   );
 }
 
 function Option({ value, children }) {
   const { lb, options } = useContext(ListboxContext);
-  const index = options.findIndex(o => o.value === value);
-  return <li {...lb.getOptionProps(index)}>{children}</li>;
+  const index = options.findIndex((o) => o.value === value);
+  return (
+    <li {...lb.getOptionProps(index)} style={{ padding: '2px 8px', background: lb.value === value ? '#dbeafe' : 'none', color: '#222' }}>
+      {children}
+    </li>
+  );
 }
 Listbox.Option = Option;
 
-// 使用者只写结构，不碰键盘和 aria
-<Listbox aria-label="水果" defaultValue="banana">
-  <Listbox.Option value="apple">苹果</Listbox.Option>
-  <Listbox.Option value="banana">香蕉</Listbox.Option>
-</Listbox>
+export default function App() {
+  const [grouped, setGrouped] = useState(false);
+  return (
+    <div>
+      <button onClick={() => setGrouped(!grouped)}>{grouped ? '去掉分组 div' : '给选项包一层 div'}</button>
+      <Listbox aria-label="水果" defaultValue="banana">
+        {grouped ? (
+          <div>
+            <Listbox.Option value="apple">苹果</Listbox.Option>
+            <Listbox.Option value="banana">香蕉</Listbox.Option>
+          </div>
+        ) : (
+          [
+            <Listbox.Option key="a" value="apple">苹果</Listbox.Option>,
+            <Listbox.Option key="b" value="banana">香蕉</Listbox.Option>,
+          ]
+        )}
+      </Listbox>
+    </div>
+  );
+}
 ```
 
-这里有一个真实的难点：键盘导航需要知道“下一个选项是谁”，也就是选项的顺序。上面用 `Children.toArray` 读取，只认直接子元素。使用者给 Option 包一层 div，顺序就丢了。成熟的库有两种做法：
+使用者只写结构，不碰键盘和 aria。
+
+这里有一个真实的难点：键盘导航需要知道“下一个选项是谁”，也就是选项的顺序。上面用 `Children.toArray` 读取，只认直接子元素。使用者给 Option 包一层 div，顺序就丢了，示例里点击就会出错。成熟的库有两种做法：
 
 - **集合 API**：使用者传 `items` 数组，再用 render 函数渲染每一项。顺序明确，适合虚拟列表；写法不那么像 HTML。
 - **注册**：每个 Option 挂载时把自己的 ref 交给父组件，父组件按 DOM 位置排序（`compareDocumentPosition`）。写法自由；实现复杂，首次渲染时还拿不到顺序。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 的函数组件不能直接接收 `ref` prop，要用 `forwardRef` 包一层。ref 回调没有清理函数：卸载时 React 用 `null` 调用它。所以 React 18 的 mergeRefs 只要依次赋值，不需要转发清理函数。在 React 19 里，这样的 mergeRefs 会丢掉使用者 ref 回调返回的清理函数。Context 也要写成 `<ListboxContext.Provider value={…}>`，React 19 仍然支持这种写法。
+
+</CallBox>
 
 ## 四、键盘焦点的两种方案
 

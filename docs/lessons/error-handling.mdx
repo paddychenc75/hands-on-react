@@ -91,7 +91,13 @@ export default function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>开发版本会多报。</strong>React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以开发时，window 的 error 事件也会收到已被边界接住的错误（通常是两次：第一次渲染和同步重试各一次）。生产版本不会这样。React 19 取消了这个做法。测试全局上报时，用生产版本确认数量。
+<strong>被边界接住的错误，不会再到达 window。</strong>React 19 不再把渲染错误重新抛出。边界接住了，window 的 error 事件就收不到它，开发版和生产版都一样。上面的示例点 ① 时，window 的 error 事件是 0 次；点 ②，是 1 次。第六节会讲没被接住的错误怎样到达 window。
+
+</CallBox>
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 的开发版本会把渲染错误再抛到 window 上，方便调试器停在出错位置。所以在 React 18 的开发环境里，window 的 error 事件也会收到已被边界接住的错误，通常是两次：第一次渲染和同步重试各一次。生产版本不会这样。测试全局上报时，在生产版本里确认数量。
 
 </CallBox>
 
@@ -121,7 +127,9 @@ function Weather({ city }) {
 
 <CallBox kind="deep" label="深入一点">
 
-React 有时会在 set 函数被调用时，提前执行一次更新函数，用来判断新旧 state 是否相同（eager state）。源码在这里包了 try/catch，注释写着“错误会在渲染时再抛一次”。所以这个写法在 18.3.1 中可靠。React 19 中，`useTransition` 返回的 startTransition 里抛出的错误（包括 async 函数里的），以及 `use()` 读取的失败 Promise，都会直接交给边界，不需要这个技巧。从 react 直接导入的 startTransition 不行，它不属于任何组件。
+React 有时会在 set 函数被调用时，提前执行一次更新函数，用来判断新旧 state 是否相同（eager state）。源码在这里包了 try/catch：eager 阶段的错误被忽略，错误会在渲染时再抛一次。所以这个写法是可靠的。
+
+React 19 的新写法不需要这个技巧：`useTransition` 返回的 startTransition 里抛出的错误（包括 async 函数里的），以及 `use()` 读取的失败 Promise，都会直接交给最近的边界。从 react 直接导入的 startTransition 不行，它不属于任何组件，错误会到达 window。
 
 </CallBox>
 
@@ -283,11 +291,128 @@ document.addEventListener('visibilitychange', () => {
 
 </CallBox>
 
-## 六、根级回调：onRecoverableError
+## 六、根级回调：三个错误的出口
 
-有些错误 React 自己就恢复了，用户什么也看不到。例如水合时服务端 HTML 和客户端不一致，React 放弃水合，改为在客户端重新渲染。这类错误交给根的 `onRecoverableError`。
+边界之外，React 还在**根**上提供三个回调。`createRoot` 和 `hydrateRoot` 都接受它们。回调的第二个参数是 `{ componentStack }`，`onUncaughtError` 和 `onCaughtError` 的 `info` 里还有 `errorBoundary`（接住错误的边界实例，源码和类型定义里有，react.dev 的文档没有列出）。
 
-React 18.3.1 的 `createRoot` 和 `hydrateRoot` 都接受这个选项。回调收到两个参数：错误，以及 `{ componentStack, digest }`。不传时，React 用浏览器的 `reportError` 报告它。React 18 还有一个少有人知的行为：渲染出错后，React 会**同步重试一次**整次渲染。如果重试成功，第一次的错误就交给 onRecoverableError。
+| 回调 | 什么时候调用 | 不传时的默认行为 |
+|---|---|---|
+| `onCaughtError(error, info)` | 错误被某个边界接住 | 用 `console.error` 打印。内容是错误对象，加一句 `The above error occurred in the <Bomb> component.` 和边界的名字 |
+| `onUncaughtError(error, info)` | 没有任何边界接住：React 卸载整棵树 | 用 `window.reportError` 报告，所以 window 的 error 事件收到 1 次 |
+| `onRecoverableError(error, info)` | React 自己恢复了，例如水合不匹配后改为客户端渲染，或渲染出错后同步重试成功 | 同样用 `window.reportError` 报告 |
+
+你传了某个回调，就**替换**了对应的默认行为：React 不再调用 reportError，也不再打印。
+
+下面的示例另开了两个根，每次点按钮都新建一个，并传入三个回调。它们和实验台自己的根互不相干：实验台也用根回调把错误记到下方的控制台，这里的回调属于你自己的根。先预测，再运行。
+
+```jsx play title="根级回调：谁收到错误？"
+import { Component, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+
+class Boundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    console.log('边界的 componentDidCatch：' + error.message);
+  }
+  render() {
+    return this.state.error ? <p>边界的备用界面</p> : this.props.children;
+  }
+}
+
+function Bomb() {
+  throw new Error('渲染时出错');
+}
+
+const where = (info) => info.componentStack.trim().split('\n')[0].trim().replace(/ \(.*$/, '');
+
+export default function App() {
+  const boxRef = useRef(null);
+  const rootRef = useRef(null);
+
+  function mount(tree) {
+    rootRef.current?.unmount();
+    rootRef.current = createRoot(boxRef.current, {
+      onCaughtError(error, info) {
+        console.log('根的 onCaughtError：' + error.message + '，' + where(info));
+      },
+      onUncaughtError(error, info) {
+        console.log('根的 onUncaughtError：' + error.message + '，' + where(info));
+      },
+      onRecoverableError(error) {
+        console.log('根的 onRecoverableError：' + error.message);
+      },
+    });
+    rootRef.current.render(tree);
+  }
+
+  return (
+    <div>
+      <button onClick={() => mount(<Boundary><Bomb /></Boundary>)}>边界内出错</button>{' '}
+      <button onClick={() => mount(<Bomb />)}>边界外出错</button>
+      <div ref={boxRef} style={{ border: '1px dashed gray', padding: 8, marginTop: 8 }} />
+    </div>
+  );
+}
+```
+
+被边界接住的错误会到达两处：边界的 `componentDidCatch`（或 `onError` 之类的 props）和根的 `onCaughtError`。上报只放在一处，或者像第五节的 capture 那样去重。
+
+不传回调时，错误去哪里？下一个示例的根没有传任何回调，并在页面里数 window 的 error 事件。
+
+```jsx play title="不传回调：window 收到几次 error？"
+import { Component, useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+
+class Boundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    return this.state.error ? <p>边界的备用界面</p> : this.props.children;
+  }
+}
+
+function Bomb() {
+  throw new Error('渲染时出错');
+}
+
+export default function App() {
+  const boxRef = useRef(null);
+  const rootRef = useRef(null);
+  const [events, setEvents] = useState(0);
+
+  useEffect(() => {
+    const count = () => setEvents((n) => n + 1);
+    window.addEventListener('error', count);
+    return () => window.removeEventListener('error', count);
+  }, []);
+
+  function mount(tree) {
+    rootRef.current?.unmount();
+    setEvents(0);
+    // 这个根没有传任何错误回调
+    rootRef.current = createRoot(boxRef.current);
+    rootRef.current.render(tree);
+  }
+
+  return (
+    <div>
+      <button onClick={() => mount(<Boundary><Bomb /></Boundary>)}>边界内出错</button>{' '}
+      <button onClick={() => mount(<Bomb />)}>边界外出错</button>
+      <p>window 的 error 事件收到：{events} 次</p>
+      <div ref={boxRef} style={{ border: '1px dashed gray', padding: 8 }} />
+    </div>
+  );
+}
+```
+
+所以全局上报要覆盖三种来源：边界的 `onError`（或根的 `onCaughtError`）、根的 `onUncaughtError`、根的 `onRecoverableError`。window 的 error 和 unhandledrejection 事件接住其余的：事件处理函数、定时器和 Promise 里的错误。
+
+最后看 `onRecoverableError`。React 渲染出错后，会**同步重试一次**整次渲染。重试成功，页面正常显示，第一次的错误就交给 onRecoverableError。React 把它包成一个新错误，原始错误放在 `error.cause` 里。
 
 ```jsx play title="一次能恢复的渲染错误"
 import { useRef, useEffect } from 'react';
@@ -311,6 +436,7 @@ export default function App() {
     const root = createRoot(boxRef.current, {
       onRecoverableError(error, info) {
         console.log('onRecoverableError：' + error.message);
+        if (error.cause) console.log('原始错误（cause）：' + error.cause.message);
         console.log('组件栈：' + info.componentStack.trim().split('\n')[0].trim().replace(/ \(.*$/, ''));
       },
     });
@@ -332,29 +458,30 @@ export default function App() {
 }
 ```
 
-React 19 把根级回调补全了。下面的代码只能阅读，本课程的运行环境是 18.3.1：
+把三个回调接到上报模块，大致是这样：
 
-```jsx title="React 19 的三个根级错误回调（只能阅读）"
-// React 19：createRoot 和 hydrateRoot 都接受这三个回调
+```jsx title="根级回调接入上报"
 const root = createRoot(container, {
   // 没有任何边界接住：React 卸载整棵树
   onUncaughtError(error, info) {
     capture(error, { level: 'fatal', componentStack: info.componentStack });
   },
-  // 被某个边界接住。info.errorBoundary 是那个边界的实例（源码和类型定义里有，react.dev 的文档没有列出）
+  // 被某个边界接住
   onCaughtError(error, info) {
     capture(error, { level: 'error', componentStack: info.componentStack });
   },
-  // React 自动恢复了。有些错误把原始错误放在 error.cause 里
+  // React 自动恢复了。原始错误放在 error.cause 里
   onRecoverableError(error, info) {
     capture(error.cause || error, { level: 'warning', componentStack: info.componentStack });
   },
 });
 ```
 
-React 19 还改了默认行为。渲染错误不再被重新抛出：没被接住的错误默认交给 `window.reportError`，所以全局的 error 事件仍然能收到；被边界接住的错误默认只用 `console.error` 打印。你传了 onUncaughtError 或 onCaughtError，就**替换**了对应的默认行为：React 不再调用 reportError，也不再打印。另外，同一个被接住的错误会先后到达边界的 onError 和根的 onCaughtError。上报只放在一处，或者像上面的 capture 那样去重。
+<CallBox kind="tip" label="维护 React 18 项目时">
 
-在 React 18 中，没有这两个新回调。被边界接住的错误，靠边界的 onError 上报；没被接住的错误，React 会卸载整棵树，再把错误抛到 window，由全局的 error 事件接住。所以 React 18 项目需要**根边界 + 全局事件 + onRecoverableError** 三处配合。
+React 18 的 `createRoot` 和 `hydrateRoot` 只有 `onRecoverableError` 一个错误回调，没有 `onCaughtError` 和 `onUncaughtError`。被边界接住的错误，靠边界的 `onError` 上报；没被接住的错误，React 卸载整棵树，再把错误抛到 window，由全局的 error 事件接住。所以 React 18 项目需要**根边界 + 全局事件 + onRecoverableError** 三处配合。另外，React 18 的 `onRecoverableError` 收到的就是第一次渲染的原始错误，不是 19 的包装错误。
+
+</CallBox>
 
 <details className="optional">
 <summary><span className="opt-tag">选读</span>七、接入监控服务<small>可以先跳过，需要时再展开</small></summary>
@@ -362,7 +489,7 @@ React 19 还改了默认行为。渲染错误不再被重新抛出：没被接�
 自己写上报模块适合学习。生产环境通常用 Sentry 这类监控服务。它们的 SDK 做了上面所有事情，还有更多：
 
 - **自动收集**：全局错误、Promise 拒绝、请求失败、路由变化，并自动记录操作记录。
-- **React 集成**：提供现成的 ErrorBoundary 组件，自动带上组件栈；React 19 项目还可以把 SDK 的处理函数传给根级回调。
+- **React 集成**：提供现成的 ErrorBoundary 组件，自动带上组件栈；也可以把 SDK 的处理函数传给根级回调。
 - **source map**：构建时上传 source map，后台把压缩后的调用栈还原成源码位置。不要把 source map 公开部署到线上。
 - **按版本聚合**：同一个错误合并成一个“问题”，显示首次出现在哪个版本、影响了多少用户。
 - **隐私**：发送前删掉 token、邮箱、表单内容。默认只发必要字段。

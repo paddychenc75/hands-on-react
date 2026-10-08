@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'perf-clinic',
   stage: 5,
+  runtime: 19,
   title: '性能诊断实战',
   mins: 42,
   summary: '拿到一份不是你写的、很卡的代码。按“复现、测量、假设、修改、再测量”的流程找出病因，用数字证明修好了，并且功能不变。',
@@ -190,7 +191,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <ThemeContext value={{ theme, toggleTheme }}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -205,7 +206,7 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
@@ -318,7 +319,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={themeValue}>
+      <ThemeContext value={themeValue}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -333,7 +334,7 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
@@ -447,7 +448,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={themeValue}>
+      <ThemeContext value={themeValue}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -462,11 +463,12 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const h = React.createElement;
       const { App, probe, feed, ORDERS } = t.exports;
       t.assert(typeof App === 'function', '请保留名为 App 的组件');
@@ -591,9 +593,9 @@ function App() {
   }, []);
   const logout = () =&gt; setUser(null);
   return (
-    &lt;AuthContext.Provider value={{ user, logout }}&gt;
+    &lt;AuthContext value={{ user, logout }}&gt;
       &lt;Header now={now} /&gt; &lt;Avatar /&gt;
-    &lt;/AuthContext.Provider&gt;
+    &lt;/AuthContext&gt;
   );
 }</code></pre></div>`,
       options: ['从不：user 没变，memo 让它跳过', '只在挂载时渲染一次', '每秒两次：Header 和 Provider 各触发一次', '每秒一次：value 每次都是新对象'],

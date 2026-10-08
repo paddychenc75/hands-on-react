@@ -12,9 +12,9 @@ title: "表单与校验架构"
 
 <LessonProse>
 
-第 8 课写了受控表单，第 26 课给字段加了 label 和错误提示，第 28 课看了 React 19 的表单 Actions。这些都是单个技巧。真实的注册、下单、设置页面要把它们组合起来，还会遇到新的问题：字段多了会卡；规则在客户端和服务器各写一遍，慢慢就不一致；用户名检查的结果乱序返回；用户连点两次，订单提交了两次。
+第 8 课写了受控表单，第 26 课给字段加了 label 和错误提示，第 28 课看了表单 Actions。这些都是单个技巧。真实的注册、下单、设置页面要把它们组合起来，还会遇到新的问题：字段多了会卡；规则在客户端和服务器各写一遍，慢慢就不一致；用户名检查的结果乱序返回；用户连点两次，订单提交了两次。
 
-本课把一个表单拆成五个决策。每个决策都有默认答案，也有不适用的情况。
+本课把一个表单拆成五个决策，最后看 React 19 的 Actions 怎样接管其中几个。每个决策都有默认答案，也有不适用的情况。
 
 ## 一、数据放在哪里：受控、非受控与 FormData
 
@@ -82,6 +82,8 @@ function App() {
 | 输入时重新渲染 | 保存 state 的组件及其子树 | 没有 |
 | 适合 | 输入时就要格式化、字段之间联动、实时预览 | 字段多、只在提交时用值 |
 | 难点 | 大表单的性能 | 联动和“边输入边校验”要另外处理 |
+
+React 19 的 `<form action={fn}>` 就建立在这个思路上：提交时 React 把 FormData 直接交给 `fn`（第七节）。
 
 两者可以混用：大部分字段非受控，少数需要联动的字段受控。React Hook Form 的思路更进一步：字段默认非受控，用 ref 注册；打字不触发 React 渲染；错误、是否提交中这类表单状态要读取了才订阅，没读的状态变化不会引起渲染（见本课最后的选读）。
 
@@ -323,54 +325,146 @@ async function handleSubmit(e) {
 
 </CallBox>
 
-## 七、React 19 的表单 Actions（只能阅读）
+React 19 的 `<form action>` 提供了另一种写法：`isPending` 替你管理“提交中”，但它不会丢弃重复提交。第七节会跑一个例子。
 
-第 28 课讲过 `useActionState` 和 `useFormStatus`。它们正好接管了本课的几件事：Action 收到 FormData；返回值就是字段错误；isPending 就是提交中。下面的代码需要 React 19 和支持 Server Functions 的框架（这里以 Next.js 为例，`redirect` 来自 `next/navigation`），本页的运行环境是 18.3.1，只能阅读。
+## 七、用 Actions 接管提交
 
-```tsx title="React 19：同一份 schema，客户端组件 + Server Function"
-// schema.js：客户端和服务器共用
-export const signupSchema = z.object({
-  username: z.string().min(3, '用户名至少 3 个字符'),
-  email: z.email('邮箱格式不正确'),
-});
+[Actions 那一课](/lessons/react-19)讲过 `<form action={fn}>`、`useActionState` 和 `useFormStatus` 的用法。这里只看它们在表单架构里接管了什么：
 
-// actions.js
-'use server';
-export async function signup(prevState, formData) {
-  const values = Object.fromEntries(formData);
-  const result = signupSchema.safeParse(values);       // 服务器再校验一次
-  if (!result.success) return { values, errors: z.flattenError(result.error).fieldErrors };
-  if (await db.user.exists(values.username)) {          // 只有服务器能判断唯一
-    return { values, errors: { username: ['用户名已被占用'] } };
+- `<form action={fn}>`：提交时 React 在过渡更新里运行 `fn`，参数是 FormData，不需要 `onSubmit` 和 `preventDefault`。
+- `useActionState(fn, 初始值)`：返回 `[state, formAction, isPending]`。`fn` 的返回值就是下一个 state，所以字段错误可以直接作为返回值。`isPending` 就是第六节的 submitting。
+- `useFormStatus()`：在 `<form>` 内部的子组件里读取 `pending`，提交按钮不用再接收 props。
+
+还有一件事要记住：**Action 结束后，React 会重置表单里的非受控字段**，校验失败时也一样。下面的示例有两个表单，用的是同一个模拟服务器。先预测，再运行。
+
+```jsx play title="Action 表单：失败后输入框还剩什么？"
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+
+const rules = {
+  username: (v) => v.length >= 3 || '用户名至少 3 个字符',
+  email: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || '邮箱格式不正确',
+};
+function validate(values) {
+  const errors = {};
+  for (const key of Object.keys(rules)) {
+    const r = rules[key](values[key] ?? '');
+    if (r !== true) errors[key] = r;
   }
-  await db.user.create(result.data);
-  redirect('/welcome');
+  return errors;
 }
 
-// SignupForm.jsx
-'use client';
+// 模拟服务器：真实项目里这是 Server Function，或一个 fetch 请求
+async function signupOnServer(values) {
+  await new Promise((r) => setTimeout(r, 600));
+  const errors = validate(values); // 服务器再校验一次
+  if (Object.keys(errors).length) return { errors };
+  return { errors: {}, ok: true };
+}
+
+// A：失败时只返回 errors
+async function signupA(prev, formData) {
+  const values = Object.fromEntries(formData);
+  return await signupOnServer(values);
+}
+
+// B：失败时把输入的值一起返回
+async function signupB(prev, formData) {
+  const values = Object.fromEntries(formData);
+  return { ...(await signupOnServer(values)), values };
+}
+
 function SubmitButton() {
-  const { pending } = useFormStatus();                   // 必须在 form 内部的组件里调用
+  const { pending } = useFormStatus(); // 必须在 form 内部的组件里调用
   return <button disabled={pending}>{pending ? '提交中…' : '注册'}</button>;
 }
 
-export function SignupForm() {
-  const [state, formAction] = useActionState(signup, { values: {}, errors: {} });
+function SignupForm({ title, action, keepValues }) {
+  const [state, formAction] = useActionState(action, { errors: {}, values: {} });
+  const err = state.errors.username;
+  return (
+    <form action={formAction} style={{ marginBottom: 12 }}>
+      <b>{title}</b>{' '}
+      <input
+        name="username"
+        defaultValue={keepValues ? state.values.username : undefined}
+        aria-invalid={err ? true : undefined}
+      />{' '}
+      <SubmitButton />
+      {err && <small style={{ color: '#c0392b' }}> {err}</small>}
+      {state.ok && <small> 注册成功</small>}
+    </form>
+  );
+}
+
+export default function App() {
+  return (
+    <div>
+      <SignupForm title="A 只返回错误" action={signupA} />
+      <SignupForm title="B 连输入值一起返回" action={signupB} keepValues />
+    </div>
+  );
+}
+```
+
+所以用 Action 做表单，失败时要把 values 一起返回，再用 `defaultValue` 填回去。这和受控表单相反：受控表单的值一直在 state 里，不会丢。
+
+第六节说过，防重复提交要靠 ref，因为 state 是快照。Action 把这件事换成另一个问题：**同一个 `useActionState` 的多次提交不会被丢弃，而是排队依次执行**。按钮不禁用，连点就会提交多次。
+
+```jsx play title="Action 排队：连点会提交几次？"
+import { useActionState } from 'react';
+
+let running = 0;
+let calls = 0;
+
+async function register(prev, formData) {
+  const n = ++calls;
+  running++;
+  console.log('第 ' + n + ' 次 register 开始，同时在途 ' + running + ' 个');
+  await new Promise((r) => setTimeout(r, 500));
+  running--;
+  console.log('第 ' + n + ' 次 register 结束');
+  return { count: prev.count + 1 };
+}
+
+export default function App() {
+  const [state, formAction, isPending] = useActionState(register, { count: 0 });
   return (
     <form action={formAction}>
-      <input name="username" defaultValue={state.values.username}
-        aria-invalid={state.errors.username ? true : undefined}
-        aria-describedby={state.errors.username ? 'username-error' : undefined} />
-      {state.errors.username && <p id="username-error">{state.errors.username[0]}</p>}
-      <SubmitButton />
+      <input name="username" defaultValue="anna" />{' '}
+      <button>注册（不禁用）</button>
+      <p>已完成 {state.count} 次{isPending ? '，处理中…' : ''}</p>
     </form>
   );
 }
 ```
 
-Action 结束后，React 会重置表单里的非受控字段。所以校验失败时要把 values 一起返回，再用 `defaultValue` 填回去，否则用户要重填。
+所以按钮仍然要用 `isPending`（或 `useFormStatus` 的 `pending`）禁用。真正防重复靠服务器的幂等键。
 
-Actions 没有替你做的事：错误什么时候显示（它只在提交后返回错误）、异步检查的竞态、多步表单。同一个 useActionState 的多次提交会**排队依次执行**，不会自动去重，所以按钮仍然要禁用。
+Actions 没有替你做的事：错误什么时候显示（它只在提交后返回错误）、异步检查的竞态、多步表单。把 Action 接进真实项目，有两处和本页的模拟不同：
+
+```tsx title="真实项目：Server Function（需要 Next.js 这类框架，实验台不能运行）"
+// actions.js
+'use server';
+export async function signup(prevState, formData) {
+  const values = Object.fromEntries(formData);
+  const result = signupSchema.safeParse(values);       // 和客户端共用同一份 schema
+  if (!result.success) return { values, errors: z.flattenError(result.error).fieldErrors };
+  if (await db.user.exists(values.username)) {          // 只有服务器能判断唯一
+    return { values, errors: { username: ['用户名已被占用'] } };
+  }
+  await db.user.create(result.data);
+  redirect('/welcome');                                  // 来自 next/navigation
+}
+```
+
+一处是 `'use server'`：函数在服务器上运行，参数和返回值要能序列化。另一处是成功后的跳转，由框架提供（这里是 Next.js 的 `redirect`）。表单组件仍然是上面那样的 `useActionState` + `useFormStatus`。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 的 `<form>` 不接受函数作为 `action`，也没有 `useActionState` 和 `useFormStatus`。同样的结构要手写：`onSubmit` 里 `preventDefault`，用 `new FormData(e.currentTarget)` 读值，用 state 保存错误和提交中状态，防重复提交用第六节的 ref。
+
+</CallBox>
 
 <details className="optional">
 <summary><span className="opt-tag">选读</span>React Hook Form 为什么快<small>可以先跳过，需要时再展开</small></summary>
