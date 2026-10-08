@@ -3,8 +3,9 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'error-handling',
   stage: 5,
+  runtime: 19,
   title: '错误处理与监控',
-  mins: 41,
+  mins: 46,
   summary: '错误边界只是起点。学会把异步错误交给边界、让边界可以重置、决定边界放在哪一层，再把错误连同上下文送到监控服务。',
   goals: [
     '能判断一个错误会到达错误边界、window 的 error 事件，还是 unhandledrejection 事件',
@@ -17,7 +18,7 @@ export default {
     '要把异步错误交给边界，就让它在渲染期间再抛一次：<code>setState(() =&gt; { throw error; })</code>。更新函数在下次渲染时执行，错误就出现在渲染期间。',
     '可重置的边界有两种出口：用户点“重试”调用 reset；resetKeys 中的值变化时自动重置。只在“已经处于出错状态”时才因 resetKeys 重置，否则一次故障会上报两次。',
     '边界按“独立的故障范围”放置：根一个、每个路由一个、每个独立数据源的小部件一个。用户的输入放在边界外面，出错时才不会丢。',
-    'React 18.3.1 的 createRoot 和 hydrateRoot 只有 onRecoverableError 一个错误回调。React 19 新增 onCaughtError 和 onUncaughtError。全局的 error 和 unhandledrejection 事件负责接住其余的错误。',
+    'React 19 的 createRoot 和 hydrateRoot 有三个错误出口：onCaughtError（被边界接住）、onUncaughtError（没被接住）、onRecoverableError（React 自己恢复了）。传了回调，就替换对应的默认行为。全局的 error 和 unhandledrejection 事件负责接住其余的错误。',
   ],
   quiz: [
     {
@@ -45,19 +46,19 @@ export default {
         'key 变化时，React 把它当成另一个组件：卸载旧的整棵子树，挂载新的。不管有没有出错，都会这样。resetKeys 只在边界处于出错状态时才起作用，平时子树正常更新，局部 state 保留。“没有区别”的误解在于把 key 当成了“出错时的开关”。',
     },
     {
-      q: '在开发环境中测试全局上报：一个组件渲染出错，被错误边界接住。监控后台除了边界 onError 的报告，还收到了来自 window 的 error 事件的报告。最可能的原因是？',
+      q: '在开发环境中测试全局上报：除了边界的 onError，你也给 window 的 error 事件加了上报。一个组件渲染出错，被错误边界接住。React 19 中，监控后台会收到什么？',
       options: [
-        '边界没有写好，错误漏到了外面',
-        'componentDidCatch 被 React 调用了两次',
-        'React 18 开发版本会把渲染错误再抛到 window，方便调试；生产版本不会',
-        '浏览器总是会把所有错误同时报给 window',
+        '边界 onError 的报告，加上 window 的 error 事件的报告',
+        '只有 window 的 error 事件的报告，边界收不到',
+        '只有边界 onError 的报告：被边界接住的错误不会到达 window',
+        '什么报告都没有，因为错误被边界吞掉了',
       ],
       answer: 2,
       explain:
-        'React 18 开发版本在组件出错后，用一个模拟事件重放这次渲染，让调试器停在出错位置。所以 window 的 error 事件也会收到这个错误，即使边界已经接住了它。生产版本没有这个重放。最迷惑的是“边界没有写好”：如果边界真的漏了，页面会显示上层的备用界面或白屏，而不是本边界的备用界面。',
+        'React 19 不再重新抛出渲染错误。被边界接住的错误交给边界的 componentDidCatch 和根的 onCaughtError，window 的 error 事件收不到它。最迷惑的是第一项：React 18 的开发版本会把渲染错误再抛到 window，方便调试器停在出错位置，所以维护 React 18 项目时，开发环境里会多收到报告，生产版本不会。最后一项错在边界并没有吞掉错误，componentDidCatch 会被调用，可以用来上报。',
     },
     {
-      q: '在 React 18.3.1 中，哪种情况会调用根的 <code>onRecoverableError</code>（createRoot 或 hydrateRoot 的选项）？',
+      q: '在 React 19 中，哪种情况会调用根的 <code>onRecoverableError</code>（createRoot 或 hydrateRoot 的选项）？',
       options: [
         '子组件渲染出错，被错误边界接住，显示了备用界面',
         '水合时服务端 HTML 和客户端不一致，React 改为在客户端重新渲染',
@@ -66,7 +67,7 @@ export default {
       ],
       answer: 1,
       explain:
-        'onRecoverableError 只接收 React 自己恢复了的错误：水合不匹配后改为客户端渲染，或者渲染出错后同步重试成功。被边界接住的错误交给边界的 componentDidCatch（React 19 中还有 onCaughtError），这是最常见的混淆。事件处理函数和 Promise 的错误根本不经过 React 的渲染。',
+        'onRecoverableError 只接收 React 自己恢复了的错误：水合不匹配后改为客户端渲染，或者渲染出错后同步重试成功。被边界接住的错误交给边界的 componentDidCatch 和根的 onCaughtError，这是最常见的混淆。事件处理函数和 Promise 的错误根本不经过 React 的渲染。',
     },
     {
       q: '一个仪表盘有顶部导航、一个可编辑的“备忘录”，以及 6 张数据卡片。每张卡片请求自己的接口。错误边界怎样放最合适？',
@@ -79,6 +80,18 @@ export default {
       answer: 3,
       explain:
         '每张卡片是一个独立的故障范围：一张卡片的接口挂了，其他卡片和备忘录都应该还能用。根边界是最后一道防线。备忘录在卡片的边界外面，卡片出错时草稿不会丢。只放根边界，一张卡片出错，整页都被替换，备忘录也没了。',
+    },
+    {
+      q: 'React 19 中，一个根这样创建：<code>createRoot(el, { onUncaughtError: report })</code>。页面里有一个错误边界，子组件渲染出错，被它接住。会发生什么？',
+      options: [
+        'onUncaughtError 被调用，因为错误发生在渲染期间',
+        '边界显示备用界面，onUncaughtError 不被调用；根没有传 onCaughtError，React 照默认方式在控制台打印这个错误',
+        '边界显示备用界面，错误不会出现在控制台，因为根已经传了错误回调',
+        '边界显示备用界面，错误同时到达 window 的 error 事件，因为根没有传 onCaughtError',
+      ],
+      answer: 1,
+      explain:
+        '三个回调各管一类错误，互不替换。这个错误被边界接住，属于 onCaughtError 的范围，没传就用默认行为：console.error 打印。onUncaughtError 只管没被接住的错误。传了某个回调，只替换它自己对应的默认行为。被边界接住的错误不会到达 window，所以最后一项也不对。',
     },
   ],
   exercise: {
@@ -398,6 +411,7 @@ function Weather({ city }) {
   {/* 天气面板同样包一个边界，resetKeys 是 [city] */}
 </section>`,
     test: async t => {
+      const { React, ReactDOM } = t;
       const h = React.createElement;
       const { ErrorBoundary, useAsyncError, api, reports } = t.exports;
       t.assert(typeof ErrorBoundary === 'function', '请保留名为 ErrorBoundary 的 class 组件');
@@ -691,8 +705,35 @@ function Weather({ city }) {
       },
       pkey: 'error-handling|一次故障，上报几次？',
     },
+    '根级回调：谁收到错误？': {
+      note: '每次点按钮，都会新建一个根，并传入三个回调。<ol class="task-steps"><li>“边界内出错”：根的 onCaughtError 和边界的 componentDidCatch 都收到了这个错误。</li><li>“边界外出错”：没有边界，React 卸载整棵树，预览区变空，错误交给 onUncaughtError。这次没有新的 onCaughtError：控制台里前面的行是上一次点击留下的。</li></ol>三个回调各管一类错误。这里没有错误回到 window：传了回调，就替换了 React 的默认上报。',
+      predict: {
+        q: '点“边界外出错”。子组件渲染时 throw，没有任何错误边界。根的三个回调里，哪些会被调用？',
+        options: [
+          '只有 onUncaughtError',
+          'onCaughtError 和 onUncaughtError 各一次',
+          '一个也不会：没有边界，错误无人处理',
+          'onUncaughtError 和 onRecoverableError',
+        ],
+        answer: 0,
+        explain:
+          '没有边界接住，错误属于 onUncaughtError。onCaughtError 只在边界接住错误时调用。onRecoverableError 只在 React 自己恢复了错误时调用；这里同步重试也失败了，没有恢复。预览区变空，是因为 React 卸载了整棵树。',
+      },
+      pkey: 'error-handling|根级回调：谁收到错误？',
+    },
+    '不传回调：window 收到几次 error？': {
+      note: '这个根没有传任何回调，用的是 React 的默认行为：<ol class="task-steps"><li>边界内出错：React 用 console.error 打印，window 的 error 事件 0 次。</li><li>边界外出错：React 调用 <code>window.reportError</code>，window 的 error 事件 1 次。控制台里的“运行时错误”是实验台自己监听 window 的 error 事件记下的。</li></ol>所以不传 onUncaughtError 时，全局的 error 监听仍然能收到没被接住的渲染错误。传了它，就不会再有这次 reportError。',
+      predict: {
+        q: '这个根没有传任何错误回调。点“边界外出错”，子组件渲染时 throw，没有边界。页面上 window 的 error 事件会收到几次？',
+        options: ['0 次', '1 次', '2 次：第一次渲染和同步重试各一次', '3 次'],
+        answer: 1,
+        explain:
+          '没被接住的错误，默认交给 window.reportError，触发 1 次 error 事件。React 19 不再像 React 18 开发版那样重放渲染再多报几次。如果你传了 onUncaughtError，React 就不再调用 reportError，这个数字会变成 0。',
+      },
+      pkey: 'error-handling|不传回调：window 收到几次 error？',
+    },
     一次能恢复的渲染错误: {
-      note: '虚线框是一个独立的 React 根，它用 createRoot 的第二个参数传入 onRecoverableError。Banner 第一次渲染时 throw，同步重试时成功。页面正常显示，错误交给了 onRecoverableError。<br>这类错误不影响用户，但说明代码依赖了“第一次渲染时还没准备好”的外部数据。上报时把它标成警告级别，不要和崩溃混在一起。',
+      note: '虚线框是一个独立的 React 根，它用 createRoot 的第二个参数传入 onRecoverableError。Banner 第一次渲染时 throw，同步重试时成功。页面正常显示，错误交给了 onRecoverableError。<br>React 19 把它包成一个新错误：message 是 “There was an error during concurrent rendering but React was able to recover by instead synchronously rendering the entire root.”，原始错误在 <code>error.cause</code> 里，所以上报时要取 cause。<br>这类错误不影响用户，但说明代码依赖了“第一次渲染时还没准备好”的外部数据。上报时把它标成警告级别，不要和崩溃混在一起。',
       predict: {
         q: '虚线框里没有错误边界。点“渲染横幅”，Banner 第一次渲染时 throw，之后再渲染就正常。会发生什么？',
         options: [
@@ -703,7 +744,7 @@ function Weather({ city }) {
         ],
         answer: 2,
         explain:
-          'React 18 在渲染出错后会同步重试一次。重试成功，就提交重试的结果，并把第一次的错误交给 onRecoverableError。这个根没有错误边界也没关系，因为错误已经恢复了。只有重试也失败，错误才会继续向上找边界；找不到，React 就卸载这个根的整棵树。',
+          'React 在渲染出错后会同步重试一次。重试成功，就提交重试的结果，并把第一次的错误交给 onRecoverableError（原始错误在 cause 里）。这个根没有错误边界也没关系，因为错误已经恢复了。只有重试也失败，错误才会继续向上找边界；找不到，React 就卸载这个根的整棵树。',
       },
       pkey: 'error-handling|一次能恢复的渲染错误',
     },

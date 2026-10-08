@@ -283,9 +283,10 @@
     "form-architecture#c3": "3620d63a",
     "error-handling#0": "7bc7b642",
     "error-handling#1": "d017dda2",
-    "error-handling#2": "7b41a01f",
-    "error-handling#3": "19d513f4",
+    "error-handling#2": "b18bae50",
+    "error-handling#3": "4353cf26",
     "error-handling#4": "f988ae88",
+    "error-handling#5": "5e82400d",
     "error-handling#c0": "6d1f5f5d",
     "error-handling#c1": "5d114b41",
     "error-handling#c2": "8b5bdd74",
@@ -338,6 +339,9 @@
     "accessibility|三个“按钮”",
     "state-architecture|亲手实现 Zustand",
     "react-19|用 React 18 模拟乐观更新的效果",
+    "react-19|useFormStatus：按钮写在哪里",
+    "react-19|use() 读取 Promise，配合 Suspense",
+    "react-19|Activity：隐藏界面，保留 state",
     "mini-react|用循环遍历 Fiber 树",
     "mini-react|20 行实现 useState",
     "engineering|模块对象：默认导出与具名导出",
@@ -361,10 +365,9 @@
     "form-architecture|用户名检查的竞态",
     "error-handling|边界能接住哪一个？",
     "error-handling|一次故障，上报几次？",
+    "error-handling|根级回调：谁收到错误？",
+    "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？",
-    "react-19|useFormStatus：按钮写在哪里",
-    "react-19|use() 读取 Promise，配合 Suspense",
-    "react-19|Activity：隐藏界面，保留 state"
+    "perf-clinic|memo 挡得住 Context 吗？"
   ]
 }
