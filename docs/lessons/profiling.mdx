@@ -179,9 +179,39 @@ React Profiler 只测量 React 的工作。但用户感到的“卡”还包括�
 | Components 轨道 | 有 | 只显示 \<Profiler\> 包裹的子树（装了 React DevTools 则全部显示） | 无 |
 | 级联更新提示、Changed props | 有 | 无 | 无 |
 
-<CallBox kind="deep" label="深入一点">
+<CallBox kind="tip" label="动手试一次：看 Scheduler 轨道">
 
-本课程运行在 React 18.3.1 上，所以看不到这些轨道。在你自己的 React 19.2+ 项目中，用开发版本录制一次 Performance，就能看到它们。前一课的 useTransition 演示，在 Scheduler 轨道中会显示在 Transition 子轨道里。
+本课程的实验台运行 React 19.3 的开发版本，不用自己建项目就能录到这些轨道。
+
+1. 运行下面的示例。打开 Chrome 的 DevTools，进入 Performance 面板，点录制。
+2. 在示例里依次点一次“紧急更新”、一次“过渡更新”。
+3. 停止录制，在 Scheduler 轨道里找这两次更新。点击引起的紧急更新在 Blocking 子轨道，放进 `startTransition` 的更新在 Transition 子轨道。
+4. 展开 Components 轨道，看每个 `Slow` 组件的渲染耗时。
+
+```jsx play title="Scheduler 轨道练习"
+import { useState, useTransition } from 'react';
+
+// 每行阻塞 10ms，让轨道上的条够宽
+function Slow({ i }) {
+  const start = performance.now();
+  while (performance.now() - start < 10) {}
+  return <li>行 {i + 1}</li>;
+}
+
+function App() {
+  const [n, setN] = useState(0);
+  const [isPending, startTransition] = useTransition();
+  return (
+    <div>
+      <button onClick={() => setN(n + 1)}>紧急更新</button>
+      <button onClick={() => startTransition(() => setN(n + 1))}>过渡更新</button>
+      {isPending && <small>过渡中…</small>}
+      <p>n = {n}</p>
+      <ul>{Array.from({ length: 10 }, (_, i) => <Slow key={i} i={i} />)}</ul>
+    </div>
+  );
+}
+```
 
 </CallBox>
 

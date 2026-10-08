@@ -5,7 +5,7 @@ export default {
   runtime: 19,
   stage: 2,
   title: '性能测量：先找到慢在哪里',
-  mins: 36,
+  mins: 38,
   summary: '用 React DevTools、Profiler 组件和浏览器 Performance 面板找到真正的瓶颈，再选择正确的优化方法。',
   goals: [
     '能用 React DevTools Profiler 录制一次操作，找出最慢的组件和它的渲染原因',
@@ -211,6 +211,9 @@ function App() {
         explain: 'memo 让列表跳过渲染，所以实际耗时 actual 接近 0。base 是“不做记忆化时”的估算，它保留列表最近一次的渲染耗时，所以不变。',
       },
       pkey: 'profiling|读懂 actualDuration 和 baseDuration',
+    },
+    'Scheduler 轨道练习': {
+      note: '这是一个动手任务，不自动判分。录制 Performance 后，紧急更新出现在 Scheduler 的 Blocking 子轨道，过渡更新出现在 Transition 子轨道。开发版本才有这些轨道。',
     },
     虚拟列表前后对比: {
       note: '运行后先看控制台里 full 的 mount 耗时，再点“虚拟列表”比较，同时看 DOM 行数。然后在虚拟列表中滚动：每次 update 只要很短的时间。这里的毫秒数只是 React 渲染的时间。浏览器为 5000 行计算样式和布局的时间不在里面，要用 Performance 面板才看得到，真实差距更大。',
