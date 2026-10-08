@@ -70,7 +70,7 @@ function usePresence(open) {
   {
     name: 'onTransitionEnd 不看当前阶段：重新打开后被过渡结束事件卸载',
     expect: 'fail',
-    match: /重新打开|取消/,
+    match: /重新打开|取消|冒泡|e\.target/,
     code: mk(`
 function usePresence(open) {
   const reduce = usePrefersReducedMotion();

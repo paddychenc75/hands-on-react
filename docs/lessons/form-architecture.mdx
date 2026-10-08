@@ -547,7 +547,7 @@ function App() {
 
 ### 订阅粒度：按状态种类，不按字段
 
-`formState` 里有很多种状态：`errors`、`isDirty`、`touchedFields`、`isSubmitting`……组件读了哪一种，就订阅哪一种。注意粒度是**状态的种类**，不是**字段**：读 `errors.email`，订阅的是整个 `errors`，别的字段出错也会让它渲染。
+`formState` 里有很多种状态：`errors`、`isDirty`、`touchedFields`、`isSubmitting`……组件读了哪一种，就订阅哪一种。注意粒度是**状态的种类**，不是**字段**：读 `errors.email`，订阅的是整个 `errors`，别的字段的错误出现、消失或换了信息，也会让它渲染。（同一个字段的错误没变，比如已经出错、继续输入，不会渲染。）
 
 想隔离到单个字段，有三个办法：
 
@@ -602,7 +602,7 @@ function App() {
 两条使用规则：
 
 - 调用 `useForm` 的组件自己不要读 `formState.errors`。否则每次错误变化，它和没有 `memo` 的子组件都跟着渲染。
-- 要在界面上显示某个字段的值，别在调用 `useForm` 的组件里写 `watch('username')`：它会让整个表单组件在每次输入时重新渲染。把显示放进子组件，用 `useWatch`。
+- 要在界面上显示某个字段的值，别在调用 `useForm` 的组件里写 `watch('username')`：用户名每变一次，整个表单组件就重新渲染一次（不带参数的 `watch()` 则是任何字段变化都渲染）。把显示放进子组件，用 `useWatch({ control, name })`，它只让自己渲染。
 
 ### 校验：同一份 Zod schema
 

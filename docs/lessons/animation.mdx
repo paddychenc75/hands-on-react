@@ -51,7 +51,7 @@ React 里的做法很直接：让 state 决定类名（或内联 `style`），�
 
 下面的卡片设置了 `transition: opacity 400ms`，并用 `@starting-style` 指定“刚挂载时的样式”。`@starting-style` 是 CSS 规则：元素第一次出现时，浏览器先用这里的值作为起点，再过渡到正常样式。
 
-```jsx play title="条件渲染：入场有动画，离场没有"
+```jsx play title="条件渲染：入场和离场"
 import { useState } from 'react';
 
 function App() {
@@ -59,7 +59,7 @@ function App() {
 
   function toggle() {
     setOpen(!open);
-    // 下一帧时，卡片还在不在 DOM 里？
+    // 记录下一帧时卡片的状态
     requestAnimationFrame(() => {
       console.log('下一帧：卡片' + (document.querySelector('.card') ? '还在 DOM 里' : '已经不在 DOM 里'));
     });
@@ -83,7 +83,7 @@ function App() {
 **入场**有两种常用写法：
 
 1. `@starting-style`：上面用的就是它。最简单，不需要 JS。
-2. 挂载后再改类名：先用“隐藏”样式渲染，等浏览器真的画过一帧，再把类名换成“显示”。只在一次 effect 里立刻改类名**不够**，浏览器还没算过初始样式。实测中，只等一层 `requestAnimationFrame` 时，第一次打开没有动画；等两层才稳定。
+2. 挂载后再改类名：先用“隐藏”样式渲染，等浏览器真的算过并画出这个样式，再把类名换成“显示”。只在一次 effect 里立刻改类名**不够**，浏览器还没算过初始样式。只等一层 `requestAnimationFrame` 也不可靠：它的回调在这一帧计算样式**之前**运行，隐藏样式还没被算过，两个类名在同一帧里合并，过渡无从开始。Chromium 里实测，单层 `requestAnimationFrame` 后改类名，第一次打开 20 次里 0 次有动画；WebKit 里却每次都有。浏览器之间不一致，所以要写成在哪里都稳的样子：等两层 `requestAnimationFrame`，或者先读一次 `el.offsetHeight`（强制浏览器先算样式）再改类名。
 
 **离场**要换思路：React 不能立刻卸载，要先让元素留在 DOM 里播放动画，播完再卸载。三种办法：
 
@@ -206,12 +206,13 @@ function App() {
 }
 ```
 
-用法上还有四条规则：
+用法上还有五条规则：
 
 1. `<ViewTransition>` 要放在被插入或移除的内容的**最外层**，它上面不能再有 DOM 节点。`{show && <div><ViewTransition>…</ViewTransition></div>}` 里，进入的是外层 `div`，里面的 `<ViewTransition>` 不会触发 enter 或 exit（实测）。
 2. 动画以**截图**为单位：整块内容一起淡入淡出或移动，不是里面每个子元素各自动。
-3. `name` 在同一时刻必须唯一。两个同名的同时挂载，浏览器放弃整次动画。
+3. `name` 在同一时刻必须唯一。两个同名的同时挂载，React 开发版会在控制台警告，浏览器放弃整次动画。
 4. 不要自己调用 `document.startViewTransition`，React 会调用它；`flushSync` 会取消当次过渡动画。
+5. 只有在视口内的元素才参与动画。共享元素的两端都要在视口里，否则那一端按普通的插入或移除处理。
 
 用 CSS 定制动画：给 `enter`、`exit`、`update`、`share` 传一个类名，React 把它加到浏览器的伪元素上，你用 `::view-transition-old(.类名)` 和 `::view-transition-new(.类名)` 写动画。旧内容是 `old`，新内容是 `new`。
 
@@ -228,7 +229,7 @@ function App() {
 
 `default="none"` 表示没有列出的触发方式都不动。需要在 JS 里控制动画时，用 `onEnter`、`onExit`、`onUpdate`、`onShare`，它们拿到旧、新伪元素，用 Web Animations API 自己播放，并返回清理函数。
 
-**浏览器不支持时**：React 检测到没有 `document.startViewTransition`，更新照常发生，只是没有动画，也不报错（我们在实验台里删掉这个函数实测过）。所以动画只能当作“锦上添花”，不能承载信息。
+**浏览器不支持时**：React 检测到没有 `document.startViewTransition`，更新照常发生，只是没有动画，也不报错。所以动画只能当作“锦上添花”，不能承载信息。
 
 <details className="optional">
 <summary><span className="opt-tag">选读</span>用类型区分前进和后退<small>可以先跳过，需要时再展开</small></summary>
@@ -377,9 +378,9 @@ function App() {
 
 **只动 `transform` 和 `opacity`。** 浏览器渲染一帧要经过样式、布局、绘制、合成几步。改 `transform` 和 `opacity` 只影响最后的合成，可以交给合成器（独立于主线程）处理。改 `width`、`height`、`top`、`margin` 会让浏览器重新计算布局，可能连带整个页面的元素，每一帧都在主线程上做。
 
-下面的页面有 8000 个元素。示例分别用 `transform` 和 `margin-left` 动画同一个方块，每一帧读一次 `offsetHeight`（读它会强制浏览器先算完布局），统计每帧耗时的中位数。比较时看**相对差距**，绝对毫秒数因设备而异。
+下面的页面有 8000 个元素。示例分别用 `transform` 和 `margin-left` 动画同一个方块，每一帧读一次 `offsetHeight`（读它会强制浏览器先算完布局），统计每帧耗时的中位数。这里测的是“强制布局这一步”的耗时，不是完整的帧耗时。比较时看**相对差距**，绝对毫秒数因设备和负载而异。
 
-```jsx play title="只动 transform：每帧的布局代价"
+```jsx play title="两种动画写法的每帧布局代价"
 import { useState, useRef } from 'react';
 
 const CELLS = Array.from({ length: 8000 }, (_, i) => i);

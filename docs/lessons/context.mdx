@@ -252,9 +252,9 @@ function App() {
 | `Intl.PluralRules` | `select(1)`、`select(2)`、`select(0)` | other、other、other | one、other、other |
 | `Intl.ListFormat` | `{ type: 'conjunction' }`，三项 | 苹果、香蕉和橘子 | apples, bananas, and oranges |
 
-上表是在 Chromium 153 里实测的。不同浏览器的输出可能略有不同（标点、空格、缩写），所以不要在测试里写死这些字符串。
+上表在 Chromium 153 和 WebKit 26.6（Safari 的引擎）里实测，输出一致。不同浏览器或版本的输出可能略有不同（标点、空格、缩写），所以不要在测试里写死这些字符串。
 
-重点是 `PluralRules`。中文没有复数变化，任何数量都是 `other`。英文有 `one` 和 `other`，而且 0 属于 `other`：“0 items”，不是“0 item”。别的语言还有更多类别，例如阿拉伯语实测 0 是 `zero`、1 是 `one`、2 是 `two`、5 是 `few`。复数规则属于语言，不属于你的代码。用字符串拼接（`n > 1 ? 's' : ''`）把规则写死在代码里，换一种语言就错。正确做法是：字典里每种语言写它自己有的形式，代码只问 `PluralRules` 属于哪一类。先预测，再运行。
+重点是 `PluralRules`。中文没有复数变化，任何数量都是 `other`。英文有 `one` 和 `other`，而且 0 属于 `other`。别的语言还有更多类别，例如阿拉伯语实测 0 是 `zero`、1 是 `one`、2 是 `two`、5 是 `few`。复数规则属于语言，不属于你的代码。用字符串拼接（`n > 1 ? 's' : ''`）把规则写死在代码里，换一种语言就错。正确做法是：字典里每种语言写它自己有的形式，代码只问 `PluralRules` 属于哪一类。先预测，再运行。
 
 ```jsx play title="Intl 与复数：拼接为什么不行？"
 import { useState } from 'react';
