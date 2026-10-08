@@ -237,6 +237,7 @@
     "tanstack-query#c4": "5aa4cc6e",
     "tanstack-query#c5": "de47a49c",
     "tanstack-query#c6": "f5f1a890",
+    "tanstack-query#c7": "4e8171c5",
     "testing#0": "99fa2539",
     "testing#1": "b14328a7",
     "testing#2": "20b894b2",
@@ -450,6 +451,8 @@
     "tanstack-query|真库：相同的 queryKey 共享请求",
     "tanstack-query|真库：mutation 成功后不失效缓存",
     "styling|第一个示例",
-    "delivery|第一个示例"
+    "delivery|第一个示例",
+    "tanstack-query|真库：分页与 keepPreviousData",
+    "tanstack-query|真库：useInfiniteQuery 加载更多"
   ]
 }

@@ -4,21 +4,21 @@ export default {
   id: 'tanstack-query',
   stage: 4,
   title: '数据请求：TanStack Query',
-  mins: 46,
+  mins: 56,
   summary: '把“服务端状态”交给专业工具：缓存、去重、后台刷新、乐观更新。',
   goals: [
-    '能列出 useEffect 手写请求没有解决的三个问题：重复请求、没有缓存、数据过期',
-    '能写出 useQuery：queryKey 包含查询用到的每个变量，并按加载中、出错、成功渲染',
-    '能预测 staleTime 不同时，切回页面会不会发请求',
+    '能写出 useQuery：queryKey 包含查询用到的每个变量，按加载中、出错、成功渲染，并区分 status 和 fetchStatus',
+    '能预测 staleTime 不同时切回页面会不会发请求，以及两个组件用同一个 queryKey 时发出几次请求',
     '能用 useMutation 加 invalidateQueries，在修改数据后刷新列表',
-    '能区分 useQuery 的 status 和 fetchStatus，并预测两个组件用同一个 queryKey 时发出几次请求',
+    '能用 keepPreviousData 做分页，用 useInfiniteQuery 做“加载更多”，并说明 getNextPageParam 返回什么值表示没有下一页',
   ],
   keyPoints: [
     '问题：服务端数据需要缓存、去重、过期刷新和重试。用 useEffect 手写，每个组件都要重复这些代码。',
     "<code>queryKey</code> 是缓存的名字。queryFn 用到的每个变量都要写进 key，例如 <code>['user', id]</code>。",
     '<code>staleTime</code> 内数据算新鲜，直接用缓存。过期后，在组件挂载、窗口重新获得焦点时，先显示缓存，再在后台刷新。默认值是 0。',
     '修改数据用 <code>useMutation</code>，成功后用 <code>invalidateQueries</code> 让相关缓存失效，列表自动重新获取。',
-    '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，间隔 1、2、4 秒，所以要等 7 秒以上才报错。',
+    '实验台能运行真的 TanStack Query（5.104.1）。数据都来自返回 Promise 的模拟函数，不发真实请求。真库失败后默认重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的耗时，所以要等很久才报错。',
+    '分页：页码写进 <code>queryKey</code>，加 <code>placeholderData: keepPreviousData</code>，换页时先显示上一页。加载更多：<code>useInfiniteQuery</code> 配 <code>initialPageParam</code> 和 <code>getNextPageParam</code>，返回 <code>undefined</code> 或 <code>null</code> 表示没有下一页。',
     '最常见的坑：key 里漏了变量（切换 id 读到别人的缓存）；queryFn 里 fetch 失败不抛错（isError 永远是 false）。',
   ],
   quiz: [
@@ -62,7 +62,7 @@ export default {
     },
   ],
   exercise: {
-    task: '<ol class="task-steps"><li>不要修改“模拟后端”（<code>fetchUser</code>）。它不发真实请求，每次约 300 毫秒，用户 4 会失败。<code>QueryClient</code> 和 <code>QueryClientProvider</code> 已经写好。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>真库在请求失败后默认重试 3 次，要等 8 秒左右才显示错误。给 <code>useQuery</code> 加 <code>retry: false</code>（也可以写在 <code>new QueryClient</code> 的 <code>defaultOptions</code> 里），用户 4 才会立刻显示 <code>#error</code>。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
+    task: '<ol class="task-steps"><li>不要修改“模拟后端”（<code>fetchUser</code>）。它不发真实请求，每次约 300 毫秒，用户 4 会失败。<code>QueryClient</code> 和 <code>QueryClientProvider</code> 已经写好。</li><li>在 <code>UserCard</code> 中调用 <code>useQuery</code>。<code>queryKey</code> 要包含 <code>id</code>，<code>queryFn</code> 调用 <code>fetchUser(id)</code>。</li><li>设置 <code>staleTime</code>（例如 <code>60_000</code>）。新鲜期内，切回看过的用户不再发请求。</li><li>按状态渲染三种界面：加载中显示 <code>#loading</code>；出错显示 <code>#error</code>，内容包含 <code>error.message</code>；成功显示 <code>#user</code>，内容是用户名。</li><li>真库在请求失败后默认重试 3 次，重试间隔合计约 7 秒，再加 4 次请求本身的耗时，要等很久才显示错误。给 <code>useQuery</code> 加 <code>retry: false</code>（也可以写在 <code>new QueryClient</code> 的 <code>defaultOptions</code> 里），用户 4 才会立刻显示 <code>#error</code>。</li><li>依次点 用户 2、用户 1、用户 4，看控制台里的请求次数。切回用户 1 时，名字应立刻出现，请求次数不变。</li></ol>',
     starter: `import { useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 
@@ -85,7 +85,7 @@ const queryClient = new QueryClient();
 function UserCard({ id }) {
   // 步骤 2：调用 useQuery。queryKey 要包含 id；queryFn 调用 fetchUser(id)。
   // 步骤 3：设置 staleTime，例如 60_000（1 分钟）。
-  // 步骤 5：真库失败后默认重试 3 次，间隔 1、2、4 秒，要等 8 秒左右才报错。给它加 retry: false，用户 4 才会立刻出错。
+  // 步骤 5：真库失败后默认重试 3 次，重试间隔合计约 7 秒，再加 4 次请求本身的耗时，要等很久才报错。给它加 retry: false，用户 4 才会立刻出错。
 
   // 步骤 4：按状态渲染：
   //   加载中 → <p id="loading">加载中…</p>
@@ -304,11 +304,55 @@ onSuccess: () =&gt; { queryClient.invalidateQueries({ queryKey: ['todos'] }); },
       explain:
         '<code>onSuccess</code> 返回 Promise 时，mutation 会等它完成才结束。写法 A 的箭头函数把 <code>invalidateQueries</code> 返回的 Promise 交了出去，所以 <code>isPending</code> 一直是 true，直到列表重新获取完成。写法 B 加了花括号，没有 return，函数返回 undefined，<code>mutationFn</code> 一返回 mutation 就结束了。想让按钮等到列表更新，用 A；想让按钮马上恢复，用 B。',
     },
+    {
+      q: `最后一页的 <code>hasMore</code> 是 false。最后一页加载完以后，<code>hasNextPage</code> 是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useInfiniteQuery({
+  queryKey: ['feed'],
+  initialPageParam: 0,
+  queryFn: ({ pageParam }) =&gt; fetchFeed(pageParam),
+  getNextPageParam: lastPage =&gt; (lastPage.hasMore ? lastPage.nextCursor : false),
+});</code></pre></div>`,
+      options: [
+        'false：getNextPageParam 返回 false，表示没有下一页',
+        '报错：getNextPageParam 的返回值必须是数字',
+        'true：只有 undefined 和 null 表示没有下一页，false 会被当作下一页的参数',
+        'undefined：最后一页之后 Query 不再计算 hasNextPage',
+      ],
+      answer: 2,
+      explain:
+        '<code>hasNextPage</code> 的判断是“<code>getNextPageParam</code> 的返回值既不是 <code>undefined</code> 也不是 <code>null</code>”。<code>false</code> 满足这个条件，所以“加载更多”按钮不会禁用，再点一次就用 <code>false</code> 作 <code>pageParam</code> 请求。要表示没有下一页，返回 <code>undefined</code> 或 <code>null</code>。',
+    },
   ],
   plays: {
+    '真库：分页与 keepPreviousData': {
+      pkey: 'tanstack-query|真库：分页与 keepPreviousData',
+      predict: {
+        q: '第 1 页加载完后，点一次“下一页”。第 2 页的请求返回之前（约 0.7 秒内），页面上显示什么？',
+        options: [
+          '列表换成“首次加载中…”，页码已经是第 2 页',
+          '列表仍是文章 1 到 5，页码还是第 1 页，按钮不可点',
+          '列表仍是文章 1 到 5，页码已经是第 2 页，旁边显示“请求中…”',
+          '列表立刻显示文章 6 到 10',
+        ],
+        answer: 2,
+        explain:
+          "页码是 state，点击后马上变成 2，queryKey 随之变成 ['posts', 2]。这个 key 下还没有数据，但 <code>keepPreviousData</code> 让 Query 先把上一页的数据当作占位数据，所以列表不变、<code>isPending</code> 是 false，<code>isFetching</code> 是 true，<code>isPlaceholderData</code> 是 true。占位期间“下一页”被禁用。“首次加载中…”是没有 <code>placeholderData</code> 时的行为。",
+      },
+      note: '删掉 <code>placeholderData: keepPreviousData</code> 那一行再运行，翻页时列表会闪回“首次加载中…”。回到看过的页（例如第 1 页）时，缓存里有数据，会立刻显示，并在后台刷新。',
+    },
+    '真库：useInfiniteQuery 加载更多': {
+      pkey: 'tanstack-query|真库：useInfiniteQuery 加载更多',
+      predict: {
+        q: '第一页出现后，每次等请求完成再点“加载更多”，直到按钮变成“没有更多了”。控制台一共有几行请求？页面一共显示几条动态？',
+        options: ['2 行请求，8 条', '3 行请求，12 条', '3 行请求，10 条', '4 行请求，10 条'],
+        answer: 2,
+        explain:
+          '一共 10 条，每次返回 4 条：cursor=0 取 4 条，cursor=4 再取 4 条，cursor=8 只剩 2 条，共 3 行请求、10 条。最后一页的 <code>nextCursor</code> 是 <code>undefined</code>，<code>getNextPageParam</code> 返回它，<code>hasNextPage</code> 就变成 false。“12 条”是把每页都当成 4 条。',
+      },
+      note: '<code>data.pages</code> 是每一页返回值组成的数组，页面显示的列表是 <code>data.pages.flatMap(page =&gt; page.items)</code>。把 <code>nextCursor</code> 改成总是返回一个数字，按钮就永远不会变成“没有更多了”。',
+    },
     '真库：useQuery 的状态字段': {
       pkey: 'tanstack-query|真库：useQuery 的状态字段',
-      note: '用户 3 会失败。这个示例在 <code>QueryClient</code> 里关掉了重试（<code>retry: false</code>），所以错误立刻显示。真库默认失败后重试 3 次，间隔 1、2、4 秒，加上每次请求的 0.8 秒，约 10 秒后 <code>status</code> 才变成 <code>error</code>。',
+      note: '用户 3 会失败。这个示例在 <code>QueryClient</code> 里关掉了重试（<code>retry: false</code>），所以错误立刻显示。真库默认失败后重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的 0.8 秒，约 10 秒后 <code>status</code> 才变成 <code>error</code>。',
     },
     '真库：相同的 queryKey 共享请求': {
       pkey: 'tanstack-query|真库：相同的 queryKey 共享请求',

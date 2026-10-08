@@ -140,7 +140,7 @@ function App() {
 
 迷你版和真库的差别：
 
-1. 真库失败后默认重试 3 次（约 7 秒）才报错，迷你版立刻报错。
+1. 真库失败后默认重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的耗时，才会报错；迷你版立刻报错。
 2. 真库在网络恢复时，也会刷新过期的数据。
 3. 真库在没有组件使用一份缓存 5 分钟后删除它（`gcTime`）。
 4. 迷你版没有 `invalidateQueries` 和 `useMutation`。
@@ -304,7 +304,7 @@ const fetchUser = id => new Promise((resolve, reject) => setTimeout(() => {
   else resolve({ id, name: ['张三', '李四'][id - 1] });
 }, 800));
 
-// 真库默认在失败后重试 3 次（间隔 1、2、4 秒），这个示例里要等约 10 秒才报错。这里关掉重试，让错误立刻显示。
+// 真库默认在失败后重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的耗时，所以要等约 10 秒才报错。这里关掉重试，让错误立刻显示。
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 function UserCard({ id }) {
@@ -532,14 +532,136 @@ function App() {
 }
 ```
 
+## 分页与无限滚动
+
+列表很长时，服务器一次只返回一部分。前端有两种常见的取法：
+
+- **分页**：一次只看一页，用“上一页”“下一页”切换。页码是 `useQuery` 的一个变量，写进 `queryKey`。
+- **无限滚动或“加载更多”**：已加载的内容留在屏幕上，新的一页接在后面。用 `useInfiniteQuery`。
+
+### 分页：keepPreviousData
+
+页码一变，`queryKey` 就变了，新的 key 下还没有数据，`isPending` 会重新变成 `true`，界面闪回“加载中”。`placeholderData: keepPreviousData` 让 Query 在新页回来之前，继续把上一页的数据当作占位数据显示。占位期间 `isPlaceholderData` 是 `true`。先预测，再运行。
+
+```jsx play title="真库：分页与 keepPreviousData"
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider, useQuery, keepPreviousData } from '@tanstack/react-query';
+
+// ===== 模拟后端：23 篇文章，每页 5 篇。不发真实请求，只返回 Promise =====
+const ALL = Array.from({ length: 23 }, (_, i) => '文章 ' + (i + 1));
+const PAGE_SIZE = 5;
+let calls = 0;
+const fetchPosts = page => new Promise(resolve => {
+  calls++;
+  console.log('🌐 请求第 ' + page + ' 页（累计 ' + calls + ' 次）');
+  setTimeout(() => resolve({
+    items: ALL.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    totalPages: Math.ceil(ALL.length / PAGE_SIZE),
+  }), 700);
+});
+
+const queryClient = new QueryClient();
+
+function Posts() {
+  const [page, setPage] = useState(1);
+  const { data, isPending, isFetching, isPlaceholderData } = useQuery({
+    queryKey: ['posts', page],           // 页码是查询用到的变量，要写进 key
+    queryFn: () => fetchPosts(page),
+    placeholderData: keepPreviousData,   // 换页时，先显示上一页的数据
+  });
+  if (isPending) return <p>⏳ 首次加载中…</p>;
+  return (
+    <div>
+      <ul>{data.items.map(t => <li key={t}>{t}</li>)}</ul>
+      <button onClick={() => setPage(p => p - 1)} disabled={page === 1}>上一页</button>
+      <span>　第 {page} 页 / 共 {data.totalPages} 页　</span>
+      <button onClick={() => setPage(p => p + 1)} disabled={isPlaceholderData || page >= data.totalPages}>下一页</button>
+      {isFetching && <small>　请求中…</small>}
+    </div>
+  );
+}
+
+function App() {
+  return <QueryClientProvider client={queryClient}><Posts /></QueryClientProvider>;
+}
+```
+
+“下一页”在占位期间被禁用，是为了不在新页还没回来时继续往后翻。到最后一页时，也要用服务器返回的总页数把它禁用。
+
+### 无限滚动：useInfiniteQuery
+
+`useInfiniteQuery` 把已加载的每一页放在 `data.pages` 数组里。它比 `useQuery` 多了几个选项和字段：
+
+| 名字 | 作用 |
+|---|---|
+| `initialPageParam` | 第一页的参数（v5 必填） |
+| `queryFn({ pageParam })` | 用 `pageParam` 请求一页 |
+| `getNextPageParam(lastPage, allPages)` | 根据最后一页算出下一页的参数。返回 `undefined` 或 `null` 表示没有下一页 |
+| `fetchNextPage()` | 请求下一页，接在 `data.pages` 末尾 |
+| `hasNextPage` | `getNextPageParam` 的返回值不是 `undefined` 或 `null` 时为 `true` |
+| `isFetchingNextPage` | 正在请求下一页 |
+
+`pageParam` 可以是页码，也可以是服务器返回的游标（cursor）。游标指向“从哪里继续”，数据在翻页期间有增删时，游标比页码更稳。先预测，再运行。
+
+```jsx play title="真库：useInfiniteQuery 加载更多"
+import { QueryClient, QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
+
+// ===== 模拟后端：10 条动态，每次返回 4 条，cursor 是起始位置。不发真实请求 =====
+const ALL = Array.from({ length: 10 }, (_, i) => '动态 ' + (i + 1));
+const SIZE = 4;
+let calls = 0;
+const fetchFeed = cursor => new Promise(resolve => {
+  calls++;
+  console.log('🌐 请求 cursor=' + cursor + '（累计 ' + calls + ' 次）');
+  setTimeout(() => {
+    const next = cursor + SIZE;
+    resolve({ items: ALL.slice(cursor, next), nextCursor: next < ALL.length ? next : undefined });
+  }, 600);
+});
+
+const queryClient = new QueryClient();
+
+function Feed() {
+  const { data, isPending, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['feed'],
+    initialPageParam: 0,                                // 第一页的参数
+    queryFn: ({ pageParam }) => fetchFeed(pageParam),
+    getNextPageParam: lastPage => lastPage.nextCursor,  // 返回 undefined 表示没有下一页
+  });
+  if (isPending) return <p>⏳ 首次加载中…</p>;
+  const items = data.pages.flatMap(page => page.items);
+  return (
+    <div>
+      <ul>{items.map(t => <li key={t}>{t}</li>)}</ul>
+      <p>已加载 {data.pages.length} 页，共 {items.length} 条</p>
+      <button onClick={() => fetchNextPage()} disabled={!hasNextPage || isFetchingNextPage}>
+        {isFetchingNextPage ? '加载中…' : hasNextPage ? '加载更多' : '没有更多了'}
+      </button>
+    </div>
+  );
+}
+
+function App() {
+  return <QueryClientProvider client={queryClient}><Feed /></QueryClientProvider>;
+}
+```
+
+真实项目里，常把“加载更多”换成滚动到底自动加载：用 `IntersectionObserver` 观察列表末尾的一个元素，它进入视口时调用 `fetchNextPage()`。条件仍然是 `hasNextPage && !isFetchingNextPage`，避免重复请求。
+
+<CallBox kind="warn" label="常见坑">
+
+`useInfiniteQuery` 的数据过期重新获取时，Query 会按顺序重新请求已经加载的**每一页**。页数很多时，这是不小的开销，可以用 `maxPages` 限制缓存的页数。
+
+</CallBox>
+
 ## 常见坑
 
 | 现象或需求 | 做法 |
 |---|---|
-| 接口失败后，约 7 秒才显示错误 | 默认会重试 3 次，间隔 1、2、4 秒。测试里要设 `retry: false` |
+| 接口失败后，要等很久才显示错误 | 默认会重试 3 次，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的耗时。测试里要设 `retry: false` |
 | 断网时一直显示“加载中”，没有错误 | 默认的 `networkMode` 是 `'online'`：没有网络时，查询暂停（`fetchStatus` 是 `paused`），不发请求，也不报错。想在断网时得到错误，设 `networkMode: 'always'` |
 | key 到处手写，容易拼错 | 用 key 工厂集中定义：`userKeys = { all: ['users'], detail: id => ['users', id] }`。`invalidateQueries({ queryKey: userKeys.all })` 能一次让所有用户缓存失效。v5 也可以用 `queryOptions({ queryKey, queryFn })` 把两者绑在一起 |
-| 翻页或搜索时，界面闪回“加载中” | `placeholderData: keepPreviousData`：换 key 时先显示上一页数据 |
+| 翻页或搜索时，界面闪回“加载中” | `placeholderData: keepPreviousData`：换 key 时先显示上一页数据（见上一节） |
 | 要等前一个数据到了再请求 | `enabled: !!userId` |
 | 只请求一次、不需要缓存；或数据已在服务端组件、loader 里取好 | 不必引入 Query |
 
@@ -586,7 +708,7 @@ export async function renameUser(id: number, name: string) {
 | 点“用户 2”，10 秒内再点回“用户 1” | 名字立刻显示，没有新的请求日志 |
 | 等超过 10 秒，再切回一个看过的用户 | 先显示旧名字，随后出现 1 行请求日志 |
 | 把 `staleTime` 改成 0，切到别的浏览器标签页再切回来 | 出现 1 行请求日志（页面重新可见时触发；只有 window 的 `focus` 事件不算）。`staleTime` 是 10 秒且没过期时，不出现 |
-| 点“用户 4” | 默认重试 3 次：控制台共 4 行“请求用户 4”，间隔 1、2、4 秒，加上每次请求的 0.8 秒，约 10 秒后才显示“用户不存在”。给 `useQuery` 加 `retry: false`，约 0.8 秒后就显示 |
+| 点“用户 4” | 默认重试 3 次：控制台共 4 行“请求用户 4”，重试间隔合计约 7 秒（1、2、4 秒），再加 4 次请求本身的 0.8 秒，约 10 秒后才显示“用户不存在”。给 `useQuery` 加 `retry: false`，约 0.8 秒后就显示 |
 | 点“改名” | 名字更新，控制台多 1 行请求（`invalidateQueries` 触发的重新获取） |
 | 把 `queryKey` 改成 `['user']`（漏写 id），再点“用户 2” | 页面仍显示用户 1 的名字：漏写依赖的症状。试完改回来 |
 
