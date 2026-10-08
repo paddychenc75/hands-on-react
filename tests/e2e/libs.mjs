@@ -99,11 +99,17 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn') && !text.includes('zustand persist middleware'),
     '站点主包里没有 react-router、@tanstack/react-query 和 zustand 的代码',
   );
-  ok(
-    bytes < 1_300_000,
-    '站点主包小于 1,300,000 字节（加库之前是 929,753，加 zustand 后是 943,790；之后课程数据里加了变式练习和新小节，增长到约 1,127,000）',
-    String(bytes),
-  );
+  ok(bytes < 215_000, '站点主包小于 215,000 字节（课程数据按课拆成异步 chunk 之前是 1,187,918；拆分后约 194,000，再留约 10% 余量）', String(bytes));
+  // 主包里不含任何一课的测验题：每课的数据在自己的 chunk（lesson-<id>.*.js）里，打开那一课才加载
+  for (const id of ['state', 'scheduler', 'project-weather']) {
+    const L = await lessonData(id);
+    const plain = L.quiz[1].q.replace(/<[^>]+>/g, '');
+    const snippet = (plain.match(/[^'"\\\n`$]{10,}/g) || []).sort((a, b) => b.length - a.length)[0];
+    const chunk = fs.readdirSync(path.join(dir, 'async')).find(f => f.startsWith(`lesson-${id}.`));
+    const chunkText = chunk ? fs.readFileSync(path.join(dir, 'async', chunk), 'utf8') : '';
+    ok(snippet && chunkText.includes(snippet), `${id} 的测验题文字在它自己的数据 chunk 里（${chunk}）`, String(snippet));
+    ok(snippet && !text.includes(snippet), `主包里不含 ${id} 的测验题文字`, String(snippet));
+  }
   const rt = path.join(ROOT, 'doc_build/runtime');
   const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query|zustand)-[\d.]+\.dev\.js$/.test(f));
   ok(libs.length === 3, 'doc_build/runtime 里有三个库文件', libs.join(','));

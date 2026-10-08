@@ -36,10 +36,10 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run test:e2e -- mechanics smoke` | 只跑学习机制 / 冒烟测试 | 各约 1 分钟 |
 | **`npm test`** | check + build + test:e2e，**完整验收**。改引擎、主题组件、样式后必跑 | 约 3 分钟 |
 | `npm run new-lesson -- <课id> --stage <0-5> --after <已有课id> --title "标题"` | 加一课 | 即时 |
-| `npm run gen` | 重新生成 `course/lessons.generated.ts`（dev、build 会自动跑；一般不用手动） | 即时 |
+| `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect 的参考答案仍通过），可以写多个；不写就七个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就八个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 49 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -55,8 +55,8 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `course/types.ts` | 课程数据和进度存储的**全部类型**（`Lesson`、`QuizItem`、`Exercise`、`Predict`、`PlayMeta`、`GlossaryEntry`、`Stage`、`Progress`、`SrsCard`…） | 逻辑 |
 | `course/order.ts` | **唯一的课程顺序**（课 id 数组，课号 = 位置）。阶段归属在每课数据文件的 `stage` | 课的内容 |
 | `course/lessons/<id>.ts` | 每课的非正文数据，`export default {…} satisfies Lesson`。只放课文件 | 共用的辅助模块（会被当成一课收集进注册表） |
-| `course/lessons.generated.ts` | **自动生成**，收集 `course/lessons/*.ts`。不要手改 | — |
-| `course/registry.ts` | `LESSONS`（按顺序）、`lessonNo(id)`、`lessonById(id)`、`LESSON_ORDER` | — |
+| `course/lessons.generated.ts`、`lessons.catalog.generated.ts`、`lessons.loaders.generated.ts` | **自动生成**（`npm run gen`），不要手改。`generated`：Node 端静态 import 全部课（单元测试、脚本用，**浏览器代码不能 import**）；`catalog`：轻量课程目录（进主包）；`loaders`：课 id → 动态 import，每课一个异步 chunk | — |
+| `course/registry.ts` | 轻量目录：`LESSONS: LessonMeta[]`（按顺序）、`lessonNo(id)`、`lessonById(id)`、`LESSON_ORDER`。**只有目录，没有题目和练习**；要完整的一课用 `course/engine/lessonData.ts` 的 `loadLesson(id)` | 课的重数据 |
 | `course/stages.ts`、`glossary.ts`、`site.ts` | 6 个阶段、术语表、站点常量（base、链接工具） | — |
 | `course/card-keys.snapshot.json` | 复习卡片键快照，**提交进仓库**，由脚本更新（见「卡片键快照」） | 手改 |
 | `course/engine/logic/` | **纯函数**：不碰 DOM、localStorage，不读 `Date.now()`（时间由参数传入）。有单元测试，`tests/unit/purity.test.ts` 会挡住副作用；`tests/unit/cycles.test.ts` 检查全仓库没有循环依赖 | DOM、存储、`window` |
@@ -65,7 +65,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `theme/` | React 薄包装组件（`components/`，在 `rspress.config.ts` 的 `globalComponents` 里注册，MDX 里不用 import）、`lib/` 钩子、`index.tsx`（顶栏加总进度）、`style.css`（全部样式，浅色 `:root`、深色 `html.dark`） | 学习机制的逻辑 |
 | `scripts/` | `check-content.mjs`、`new-lesson.mjs`、`gen-registry.mjs`、`setup-hooks.mjs`，`lib/` 是它们共用的 | — |
 | `tests/unit/` | Vitest 单元测试（`*.test.ts`） | 需要浏览器的测试 |
-| `tests/e2e/` | Playwright 测试：`lessons.mjs`、`mechanics.mjs`、`smoke.mjs`，`screenshots.mjs`，`run.mjs` 是入口，`_site.mjs` 是共用的静态服务器和浏览器启动 | — |
+| `tests/e2e/` | Playwright 测试：`lessons.mjs`、`mechanics.mjs`、`smoke.mjs`、`split.mjs`（课数据拆分：网络请求、慢网、旧进度），`screenshots.mjs`，`run.mjs` 是入口，`_site.mjs` 是共用的静态服务器和浏览器启动 | — |
 | `tests/screenshots/` | 截图（人工看版面用） | — |
 | `review/` | 历次评审报告。只读参考，不是代码，不检查 | — |
 | `.github/` | `workflows/ci.yml`（check + e2e）、`deploy.yml`（CI 通过后部署）、`dependabot.yml` | — |
@@ -76,6 +76,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | 模块 | 职责 |
 |---|---|
 | `index.ts` | 对外出口：`theme/` 只从这里 import |
+| `lessonData.ts` | 按课加载重数据：`loadLesson(id)`（同一课只请求一次，失败可重试）、`loadLessons(ids)`、`loadedLesson(id)`（同步取已加载的） |
 | `store.ts` | 进度存储（`localStorage['hands-on-react-v1']`）、`lp(id)`、进度变化事件 |
 | `util.ts` | DOM 小工具（`el`、`toast`、`highlight`…） |
 | `exec.ts` | 代码预处理和编译（`prepare`、`compile`、`stripComments`）。练习的检查函数也 import 它 |
@@ -87,7 +88,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `exercise.ts` | 练习：任务、检查答案、提示阶梯 |
 | `drills.ts` | 变式练习：每道独立的实验台和检查答案，进度记在 `LessonProgress.dr`，不影响本课完成 |
 | `question.ts` / `quiz.ts` / `warmup.ts` / `review.ts` / `stageCheck.ts` | 题目共用组件 / 课内测验 / 课前热身 / 复习页 / 阶段测验 |
-| `cards.ts` | 间隔复习卡片的读写（`__srs`），卡片键对应回题目 |
+| `cards.ts` | 间隔复习卡片的读写（`__srs`）。卡片键先对应成**引用**（`cardRefOf`、`dueRefs`、`learnedRefs`：只用目录和进度，同步），要显示题目时才 `resolveCards(refs)` 按课加载 |
 | `completion.ts` | 一课的完成判定和“掌握标准”条 |
 | `selfExplain.ts` | 自我解释 |
 | `terms.ts` | 术语标注 |
@@ -110,7 +111,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 npm run new-lesson -- hooks-recap --stage 1 --after custom-hooks --title "Hook 复盘"
 ```
 
-脚本做的事：生成 `docs/lessons/<id>.mdx`（含 `LessonHeader`/`Warmup`/`LessonGoals`/`LessonProse`、一个 `play` 示例、`Quiz`/`Exercise`/`SelfExplain`/`LessonFooter`）和 `course/lessons/<id>.ts`（所有字段都有，文字是“【待写】”占位，练习是一个能通过的小例子），在 `course/order.ts` 里 `--after` 那一课后面登记，更新 `lessons.generated.ts` 和卡片键快照。侧栏、首页、翻页、热身、阶段测验自动生效。
+脚本做的事：生成 `docs/lessons/<id>.mdx`（含 `LessonHeader`/`Warmup`/`LessonGoals`/`LessonProse`、一个 `play` 示例、`Quiz`/`Exercise`/`SelfExplain`/`LessonFooter`）和 `course/lessons/<id>.ts`（所有字段都有，文字是“【待写】”占位，练习是一个能通过的小例子），在 `course/order.ts` 里 `--after` 那一课后面登记，更新 `lessons.*generated.ts`（含轻量目录）和卡片键快照。侧栏、首页、翻页、热身、阶段测验自动生效。
 
 然后：
 
@@ -357,7 +358,13 @@ export default {
 - **实验台不用 iframe**：页面内按需加载 React 19.3.0 **开发版**，站点自己的 React 与它互不干扰，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
 - **进度**只存在浏览器 `localStorage['hands-on-react-v1']`（键和结构不要改，结构见 `course/types.ts` 的 `Progress`）；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
 - **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`），样式在 `theme/style.css`。
-- **课程注册表自动收集**：`course/lessons/*.ts` → `scripts/gen-registry.mjs` → `course/lessons.generated.ts`（提交进仓库）。选生成脚本而不是 `import.meta.webpackContext`：rspress dev/build、Vitest、node 脚本和 tsc 要读同一份课程表，没有一种目录收集写法四处都能用。`dev`/`build` 前自动重新生成，`check:content` 检查它是否最新。
+- **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
+  - **同步的只靠目录**：课头、学习目标、测验题数、跳转条、侧栏、首页统计、顶栏、翻页、课末“掌握标准”条（`completion.ts` 用 `quizAnswers` 判断是否全对）、复习到期数量、阶段进度。这些在静态 HTML 里照常输出，水合时不会不一致。**写这类组件时用 `useLesson()`（返回 `LessonMeta`），不要为了读一个字段去加载整课。**
+  - **要重数据的用 `useSlot(build)`**（`theme/lib/useSlot.ts`）：先在占位里显示加载状态（`.hoc-loading`，0.15 秒后才淡入，数据很快到达时看不到），数据到了再 `build(lesson)`（拿到的是完整的 `Lesson`）；加载失败显示 `.hoc-loaderr`（原因和“重试”）。实验台、练习的运行时和课数据并行加载。只需要目录的占位用 `useMetaSlot`（例如课前热身）。
+  - **跨课取题**（热身、复习、阶段测验）：先用目录和进度选题，得到 `CardRef`（键、课目录项、题号），选好之后才 `resolveCards(refs)`，**只加载选中的题所属的课**（并行），界面在这期间显示加载状态，失败给出重试。**不要在这些页面一次加载全部课。**
+  - **新增或修改课的字段后**：生成的目录和映射由 `npm run gen` 更新（`dev`、`build` 启动时自动跑，`check:content` 检查是否最新）。dev 服务器运行期间改了某课的 `title`、`summary`、`goals`、`mins`、题数、有没有练习等目录里的字段，要手动 `npm run gen`（或重启 dev）页面才会变；改题干、练习、示例说明不用，那些在课自己的 chunk 里，热更新照常。
+  - 体积由 `tests/e2e/libs.mjs` 守着：主包有上限，且主包里不能有任何课的测验题文字；`tests/e2e/split.mjs` 守着“只请求需要的课的 chunk”。
+- **课程注册表自动收集**：`course/lessons/*.ts` → `scripts/gen-registry.mjs` → `course/lessons.generated.ts`、`lessons.catalog.generated.ts`、`lessons.loaders.generated.ts`（提交进仓库）。选生成脚本而不是 `import.meta.webpackContext`：rspress dev/build、Vitest、node 脚本和 tsc 要读同一份课程表，没有一种目录收集写法四处都能用。`dev`/`build` 前自动重新生成，`check:content` 检查它是否最新。
 - **站内链接**：引擎拼出来的 `<a>` 带 base 和 `.html`（`course/site.ts` 的 `lessonHref` 等）；全局组件 `LinkRouter` 拦截点击，交给 Rspress 的客户端路由，页面不整页刷新。
 - **实验台版面**：`.hoc-slot` 是 CSS 容器，宽度不足 900px 时编辑器在上、预览在下，保证 60 字符的代码行不折行。
 - **预览区的站点默认样式必须是零优先级**（`theme/style.css` 里 `:where(.preview button)` 这种写法，不要写成 `.preview button`）。因为实验台没有 iframe，站点样式和学习者的 `<style>` 在同一页面，优先级更高的默认样式会盖住示例里的单类选择器。示例里不要出现 `.preview`，选择器按真实项目的自然写法来；冒烟测试 b2 项守着这一条。示例的类名也别用站点自己的 `.btn`。

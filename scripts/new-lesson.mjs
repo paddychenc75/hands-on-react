@@ -195,7 +195,7 @@ const checkStatus = run('check-content.mjs', '--update');
 // ---------- 提醒：课号顺延 ----------
 const newNo = afterIdx + 2;
 console.log(
-  `\n✓ 已创建第 ${newNo} 课 "${id}"（阶段 ${stage}）：\n  ${path.relative(ROOT, mdxPath)}\n  ${path.relative(ROOT, dataPath)}\n  course/order.ts 已登记；course/lessons.generated.ts、course/card-keys.snapshot.json 已更新`,
+  `\n✓ 已创建第 ${newNo} 课 "${id}"（阶段 ${stage}）：\n  ${path.relative(ROOT, mdxPath)}\n  ${path.relative(ROOT, dataPath)}\n  course/order.ts 已登记；course/lessons.*generated.ts（目录和 chunk 映射）、course/card-keys.snapshot.json 已更新`,
 );
 if (afterIdx + 1 < LESSON_ORDER.length) {
   console.log(
