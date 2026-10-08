@@ -22,6 +22,8 @@ export default function HomePage() {
     LESSONS.filter((l: any) => l.id === 'portfolio'),
     l => l.mins + (l.localMins || 0),
   );
+  // 变式练习是选做：时间单独列出，不并入 mins
+  const drillMinsTotal = sum(LESSONS, l => l.drillMins || 0);
   const hours = (mins: number) => Math.round((mins / 60) * 10) / 10;
   const exCount = LESSONS.filter(l => l.hasExercise).length;
   const playCount = LESSONS.reduce((s, l) => s + l.nPlays, 0);
@@ -79,6 +81,7 @@ export default function HomePage() {
         <div>
           <b>{hours(inSiteMins)}</b>
           <span>小时站内学习（含练习）</span>
+          {drillMinsTotal ? <small className="dim">+ 变式练习约 {hours(drillMinsTotal)} 小时</small> : null}
         </div>
         <div>
           <b>{hours(localMins)}</b>

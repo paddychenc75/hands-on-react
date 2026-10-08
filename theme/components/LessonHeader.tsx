@@ -18,6 +18,7 @@ export default function LessonHeader() {
         </span>
         <span>·</span>
         <span>约 {lesson.mins} 分钟</span>
+        {lesson.drillMins ? <span className="dim">+ 变式练习约 {lesson.drillMins} 分钟</span> : null}
       </div>
       <p className="lesson-sum" dangerouslySetInnerHTML={{ __html: lesson.summary }} />
     </div>

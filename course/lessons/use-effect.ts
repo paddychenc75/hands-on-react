@@ -169,6 +169,7 @@ function App() {
       }
     },
   },
+  drillMins: 11,
   drills: [
     {
       title: '订阅按键事件：加上清理，再修掉旧的 count',

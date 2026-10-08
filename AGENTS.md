@@ -226,6 +226,7 @@ export default {
 
 **字段、含义和类型以 `course/types.ts` 为准**（不在这里重复抄字段表）。写法要点：
 
+- `drillMins`（有 `drills` 就必填，否则不能写）：每道变式按任务大小在 **3–8 分钟**之间取值，写它们的和。取值参考：改动 ≤2 行的小修 3–4 分钟；改动 3–6 行、要想一想 5–6 分钟；要改写结构、改动 6–10 行 6–7 分钟；超过 10 行的重构或多步任务 8 分钟。`check:content` 检查它在 道数×3 到 道数×8 之间。它进轻量目录，课头显示成“约 X 分钟”后面淡色的“+ 变式练习约 Y 分钟”，首页“站内学习”旁显示全部变式的合计；**不并入 `mins`**，因为变式不是完成一课的必要条件。
 - `localMins`（可选，正整数分钟）：这一课的本机任务或本机项目的预计时间，只算要在自己电脑上做、站内没有自动检查的部分（课文里写了“本机项目另需约 2–3 小时”就填 150）。首页把“站内学习（各课 `mins` 之和，不含毕业设计）”“本机任务与本机项目（各课 `localMins` 之和）”“毕业设计（portfolio 的 `mins` + `localMins`）”分三段显示；缺省按 0。`mins` 不含它。
 - 预测题：写在 `plays[标题].predict`，`pkey` 是预测键（`课id|标题`，进度里 `__pred` 用它，别改）。示例从别的课搬来时 `pkey` 保持原样（例如 concurrent 里仍是 `rendering|三种隐藏方式`）：`check:content` 允许已经在快照里的 `pkey` 不以本课 id 开头。**被预测的代码、按钮文字、日志里不能剧透答案**，解释放进 `note`（预测后才显示）。
 - `options` 是纯文本，不能写 HTML（会被转义）。`q`、`explain`、`task`、`hint` 按 HTML 渲染，写 JSX 或泛型时把 `<` 写成 `&lt;`。
@@ -364,7 +365,7 @@ export default {
 - **实验台不用 iframe**：页面内按需加载 React 19.3.0 **开发版**，站点自己的 React 与它互不干扰，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
 - **进度**只存在浏览器 `localStorage['hands-on-react-v1']`（键和结构不要改，结构见 `course/types.ts` 的 `Progress`）；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
 - **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`），样式在 `theme/style.css`。
-- **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
+- **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`drillMins`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
   - **同步的只靠目录**：课头、学习目标、测验题数、跳转条、侧栏、首页统计、顶栏、翻页、课末“掌握标准”条（`completion.ts` 用 `quizAnswers` 判断是否全对）、复习到期数量、阶段进度。这些在静态 HTML 里照常输出，水合时不会不一致。**写这类组件时用 `useLesson()`（返回 `LessonMeta`），不要为了读一个字段去加载整课。**
   - **要重数据的用 `useSlot(build)`**（`theme/lib/useSlot.ts`）：先在占位里显示加载状态（`.hoc-loading`，0.15 秒后才淡入，数据很快到达时看不到），数据到了再 `build(lesson)`（拿到的是完整的 `Lesson`）；加载失败显示 `.hoc-loaderr`（原因和“重试”）。实验台、练习的运行时和课数据并行加载。只需要目录的占位用 `useMetaSlot`（例如课前热身）。
   - **跨课取题**（热身、复习、阶段测验）：先用目录和进度选题，得到 `CardRef`（键、课目录项、题号），选好之后才 `resolveCards(refs)`，**只加载选中的题所属的课**（并行），界面在这期间显示加载状态，失败给出重试。**不要在这些页面一次加载全部课。**

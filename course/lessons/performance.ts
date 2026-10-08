@@ -170,6 +170,7 @@ function App() {
       t.assert(list() === '苹果、香蕉、橙子、葡萄、西瓜、哈密瓜', `清空输入框后，列表应恢复全部 6 种水果，实际是：${list() || '空'}`);
     },
   },
+  drillMins: 9,
   drills: [
     {
       title: 'memo 包了却没用：每次都是新的 style 对象',

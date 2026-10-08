@@ -218,6 +218,7 @@ function App() {
       t.assert(srv.connects === 2, `从开始到现在共连接了 ${srv.connects} 次，应为 2 次（综合 1 次 + 旅行 1 次）。收到消息时不要重新连接`);
     },
   },
+  drillMins: 9,
   drills: [
     {
       title: '稍后保存，要存到点时的最新输入',

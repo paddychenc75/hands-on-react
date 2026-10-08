@@ -142,6 +142,8 @@ export interface Lesson {
   exercise?: Exercise;
   /** 变式练习：2–3 道小而快的练习，练同一个概念的不同情境。可选，不影响“本课完成”。MDX 里写 `<Drills />` */
   drills?: Drill[];
+  /** 变式练习的预计分钟数之和（每道 3–8 分钟，按任务大小取）。有 drills 必须有它；不计入 mins（变式不是完成一课的必要条件） */
+  drillMins?: number;
   /** 这课的本机任务或本机项目的预计分钟数（需要在自己电脑上做，站内没有自动检查）。可选，缺省按 0；首页单独统计，不计入 mins */
   localMins?: number;
   /** 阶段测验专用的读代码题。下标是复习卡片键 `课id#cN` 的 N，只能在末尾追加 */
@@ -168,6 +170,8 @@ export interface LessonMeta {
   hasExercise: boolean;
   /** 变式练习数 */
   nDrills: number;
+  /** 变式练习的预计分钟数之和（没有变式时缺省） */
+  drillMins?: number;
   /** 可运行示例数（plays 的键数） */
   nPlays: number;
 }

@@ -236,6 +236,12 @@ for (const [id, l] of Object.entries(lessons)) {
         '运行 npm run mins 看对照表；确实该这么多就改公式规则（AGENTS.md「估算 mins」），否则改 mins',
       );
   }
+  if (l.drills?.length) {
+    const n = l.drills.length;
+    if (!Number.isInteger(l.drillMins)) fail(where, `有 drills 就必须有 drillMins（正整数分钟，每道 3–8 分钟之和），现在是 ${JSON.stringify(l.drillMins)}`);
+    else if (l.drillMins < n * 3 || l.drillMins > n * 8)
+      fail(where, `drillMins 是 ${l.drillMins}，${n} 道变式应在 ${n * 3}–${n * 8} 分钟之间（每道 3–8 分钟）`);
+  } else if (l.drillMins !== undefined) fail(where, '没有 drills 却写了 drillMins');
   for (const f of ['goals', 'keyPoints']) if (!Array.isArray(l[f]) || !l[f].length) fail(where, `${f} 是空的`);
   if (l.exercise) {
     const ex = l.exercise;

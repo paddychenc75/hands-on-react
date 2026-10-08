@@ -156,6 +156,7 @@ function App() {
       );
     },
   },
+  drillMins: 12,
   drills: [
     {
       title: '把层层传递的 props 改成 Context',

@@ -131,6 +131,7 @@ function App() {
       );
     },
   },
+  drillMins: 7,
   drills: [
     {
       title: '对象 state：点了没反应',

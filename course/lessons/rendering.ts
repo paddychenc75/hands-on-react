@@ -150,6 +150,7 @@ function App() {
       );
     },
   },
+  drillMins: 9,
   drills: [
     {
       title: '换收件人，留言草稿要跟着清空',

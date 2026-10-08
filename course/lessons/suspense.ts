@@ -133,6 +133,7 @@ function App() {
       t.assert(t.q('#safe'), '没有出错的子树应正常显示 children，而不是备用界面');
     },
   },
+  drillMins: 11,
   drills: [
     {
       title: '把 fallback 放到合适的层级',

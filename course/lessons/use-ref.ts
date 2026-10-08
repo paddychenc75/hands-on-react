@@ -215,6 +215,7 @@ function App() {
       }
     },
   },
+  drillMins: 13,
   drills: [
     {
       title: '记住上一次渲染时的值',

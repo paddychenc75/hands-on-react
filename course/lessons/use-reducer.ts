@@ -150,6 +150,7 @@ function App() {
       t.assert(r({ count: 1 }, { type: 'increment' }).count === 2, 'increment 应返回 count 加 1 的新对象');
     },
   },
+  drillMins: 15,
   drills: [
     {
       title: '两个 useState 改写成一个 reducer',

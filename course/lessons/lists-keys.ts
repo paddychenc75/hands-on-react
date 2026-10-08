@@ -181,6 +181,7 @@ export default {
       }
     },
   },
+  drillMins: 10,
   drills: [
     {
       title: '嵌套列表：两层 map，两层 key',

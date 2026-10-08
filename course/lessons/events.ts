@@ -124,6 +124,7 @@ function App() {
       t.assert(p() === '无', '点击外层空白处应清空为“无”。请保留外层 div 的 onClick');
     },
   },
+  drillMins: 6,
   drills: [
     {
       title: '链接当按钮用：阻止默认行为',

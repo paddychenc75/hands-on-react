@@ -203,6 +203,7 @@ function App() {
       }
     },
   },
+  drillMins: 9,
   drills: [
     {
       title: '两个输入框同步',

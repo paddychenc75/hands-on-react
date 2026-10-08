@@ -264,6 +264,7 @@ function boardReducer(state, action) {
       t.assert(!card('写测试'), '删除后卡片应消失');
     },
   },
+  drillMins: 13,
   drills: [
     {
       title: '补全界面的事件接线',

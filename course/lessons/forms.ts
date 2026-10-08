@@ -97,6 +97,7 @@ function App() {
       t.assert(pv() === '你好，陌生人', '清空后应恢复“你好，陌生人”');
     },
   },
+  drillMins: 9,
   drills: [
     {
       title: '复选框和下拉框：读对属性',

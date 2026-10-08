@@ -95,6 +95,8 @@ export default {
   },
   // 变式练习（可选）：2–3 道 3–8 分钟的小任务，练同一概念的不同情境；不影响“本课完成”。
   // 要用时取消注释，并在课文里的 <Exercise /> 后面加一行 <Drills />。字段说明见 AGENTS.md「变式练习」。
+  // 有 drills 必须有 drillMins：每道按任务大小取 3–8 分钟，写它们的和（check:content 检查在 道数×3 到 道数×8 之间）。
+  // drillMins: 8,
   // drills: [
   //   {
   //     title: '换成对象状态',

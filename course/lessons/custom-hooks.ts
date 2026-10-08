@@ -231,6 +231,7 @@ function App() {
       t.assert(t.text('#stock') === '10', `点“补满”后库存应恢复为 10，实际是 ${t.text('#stock')}`);
     },
   },
+  drillMins: 13,
   drills: [
     {
       title: '抽出 useLocalStorage：两个组件共用读写逻辑',
