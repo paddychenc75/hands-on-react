@@ -849,6 +849,7 @@ describe('详情页', () => {
 | URL | 复制带 `?q=` 的网址到新标签页 | 同样的结果 |
 | 缓存 | 来回切换两个城市 | 第二次进入同一个城市，网络面板里没有新请求 |
 | 出错 | 开 Offline，搜索新词，再打开新城市 | 都有错误提示和重试按钮 |
+| 版本 | 运行 `npm ls react react-router @tanstack/react-query` | react 是 19.2 以上，react-router 是 8.x，@tanstack/react-query 是 5.x |
 | 质量 | `npm run typecheck`、`npm run lint`、`npm test`、`npm run build` | 全部通过 |
 | 测试 | 故意改坏一处再运行测试 | 至少一个变红 |
 
