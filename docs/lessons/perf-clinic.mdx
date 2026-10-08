@@ -81,7 +81,7 @@ export default function App() {
   });
 
   return (
-    <ThemeContext.Provider value={value}>
+    <ThemeContext value={value}>
       <label>
         <input type="checkbox" checked={fixed} onChange={e => setFixed(e.target.checked)} />
         {' '}用 useMemo 固定 value
@@ -90,10 +90,16 @@ export default function App() {
       <ul style={{ columns: 2 }}>
         {LABELS.map(l => <Item key={l} label={l} />)}
       </ul>
-    </ThemeContext.Provider>
+    </ThemeContext>
   );
 }
 ```
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 没有 `<ThemeContext value={…}>` 这种写法，要写 `<ThemeContext.Provider value={…}>`。性能上两者没有区别：value 每次都是新对象，消费者照样全部渲染。
+
+</CallBox>
 
 ## 三、量化：用计数说话
 

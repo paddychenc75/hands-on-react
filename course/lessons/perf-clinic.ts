@@ -191,7 +191,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <ThemeContext value={{ theme, toggleTheme }}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -206,7 +206,7 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
@@ -319,7 +319,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={themeValue}>
+      <ThemeContext value={themeValue}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -334,7 +334,7 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
@@ -448,7 +448,7 @@ function App() {
 
   return (
     <Profiler id="dashboard" onRender={logCommit}>
-      <ThemeContext.Provider value={themeValue}>
+      <ThemeContext value={themeValue}>
         <style>{css}</style>
         <div className={'dash ' + theme}>
           <Sidebar />
@@ -463,7 +463,7 @@ function App() {
             <OrderTable query={query} />
           </main>
         </div>
-      </ThemeContext.Provider>
+      </ThemeContext>
     </Profiler>
   );
 }`,
@@ -593,9 +593,9 @@ function App() {
   }, []);
   const logout = () =&gt; setUser(null);
   return (
-    &lt;AuthContext.Provider value={{ user, logout }}&gt;
+    &lt;AuthContext value={{ user, logout }}&gt;
       &lt;Header now={now} /&gt; &lt;Avatar /&gt;
-    &lt;/AuthContext.Provider&gt;
+    &lt;/AuthContext&gt;
   );
 }</code></pre></div>`,
       options: ['从不：user 没变，memo 让它跳过', '只在挂载时渲染一次', '每秒两次：Header 和 Provider 各触发一次', '每秒一次：value 每次都是新对象'],

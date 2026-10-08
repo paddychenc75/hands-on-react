@@ -298,7 +298,7 @@
     "perf-clinic#2": "9a4aab4a",
     "perf-clinic#3": "a8d08651",
     "perf-clinic#4": "5614e562",
-    "perf-clinic#c0": "98e4b85f",
+    "perf-clinic#c0": "957a38dc",
     "perf-clinic#c1": "863ec722",
     "perf-clinic#c2": "56217631",
     "perf-clinic#c3": "031861f9",
@@ -363,17 +363,17 @@
     "state-at-scale|两个请求并发时的回滚",
     "headless-components|受控模式下的函数式更新",
     "headless-components|同一个 Hook，两种界面",
+    "headless-components|合并 ref：卸载时调用谁？",
+    "headless-components|复合组件：选项被包了一层",
     "form-architecture|每输入一个字，谁在重新渲染？",
     "form-architecture|用户名检查的竞态",
+    "form-architecture|Action 表单：失败后输入框还剩什么？",
+    "form-architecture|Action 排队：连点会提交几次？",
     "error-handling|边界能接住哪一个？",
     "error-handling|一次故障，上报几次？",
     "error-handling|根级回调：谁收到错误？",
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？",
-    "form-architecture|Action 表单：失败后输入框还剩什么？",
-    "form-architecture|Action 排队：连点会提交几次？",
-    "headless-components|合并 ref：卸载时调用谁？",
-    "headless-components|复合组件：选项被包了一层"
+    "perf-clinic|memo 挡得住 Context 吗？"
   ]
 }
