@@ -1,5 +1,5 @@
-// 第三方库（react-router、@tanstack/react-query）在实验台里的浏览器测试：
-//   按需加载（只用到 React 的课不请求库文件）、版本标记、两课的真库示例无错误且行为符合课文和预测题的答案、
+// 第三方库（react-router、@tanstack/react-query、zustand）在实验台里的浏览器测试：
+//   按需加载（只用到 React 的课不请求库文件）、版本标记、三课的真库示例无错误且行为符合课文和预测题的答案、
 //   库文件被拦截时的失败提示（其余部分正常、可以重试）、tanstack-query 练习（参考答案、起始代码、常见错误、不同写法）。
 // 用法：node tests/e2e/libs.mjs      （先 npm run build）
 import fs from 'node:fs';
@@ -12,6 +12,8 @@ const { ok, done } = checker();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const ROUTER = 'react-router 8.4.0';
 const QUERY = '@tanstack/react-query 5.104.1';
+const ZUSTAND = 'zustand 5.0.15';
+const ALL_SLUGS = ['react-router', 'tanstack-query', 'zustand'];
 
 async function open(ctx, id) {
   const p = await ctx.newPage();
@@ -82,7 +84,7 @@ const runCodeIn = (p, title, code, ms = 600) =>
 const codeOf = (p, title) => inPg(p, title, pg => pg._editor.value);
 const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).test(u);
 
-/* 0. 站点主包不含这两个库，体积在预算内（课文里记录的数字：react-router 约 470 KB、react-query 约 155 KB，都不在主包里） */
+/* 0. 站点主包不含这三个库，体积在预算内（课文里记录的数字：react-router 约 470 KB、react-query 约 155 KB、zustand 约 24 KB，都不在主包里） */
 {
   const dir = path.join(ROOT, 'doc_build/static/js');
   const main = fs.readdirSync(dir).filter(f => /^index\..*\.js$/.test(f));
@@ -94,42 +96,43 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     .reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
   console.log(`     主包 ${main.join(',')}：${bytes} 字节；static/js 全部 ${total} 字节`);
   ok(
-    !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn'),
-    '站点主包里没有 react-router 和 @tanstack/react-query 的代码',
+    !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn') && !text.includes('zustand persist middleware'),
+    '站点主包里没有 react-router、@tanstack/react-query 和 zustand 的代码',
   );
   ok(bytes < 1_000_000, '站点主包小于 1,000,000 字节（加库之前是 929,753，加库之后是 943,790）', String(bytes));
   const rt = path.join(ROOT, 'doc_build/runtime');
-  const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query)-[\d.]+\.dev\.js$/.test(f));
-  ok(libs.length === 2, 'doc_build/runtime 里有两个库文件', libs.join(','));
+  const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query|zustand)-[\d.]+\.dev\.js$/.test(f));
+  ok(libs.length === 3, 'doc_build/runtime 里有三个库文件', libs.join(','));
   for (const f of libs) console.log(`     ${f}：${fs.statSync(path.join(rt, f)).size} 字节`);
 }
 
-/* 1. 按需加载：只用到 React 的课不请求库文件；router 课只请求 react-router；tanstack-query 课只请求 @tanstack/react-query */
-{
+/* 1. 按需加载：只用到 React 的课不请求库文件；每个库的课只请求自己的库文件 */
+for (const id of ['state', 'what-is-react']) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
-  const p = await open(ctx, 'state');
+  const p = await open(ctx, id);
   await reveal(p);
   ok(
     p.reqs.some(u => /react-19\.3\.0\.dev\.js/.test(u)),
-    'state 一课加载了 React 运行时（对照）',
+    `${id} 一课加载了 React 运行时（对照）`,
   );
   ok(
-    !p.reqs.some(u => isLib(u, 'react-router') || isLib(u, 'tanstack-query')),
-    'state 一课没有请求任何库文件',
+    !p.reqs.some(u => ALL_SLUGS.some(slug => isLib(u, slug))),
+    `${id} 一课没有请求任何库文件（包括 zustand）`,
     p.reqs.filter(u => /runtime/.test(u)).join(','),
   );
   const tags = await p.evaluate(() => [...document.querySelectorAll('.pg-head')].map(h => h.querySelector('.pg-lib')?.hidden));
   ok(
     tags.every(t => t === true),
-    'state 一课的实验台没有库标记',
+    `${id} 一课的实验台没有库标记`,
     tags.join(','),
   );
-  ok(!(await p.evaluate(() => 'React' in window || '__hocLibs' in window)), '没有加载库时，页面全局没有 __hocLibs');
+  ok(!(await p.evaluate(() => 'React' in window || '__hocLibs' in window)), `${id} 一课：没有加载库时，页面全局没有 __hocLibs`);
   await ctx.close();
 }
-for (const [id, want, notWant, name] of [
-  ['router', 'react-router', 'tanstack-query', ROUTER],
-  ['tanstack-query', 'tanstack-query', 'react-router', QUERY],
+for (const [id, want, name, minMini] of [
+  ['router', 'react-router', ROUTER, 2],
+  ['tanstack-query', 'tanstack-query', QUERY, 2],
+  ['state-architecture', 'zustand', ZUSTAND, 1],
 ]) {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   const p = await open(ctx, id);
@@ -139,7 +142,8 @@ for (const [id, want, notWant, name] of [
     `${id} 一课请求了 ${want} 的库文件`,
     p.reqs.filter(u => /runtime/.test(u)).join(','),
   );
-  ok(!p.reqs.some(u => isLib(u, notWant)), `${id} 一课没有请求 ${notWant} 的库文件`);
+  const others = ALL_SLUGS.filter(slug => slug !== want);
+  ok(!p.reqs.some(u => others.some(slug => isLib(u, slug))), `${id} 一课没有请求其他库的文件（${others.join('、')}）`);
   const info = await p.evaluate(() =>
     [...document.querySelectorAll('.pg')].map(x => [
       x.querySelector('.pg-title').textContent,
@@ -149,18 +153,25 @@ for (const [id, want, notWant, name] of [
   );
   const real = info.filter(i => i[0].includes('真库'));
   ok(
-    real.length >= 3 && real.every(i => i[1] === 'React 19.3.0' && i[2] === name),
+    real.length >= (id === 'router' ? 4 : id === 'tanstack-query' ? 5 : 3) && real.every(i => i[1] === 'React 19.3.0' && i[2] === name),
     `${id} 一课的真库示例标题栏显示 React 版本和 ${name}`,
     JSON.stringify(real),
   );
   const mini = info.filter(i => !i[0].includes('真库') && !i[0].includes('你的代码'));
-  ok(mini.length >= 2 && mini.every(i => i[2] === ''), `${id} 一课的迷你示例没有库标记`, JSON.stringify(mini));
+  ok(mini.length >= minMini && mini.every(i => i[2] === ''), `${id} 一课的迷你示例没有库标记`, JSON.stringify(mini));
   const bad = await p.evaluate(() => [...document.querySelectorAll('.pg .pv-err,.pg .console .err,.pg .console .warn')].map(e => e.textContent.slice(0, 120)));
   ok(bad.length === 0, `${id} 一课的全部示例运行无错误、无警告`, bad.join(' | '));
   ok(p.errs.length === 0, `${id} 一课没有页面错误`, p.errs.join('|'));
   ok(
-    await p.evaluate(() => typeof window.React === 'undefined' && typeof window.ReactRouter === 'undefined' && typeof window.ReactQuery === 'undefined'),
-    `${id} 一课：页面全局没有被库写入 React、ReactRouter、ReactQuery`,
+    await p.evaluate(
+      () =>
+        typeof window.React === 'undefined' &&
+        typeof window.ReactRouter === 'undefined' &&
+        typeof window.ReactQuery === 'undefined' &&
+        typeof window.zustand === 'undefined' &&
+        typeof window.Zustand === 'undefined',
+    ),
+    `${id} 一课：页面全局没有被库写入 React、ReactRouter、ReactQuery、zustand`,
   );
   await ctx.close();
 }
@@ -411,6 +422,111 @@ for (const [id, want, notWant, name] of [
   await ctx.close();
 }
 
+/* 3b. state-architecture 一课：zustand 真库示例的行为 = 课文和预测题的答案 */
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await open(ctx, 'state-architecture');
+  await reveal(p);
+  const wait = ms => sleep(ms);
+  const T1 = '真库：create、选择器与组件外读写';
+  let v = await preview(p, T1);
+  ok(v.includes('熊：0') && v.includes('蜂蜜：10'), 'zustand 1：初始熊 0、蜂蜜 10', v);
+  await inPg(p, T1, pg => {
+    pg.querySelector('.console').innerHTML = '';
+  });
+  v = await clickIn(p, T1, '组件外：蜂蜜 +5', 200);
+  let c = await consoleOf(p, T1);
+  ok(
+    v.includes('蜂蜜：15') && c.trim().split('\n').join('|') === 'store 变了：蜂蜜 10 → 15|HoneyPot 渲染',
+    'zustand 1（预测题答案）：组件外 setState，先是 subscribe 的日志，然后只有 HoneyPot 渲染',
+    v + ' / ' + c,
+  );
+  await inPg(p, T1, pg => {
+    pg.querySelector('.console').innerHTML = '';
+  });
+  v = await clickIn(p, T1, '加一只熊', 200);
+  c = await consoleOf(p, T1);
+  ok(
+    v.includes('熊：1') && c.trim().split('\n').join('|') === 'store 变了：蜂蜜 15 → 15|BearCounter 渲染',
+    'zustand 1：加熊时蜂蜜没变，subscribe 仍被调用，只有 BearCounter 渲染',
+    v + ' / ' + c,
+  );
+  await clickIn(p, T1, '组件外：读一下', 100);
+  ok((await consoleOf(p, T1)).includes('getState： {"bears":1,"honey":15}'), 'zustand 1：getState 在组件外读到当前 state', await consoleOf(p, T1));
+
+  const T2 = '真库：persist 持久化';
+  const KEY = 'hoc-demo-zustand';
+  const ls = k => p.evaluate(k => localStorage.getItem(k), k);
+  ok((await ls(KEY)) === null, 'zustand 2：初始没有 hoc-demo-zustand 这个键');
+  v = await preview(p, T2);
+  ok(v.includes('计数：0') && v.includes('存储位置：localStorage'), 'zustand 2：初始计数 0，存储位置是 localStorage', v);
+  const progressBefore = await ls('hands-on-react-v1');
+  for (let i = 0; i < 3; i++) v = await clickIn(p, T2, '+1', 60);
+  ok(v.includes('计数：3') && v.includes('{"state":{"count":3},"version":0}'), 'zustand 2：点三次，计数 3，存储里是 {"state":{"count":3},"version":0}', v);
+  ok((await ls(KEY)) === '{"state":{"count":3},"version":0}', 'zustand 2：localStorage 里只写了 hoc-demo-zustand 这个键', await ls(KEY));
+  ok((await ls('hands-on-react-v1')) === progressBefore, 'zustand 2：没有改动学习进度的键 hands-on-react-v1');
+  // 重新运行 = 刷新页面：新 store 把存储读回来
+  await inPg(p, T2, pg => pg._run());
+  await wait(600);
+  v = await preview(p, T2);
+  ok(v.includes('计数：3'), 'zustand 2（预测题答案）：重新运行后计数仍是 3', v);
+  v = await clickIn(p, T2, '清除存储并重置', 100);
+  ok(v.includes('计数：0') && v.includes('存储里的内容：（没有）'), 'zustand 2：清除后计数回到 0，存储里没有内容', v);
+  ok((await ls(KEY)) === null, 'zustand 2：清除后 hoc-demo-zustand 键被删除（没有被 setState 又写回去）', await ls(KEY));
+  ok((await ls('hands-on-react-v1')) === progressBefore, 'zustand 2：清除没有动学习进度的键');
+  await inPg(p, T2, pg => pg._run());
+  await wait(600);
+  v = await preview(p, T2);
+  ok(v.includes('计数：0'), 'zustand 2：清除后重新运行，仍是初始值 0', v);
+  // localStorage 不可用：退回内存存储，示例仍能用，重新运行后丢失
+  await p.evaluate(() => {
+    window.__lsDesc = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('denied');
+      },
+    });
+  });
+  await inPg(p, T2, pg => pg._run());
+  await wait(600);
+  await clickIn(p, T2, '+1', 60);
+  v = await clickIn(p, T2, '+1', 60);
+  ok(v.includes('计数：2') && v.includes('存储位置：内存（localStorage 不可用）'), 'zustand 2：localStorage 不可用时退回内存存储，仍能计数', v);
+  await inPg(p, T2, pg => pg._run());
+  await wait(600);
+  v = await preview(p, T2);
+  ok(v.includes('计数：0'), 'zustand 2：内存存储在重新运行后丢失', v);
+  ok(!(await consoleOf(p, T2)).includes('unavailable'), 'zustand 2：退回内存存储时没有 persist 的“存储不可用”警告', await consoleOf(p, T2));
+  await p.evaluate(() => {
+    Object.defineProperty(window, 'localStorage', window.__lsDesc);
+  });
+
+  const T3 = '真库：选择器返回新对象与 useShallow';
+  v = await clickIn(p, T3, '挂载写法 A', 500);
+  c = await consoleOf(p, T3);
+  ok(
+    v.startsWith('捕获到：Maximum update depth exceeded') && c.includes('The result of getSnapshot should be cached'),
+    'zustand 3（预测题答案）：v5 里选择器返回新对象，无限渲染，超过上限报错，由 Box 接住',
+    v + ' / ' + c.slice(0, 120),
+  );
+  await inPg(p, T3, pg => {
+    pg.querySelector('.console').innerHTML = '';
+  });
+  v = await clickIn(p, T3, '挂载写法 B', 300);
+  ok(v.startsWith('B：a = 1，b = 2'), 'zustand 3：写法 B（useShallow）正常显示', v);
+  await inPg(p, T3, pg => {
+    pg.querySelector('.console').innerHTML = '';
+  });
+  for (let i = 0; i < 3; i++) await clickIn(p, T3, '改 c', 60);
+  await wait(100);
+  ok(((await consoleOf(p, T3)).match(/PairB 渲染/g) || []).length === 0, 'zustand 3：改 c 三次，PairB 没有重新渲染');
+  v = await clickIn(p, T3, '改 a', 100);
+  ok(v.startsWith('B：a = 2，b = 2') && ((await consoleOf(p, T3)).match(/PairB 渲染/g) || []).length === 1, 'zustand 3：改 a 一次，PairB 重新渲染一次', v);
+  ok(p.errs.length === 0, 'state-architecture 一课没有页面错误', p.errs.join('|'));
+  await ctx.close();
+}
+
 /* 4. 库文件被拦截：真库示例显示加载失败提示，其余部分（课文、测验、迷你示例、练习）正常；放开后离开再回来可以重试 */
 {
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
@@ -465,6 +581,37 @@ for (const [id, want, notWant, name] of [
   }));
   ok(again.errs === 0 && again.libs === 4, '放开拦截后离开再回到本课：真库示例加载成功', JSON.stringify(again));
   ok(errs.length === 0, '拦截期间没有页面错误', errs.join('|'));
+  await ctx.close();
+}
+
+/* 4b. zustand 库文件被拦截：三个真库示例显示加载失败提示，迷你示例和练习正常 */
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.route('**/runtime/zustand-*.js', r => r.abort());
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(e.message));
+  await p.goto(lessonUrl(site, 'state-architecture'));
+  await p.evaluate(() => localStorage.clear());
+  await p.reload();
+  await p.waitForSelector('.selfx', { timeout: 60000 });
+  await p.waitForFunction(() => document.querySelectorAll('.pv-err').length >= 3, null, { timeout: 30000 });
+  await sleep(1000);
+  await reveal(p);
+  const r = await p.evaluate(() => ({
+    errs: [...document.querySelectorAll('.pv-err')].map(e => e.textContent),
+    prose: document.querySelector('.prose').textContent.length,
+    pg: [...document.querySelectorAll('.pg')].map(x => x.querySelector('.pg-title').textContent),
+    mini: [...document.querySelectorAll('.pg')].filter(x => !x.querySelector('.pv-err')).every(x => x.querySelector('.preview').innerText.length > 0),
+  }));
+  ok(
+    r.errs.length === 3 && r.errs.every(e => e.includes('运行环境加载失败（zustand），请检查网络后刷新页面')),
+    '库文件被拦截：3 个 zustand 真库示例都显示“运行环境加载失败（zustand）…”',
+    r.errs.join('|'),
+  );
+  ok(r.prose > 1000, '拦截 zustand 时课文正常显示');
+  ok(r.mini, '拦截 zustand 时迷你示例和练习照常运行');
+  ok(errs.length === 0, '拦截 zustand 期间没有页面错误', errs.join('|'));
   await ctx.close();
 }
 

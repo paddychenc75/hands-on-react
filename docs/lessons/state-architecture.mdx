@@ -134,6 +134,227 @@ function App() {
 
 </CallBox>
 
+## 用真的 Zustand
+
+迷你版只有 20 行。真的 Zustand 在它之上多了几样东西：组件外的读写方法、中间件、`useShallow`。下面的示例运行 zustand 5.0.15 的开发版（本节对真库行为的描述都按这个版本实测）。它只在示例用到时才加载，不发任何网络请求。
+
+### create、选择器与组件外读写
+
+`create` 接收一个初始化函数，返回一个 Hook。初始化函数的参数 `set` 用来更新 state。`set` 把你给的字段**浅合并**进旧 state，所以只写要改的字段。选择器的作用和迷你版一样：只订阅需要的那一小块。
+
+这个 Hook 本身还是一个 store 对象，带三个方法。它们在组件外也能用：
+
+- `getState()`：读当前 state。
+- `setState(partial)`：更新，规则和 `set` 一样。
+- `subscribe(listener)`：订阅变化，返回取消订阅的函数。listener 收到新旧两份 state。
+
+`subscribe` 不经过选择器：不管哪个字段变了，listener 都会被调用。先预测，再运行。
+
+```jsx play title="真库：create、选择器与组件外读写"
+import { create } from 'zustand';
+
+const useBear = create((set) => ({
+  bears: 0,
+  honey: 10,
+  addBear: () => set((s) => ({ bears: s.bears + 1 })),
+}));
+
+// 在组件外订阅：store 每次变化都会调用它。返回的函数用来取消订阅
+useBear.subscribe((state, prev) => {
+  console.log('store 变了：蜂蜜 ' + prev.honey + ' → ' + state.honey);
+});
+
+function BearCounter() {
+  const bears = useBear((s) => s.bears);
+  console.log('BearCounter 渲染');
+  return <p>🐻 熊：{bears}</p>;
+}
+
+function HoneyPot() {
+  const honey = useBear((s) => s.honey);
+  console.log('HoneyPot 渲染');
+  return <p>🍯 蜂蜜：{honey}</p>;
+}
+
+function App() {
+  const addBear = useBear((s) => s.addBear);
+  return (
+    <div>
+      <BearCounter />
+      <HoneyPot />
+      <p>
+        <button onClick={addBear}>加一只熊</button>{' '}
+        <button onClick={() => useBear.setState((s) => ({ honey: s.honey + 5 }))}>组件外：蜂蜜 +5</button>{' '}
+        <button onClick={() => console.log('getState：', JSON.stringify(useBear.getState()))}>组件外：读一下</button>
+      </p>
+    </div>
+  );
+}
+```
+
+`setState` 在组件外调用，组件照样更新。因为组件里的 `useBear` 内部订阅了同一个 store，更新由 store 通知，不靠调用的位置。点“加一只熊”，对照一下 `subscribe` 的日志：蜂蜜没变，它也被调用了。
+
+### persist：把 state 存进 localStorage
+
+`persist` 是一个中间件：包在初始化函数外面，每次更新后把 state 写进存储，创建 store 时再读回来。`name` 是存储的键。`createJSONStorage` 把存储包成 JSON 格式，默认的存储就是 `localStorage`。
+
+存进去的不是 state 本身，而是 `{"state": …, "version": 0}`。函数不能写成 JSON，所以 `inc` 这类方法不会被存。想只存部分字段，用 `partialize`；改了 state 的结构，用 `version` 和 `migrate` 迁移旧数据。
+
+下面的示例只用一个独立的键 `hoc-demo-zustand`，不会碰本站保存学习进度的数据。点“清除存储并重置”，会删掉这个键，store 回到初始值。如果你的浏览器不允许使用 localStorage，示例会退回内存存储：数据只在页面打开期间有效，重新运行就丢了。
+
+```jsx play title="真库：persist 持久化"
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+// 只用这一个键，不碰本站的学习进度
+const KEY = 'hoc-demo-zustand';
+
+// localStorage 不可用（隐私模式、被禁用）时，退回内存存储：重新运行后数据会丢
+const memory = {};
+let where = 'localStorage';
+const storage = createJSONStorage(() => {
+  try {
+    localStorage.setItem('hoc-demo-probe', '1');
+    localStorage.removeItem('hoc-demo-probe');
+    return localStorage;
+  } catch {
+    where = '内存（localStorage 不可用）';
+    return {
+      getItem: (k) => (k in memory ? memory[k] : null),
+      setItem: (k, v) => { memory[k] = v; },
+      removeItem: (k) => { delete memory[k]; },
+    };
+  }
+});
+
+const useCounter = create(
+  persist(
+    (set) => ({
+      count: 0,
+      inc: () => set((s) => ({ count: s.count + 1 })),
+    }),
+    { name: KEY, storage },
+  ),
+);
+
+function reset() {
+  useCounter.setState({ count: 0 }); // 先重置，这一步会再写一次存储
+  useCounter.persist.clearStorage(); // 再删掉这个键
+}
+
+function App() {
+  const count = useCounter((s) => s.count);
+  const inc = useCounter((s) => s.inc);
+  // 直接读存储里现在存的内容
+  const saved = storage.getItem(KEY);
+  return (
+    <div>
+      <p>计数：{count}</p>
+      <p>存储位置：{where}</p>
+      <p>存储里的内容：{saved ? JSON.stringify(saved) : '（没有）'}</p>
+      <p>
+        <button onClick={inc}>+1</button> <button onClick={reset}>清除存储并重置</button>
+      </p>
+    </div>
+  );
+}
+```
+
+几个细节：
+
+- 默认存储是同步的，所以 `create` 一返回，state 就已经是读回来的值，第一次渲染就能看到。异步的存储（例如 IndexedDB）要等读完才有值，用 `useStore.persist.hasHydrated()` 判断。
+- 清除时先 `setState` 重置，再 `clearStorage()`。顺序反过来，`setState` 会又把初始值写回去。
+- 真实项目里 `localStorage` 可能抛错（隐私模式、被禁用）。`createJSONStorage(() => localStorage)` 的参数是函数，示例在里面用 `try/catch` 退回内存存储。不处理的话，store 仍然能用，但每次更新控制台都会警告“storage is currently unavailable”，数据不会保存。
+
+[《毕业设计：从练习到作品集》](/lessons/portfolio)里的“电影搜索与收藏”项目，会用这样一个 `persist` store 管理并持久化收藏列表。
+
+### 选择器返回新对象：用 useShallow
+
+上一节的“深入一点”说过，选择器每次返回新对象，快照就永远在变。在真库里亲手试一次。示例有两种写法：写法 A 直接返回新对象，写法 B 用 `useShallow` 包住选择器。`useShallow` 来自 `zustand/react/shallow`。它把这次返回的对象和上次的逐字段比较（只比第一层）：每个字段都相同，就沿用上一次的对象。
+
+先预测点“挂载写法 A”会发生什么，再试写法 B。
+
+```jsx play title="真库：选择器返回新对象与 useShallow"
+import { Component, useState } from 'react';
+import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
+
+const useStore = create((set) => ({
+  a: 1,
+  b: 2,
+  c: 0,
+  bumpA: () => set((s) => ({ a: s.a + 1 })),
+  bumpC: () => set((s) => ({ c: s.c + 1 })),
+}));
+
+// 渲染出错时，在原位置显示出错信息，让页面其余部分继续工作
+class Box extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) return <p>捕获到：{this.state.error.message.slice(0, 40)}…</p>;
+    return this.props.children;
+  }
+}
+
+// 写法 A：选择器直接返回一个新对象
+function PairA() {
+  const { a, b } = useStore((s) => ({ a: s.a, b: s.b }));
+  return <p>A：a = {a}，b = {b}</p>;
+}
+
+// 写法 B：用 useShallow 包住选择器
+function PairB() {
+  const { a, b } = useStore(useShallow((s) => ({ a: s.a, b: s.b })));
+  console.log('PairB 渲染');
+  return <p>B：a = {a}，b = {b}</p>;
+}
+
+function App() {
+  const [mode, setMode] = useState('none');
+  const bumpA = useStore((s) => s.bumpA);
+  const bumpC = useStore((s) => s.bumpC);
+  return (
+    <div>
+      <Box key={mode}>
+        {mode === 'A' && <PairA />}
+        {mode === 'B' && <PairB />}
+      </Box>
+      <p>
+        <button onClick={() => setMode('A')}>挂载写法 A</button> <button onClick={() => setMode('B')}>挂载写法 B</button>
+      </p>
+      <p>
+        <button onClick={bumpA}>改 a</button> <button onClick={bumpC}>改 c</button>
+      </p>
+    </div>
+  );
+}
+```
+
+要点：
+
+- 在 v5 里，选择器返回新对象（或新数组）不是“多渲染几次”，而是无限渲染。开发模式先警告 `The result of getSnapshot should be cached to avoid an infinite loop`，React 渲染到 50 次的上限后抛出 `Maximum update depth exceeded`。
+- 写法 B 里，“改 c”不会让 `PairB` 重新渲染：选出的 a、b 没变。“改 a”才会。
+- 只需要几个字段时，还有一个不用 `useShallow` 的办法：每个字段写一个 `useStore(s => s.字段)`，每次返回的都是原始值。
+
+<CallBox kind="tip" label="要点">
+
+迷你版和真库的核心一样：外部 store 加 `useSyncExternalStore`，用选择器控制订阅范围。真库多出来的，是组件外的 `getState`、`setState`、`subscribe`，`persist` 这类中间件，和 `useShallow`。
+
+</CallBox>
+
+## 本机任务：给 store 加上持久化
+
+请在你本机的 React 项目里做下面几步。还没有项目的话，可以先按[《项目搭建与交付》](/lessons/engineering)的步骤用 Vite 新建一个。
+
+1. 运行 `npm install zustand`。
+2. 新建 `src/store.ts`，用 `create` 和 `persist` 写一个收藏 store：`favorites`（id 数组）、`toggle(id)`。`name` 用 `'favorites'`。
+3. 在两个互不相关的组件里读它：一个用选择器显示收藏数量，一个显示收藏列表。点收藏时，只有用到 `favorites` 的组件重新渲染。
+4. 刷新页面，收藏仍然在。打开浏览器开发者工具的 Application 面板，在 Local Storage 里找到 `favorites` 这个键，看它的内容。
+5. 在 `toggle` 之外，用 `useStore.getState().favorites` 在组件外读一次，并用 `useStore.setState({ favorites: [] })` 清空。
+
 </LessonProse>
 
 <Quiz />
