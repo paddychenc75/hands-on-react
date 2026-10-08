@@ -89,7 +89,7 @@ export default function AddToCart({ productId }) {
 
 <CallBox kind="warn" label="常见坑">
 
-`"use client"` 标记的是**边界**，而不是单个组件：被它导入的所有模块都会成为客户端代码。所以要尽量把 "use client" 放在组件树的**叶子**上，让大部分组件留在服务器。另外，服务端传给客户端组件的 props 必须**可序列化**。不能传函数，Server Function 除外。
+`"use client"` 标记的是**边界**，而不是单个组件：被它导入的所有模块都会成为客户端代码。所以要尽量把 "use client" 放在组件树的**叶子**上，让大部分组件留在服务器。另外，服务端传给客户端组件的 props 必须**可序列化**，所以不能传函数，Server Function 除外。
 
 </CallBox>
 
@@ -274,7 +274,7 @@ export async function addComment(formData) {
 
 <CallBox kind="deep" label="深入一点">
 
-RSC 的传输格式不是 HTML。它是一种特殊的序列化格式，叫 RSC Payload。它描述服务端组件渲染出的树，以及客户端组件的“占位引用”。这让页面导航时可以只获取新的 RSC 数据并与现有客户端状态合并，而不用整页刷新。
+RSC 的传输格式不是 HTML，而是一种特殊的序列化格式，叫 RSC Payload。它描述服务端组件渲染出的树，以及客户端组件的“占位引用”。因此页面导航时可以只获取新的 RSC 数据并与现有客户端状态合并，而不用整页刷新。
 
 </CallBox>
 

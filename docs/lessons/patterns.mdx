@@ -16,7 +16,7 @@ title: "组件设计模式"
 
 ## 模式一：复合组件（Compound Components）
 
-一组组件协同工作，共享隐式的状态。就像 HTML 的 `<select>` 和 `<option>`。使用者可以自由组合结构，而不用传一大堆配置 props。
+一组组件协同工作，共享隐式的状态，就像 HTML 的 `<select>` 和 `<option>`。使用者可以自由组合结构，而不用传一大堆配置 props。
 
 ```jsx play title="复合组件：Tabs"
 import { createContext, useContext, useState } from 'react';

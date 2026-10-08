@@ -39,7 +39,7 @@ React 18 没有 Action、`<form action>`、`useActionState`、`useOptimistic`。
 
 `startTransition` 可以接收**异步函数**。这类函数叫 **Action**。React 会追踪它：函数开始时 `isPending` 变成 true，函数结束（正常返回、提前 return 或抛错）时变回 false。
 
-手写时的麻烦是：每次提交都要成对地设置 pending。中途 return 或抛错时，很容易忘了设回 false，按钮就一直显示“提交中”。
+手写时的麻烦是：每次提交都要成对地设置 pending。中途 return 或抛错时，很容易忘了设回 false，结果按钮一直显示“提交中”。
 
 ```jsx
 // 手写：自己管 pending 和错误
@@ -100,7 +100,7 @@ function App() {
 
 ## 表单的 action 属性与 useActionState
 
-手写表单要写 `onSubmit` 和 `e.preventDefault()`，每个字段还要一个受控 state。结果和错误又各占一个 state。
+手写表单要写 `onSubmit` 和 `e.preventDefault()`，每个字段还要一个受控 state，而结果和错误又各占一个 state。
 
 `<form>` 的 `action` 属性可以直接接收函数。提交时，React 调用它并传入 `FormData`。`useActionState` 把 Action 的返回值和 pending 打包给你：
 
@@ -252,7 +252,7 @@ function App() {
 
 两点规则：
 
-- `addOptimistic` 必须在 Action 或 `startTransition` 里调用。表单的 `action` 本身就是 Action。在普通事件处理函数里直接调用，开发模式会警告“An optimistic state update occurred outside a transition or action.”。乐观值提交后会立刻被撤回，界面可能闪一下。
+- `addOptimistic` 必须在 Action 或 `startTransition` 里调用。表单的 `action` 本身就是 Action。如果在普通事件处理函数里直接调用，开发模式会警告“An optimistic state update occurred outside a transition or action.”，乐观值也会在提交后立刻被撤回，界面可能闪一下。
 - ② 要再包一层 `startTransition`，原因和上一节一样：`await` 之后不再属于这个 Action。
 
 表单里的写法更常见。把 `addOptimistic` 写在表单的 `action` 函数里：
@@ -453,7 +453,7 @@ function App() {
 表单变大后，按这几条组织（[表单与校验架构](/lessons/form-architecture)会专门讲）：
 
 1. 用 `FormData` 读取字段，例如 `formData.get('email')`。
-2. 校验两次。客户端校验给出即时反馈。服务器校验保证安全，不能省略。
+2. 校验两次：客户端校验给出即时反馈，服务器校验保证安全，不能省略。
 3. Action 返回每个字段的错误，例如 `{ errors: { email: '…' } }`。
 4. 让屏幕阅读器读到错误：出错的输入框加 `aria-invalid`，再用 `aria-describedby` 指向错误文字。
 

@@ -12,14 +12,14 @@ title: "数据请求：TanStack Query"
 
 <LessonProse>
 
-第 15 课我们用 useEffect 请求数据。那时要自己处理 loading、error 和竞态。真实应用还会遇到更多问题：
+第 15 课我们用 useEffect 请求数据，那时要自己处理 loading、error 和竞态。真实应用还会遇到更多问题：
 
 - 两个组件请求同一个接口，发了两次请求
 - 切走再切回页面，又要重新等待加载
 - 数据在别处被修改了，这里显示的还是旧的
 - 请求失败要不要自动重试？窗口重新获得焦点时要不要刷新？
 
-这些都属于**服务端状态**的管理问题。TanStack Query（原名 React Query）解决了这些问题。它是目前最流行的方案。
+这些都属于**服务端状态**的管理问题。TanStack Query（原名 React Query）解决了这些问题，是目前最流行的方案。
 
 ## useQuery：读取数据
 
@@ -58,7 +58,7 @@ function Todos() {
 
 ## queryKey：缓存的身份证
 
-`queryKey` 决定数据存在缓存的哪个位置。**查询依赖的所有变量都要写进 key**，比如 `['user', userId]`。userId 变了，key 就变了，会自动请求新数据；切回之前的 userId 时，页面立刻显示缓存。同时，它在后台检查是否需要更新。
+`queryKey` 决定数据存在缓存的哪个位置。**查询依赖的所有变量都要写进 key**，比如 `['user', userId]`。userId 变了，key 就变了，会自动请求新数据；切回之前的 userId 时，页面立刻显示缓存。同时，Query 在后台检查是否需要更新。
 
 ## 自己动手：迷你 useQuery
 
@@ -667,7 +667,7 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-在 Next.js App Router 中，很多数据可以在服务端组件里直接 `await`。这时不需要 useQuery。TanStack Query 适合客户端频繁交互的数据。例如无限滚动、轮询和乐观更新。两者可以搭配使用。
+在 Next.js App Router 中，很多数据可以在服务端组件里直接 `await`，这时不需要 useQuery。TanStack Query 适合客户端频繁交互的数据，例如无限滚动、轮询和乐观更新。两者可以搭配使用。
 
 </CallBox>
 
