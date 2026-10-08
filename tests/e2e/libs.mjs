@@ -56,13 +56,19 @@ const inPg = (p, title, fn, arg) =>
     },
     { title, fn: fn.toString(), arg },
   );
-// 点预览区里文字完全等于 text 的按钮或链接，等 ms 毫秒，返回预览区文字（行用 | 连接）
+// 点预览区里文字完全等于 text 的按钮或链接（没出现就先等它出现），等 ms 毫秒，返回预览区文字（行用 | 连接）
 const clickIn = (p, title, text, ms = 150) =>
   inPg(
     p,
     title,
     async (pg, { text, ms }) => {
-      const el = [...pg.querySelectorAll('.preview button, .preview a')].find(x => x.textContent.trim() === text);
+      // 慢机器上库文件还没加载完、示例还没渲染：最多等 20 秒，等到按钮出现再点
+      const find = () => [...pg.querySelectorAll('.preview button, .preview a')].find(x => x.textContent.trim() === text);
+      let el = find();
+      for (let i = 0; i < 200 && !el; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        el = find();
+      }
       if (!el) return 'NO EL ' + text;
       el.click();
       await new Promise(r => setTimeout(r, ms));
