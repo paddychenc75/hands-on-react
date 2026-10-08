@@ -25,7 +25,7 @@ export const STAGES: Stage[] = [
     no: '05',
     name: '生态与实战',
     en: 'Ecosystem & projects',
-    desc: '项目搭建与交付、TypeScript、React Router、TanStack Query、测试与 Next.js，最后用一个综合项目把这些工具接在一起。',
+    desc: '项目搭建与工具链、交付与升级、TypeScript、React Router、TanStack Query、测试与 Next.js，最后用一个综合项目把这些工具接在一起。',
   },
   {
     no: '06',

@@ -12,21 +12,397 @@ title: "交付：构建、部署与升级"
 
 <LessonProse>
 
-【待写】正文用普通 Markdown：段落、列表、表格、围栏代码块。每个新概念第一次出现时给一句定义。
+[上一课](/lessons/engineering)把项目搭起来、检查好了。这一课把它**发出去**：看懂构建产物，部署到一个别人能打开的网址，处理单页应用特有的路由回退，再把密钥留在服务端。最后是两个选读：用持续集成自动检查，以及把旧的 React 18 项目升到 19。
 
-## 【待写】小节标题
+<CallBox kind="tip" label="这一课怎样学">
 
-```jsx play title="第一个示例"
+课文里带“**在本机终端里做**”或“**在网页上做**”标记的步骤，只能在你自己的电脑和托管平台上完成。站内有 3 个可运行示例和 1 道练习：它们用模拟的方式演示缓存、回退规则和服务端代理，每个示例开头都说明了模拟了什么。课末有一份“本机任务清单”，请照着做完，并对照“应该看到”自查。持续集成和从 React 18 升级两节是选读。
+
+</CallBox>
+
+## 构建产物里有什么
+
+在项目里运行 `npm run build`，Vite 会在 `dist/` 里生成可以直接发布的文件。用 `react-compiler-ts` 模板建的新项目，终端里会看到类似这样的输出（实测 Vite 8）：
+
+```text title="在本机终端里看到：npm run build（节选）"
+dist/index.html                   0.45 kB │ gzip:  0.29 kB
+dist/assets/index-D64VDMd1.css    4.10 kB │ gzip:  1.47 kB
+dist/assets/index-DP45_tYn.js   223.90 kB │ gzip: 69.85 kB
+```
+
+`dist/` 里全是静态文件，没有服务器代码。`public/` 里的文件原样复制到 `dist/` 的根目录，`src/` 里的 JS 和 CSS 被打包压缩，放进 `dist/assets/`。
+
+注意文件名里的 `DP45_tYn`。它是**内容哈希**：构建工具根据文件内容算出的一串字符。内容不变，名字就不变；改了一行代码，名字就变。实测：只改 `App.tsx` 里的一段文字再构建，JS 文件名从 `index-DP45_tYn.js` 变成 `index-BR5IduAv.js`，CSS 文件名没变，`index.html` 里的引用跟着更新。
+
+这个设计是为了**缓存**。浏览器会把下载过的文件存起来，下次直接用。文件名带哈希，就可以放心地让它存一年：内容变了，名字就变了，浏览器会把它当成新文件。但 `index.html` 的名字是固定的，它指向当前版本的文件名。所以两类文件要区别对待：
+
+| 文件 | 名字 | 缓存头（常见做法） | 原因 |
+|---|---|---|---|
+| `assets/` 里的 JS、CSS | 带内容哈希 | `Cache-Control: public, max-age=31536000, immutable` | 内容不变名字不变，缓存一年也不会过期出错 |
+| `index.html` | 固定 | `Cache-Control: no-cache` | 每次都向服务器确认，才能发现新版本 |
+
+`no-cache` 的意思不是“不缓存”，而是“用之前先向服务器确认”。文件没变，服务器回一个很小的“没变”；变了，才下载新的。托管平台通常已经为静态文件配好了合理的默认值，具体数值以平台文档为准；自己配服务器时，就要照上表设置。
+
+下面的示例模拟这一过程。它用一个简单的函数代替构建工具的哈希算法，道理相同。
+
+```jsx play title="构建产物：文件名里的哈希"
+import { useState } from 'react';
+
+// 模拟：用简单函数代替构建工具算内容哈希。真实构建产物的哈希算法不同，规则一样：内容变，名字才变。
+function hash(text) {
+  let h = 0;
+  for (const c of text) h = (h * 31 + c.charCodeAt(0)) % 1679616;
+  return h.toString(36).padStart(4, '0');
+}
+
+// 构建：index.html 的名字固定，里面写着另外两个文件的名字
+function build(src) {
+  return [
+    { url: '/index.html', hashed: false },
+    { url: '/assets/index-' + hash(src.js) + '.js', hashed: true },
+    { url: '/assets/index-' + hash(src.css) + '.css', hashed: true },
+  ];
+}
+
+const first = { js: 'JS 版本 1', css: 'CSS 版本 1' };
+
 function App() {
-  return <p>【待写】可运行的示例</p>;
+  const [src, setSrc] = useState(first);
+  const [site, setSite] = useState(() => build(first));
+  // 访客昨天来过：带哈希的两个文件在浏览器缓存里
+  const [cache, setCache] = useState(() => new Set(build(first).filter(f => f.hashed).map(f => f.url)));
+  const [visit, setVisit] = useState([]);
+
+  function open() {
+    setVisit(site.map(f => ({ url: f.url, from: f.hashed && cache.has(f.url) ? '缓存，没有下载' : '下载' })));
+    setCache(new Set([...cache, ...site.filter(f => f.hashed).map(f => f.url)]));
+  }
+
+  return (
+    <div>
+      <p>
+        <button onClick={() => setSrc({ ...src, js: src.js + '+' })}>改一行 JS</button>{' '}
+        <button onClick={() => setSrc({ ...src, css: src.css + '+' })}>改一行 CSS</button>{' '}
+        <button onClick={() => setSite(build(src))}>重新构建并部署</button>
+      </p>
+      <p>线上现在有：</p>
+      <ul>
+        {site.map(f => (
+          <li key={f.url}><code>{f.url}</code></li>
+        ))}
+      </ul>
+      <p><button onClick={open}>访客打开页面</button></p>
+      <ul>
+        {visit.map(v => (
+          <li key={v.url}><code>{v.url}</code>：{v.from}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 ```
 
-<CallBox kind="tip" label="要点">
+## 部署：把 dist/ 放到网上
 
-【待写】提示框内容。kind 有 tip 要点 / warn 常见坑 / like 打个比方 / deep 深入一点。
+部署就是把 `dist/` 放到一个能被访问的地方。静态托管有多种选择，**这里细讲 Vercel**，Netlify 的流程相近，GitHub Pages 稍有不同。
+
+**在本机和网页上做：用 Vercel 部署**
+
+1. 把项目推送到 GitHub 仓库。
+2. 在 vercel.com 用 GitHub 账号登录，选择“导入项目”，选中这个仓库。
+3. Vercel 会自动识别 Vite 项目：构建命令是 `npm run build`，输出目录是 `dist`。保持默认，点“部署”。
+4. 完成后得到一个网址。以后每次推送到 `main`，它自动重新部署；每个 pull request 还会得到一个预览网址。
+5. 如果项目有环境变量，在 Vercel 的项目设置里添加。规则不变：`VITE_` 变量会进入前端包。
+
+Netlify 的流程相同，识别的构建命令和输出目录也一样。
+
+GitHub Pages 的项目站点网址带仓库名，例如 `https://用户名.github.io/my-app/`。而 Vite 默认的 `base` 是 `/`，产物里的资源地址写成 `/assets/…`，指向网站根目录，会 404。要在 `vite.config.ts` 里设置 `base`：
+
+```ts title="在本机项目里：vite.config.ts（GitHub Pages 项目站点）"
+export default defineConfig({
+  base: '/my-app/', // 换成你的仓库名
+  plugins: [/* … */],
+});
+```
+
+实测：设置后 `index.html` 里的地址变成 `/my-app/assets/index-xxx.js`。发布步骤见 [Vite 的静态部署文档](https://vite.dev/guide/static-deploy)。另外，`npm run preview` 会按 `base` 提供产物，上线前先在本机看一眼。
+
+## 单页应用的路由回退
+
+如果你的应用用了 [React Router](/lessons/router)，部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。点链接时，是前端路由在浏览器里换页面，没有向服务器要文件；刷新才会真的向服务器请求。
+
+解决办法：让服务器对找不到的路径返回 `index.html`，再由前端路由接管。
+
+```json title="在本机项目里：vercel.json（放在项目根目录）"
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+Netlify 用 `public/_redirects` 文件。放进 `public/`，构建时才会被复制到 `dist/`，Netlify 发布的是 `dist/` 里的内容：
+
+```text title="在本机项目里：public/_redirects"
+/*  /index.html  200
+```
+
+这两条规则不会挡住真实存在的文件：服务器先找文件，找不到才回退。GitHub Pages 没有这种回退配置，所以有多级路由的应用不适合放在它上面，优先选 Vercel 或 Netlify。（变通办法是把 `index.html` 复制成 `404.html`，或者改用 hash 路由；都不如真正的回退规则干净。）
+
+但“找不到的路径一律回退”有一个副作用。设想你发布了新版本，旧的 `assets/index-old.js` 被删掉了，一位老用户的浏览器里还缓存着旧的 `index.html`，它仍然请求旧文件。回退规则会对这个缺失的文件返回 `index.html`：状态码 200，内容是 HTML。浏览器把 HTML 当成 JS 解析，控制台报 `Expected a JavaScript module but got text/html`，页面白屏。
+
+更稳的规则是区分两类请求：**像页面的路径回退，像资源文件的路径（最后一段带扩展名）返回 404。**自己配 nginx 时可以这样写：
+
+```nginx title="自建服务器（nginx）：只对页面路径回退"
+location /assets/ { try_files $uri =404; }
+location / { try_files $uri /index.html; }
+```
+
+托管平台的规则能不能做到这一点，要看各自的文档。下面的示例模拟三种规则：先预测，再对比。
+
+```jsx play title="单页应用的路由回退"
+import { useState } from 'react';
+
+// 模拟：用几行代码代替真实的托管服务器。真实平台的细节不同，规则的逻辑一样。
+const FILES = {
+  '/index.html': 'text/html',
+  '/favicon.svg': 'image/svg+xml',
+  '/assets/index-3fa91c.js': 'text/javascript',
+  '/assets/index-b7d20e.css': 'text/css',
+};
+
+function serve(path, rule) {
+  const target = path === '/' ? '/index.html' : path;
+  if (FILES[target]) return { status: 200, type: FILES[target], file: target };
+  if (rule === 'all') return { status: 200, type: 'text/html', file: '/index.html' };
+  if (rule === 'pages' && !/\.\w+$/.test(target)) return { status: 200, type: 'text/html', file: '/index.html' };
+  return { status: 404, type: 'text/plain', file: '（没有）' };
+}
+
+const PATHS = ['/', '/city/1', '/assets/index-3fa91c.js', '/assets/index-old999.js', '/nope.png'];
+
+function App() {
+  const [rule, setRule] = useState('none');
+  const [path, setPath] = useState('/city/1');
+  const [res, setRes] = useState(null);
+  return (
+    <div>
+      <p>
+        回退规则：{' '}
+        <select value={rule} onChange={e => setRule(e.target.value)}>
+          <option value="none">不回退</option>
+          <option value="all">全部回退</option>
+          <option value="pages">只回退页面路径</option>
+        </select>
+      </p>
+      <p>
+        请求路径：{' '}
+        <select value={path} onChange={e => setPath(e.target.value)}>
+          {PATHS.map(p => (
+            <option key={p}>{p}</option>
+          ))}
+        </select>{' '}
+        <button onClick={() => setRes(serve(path, rule))}>发送请求</button>
+      </p>
+      {res && (
+        <pre>{`状态码：${res.status}\n内容类型：${res.type}\n返回的文件：${res.file}`}</pre>
+      )}
+    </div>
+  );
+}
+```
+
+## 密钥与服务端代理
+
+[上一课](/lessons/engineering)讲过：`VITE_` 变量会被写进前端包，所有访客都能读到。需要密钥的请求，要交给自己的服务端（或 serverless 函数，即按请求运行、不用自己维护服务器的函数）转发：
+
+```text title="请求的路径"
+浏览器 ──请求 /api/weather?city=Beijing──▶ 你的服务端函数 ──带着密钥──▶ 第三方天气服务
+（没有密钥）                              （密钥在环境变量里）
+```
+
+密钥只存在服务端的环境变量里。访客在开发者工具里最多看到请求你自己服务端的那一条，看不到第二条。
+
+但这个转发入口本身是**公开**的：它的地址就在前端代码里，任何人都可以绕过你的页面，直接向它发请求。所以服务端函数必须自己做三件事：
+
+1. **只转发需要的请求。**不要把前端传来的路径或地址原样拼进第三方的 URL，那等于让所有人借用你的密钥访问任意接口。
+2. **校验输入。**城市名是否在允许的范围内、长度是否合理、类型对不对。页面上的下拉框只方便用户，不是安全措施。
+3. **需要登录的接口，先检查身份和权限。**检查必须在服务端做，原因和做法在[《Server Components 与全栈 React》](/lessons/server-components)里讲。
+
+一个转发函数的样子（只能阅读：函数文件的位置和导出形式因平台而异，以所用平台的文档为准）：
+
+```ts title="服务端函数（示意，只能阅读）"
+const ALLOWED = ['Beijing', 'Shanghai', 'Shenzhen'];
+
+export async function GET(request: Request) {
+  const city = new URL(request.url).searchParams.get('city') ?? '';
+  if (!ALLOWED.includes(city)) {
+    return Response.json({ error: '不支持的城市' }, { status: 400 });
+  }
+  const res = await fetch(`https://weather.example.com/v1?city=${encodeURIComponent(city)}`, {
+    headers: { Authorization: `Bearer ${process.env.WEATHER_KEY}` }, // 密钥只在服务端
+  });
+  return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json' } });
+}
+```
+
+下面的示例模拟这个流程。实验台里没有服务器，`serverHandler` 是一个普通函数，代表运行在你的服务端的代码；真实环境里它在另一台机器上，浏览器拿不到它的代码和环境变量。
+
+```jsx play title="服务端代理：密钥留在服务端"
+import { useState } from 'react';
+
+// 模拟：下面三段代码分别代表「服务端的环境变量」「第三方服务」「你的服务端函数」，实际都运行在页面里。
+const SERVER_ENV = { WEATHER_KEY: 'k-demo-7f3a' };
+const ALLOWED = ['Beijing', 'Shanghai', 'Shenzhen'];
+
+function thirdParty(city, headers) {
+  if (headers.Authorization !== 'Bearer ' + SERVER_ENV.WEATHER_KEY) return { status: 401, body: '密钥不对' };
+  return { status: 200, body: city + '：晴，24°C' };
+}
+
+function serverHandler(url, serverLog) {
+  const city = new URL(url, 'https://app.example.com').searchParams.get('city') ?? '';
+  if (!ALLOWED.includes(city)) return { status: 400, body: '不支持的城市' };
+  const headers = { Authorization: 'Bearer ' + SERVER_ENV.WEATHER_KEY };
+  serverLog.push('→ 第三方  city=' + city + '  Authorization: ' + headers.Authorization);
+  return thirdParty(city, headers);
+}
+
+function App() {
+  const [city, setCity] = useState('Beijing');
+  const [browserLog, setBrowserLog] = useState([]);
+  const [serverLog, setServerLog] = useState([]);
+
+  function send(c) {
+    const url = '/api/weather?city=' + encodeURIComponent(c);
+    const log = [];
+    const res = serverHandler(url, log);
+    setBrowserLog(l => [...l, 'GET ' + url + '  →  ' + res.status + ' ' + res.body]);
+    setServerLog(l => [...l, ...log]);
+  }
+
+  return (
+    <div>
+      <p>
+        <select value={city} onChange={e => setCity(e.target.value)}>
+          {ALLOWED.map(c => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>{' '}
+        <button onClick={() => send(city)}>查询天气</button>{' '}
+        <button onClick={() => send('Tokyo')}>绕过页面，直接请求 Tokyo</button>
+      </p>
+      <p>浏览器的网络请求（访客看得到）：</p>
+      <pre>{browserLog.join('\n') || '（还没有请求）'}</pre>
+      <p>服务端的日志（访客看不到）：</p>
+      <pre>{serverLog.join('\n') || '（还没有请求）'}</pre>
+    </div>
+  );
+}
+```
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>最小的持续集成<small>可以先跳过，需要时再展开</small></summary>
+
+**持续集成**（CI）是每次推送代码，由服务器自动把检查跑一遍。有了它，没通过检查的代码不会悄悄进入 `main`。先在 `package.json` 里准备好命令：
+
+```json title="在本机项目里：package.json 的 scripts"
+{
+  "scripts": {
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "build": "tsc -b && vite build"
+  }
+}
+```
+
+再写一个工作流文件：
+
+```yaml title="在本机项目里：.github/workflows/ci.yml"
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+```
+
+逐行看：`on` 表示什么时候运行，写了 `pull_request`，PR 也会被检查；`actions/checkout` 取出代码；`actions/setup-node` 安装 Node 并缓存依赖；`npm ci` 严格按 `package-lock.json` 安装，lock 文件和 `package.json` 对不上就报错，比 `npm install` 更适合服务器；后面四步依次是类型检查、lint、测试、构建，任何一步失败，整个检查就变红。
+
+</details>
+
+<CallBox kind="warn" label="常见坑">
+
+1. 部署以后改了环境变量，页面没变化：变量在构建时就固定了，要重新构建。
+2. CI 里 Node 版本和本机差别太大，出现“本机能过，CI 不过”：让 `node-version` 的大版本和 `node -v` 一致。
+3. 给所有路径都设置了长期缓存，包括 `index.html`：用户长时间看到旧页面。长期缓存只给文件名带哈希的资源。
+4. 部署到子路径（GitHub Pages 项目站点）却没设置 `base`：页面空白，网络面板里的资源全是 404。
+5. Actions 的版本标签（例如 `@v7`）会更新。以各个 Action 仓库的最新发布为准，Dependabot 可以帮你自动升级。
 
 </CallBox>
+
+<details className="optional">
+<summary><span className="opt-tag">选读</span>维护 React 18 项目：升级到 React 19<small>可以先跳过，需要时再展开</small></summary>
+
+本站的示例都是 React 19 的写法。你接手的旧项目可能还在 React 18。官方推荐的升级路线是三步：
+
+1. 先升到 **React 18.3.1**。它和 18.2 行为相同，但会对 19 将移除的 API 打印弃用警告。把这些警告清掉。
+2. 运行官方 codemod：`npx codemod@latest react/19/migration-recipe`。它会自动改写其中大部分写法。用 TypeScript 的项目，还要升级类型包，并运行类型的 codemod：`npx types-react-codemod@latest preset-19 ./src`。
+3. 再升到 React 19：`npm install react@19 react-dom@19`，类型包用 `@types/react@19`、`@types/react-dom@19`。
+
+React 19 移除了下面这些 API：
+
+| 被移除的 API | 替代写法 |
+|---|---|
+| 函数组件的 `defaultProps` | 参数默认值：`function Heading({ text = '你好' })` |
+| 函数组件的 `propTypes` | TypeScript 类型 |
+| 字符串 ref：`ref="input"` | ref 回调或 `useRef` |
+| `ReactDOM.render`、`ReactDOM.hydrate` | `createRoot`、`hydrateRoot` |
+| `ReactDOM.findDOMNode` | 用 ref 拿 DOM 节点 |
+| `react-dom/test-utils` 里的 `act` | 从 `react` 导入 `act` |
+| 全局的 `JSX` 类型命名空间 | `React.JSX.Element` |
+
+`forwardRef` 和 `<Context.Provider>` 在 19 中仍然能用，只是函数组件现在可以直接把 `ref` 当 prop 接收，Context 对象也可以直接当 Provider，通常不再需要它们。具体步骤和已知的变化，以 [React 19 升级指南](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) 为准。
+
+升级后的自查：`npm run build` 通过；`npx tsc -b` 零错误；`npm run lint` 里没有新增的警告；打开开发服务器，控制台没有红色报错。
+
+</details>
+
+课后的练习把前面的规则写成代码：哪些路径回退到 `index.html`，哪些返回 404，每个文件带什么缓存头。
+
+下面是这一课的收尾：在你的电脑上把它们全部做一遍。
+
+## 本机任务清单
+
+用[上一课](/lessons/engineering)里搭好的项目。照着做，对照“应该看到”自查。
+
+| 任务 | 怎样做 | 应该看到 |
+|---|---|---|
+| 1. 看构建产物 | 运行 `npm run build`，再 `ls dist/assets` | 终端列出 `dist/` 里的文件和大小；JS、CSS 文件名里有一串哈希 |
+| 2. 验证哈希的规律 | 只改 `App.tsx` 里的一段文字，再运行 `npm run build`，对比两次的文件名 | JS 文件名变了；CSS 文件名没变；`dist/index.html` 里引用的 JS 文件名跟着变 |
+| 3. 本机预览 | 运行 `npm run preview`，打开终端里显示的地址（默认 `http://localhost:4173`） | 页面和开发时一样。预览用的是 `dist/` 里的产物，不是源代码 |
+| 4. 部署 | 推送到 GitHub，在 Vercel 导入项目 | 得到一个网址，用手机也能打开 |
+| 5. 路由回退 | 如果应用有多个路由，在线上网址直接打开一个子路径，再刷新 | 不出现 404；没有 `vercel.json` 时对比一下 |
+| 6. 查看缓存头 | 运行 `curl -I 你的网址/`，再对 `dist/assets/` 里某个文件的线上地址运行一次 | 记下两次的 `cache-control`。对照课文：`index.html` 应该每次向服务器确认；哈希文件应该长期缓存。和课文不一致时，查所用平台的文档，看怎样配置 headers |
+| 7. 服务端转发（选读） | 按所用平台的文档，写一个转发函数：密钥放在平台的环境变量里，函数只接受固定的几个城市 | 在浏览器开发者工具的网络面板里，只看到请求你自己的地址，请求头里没有密钥；用 `curl` 传一个不在名单里的城市，返回 400 |
+| 8. CI（选读） | 加上 `.github/workflows/ci.yml`，推送，在 GitHub 仓库的 Actions 页面查看 | 出现绿色的对勾；故意让一个测试失败再推送，变成红色 |
+| 9. 升级 React 18 项目（选读） | 找一个 React 18 的小项目，按选读的三步升级 | `npm run build`、`npx tsc -b` 都通过，开发服务器的控制台没有红色报错 |
+
+全部做完，你就有了一个“从空文件夹到线上网址”的完整流程。后面的路由、数据请求、测试都可以在这个项目里继续练。毕业设计的验收清单里“交付”那几行，也是这里的内容。
 
 </LessonProse>
 

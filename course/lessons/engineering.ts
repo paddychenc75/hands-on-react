@@ -3,21 +3,21 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'engineering',
   stage: 4,
-  title: '项目搭建与交付',
-  mins: 32,
-  summary: '在本机用 Vite 建项目、把单文件拆成模块、选样式方案、管好环境变量，再部署到网上并接上持续集成。',
+  title: '项目搭建与工具链',
+  mins: 47,
+  summary: '在本机用 Vite 建项目、把单文件拆成模块、用类型检查和 lint 把关、启用 React Compiler、管好环境变量。',
   goals: [
     '能在本机用 Vite 创建 React + TypeScript 项目，说出各目录和三条命令的作用，并判断什么时候该用框架',
-    '能把单文件示例拆成多个文件，写对默认导出、具名导出和 import 路径（选读：按场景选择样式方案）',
-    '能说出 VITE_ 变量为什么是公开的，并给出保密值的处理办法',
-    '能写出单页应用的路由回退配置，把项目部署到静态托管（选读：写一份最小的 CI 工作流）',
+    '能把单文件示例拆成多个文件，写对默认导出、具名导出和 import 路径',
+    '能说出类型检查、ESLint、测试和 React Compiler 各管什么，并按 Hook 规则的警告改代码',
+    '能说出 VITE_ 变量为什么是公开的，并写出构建时过滤掉密钥、把变量换成字面量的逻辑',
   ],
   keyPoints: [
     '纯客户端应用用 Vite 创建，需要 SEO、服务端渲染或 Server Components 时用框架。Create React App 已被弃用。<code>npm run dev</code> 开发，<code>npm run build</code> 生成 <code>dist/</code>，<code>npm run preview</code> 本机看产物。',
     '一个文件是一个模块。默认导出导入时不带花括号，名字随便取；具名导出要带花括号，名字必须一致。实验台会处理 react 的 import 并忽略其他 import，真实项目里一切都要自己导入。',
-    '（选读）样式：全局 CSS 靠命名约定；CSS Modules 在构建时把类名改写成唯一名字，导入得到“原名 → 新名”的对象；Tailwind 直接写原子类；运行时 CSS-in-JS 要在浏览器里多做一轮工作。',
+    '<code>vite build</code> 只去掉类型，不检查类型，类型检查靠 <code>tsc -b</code>。ESLint 的 react-hooks 规则抓依赖数组和 Hook 调用错误，警告要改代码，不要关掉。<code>react-compiler-ts</code> 模板已经启用 React Compiler。',
     '只有 <code>VITE_</code> 开头的变量会在构建时被换成字面量，写进前端包，任何访客都能读到。密钥不能用这个前缀，要让服务端转发请求。改了变量要重新构建。',
-    '交付：单页应用的服务器要把找不到的路径回退到 index.html（Vercel 用 rewrites，Netlify 用 _redirects）。（选读）CI 里依次跑 <code>npm ci</code>、类型检查、lint、测试、构建。',
+    '（选读）CSS Modules 在构建时把类名改写成唯一名字，导入得到“原名 → 新名”的对象；样式方案怎么选见《样式》一课。',
   ],
   quiz: [
     {
@@ -74,6 +74,18 @@ export default {
       answer: 0,
       explain:
         'Vite 在构建时把 import.meta.env.VITE_MAP_KEY 直接替换成字面量，写进所有访客都会下载的 JS 文件。压缩不等于加密，搜索字符串就能找到。没有 VITE_ 前缀的变量不会进入前端代码。所以真正要保密的值，只能放在服务端，由服务端替你发请求。',
+    },
+    {
+      q: '一个 Vite 项目里，某个组件把需要数字的 prop <code>n</code> 传成了字符串。开发服务器页面正常，<code>npx vite build</code> 也成功了，但 <code>npx tsc -b</code> 报错。下面的说法哪个对？',
+      options: [
+        '这是 tsc 的误报：能构建成功，说明代码没有问题',
+        'Vite 只负责去掉类型再打包，类型对不对要靠 tsc 或编辑器检查，所以应该修好这个错误',
+        'Vite 构建时其实检查了类型，只是把类型错误当成警告，没有显示',
+        '只有打开严格模式（strict）之后，传错类型才算错误',
+      ],
+      answer: 1,
+      explain:
+        'Vite 的开发服务器和 <code>vite build</code> 都只是把 TypeScript 里的类型去掉，不做检查，所以类型错误不会让它们失败。模板的 <code>npm run build</code> 写成 <code>tsc -b && vite build</code>，就是为了在构建前先跑类型检查。第一项最有迷惑性：构建成功只说明语法没问题，不说明类型对。字符串传给数字类型在默认配置下就是错误，不需要 strict。',
     },
   ],
   exercise: {
@@ -272,16 +284,20 @@ function inline(code, publicEnv) {
         '定时器回调是第一次渲染创建的，它读到的 count 和 step 永远是初始值。每秒都执行 <code>setCount(0 + 1)</code>，所以计数停在 1。ESLint 的 react-hooks 规则正是用来发现这种过期闭包的。“每秒加 1”有迷惑性：那是写成 <code>setCount(c =&gt; c + 1)</code> 时的行为，这里用的是旧的 count。正确的修法：<code>setCount(c =&gt; c + step)</code>，并把 step 写进依赖。',
     },
     {
-      q: '应用用 React Router 做了多个页面，部署到静态托管后，从首页点链接进入 /city/1 一切正常，但在 /city/1 上刷新页面，出现 404。下面哪个改动能解决？',
+      q: `项目的 <code>package.json</code> 如下。同事提交了一个类型错误，但 CI 里 <code>npm run build</code> 这一步仍然是绿的。怎样让类型错误在构建时被发现？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">"scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "lint": "eslint ."
+}</code></pre></div>`,
       options: [
-        '把路由表里的 path 从 city/:id 改成完整的 /city/1',
-        '在 Vercel 上添加 rewrites 规则：把所有路径（/(.*)）指向 /index.html',
-        '把构建命令改成 npm run dev，让开发服务器处理路由',
-        '给每个 Link 加上 reloadDocument，让它整页刷新',
+        '在 ESLint 里打开 strict 规则，lint 会顺便检查类型',
+        '把 vite build 换成 vite build --mode production，生产模式会检查类型',
+        '把 build 改成 "tsc -b && vite build"，先做类型检查，通过了再构建',
+        '什么都不用改：vite build 成功就说明类型没有问题',
       ],
-      answer: 1,
+      answer: 2,
       explain:
-        '点链接时，是前端路由在浏览器里换页面，没有向服务器要新文件。刷新是向服务器请求 /city/1，而静态服务器上没有这个文件，所以 404。让服务器对找不到的路径一律返回 index.html，前端路由再接管，问题就解决了。改路由表没有用：404 发生在路由表加载之前。reloadDocument 会让每次跳转都整页刷新，反而丢掉 state。',
+        '<code>vite build</code> 只去掉类型，不检查类型，所以类型错误不会让它失败。<code>tsc -b</code> 才做类型检查，两者用 <code>&&</code> 连起来，前一步失败就不会进入构建（Vite 的模板就是这样写的）。生产模式只影响打包方式，不会开启类型检查。最有迷惑性的是最后一项：构建成功只能说明语法能被解析。',
     },
     {
       q: `同事在 .env 里写了 <code>VITE_STRIPE_SECRET=sk_live_abc</code>，代码里这样用，并说：“.env 没有提交到 GitHub，所以密钥是安全的。”这个说法对吗？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">fetch('https://api.stripe.com/v1/charges', {
@@ -298,20 +314,25 @@ function inline(code, publicEnv) {
         '“没有提交到 GitHub”只保证仓库里没有。构建时 Vite 把 import.meta.env.VITE_STRIPE_SECRET 换成了字面量，写进所有访客都会下载的 JS。压缩不是加密。去掉 VITE_ 前缀后，前端读到的是 undefined，请求会失败，而不是“安全地读到”。正确做法：浏览器请求你自己的服务端，由服务端带着密钥请求 Stripe。',
     },
     {
-      q: `<code>Card.module.css</code> 里写了 <code>.title { color: red; }</code>，组件如下，但标题没有变红。原因是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">import styles from './Card.module.css';
+      q: `<code>CartBadge.tsx</code> 保存后，开发服务器整页刷新，局部更新失效，ESLint 报错 <code>Fast refresh only works when a file only exports components</code>。怎样改？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">import { useState } from 'react';
 
-export default function Card() {
-  return &lt;h2 className="title"&gt;天气&lt;/h2&gt;;
+export function useCartCount() {
+  return useState(0);
+}
+
+export default function CartBadge() {
+  const [n] = useCartCount();
+  return &lt;span&gt;{n}&lt;/span&gt;;
 }</code></pre></div>`,
       options: [
-        '.module.css 文件里不能写类选择器，要写成 #title',
-        'CSS Modules 在构建时把类名改写成了唯一的名字，要写成 className={styles.title}',
-        '要在 main.tsx 里再导入一次 Card.module.css，样式才会生效',
-        'color 属性在 CSS Modules 里被禁用，要改用内联 style',
+        '把 useCartCount 移到单独的文件（例如 useCartCount.ts），CartBadge.tsx 从那里 import',
+        '把 useCartCount 改成箭头函数的写法',
+        '去掉 CartBadge 的 export default，改成具名导出',
+        '在 ESLint 配置里关掉这条规则，整页刷新只是慢一点',
       ],
-      answer: 1,
+      answer: 0,
       explain:
-        'CSS Modules 的类名只在这个文件的范围内有效：构建时 .title 被改写成类似 _title_1agl6_1 的名字，styles.title 才是这个名字。普通字符串 "title" 对不上。样式已经在导入 styles 时加载了，不需要在别处再导入一次；类选择器和 color 在 CSS Modules 里都可以正常使用。',
+        '开发服务器要靠“一个文件只导出组件”才能只替换这个组件，同时保留其他组件的 state。文件里混着 Hook 就没法做到，所以规则要求把 Hook 和普通函数放进单独的文件。换成箭头函数、换成具名导出，文件里导出的东西没变，问题照旧。关掉规则只是不报错，整页刷新会让你每次保存都丢掉页面上的 state。',
     },
   ],
   plays: {
@@ -326,7 +347,7 @@ export default function Card() {
       pkey: 'engineering|模块对象：默认导出与具名导出',
     },
     'CSS Modules：类名被改写成唯一名字': {
-      note: '两个文件里都写了 .button，但构建后它们的名字不同，样式互不影响。这就是 CSS Modules 的作用域：类名只属于自己的那个文件。import 得到的对象，就是“原名 → 新名”的对照表。（示例里的选择器写成 button.类名，是为了盖过本站预览区对按钮的默认样式；真实项目里直接写 .button 就行。）',
+      note: '两个文件里都写了 .button，但构建后它们的名字不同，样式互不影响。这就是 CSS Modules 的作用域：类名只属于自己的那个文件。import 得到的对象，就是“原名 → 新名”的对照表。',
       predict: {
         q: '两个文件各写了一个 <code>.button</code>，一个蓝色，一个绿色。页面上“按钮 A”和“按钮 B”分别是什么颜色？',
         options: ['都是绿色：后面的样式覆盖前面的', '都是蓝色：先定义的样式优先', 'A 蓝色，B 绿色', '页面报错：类名重复'],

@@ -711,7 +711,7 @@ React Router 的数据模式（`createBrowserRouter`）和框架模式还提供�
 
 ## 本机任务：用真库再做一遍
 
-迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2.7 以上的项目）里做下面几步。react-router 8 要求 Node.js 22.22 以上，本课程用的 Node.js 24 满足。
+迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与工具链》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2.7 以上的项目）里做下面几步。react-router 8 要求 Node.js 22.22 以上，本课程用的 Node.js 24 满足。
 
 1. 运行 `npm install react-router`，再运行 `npm ls react-router`，确认版本是 8.x。
 2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。路由表和路由组件写在同一个文件里时，模板的 `react-refresh/only-export-components` 规则会在 `npm run lint` 里报错：把路由表写在 `main.tsx` 里，或者把组件放进别的文件。
