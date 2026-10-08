@@ -31,7 +31,7 @@ dispatch({ type: 'increment' });
 
 <CallBox kind="like" label="打个比方">
 
-reducer 像银行柜台。你不能自己进金库拿钱。你填一张单子（action：“取款 100 元”），交给柜员（dispatch）。柜员按规定流程（reducer）更新账户（state）。所有账户变动都遵守同一套规则。
+reducer 像银行柜台。你不能自己进金库拿钱，只能填一张单子（action：“取款 100 元”），交给柜员（dispatch）。柜员按规定流程（reducer）更新账户（state），所以所有账户变动都遵守同一套规则。
 
 </CallBox>
 
@@ -107,7 +107,7 @@ reducer 管的是 state 怎么变。但 state 长什么样，决定了“变”�
 | 避免重复的 state | `items` 里有一个对象，`selectedItem` 里又存了同一个对象 | 只存 `selectedId`，用 id 到 `items` 里找 |
 | 避免深嵌套的 state | 多层嵌套的对象，改一个叶子要层层展开 | 拍平成数组或按 id 索引的对象，用 id 互相引用 |
 
-这五条的共同点是：**同一个事实只存在一处**。同一个事实存了两处，每次更新就要同时改两处，漏掉一处，界面就和数据对不上。
+这五条的共同点是：**同一个事实只存在一处**。如果同一个事实存了两处，每次更新就要同时改两处；漏掉一处，界面就和数据对不上。
 
 下面的示例演示第二条。左边用两个布尔值，右边用一个 status，由 reducer 管。两边都点“请求（会失败）”，再点“请求（会成功）”。
 
@@ -195,7 +195,7 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-reducer 必须是**纯函数**。同样的输入必须得到同样的输出。reducer 不发请求，不修改原来的 state，不使用随机数或 Date.now()。所以上例在 dispatch 之前生成 id，再放进 action。
+reducer 必须是**纯函数**，同样的输入必须得到同样的输出。reducer 不发请求，不修改原来的 state，不使用随机数或 Date.now()，所以上例在 dispatch 之前生成 id，再放进 action。
 
 `default` 分支可以返回原 state，也可以抛出错误。抛出错误能尽早发现拼错的 `type`，本课示例用这种写法。
 
@@ -203,7 +203,7 @@ reducer 必须是**纯函数**。同样的输入必须得到同样的输出。re
 
 ## 为什么 reducer 必须是纯函数
 
-React 需要在渲染时调用 reducer，算出新 state。它可能调用不止一次。开发环境的严格模式（`<StrictMode>`）会故意把 reducer 调用两次，用来暴露不纯的写法。纯函数调用几次结果都一样，所以不受影响。
+React 需要在渲染时调用 reducer，算出新 state，而且可能调用不止一次。开发环境的严格模式（`<StrictMode>`）会故意把 reducer 调用两次，用来暴露不纯的写法。纯函数调用几次结果都一样，所以不受影响。
 
 ```jsx play title="严格模式会把 reducer 调用两次"
 import { StrictMode, useReducer } from 'react';
@@ -234,7 +234,7 @@ function App() {
 }
 ```
 
-控制台里有两行，按钮上的数字却只加了 1。因为这个 reducer 是纯的：两次调用都从同一个旧 state 出发，得到同样的新 state，React 只用其中一个结果。
+控制台里有两行，按钮上的数字却只加了 1，这是因为这个 reducer 是纯的：两次调用都从同一个旧 state 出发，得到同样的新 state，React 只用其中一个结果。
 
 如果 reducer 直接修改旧 state，例如 `state.count += 1; return { ...state }`，两次调用会改同一个对象，数字就加 2。生产环境不会调用两次，所以这类错误平时看不出来，换到严格模式才暴露。
 

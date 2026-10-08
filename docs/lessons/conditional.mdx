@@ -73,7 +73,7 @@ function App() {
 
 提前 return 要写在所有 Hook（例如 useState）之后。原因在[自定义 Hook：复用逻辑](/lessons/custom-hooks)一课讲，这里先记住这条规则。
 
-条件变成 false 时，React 会把对应的元素从页面上移除。元素里输入的内容、组件里的 state 都会丢失。条件再变回 true，得到的是一个全新的元素。
+条件变成 false 时，React 会把对应的元素从页面上移除，所以元素里输入的内容和组件里的 state 都会丢失。条件再变回 true 时，得到的是一个全新的元素。
 
 <CallBox kind="tip" label="要点">
 
