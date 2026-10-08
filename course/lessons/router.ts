@@ -4,19 +4,21 @@ export default {
   id: 'router',
   stage: 4,
   title: '路由：React Router',
-  mins: 38,
+  mins: 48,
   summary: '让单页应用拥有多个“页面”：路由表、动态参数、嵌套布局与跳转。',
   goals: [
     '能解释客户端路由的三步：URL 变化、路由库读 URL、渲染匹配的组件',
     '能写出路由表：静态路径、动态参数 <code>:id</code>、兜底 <code>*</code> 和带 <code>&lt;Outlet /&gt;</code> 的嵌套布局，并能说出 React Router 怎样在多条匹配里选一条',
     '能用 Link、useParams、useNavigate 完成“列表 → 详情 → 返回”的流程',
     '能判断哪些状态该放进 URL 的查询参数，并解释 <code>loader</code> 在导航中的时机：取到数据之前，页面停留在旧位置',
+    '能在 <code>createMemoryRouter</code> 的示例里读出导航状态，并说明 <code>errorElement</code> 写在哪条路由上，出错时就只替换哪一块',
   ],
   keyPoints: [
     '问题：单页应用只有一个 HTML。路由库读取 URL，决定渲染哪个组件，浏览器不刷新。',
     '站内跳转用 <code>&lt;Link to&gt;</code>。普通 <code>&lt;a href&gt;</code> 会整页刷新，所有 state 丢失。',
     '动态段 <code>users/:id</code> 用 <code>useParams()</code> 读出；值是字符串，和数字比较前要转换。',
     '嵌套路由：父路由渲染公共布局，子路由的内容出现在 <code>&lt;Outlet /&gt;</code> 的位置。<code>loader</code> 在导航开始时运行，没返回之前页面停留在旧位置；嵌套路由的 loader 同时运行。',
+    '实验台能运行真的 React Router（8.4.0），用内存路由 <code>createMemoryRouter</code> 代替 <code>createBrowserRouter</code>，因为它不能改页面的真实地址。数据都是模拟的。',
     '最常见的坑：部署后在 <code>/users/2</code> 刷新得到 404。服务器要把所有路径都返回 index.html。',
   ],
   quiz: [
@@ -458,8 +460,75 @@ const page = params.get('page') ?? 1;
       explain:
         '访问 / 时，只有父路由匹配，没有任何子路由，所以 Layout 里的 Outlet 什么也不渲染。index 路由就是“父路径本身”的默认子页面。把 Layout 改成 "*" 会让它匹配所有路径，问题更多；useParams 只能读 URL 里的动态段；把 users 改成绝对路径对这个问题没有帮助。',
     },
+    {
+      q: `当前地址是 <code>/products/42</code>。下面三个 <code>NavLink</code> 里，哪些是“当前页”（带 <code>aria-current="page"</code>）？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;NavLink to="/products"&gt;商品&lt;/NavLink&gt;
+&lt;NavLink to="/products" end&gt;商品（end）&lt;/NavLink&gt;
+&lt;NavLink to="/"&gt;首页&lt;/NavLink&gt;</code></pre></div>`,
+      options: ['三个都是：路径都是 /products/42 的前缀', '第一个和第三个：不加 end 就按前缀匹配', '只有第一个', '只有第二个'],
+      answer: 2,
+      explain:
+        '<code>NavLink</code> 默认按前缀匹配，所以 <code>to="/products"</code> 在 <code>/products/42</code> 时是当前页。加了 <code>end</code> 就只在地址正好是 <code>/products</code> 时才算，所以第二个不是。指向 <code>/</code> 的链接是特例：只在地址正好是 <code>/</code> 时才算当前页，所以第三个也不是。“第三个也是”是最容易想到的，因为 <code>/</code> 确实是所有地址的前缀。',
+    },
+    {
+      q: `<code>errorElement</code> 只写在最外层路由上。用户点进 <code>/users/3</code>，这条子路由的 <code>loader</code> 抛出了 404 错误。页面上会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">{ path: '/', element: &lt;Layout /&gt;, errorElement: &lt;AppError /&gt;, children: [
+  { index: true, element: &lt;Home /&gt; },
+  { path: 'users/:id', loader: userLoader, element: &lt;UserDetail /&gt; },
+] }</code></pre></div>`,
+      options: [
+        'Layout 的导航还在，内容区显示 AppError',
+        '整个 Layout 被换成 AppError，导航也没了',
+        'UserDetail 的位置显示空白，Layout 不变',
+        '显示 React Router 自带的错误页，不使用 AppError',
+      ],
+      answer: 1,
+      explain:
+        '错误从出错的路由开始向上找最近的 <code>errorElement</code>。子路由 <code>users/:id</code> 自己没有，就找到父路由，父路由的位置是整个 Layout，所以整个 Layout 都被换成 AppError。想保留导航，把 <code>errorElement</code> 写在子路由上。自带的错误页只在整条链上都没有 <code>errorElement</code> 时才出现。',
+    },
   ],
   plays: {
+    '真库：动态段与嵌套路由里的 state': {
+      pkey: 'router|真库：动态段与嵌套路由里的 state',
+      predict: {
+        q: '先点“布局里的计数器”3 次，再点“详情页里的计数器”2 次，最后点页面里的“看用户 2”。两个计数器依次显示什么？',
+        options: ['布局 3，详情页 2', '布局 3，详情页 0', '布局 0，详情页 0', '布局 0，详情页 2'],
+        answer: 0,
+        explain:
+          '地址从 /users/1 变成 /users/2，匹配到的是同一条路由：Layout 和 UserDetail 在树上的位置都没变，所以两个组件都不会重新挂载，state 都保留。“详情页变成 0”是最常见的预期，因为换了用户看起来像换了一页。要让它随用户重置，给有 state 的子组件加 key={id}。',
+      },
+      note: '切换用户时，只有 <code>useParams()</code> 返回的 <code>id</code> 变了。React Router 没有为每个用户创建新的组件，所以组件自己的 state 要自己负责重置。',
+    },
+    '真库：loader 运行期间的导航状态': {
+      pkey: 'router|真库：loader 运行期间的导航状态',
+      predict: {
+        q: '点“用户 2”之后，等 300 毫秒（loader 要 900 毫秒才返回）。灰条里的三行和页面内容分别是什么？',
+        options: [
+          '内存地址是 /users/2，导航状态是 loading，页面仍是首页',
+          '内存地址是 /，导航状态是 loading，目标地址是 /users/2，页面仍是首页',
+          '内存地址是 /users/2，导航状态是 idle，页面是空白',
+          '内存地址是 /，导航状态是 idle，目标地址是（没有），页面仍是首页',
+        ],
+        answer: 1,
+        explain:
+          'loader 返回之前，路由不更新当前位置：内存地址和页面都停留在首页。这时 useNavigation() 的 state 是 loading，location 是正在去的地址 /users/2。900 毫秒后位置和页面一起切换，状态回到 idle。这和迷你版一样，真库多给了 navigation.location，可以在旧页面上提示“正在去哪里”。“idle”把“loader 在运行”当成了“没有导航”。',
+      },
+      note: '在 loader 运行期间再点“用户 1”，上一次导航会被放弃，只有最后一次点击生效。',
+    },
+    '真库：errorElement 替换哪一块': {
+      pkey: 'router|真库：errorElement 替换哪一块',
+      predict: {
+        q: '点“用户 3（不存在）”，等 300 毫秒（它的 loader 抛出 404）。页面上还剩什么？',
+        options: [
+          '整个页面都被错误信息替换，连导航也没了',
+          '导航还在，内容区显示“出错了：404 找不到用户 3”',
+          '页面不变，只在控制台里报错',
+          '页面空白，什么都不显示',
+        ],
+        answer: 1,
+        explain:
+          'errorElement 写在 users/:id 这条路由上，出错时只替换这条路由自己的位置，也就是布局 <Outlet /> 的位置。布局和导航不受影响，用户可以点别的链接离开。试一试：把 errorElement 从 users/:id 移到最外层路由上再运行，整个布局都会被换成错误信息。',
+      },
+      note: '再点“用户 1”，错误页消失，用户 1 的数据正常显示：每次导航都会重新运行 loader。',
+    },
     '迷你路由（Link 和 Hook 的用法与 React Router 一致）': {
       pkey: 'router|迷你路由（Link 和 Hook 的用法与 React Router 一致）',
       predict: {

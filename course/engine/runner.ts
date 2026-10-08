@@ -1,9 +1,9 @@
 /* 代码执行引擎：把学习者的代码编译、运行进实验台的预览区，并收集控制台输出和错误。 */
 import { prepare, compile } from './exec.ts';
 import { explainError } from './logic/errors.ts';
-import { reactWarning, warningLine } from './logic/warnings.ts';
+import { formatMessage, reactWarning, warningLine } from './logic/warnings.ts';
 import { esc } from './logic/text.ts';
-import { onReact19Console, type Runtime } from './runtime.ts';
+import { onLibConsole, onReact19Console, type Runtime } from './runtime.ts';
 import { el } from './util.ts';
 
 let activeRunner: Runner | null = null;
@@ -140,6 +140,7 @@ export class Runner {
     const sandbox = {
       React: this.runtime.React,
       ReactDOM: this.runtime.ReactDOM,
+      __libs: this.runtime.libs,
       console: fakeConsole,
       setTimeout: wrapTimer(window.setTimeout.bind(window)),
       setInterval: wrapTimer(window.setInterval.bind(window)),
@@ -192,6 +193,12 @@ export function installHooks(): void {
   onReact19Console((_method, args) => {
     const w = activeRunner && reactWarning(args);
     if (w) activeRunner.log('warn', [warningLine(w)]);
+  });
+  // 第三方库（react-router 等）自己的 console.warn / console.error 也显示在实验台的控制台里
+  onLibConsole((lib, method, args) => {
+    if (!activeRunner || typeof args[0] !== 'string') return;
+    const msg = formatMessage(args).split('\n')[0].trim();
+    if (msg) activeRunner.log(method === 'error' ? 'error' : 'warn', [lib + ' ' + (method === 'error' ? '报告' : '提示') + '：' + msg]);
   });
   window.addEventListener('unhandledrejection', e => {
     if (activeRunner) {

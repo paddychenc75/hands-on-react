@@ -357,7 +357,7 @@ function App() {
 1. **props**：给 `TodoItem` 等组件的 props 写类型。
 2. **事件**：给输入框的 `onChange` 和表单的 `onSubmit` 处理函数写参数类型。
 3. **reducer 的 action**：写成可辨识联合，并在 `default` 分支用 `never` 检查。
-4. **Context**：写成 `Value | null`，用一个自定义 Hook 把 `null` 挡在外面。
+4. **Context**：写成 `Value | null`，用一个自定义 Hook 把 `null` 挡在外面。Context、Hook 和 Provider 放在同一个文件里时，模板的 `react-refresh/only-export-components` 规则会在 `npm run lint` 里报错：把 Context 和 Hook 放进一个 `.ts` 文件，Provider 单独放一个 `.tsx` 文件。
 5. **自定义 Hook 的返回值**：返回元组时加 `as const`。
 
 做完后，故意写错一次，看编辑器和 `npx tsc -b` 是否报出下面的错误。试完改回来：
@@ -368,8 +368,8 @@ function App() {
 | `dispatch({ type: 'toggle', id: 'a' })` | `TS2322`：类型 `string` 不能赋给 `number` |
 | `dispatch({ type: 'add' })` 漏掉 `title` | `TS2345`：缺少属性 `title` |
 | 新增一种 action `rename` 但不改 reducer | `default` 分支里的 `never` 那一行报 `TS2322` |
-| 不用自定义 Hook，直接 `useContext(ThemeContext).mode` | `TS18047`：对象可能为 `null` |
-| 去掉自定义 Hook 的 `as const`，再调用返回的函数 | `TS2349`：表达式不可调用 |
+| 不用自定义 Hook，直接 `useContext(ThemeContext).mode` | `TS2531`：对象可能为 `null`（先存进变量 `theme`，再读 `theme.mode`，则是 `TS18047`：`'theme'` 可能为 `null`） |
+| 去掉自定义 Hook 的 `as const`，再调用返回的函数 | `TS2349`：表达式不可调用，因为元组里取出的值可能是 `boolean`，而 `boolean` 没有调用签名 |
 | 写 `const ref = useRef()` | `TS2554`：需要 1 个参数，但得到 0 个 |
 
 全部做完、`npx tsc -b` 零错误时，这项任务就完成了。项目课[《实战四：城市天气应用》](/lessons/project-weather)的代码全部是 TypeScript。

@@ -40,6 +40,8 @@ export interface Tester {
   /** 实验台运行时里的 React / ReactDOM（练习检查必须用它们，不要读全局的 React / ReactDOM，全局没有） */
   React: any;
   ReactDOM: any;
+  /** 已加载的第三方库的模块对象，键是 import 的路径，例如 t.libs['react-router']、t.libs['@tanstack/react-query']。只有练习的代码 import 了才有 */
+  libs: Record<string, any>;
   /** 本次运行里表单被提交、但学习者的处理函数没有调用 preventDefault 的次数。实验台会替学习者拦住刷新，所以只有这个计数能看出漏写 */
   unpreventedSubmits: () => number;
   /** 返回元素；约定是"找得到"，找不到时返回 null。查询结果按 any 使用，因为练习要读 value、checked 等各种元素的属性 */

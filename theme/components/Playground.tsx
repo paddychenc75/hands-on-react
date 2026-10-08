@@ -14,7 +14,7 @@ export default function Playground({ code, title, playKey }: { code: string; tit
         predictKey: meta.pkey,
       });
     },
-    { needsRuntime: true, cleanup: disposePlayground, deps: [code, title, playKey] },
+    { needsRuntime: true, libSources: () => [code], cleanup: disposePlayground, deps: [code, title, playKey] },
   );
   return <div ref={ref} className="hoc-slot hoc-slot-pg wide" />;
 }

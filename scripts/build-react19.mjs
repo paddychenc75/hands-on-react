@@ -30,6 +30,7 @@ for (const [name, dir] of [
 const mods = {
   react: path.join(reactDir, 'cjs/react.development.js'),
   scheduler: path.join(schedDir, 'cjs/scheduler.development.js'),
+  'react/jsx-runtime': path.join(reactDir, 'cjs/react-jsx-runtime.development.js'), // 第三方库（react-router 等）的 JSX 编译产物要用，和 react 是同一个实例
   'react-dom': path.join(domDir, 'cjs/react-dom.development.js'),
   'react-dom/client': path.join(domDir, 'cjs/react-dom-client.development.js'),
 };
@@ -65,7 +66,7 @@ const text = `/* React ${want} 开发版（react + react-dom + react-dom/client 
 ${body}
   var React = __req('react');
   var ReactDOM = Object.assign({}, __req('react-dom'), __req('react-dom/client'));
-  window.__hocReact19 = { version: React.version, React: React, ReactDOM: ReactDOM, setConsoleHook: function (fn) { __hook = fn; } };
+  window.__hocReact19 = { version: React.version, React: React, ReactDOM: ReactDOM, jsxRuntime: __req('react/jsx-runtime'), setConsoleHook: function (fn) { __hook = fn; } };
 })();
 `;
 fs.mkdirSync(path.dirname(out), { recursive: true });

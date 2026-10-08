@@ -53,6 +53,24 @@ describe('Counter', () => {
 1. 在 vitest.config 中设置 `environment: 'jsdom'` 和 `globals: true`。否则 Testing Library 不会在每个测试后自动清理 DOM。
 2. 在 setup 文件中写 `import '@testing-library/jest-dom/vitest'`。这样才能用 `toBeInTheDocument`。
 
+在 Vite 项目里，一份可用的配置是：
+
+```ts title="在本机项目里：vitest.config.ts（放在项目根目录）"
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/setup.ts',   // 文件里只有上面那一行 import
+  },
+});
+```
+
+`globals: true` 让测试里可以不写 `import { it, expect } from 'vitest'`，直接用 `it`、`expect`、`beforeAll`。这样写的测试文件，TypeScript 会在 `npm run build` 的 `tsc -b` 一步报 `Cannot find name 'it'`。要在 `tsconfig.app.json` 的 `compilerOptions.types` 里加上 `"vitest/globals"`：`"types": ["vite/client", "vitest/globals"]`。已经 `import` 了这些函数的测试文件不受影响。
+
 </CallBox>
 
 ## 该用哪种查询？
@@ -284,9 +302,9 @@ Playwright 的查询和 Testing Library 一样，优先按角色和名称找元�
 | 做什么 | 应该看到 |
 |---|---|
 | 运行 `npx vitest run` | 全部通过，终端显示通过的测试数 |
-| 把组件里的 `n + 1` 改成 `n + 2` | 点击相关的测试变红，失败信息写着期望值和实际值。改回后恢复 |
-| 把 `findByText` 换成 `getByText` 测试异步内容 | 测试失败：内容还没出现 |
-| 测试里去掉 `retry: false` 再测错误状态 | 约 1 秒后超时失败（见项目课里程碑 5 的“常见坑”） |
+| 把组件里的 `n + 1` 改成 `n + 2` | 点击相关的测试变红，失败信息是 `Unable to find an element with the text: 计数：1`，后面打印出当前的 DOM，里面显示的是“计数：2”。改回后恢复 |
+| 把 `findByText` 换成 `getByText` 测试异步内容 | 测试失败：`Unable to find an element with the text: 张三`，内容还没出现 |
+| 测试里去掉 `retry: false` 再测错误状态 | 约 1 秒后失败：`Unable to find role="alert"`。`findBy…` 默认只等 1 秒，而查询要重试 3 次才报错（见项目课里程碑 5 的“常见坑”） |
 
 </LessonProse>
 

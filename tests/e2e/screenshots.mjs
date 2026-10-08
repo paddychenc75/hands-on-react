@@ -105,6 +105,42 @@ await run('lesson-mobile', 390, 844, 'light', async p => {
   await pg.scrollIntoViewIfNeeded();
   await p.waitForTimeout(2500);
 });
+// 真库示例（浅色）：router 课的 loader 导航状态、tanstack-query 课的状态字段。先点开预测题，再点一下，让页面停在有内容的时刻
+for (const [id, title, pick] of [
+  [
+    'router',
+    '真库：loader 运行期间',
+    async pg => {
+      await pg.locator('.preview a', { hasText: '用户 2' }).click();
+      await pg.page().waitForTimeout(350);
+    },
+  ],
+  [
+    'tanstack-query',
+    '真库：useQuery 的状态字段',
+    async pg => {
+      await pg.locator('.preview button', { hasText: '用户 2' }).click();
+      await pg.page().waitForTimeout(300);
+      await pg.locator('.preview table').scrollIntoViewIfNeeded();
+      await pg.page().evaluate(() => window.scrollBy(0, 300));
+    },
+  ],
+]) {
+  await run(id, 1280, 1000, 'light', async p => {
+    await p.goto(site + `lessons/${id}.html`);
+    await p.waitForSelector('.selfx');
+    const pg = p.locator('.pg', { has: p.locator('.pg-title', { hasText: title }) });
+    await pg.scrollIntoViewIfNeeded();
+    await p.waitForTimeout(2500);
+    if (await pg.locator('.predict .opt').count()) {
+      await pg.locator('.predict .opt').first().click();
+      await pg.locator('.predict .btn.primary').click();
+      await p.waitForTimeout(1500);
+    }
+    await pick(pg);
+    await p.evaluate(() => window.scrollBy(0, -20));
+  });
+}
 await b.close();
 close();
 console.log('截图已保存到', OUT);

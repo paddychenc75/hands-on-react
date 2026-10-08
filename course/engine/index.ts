@@ -1,5 +1,5 @@
 /* 引擎的对外出口：theme/ 里的 React 薄包装只从这里 import。 */
-export { loadRuntime, getRuntime } from './runtime.ts';
+export { loadRuntime, loadLibs, getRuntime, LibLoadError } from './runtime.ts';
 export { STORE_KEY, PROGRESS_EVENT, emitProgress, progress, lp, isDone } from './store.ts';
 export { toast } from './util.ts';
 export { makePlayground, disposePlayground } from './playground.ts';

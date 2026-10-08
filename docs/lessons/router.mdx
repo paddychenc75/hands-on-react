@@ -64,11 +64,12 @@ function UserDetail() {
 
 ## 自己动手：一个 40 行的迷你路由
 
-实验台里不安装第三方库，所以我们用学过的 Context 和 state 写**迷你版**。本课分三层：
+先用学过的 Context 和 state 写一个**迷你版**，看清路由库的原理。实验台也能运行真的 React Router，所以本课分四层：
 
-1. **迷你实现**（本节和后面两个示例）：弄懂原理，并通过预测检验自己的理解。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。
-2. **本机任务**（课末）：在你自己的电脑上装真库，把同样的功能再做一遍，并按清单自查。
-3. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库把路由、数据请求和测试接成一个完整应用。
+1. **迷你实现**（本节和后面两个迷你示例）：弄懂原理，并通过预测检验自己的理解。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。
+2. **真库示例**（“用真的 React Router”一节）：在实验台里运行 react-router 8.4.0，看真实 API 的行为。
+3. **本机任务**（课末）：在你自己的电脑上装真库，把同样的功能再做一遍，并按清单自查。
+4. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库把路由、数据请求和测试接成一个完整应用。
 
 第一个迷你路由很小：路由表用数组传入（写法类似 `createBrowserRouter`），暂时不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
 
@@ -289,7 +290,7 @@ function ProductList() {
 
 ## 数据模式：让路由来加载数据
 
-`createBrowserRouter` 让你把 `loader` 写在路由表里。`loader` 是**导航开始时**运行的函数，返回的数据用 `useLoaderData()` 读取。在 `loader` 返回之前，地址栏和页面都停留在旧位置，`useNavigation().state` 是 `'loading'`。下面是真库的写法，只读。
+`createBrowserRouter` 让你把 `loader` 写在路由表里。`loader` 是**导航开始时**运行的函数，返回的数据用 `useLoaderData()` 读取。在 `loader` 返回之前，地址栏和页面都停留在旧位置，`useNavigation().state` 是 `'loading'`。下面是真实项目里的写法，里面的 `fetch('/api/…')` 要有服务器，所以只读；可以运行的版本在后面的“用真的 React Router”一节。
 
 ```jsx
 import { createBrowserRouter, useLoaderData, useNavigation } from 'react-router';
@@ -423,6 +424,248 @@ function App() {
 
 迷你版和真库的差别：真库的 `loader` 能被取消（用户又点了别的链接，旧请求收到中止信号），能返回 `Response` 或抛出错误，错误由路由的 `errorElement` 显示；提交表单后会自动重新运行相关 `loader`。迷你版都没有做。
 
+## 用真的 React Router
+
+下面的示例运行的是 react-router 8.4.0 的开发版（本课的行为描述都按这个版本实测）。它只在示例用到时才加载。
+
+实验台不能改动页面的真实地址。所以示例用**内存路由**：`createMemoryRouter` 把地址存在内存里，路由表、`Link`、`loader` 的行为和真实项目一样。预览区上方的灰条显示这个内存地址。真实项目里用 `createBrowserRouter`，其余代码不变。示例里的数据都是模拟的：函数返回 Promise，不发任何网络请求。
+
+### 声明路由、Link 与 NavLink
+
+`Link` 点击后只改地址并重新渲染。`NavLink` 在 `Link` 的基础上知道“我是不是当前页”：当前页的链接带 `aria-current="page"` 和 `active` 类名，`style` 或 `className` 还可以写成函数，从参数里读 `isActive`。
+
+```jsx play title="真库：声明路由、Link 与 NavLink"
+import { createMemoryRouter, Link, NavLink, Outlet, useLocation } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+
+// 真实项目里用 createBrowserRouter。实验台不能改动页面的真实地址，所以这里用内存路由：地址只存在内存里。
+function Layout() {
+  const { pathname, search } = useLocation();
+  const bold = ({ isActive }) => ({ fontWeight: isActive ? 700 : 400 });
+  return (
+    <div>
+      <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>
+        内存地址：{pathname}{search}
+      </div>
+      <nav style={{ display: 'flex', gap: 12, margin: '8px 0' }}>
+        <NavLink to="/" style={bold}>首页</NavLink>
+        <NavLink to="/products" style={bold}>商品</NavLink>
+        <NavLink to="/products" end style={bold}>商品（end）</NavLink>
+        <Link to="/products/42">商品 42</Link>
+        <Link to="/nowhere">不存在的页面</Link>
+      </nav>
+      <Outlet />
+    </div>
+  );
+}
+
+const router = createMemoryRouter(
+  [
+    {
+      path: '/',
+      element: <Layout />,
+      children: [
+        { index: true, element: <h3>首页</h3> },
+        { path: 'products', element: <h3>商品列表</h3> },
+        { path: 'products/:id', element: <h3>商品详情</h3> },
+        { path: '*', element: <h3>404：没有这个页面</h3> },
+      ],
+    },
+  ],
+  { initialEntries: ['/'] },
+);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+`NavLink` 默认也匹配子路径：地址是 `/products/42` 时，指向 `/products` 的链接仍然是当前页。想只在 `/products` 时才算当前页，加 `end`。指向 `/` 的链接是特例，只在地址正好是 `/` 时才算当前页，不需要 `end`。
+
+### 动态段与嵌套路由
+
+路由的 `path` 里写 `:id`，组件里用 `useParams()` 读出。值是字符串，和数字比较前要转换。嵌套路由用 `children`：父路由的组件渲染公共部分，子路由出现在 `<Outlet />` 的位置。
+
+下面的页面里有两个计数器：一个在布局（父路由）里，一个在详情页（子路由）里。先预测，再运行。
+
+```jsx play title="真库：动态段与嵌套路由里的 state"
+import { useState } from 'react';
+import { createMemoryRouter, Link, Outlet, useLocation, useParams } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+
+const USERS = [
+  { id: 1, name: '张三', city: '北京' },
+  { id: 2, name: '李四', city: '上海' },
+];
+
+function Layout() {
+  const [n, setN] = useState(0);
+  const { pathname } = useLocation();
+  return (
+    <div>
+      <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>内存地址：{pathname}</div>
+      <button onClick={() => setN(n + 1)} style={{ margin: '8px 0' }}>布局里的计数器：{n}</button>
+      <Outlet />
+    </div>
+  );
+}
+
+function UserDetail() {
+  const { id } = useParams();                 // 动态段的值永远是字符串
+  const user = USERS.find(u => u.id === Number(id));
+  const [n, setN] = useState(0);
+  if (!user) return <p>没有这个用户</p>;
+  return (
+    <div>
+      <h3>{user.name}（{user.city}）</h3>
+      <button onClick={() => setN(n + 1)}>详情页里的计数器：{n}</button>
+      <p>
+        <Link to="/users/1">看用户 1</Link>{'　'}
+        <Link to="/users/2">看用户 2</Link>
+      </p>
+    </div>
+  );
+}
+
+const router = createMemoryRouter(
+  [
+    {
+      path: '/',
+      element: <Layout />,
+      children: [{ path: 'users/:id', element: <UserDetail /> }],
+    },
+  ],
+  { initialEntries: ['/users/1'] },
+);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+地址从 `/users/1` 变成 `/users/2` 时，匹配到的还是同一条路由，React 看到树上同一个位置是同一个组件，所以 `UserDetail` 不会重新挂载，它的 state 保留。想让 state 随用户重置，给有 state 的子组件加 `key={id}`，例如 `<Counter key={id} />`。`key` 变了，React 就把它当成另一个组件。
+
+### loader、useLoaderData 与导航状态
+
+`loader` 在导航开始时运行，页面里用 `useLoaderData()` 读它返回的数据。在 `loader` 返回之前，路由不更新当前位置。这段时间里，`useNavigation()` 告诉你导航的状态（`state`）和正在去哪里（`location`）。先预测，再运行。
+
+```jsx play title="真库：loader 运行期间的导航状态"
+import { createMemoryRouter, Link, Outlet, useLoaderData, useLocation, useNavigation } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+
+// ===== 模拟后端：不发真实请求，只是等 900 毫秒再返回 =====
+const USERS = { 1: { name: '张三', city: '北京' }, 2: { name: '李四', city: '上海' } };
+const fetchUser = id => new Promise(resolve => {
+  console.log('🌐 loader 开始：用户 ' + id);
+  setTimeout(() => resolve(USERS[id]), 900);
+});
+
+function Layout() {
+  const { pathname } = useLocation();
+  const navigation = useNavigation();                 // 'idle' | 'loading' | 'submitting'
+  return (
+    <div>
+      <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>
+        <div>内存地址：{pathname}</div>
+        <div>导航状态：{navigation.state}</div>
+        <div>目标地址：{navigation.location ? navigation.location.pathname : '（没有）'}</div>
+      </div>
+      <nav style={{ display: 'flex', gap: 12, margin: '8px 0' }}>
+        <Link to="/">首页</Link>
+        <Link to="/users/1">用户 1</Link>
+        <Link to="/users/2">用户 2</Link>
+      </nav>
+      <Outlet />
+    </div>
+  );
+}
+
+function UserDetail() {
+  const user = useLoaderData();                       // 进入页面时数据已经取好
+  return <h3>{user.name}（{user.city}）</h3>;
+}
+
+const router = createMemoryRouter(
+  [
+    {
+      path: '/',
+      element: <Layout />,
+      children: [
+        { index: true, element: <h3>首页</h3> },
+        { path: 'users/:id', loader: ({ params }) => fetchUser(params.id), element: <UserDetail /> },
+      ],
+    },
+  ],
+  { initialEntries: ['/'] },
+);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+### errorElement：出错时替换哪一块
+
+`loader` 抛出的错误，或路由组件渲染时的错误，由这条路由的 `errorElement` 显示。在 `errorElement` 里用 `useRouteError()` 读出错误；`loader` 抛出的 `Response` 可以用 `isRouteErrorResponse` 判断。错误从出错的路由开始向上找最近的 `errorElement`。先预测，再运行。
+
+```jsx play title="真库：errorElement 替换哪一块"
+import { createMemoryRouter, Link, Outlet, isRouteErrorResponse, useLoaderData, useLocation, useRouteError } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+
+// ===== 模拟后端：用户 3 不存在，loader 里抛出 404 =====
+const USERS = { 1: '张三', 2: '李四' };
+async function userLoader({ params }) {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  if (!USERS[params.id]) throw new Response('找不到用户 ' + params.id, { status: 404 });
+  return USERS[params.id];
+}
+
+function Layout() {
+  const { pathname } = useLocation();
+  return (
+    <div>
+      <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>内存地址：{pathname}</div>
+      <nav style={{ display: 'flex', gap: 12, margin: '8px 0' }}>
+        <Link to="/">首页</Link>
+        <Link to="/users/1">用户 1</Link>
+        <Link to="/users/3">用户 3（不存在）</Link>
+      </nav>
+      <Outlet />
+    </div>
+  );
+}
+
+function UserDetail() {
+  return <h3>用户：{useLoaderData()}</h3>;
+}
+
+// 路由上的 errorElement：这条路由的 loader、渲染出错时，显示它
+function UserError() {
+  const error = useRouteError();
+  return <p style={{ color: 'crimson' }}>出错了：{isRouteErrorResponse(error) ? error.status + ' ' + error.data : error.message}</p>;
+}
+
+const router = createMemoryRouter(
+  [
+    {
+      path: '/',
+      element: <Layout />,
+      children: [
+        { index: true, element: <h3>首页</h3> },
+        { path: 'users/:id', loader: userLoader, element: <UserDetail />, errorElement: <UserError /> },
+      ],
+    },
+  ],
+  { initialEntries: ['/'] },
+);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
+```
+
+没有任何路由写 `errorElement` 时，React Router 显示自带的错误页（标题是 `Unexpected Application Error!`），同时在控制台提示你自己提供 `errorElement`。
+
 ## 选哪种模式？
 
 | 情况 | 模式 |
@@ -431,7 +674,7 @@ function App() {
 | 要在进入页面前取数据，或要显示待定状态 | 数据模式（`createBrowserRouter`） |
 | 新项目，需要服务端渲染 | 框架模式（react.dev 推荐从框架开始） |
 
-版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2 以上，并且只提供 ESM。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
+版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2.7 以上、Node.js 22.22 以上，并且只提供 ESM。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
 
 <CallBox kind="tip" label="维护 React 18 项目时">
 
@@ -468,10 +711,10 @@ React Router 的数据模式（`createBrowserRouter`）和框架模式还提供�
 
 ## 本机任务：用真库再做一遍
 
-迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2 以上的项目）里做下面几步。
+迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2.7 以上的项目）里做下面几步。react-router 8 要求 Node.js 22.22 以上，本课程用的 Node.js 24 满足。
 
 1. 运行 `npm install react-router`，再运行 `npm ls react-router`，确认版本是 8.x。
-2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。
+2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。路由表和路由组件写在同一个文件里时，模板的 `react-refresh/only-export-components` 规则会在 `npm run lint` 里报错：把路由表写在 `main.tsx` 里，或者把组件放进别的文件。
 3. 给 `users/:id` 加一个 `loader`，里面等 1 秒再返回用户，详情页用 `useLoaderData()` 读取。
 4. 在 `Layout` 里用 `useNavigation()` 显示“导航中…”。
 5. 用 `useSearchParams` 在用户列表上加一个搜索框，搜索词存进 `?q=`。

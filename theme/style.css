@@ -103,8 +103,8 @@ html.dark {
 .pg-head .pg-title { font-weight: 600; font-size: 14px; margin-right: auto; display: flex; gap: 8px; align-items: center; min-width: 0; }
 .pg-head .pg-badge { font: 600 10.5px var(--f-mono); letter-spacing: .08em; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; }
 .pg-head .pg-badge.ex { color: var(--sun); border-color: var(--sun); }
-/* 实验台运行的 React 版本：全站同一个版本，只是一行不抢眼的小灰字 */
-.pg-head .pg-rt { font: 500 11px var(--f-mono); color: var(--ink-3); opacity: .75; white-space: nowrap; }
+/* 实验台运行的 React 版本和用到的第三方库的版本：一行不抢眼的小灰字 */
+.pg-head .pg-rt, .pg-head .pg-lib { font: 500 11px var(--f-mono); color: var(--ink-3); opacity: .75; white-space: nowrap; }
 .pg-body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); }
 .editor { position: relative; background: var(--code-bg); min-height: 120px; }
 .editor pre, .editor textarea { margin: 0; padding: 14px 16px; font: 13px/1.65 var(--f-mono); tab-size: 2; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; border: 0; letter-spacing: 0; }

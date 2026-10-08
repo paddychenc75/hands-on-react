@@ -10,6 +10,7 @@ export default function Exercise() {
     },
     {
       needsRuntime: true,
+      libSources: l => [l.exercise?.starter ?? '', l.exercise?.solution ?? ''],
       cleanup: w => {
         const pg = (w as any)._pg;
         if (pg) disposePlayground(pg);

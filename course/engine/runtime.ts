@@ -6,7 +6,7 @@
    必须是开发版：引擎靠拦截 React 的警告向学习者显示它们（识别规则见 logic/warnings.ts）。
    不放 iframe：站点自己打包的 React 是另一份，各自独立的 root，互不干扰。运行时只加载一次。 */
 import { BASE } from '../site.ts';
-import { react19Path } from './logic/runtime.ts';
+import { libPath, react19Path, type LibInfo } from './logic/runtime.ts';
 
 const CDN = 'https://cdn.jsdelivr.net/npm/';
 const COMMON_LIBS = [
@@ -25,6 +25,19 @@ export interface Runtime {
   React: any;
   /** react-dom 和 react-dom/client 合在一起（createRoot、flushSync、createPortal、useFormStatus 等） */
   ReactDOM: any;
+  /** 已加载的第三方库（只有示例 import 了才会加载）。键是 import 的路径，例如 'react-router'、'react-router/dom'、'@tanstack/react-query' */
+  libs: Record<string, any>;
+  /** 已加载的第三方库的版本，键是包名 */
+  libVersions: Record<string, string>;
+}
+
+/** 第三方库加载失败。message 是显示给学习者的提示 */
+export class LibLoadError extends Error {
+  lib: string;
+  constructor(lib: string) {
+    super(`运行环境加载失败（${lib}），请检查网络后刷新页面。`);
+    this.lib = lib;
+  }
 }
 
 function loadScript(src: string): Promise<void> {
@@ -71,7 +84,7 @@ async function load(base: string, assetBase: string): Promise<Runtime> {
   const rt = (window as any).__hocReact19;
   if (!rt || !rt.React || !rt.ReactDOM) throw new Error('运行环境加载失败');
   if (consoleHandler) rt.setConsoleHook(consoleHandler);
-  return { reactVersion: rt.React.version, React: rt.React, ReactDOM: rt.ReactDOM };
+  return { reactVersion: rt.React.version, React: rt.React, ReactDOM: rt.ReactDOM, libs: {}, libVersions: {} };
 }
 
 /** 加载运行时，返回 React / ReactDOM。只加载一次；失败后可以重试 */
@@ -95,4 +108,37 @@ export function loadRuntime(base = CDN, assetBase = BASE): Promise<Runtime> {
 export function getRuntime(): Runtime {
   if (!loaded) throw new Error('React 运行环境还没有加载');
   return loaded;
+}
+
+const libLoading = new Map<string, Promise<void>>();
+/** 加载示例用到的第三方库（在 loadRuntime 完成之后调用）。已经加载过的不再请求；失败后可以重试 */
+export function loadLibs(libs: LibInfo[], assetBase = BASE): Promise<void> {
+  const rt = getRuntime();
+  return Promise.all(
+    libs.map(lib => {
+      if (rt.libVersions[lib.name]) return Promise.resolve();
+      let p = libLoading.get(lib.name);
+      if (!p) {
+        p = loadScript(assetBase + libPath(lib)).then(
+          () => {
+            const reg = (window as any).__hocLibs?.[lib.name];
+            if (!reg) throw new LibLoadError(lib.name);
+            Object.assign(rt.libs, reg.modules);
+            rt.libVersions[lib.name] = reg.version;
+          },
+          () => {
+            throw new LibLoadError(lib.name);
+          },
+        );
+        libLoading.set(lib.name, p);
+        p.catch(() => libLoading.delete(lib.name));
+      }
+      return p;
+    }),
+  ).then(() => {});
+}
+
+/** 注册第三方库里的 console.error / console.warn 的接收函数（库的包装脚本通过 window.__hocLibConsole 调用它） */
+export function onLibConsole(fn: (lib: string, method: 'error' | 'warn', args: unknown[]) => void): void {
+  (window as any).__hocLibConsole = fn;
 }

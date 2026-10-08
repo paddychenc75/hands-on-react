@@ -16,7 +16,7 @@ Next.js 是使用最广的 React 全栈框架。Server Components 主要就用�
 
 <CallBox kind="tip" label="要点">
 
-Next.js 需要 Node.js 服务器，实验台跑不了，所以本课的代码块都是只读的，站内练习实现的是它最核心的一条规则（文件夹就是路由）。课末的“本机任务”带你在自己的电脑上亲手跑一遍。创建项目只需一行：`npx create-next-app@latest my-app`，选“使用推荐的默认设置”即可（需要 Node.js 20.9 以上）。
+Next.js 需要 Node.js 服务器，实验台跑不了，所以本课的代码块都是只读的，站内练习实现的是它最核心的一条规则（文件夹就是路由）。课末的“本机任务”带你在自己的电脑上亲手跑一遍。创建项目只需一行：`npx create-next-app@latest my-app`，选 `Yes, use recommended defaults`（推荐的默认设置）即可（需要 Node.js 20.9 以上）。本课的描述按 Next.js 16.4.0 实测。
 
 </CallBox>
 
@@ -126,7 +126,7 @@ export async function addComment(postId: number, formData: FormData) {
 
 ## 渲染策略：两种模型
 
-Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目默认使用 **Cache Components**（`next.config.ts` 里的 `cacheComponents: true` 和 `partialPrefetching: true`）。Next.js 17 会把它变成默认。没开这个开关的老项目用后面的“旧模型”表。
+Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目默认使用 **Cache Components**（`next.config.ts` 里的 `cacheComponents: true` 和 `partialPrefetching: true`）。官方文档说，下一个大版本会在所有项目里默认启用这两项功能，开关也会被移除。没开这个开关的老项目用后面的“旧模型”表。
 
 ### 新模型：Cache Components
 
@@ -136,9 +136,9 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 |---|---|
 | 不依赖请求的内容 | 自动预渲染进静态外壳 |
 | 用 `'use cache'` 缓存的内容（配合 `cacheLife('hours')`、`cacheTag('posts')`） | 缓存后进静态外壳 |
-| 没缓存的数据，或 `cookies()`、`headers()`、`searchParams` 这类运行时数据 | 必须包在 `<Suspense>` 里，请求时流式返回 |
+| 没缓存的数据，或 `cookies()`、`headers()`、`params`、`searchParams` 这类运行时数据 | 必须包在 `<Suspense>` 里，请求时流式返回 |
 
-在新模型里，数据默认不缓存。在 Suspense 之外读取没缓存的数据，开发时会报错。`loading.tsx` 就是一层 Suspense。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
+在新模型里，数据默认不缓存。在 Suspense 之外读取没缓存的数据，开发时会报错：`fetch(...)` 报 `Next.js encountered uncached data during prerendering`，读 `params`、`cookies()` 这类运行时数据报 `Next.js encountered runtime data during prerendering`。页面仍然能显示，浏览器右下角出现红色的 `1 Issue`。`loading.tsx` 就是一层 Suspense。读取 cookies 只影响它所在的 Suspense 区域，不会让整页变成动态。
 
 ### 旧模型（没有开启 Cache Components 的项目）
 
@@ -165,18 +165,18 @@ Next.js 有两套缓存模型。从 16.4 起，`create-next-app` 新建的项目
 
 在你的电脑上做下面四步。照着做，对照表格自查。
 
-1. 运行 `npx create-next-app@latest my-shop`，选择推荐的默认设置，再 `cd my-shop && npm run dev`，打开 `http://localhost:3000`。
-2. **动态路由**：新建 `app/shop/[id]/page.tsx`，用 `const { id } = await params` 读出 id 并显示。再新建 `app/shop/layout.tsx`，在 `{children}` 上方放一个标题。
+1. 运行 `npx create-next-app@latest my-shop`，选择 `Yes, use recommended defaults`，再 `cd my-shop && npm run dev`，打开 `http://localhost:3000`。创建好的项目里，`next.config.ts` 已经有 `cacheComponents: true` 和 `partialPrefetching: true`，开发服务器启动时会打印 `Cache Components enabled`。
+2. **动态路由**：新建 `app/shop/[id]/page.tsx`，用 `const { id } = await params` 读出 id 并显示。再新建 `app/shop/layout.tsx`，在 `{children}` 上方放一个标题。`params` 是运行时数据，直接在页面组件里 `await` 它，开发时浏览器右下角会出现红色的 `1 Issue`（`Route "/shop/[id]": Next.js encountered runtime data during prerendering`）。把读取 `params` 的部分拆成一个子组件，页面里用 `<Suspense fallback={<p>加载中…</p>}>` 包住它，问题就消失了。（想让一个页面整体阻塞渲染，可以加 `export const instant = false;`，这样同样不再报错。）
 3. **Server Function 表单**：新建 `app/shop/[id]/actions.ts`（第一行 `'use server'`），导出一个函数，用 `formData.get('text')` 读出文字并 `console.log`。在页面里用 `<form action={…}>` 调用它。
 4. **看 RSC payload**：在首页放一个 `<Link href="/shop/42">`，打开浏览器开发者工具的 Network 面板，点这个链接。
 
 | 做什么 | 应该看到 |
 |---|---|
 | 访问 `/shop/42` | 页面显示 42；页面外面套着根布局和 `shop` 布局两层 |
-| 在 `shop/layout.tsx` 里加一行 `console.log('layout')`，刷新页面 | 输出出现在运行 `npm run dev` 的终端，不在浏览器控制台：服务端组件在服务器上运行 |
+| 在 `shop/layout.tsx` 里加一行 `console.log('layout')`，刷新页面 | 输出出现在运行 `npm run dev` 的终端：服务端组件在服务器上运行。开发模式还会把这条服务端日志转发到浏览器控制台，带着一个标签（例如 `Prerender`），它不是浏览器里的组件打印的 |
 | 在 `page.tsx` 里写 `useState`，不加 `'use client'` | 页面报错，提示在服务端组件里不能使用。加上 `'use client'` 后恢复，再把它删掉（更好的做法是只拆出小的客户端组件） |
 | 提交表单 | 终端输出你填的文字；页面没有整页刷新，Network 里多了一个发到当前页面地址的 POST 请求 |
-| 点首页的 `Link` 去 `/shop/42` | Network 里出现一个带 `_rsc` 参数的请求，返回的是文本格式的 RSC payload，不是整页 HTML。具体的请求形式随 Next.js 版本变化，以所用版本为准 |
+| 点首页的 `Link` 去 `/shop/42` | Network 里出现一个 `/shop/42?_rsc=…` 的 `fetch` 请求，请求头里有 `rsc: 1`，返回的是文本格式的 RSC payload，不是整页 HTML。开发模式只有点击时这一个请求；`npm run build` 后用 `npm run start` 运行，页面一加载就会先出现带 `Next-Router-Prefetch` 头的预取请求。具体的请求形式随 Next.js 版本变化，以所用版本为准 |
 
 做完后，再回头看上面的目录图，你就能说出每个文件在哪里运行。
 

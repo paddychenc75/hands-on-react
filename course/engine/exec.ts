@@ -1,4 +1,6 @@
 /* 代码预处理与编译：从引擎里拆出来，练习的检查函数（course/lessons/*.ts）也要用，而它们不能反过来依赖引擎（会形成循环引用）。 */
+import { libOf } from './logic/runtime.ts';
+
 export const HOOK_NAMES = [
   'useState',
   'useEffect',
@@ -37,14 +39,47 @@ export const HOOK_NAMES = [
 export interface PrepareRuntime {
   React: any;
   ReactDOM: any;
+  /** 已加载的第三方库，键是 import 的路径（'react-router'、'@tanstack/react-query'…）。缺省表示一个库都没加载 */
+  libs?: Record<string, any>;
+}
+
+/** import 语句里的绑定部分（`{ a, b as c }`、`* as X`、`X`、`X, { a }`）转成一行解构声明，库的模块对象从 __libs 里取 */
+function libBindings(what: string, spec: string): string {
+  const out: string[] = [];
+  const braces = what.match(/\{([\s\S]*)\}/);
+  const rest = what
+    .replace(/\{[\s\S]*\}/, '')
+    .replace(/,\s*$/, '')
+    .trim();
+  const ns = rest.match(/^\*\s+as\s+([\w$]+)$/);
+  const def = ns ? null : rest.match(/^([\w$]+)$/);
+  const mod = '__libs[' + JSON.stringify(spec) + ']';
+  if (ns) out.push('const ' + ns[1] + ' = ' + mod + ';');
+  if (def) out.push('const ' + def[1] + ' = ' + mod + ';');
+  if (braces) {
+    const names = braces[1]
+      .split(',')
+      .map(x => x.trim())
+      .filter(x => x && !/^type\s/.test(x))
+      .map(x => x.replace(/\s+as\s+/, ': '));
+    if (names.length) out.push('const { ' + names.join(', ') + ' } = ' + mod + ';');
+  }
+  return out.join('\n');
 }
 
 export function prepare(source: string, exportNames: string[] | undefined, rt: PrepareRuntime): string {
   const dom = rt.ReactDOM;
   const imported = new Set<string>();
   const fromDom = new Set<string>();
+  const libLines: string[] = [];
   const code = source
     .replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm, (_m: string, what: string, from: string) => {
+      const lib = libOf(from);
+      if (lib) {
+        if (!rt.libs || !rt.libs[from]) throw new Error(lib.name + ' 还没有加载。请刷新页面，或点“▶ 运行”重试。');
+        if (!/^type\s/.test(what.trim())) libLines.push(libBindings(what, from));
+        return '';
+      }
       if (from === 'react' || from === 'react-dom' || from === 'react-dom/client') {
         const braces = what.match(/\{([\s\S]*)\}/);
         if (braces)
@@ -77,6 +112,7 @@ export function prepare(source: string, exportNames: string[] | undefined, rt: P
   // react-dom 的具名导入（createPortal、flushSync 等）从 ReactDOM 取
   const domNames = names.filter(n => fromDom.has(n) && !HOOK_NAMES.includes(n.split(':')[0].trim()) && n.split(':')[0].trim() in dom);
   const head =
+    (libLines.length ? libLines.join('\n') + '\n' : '') +
     (reactNames.length ? 'const { ' + reactNames.join(', ') + ' } = React;\n' : '') +
     (domNames.length ? 'const { ' + domNames.join(', ') + ' } = ReactDOM;\n' : '');
   const ex = (exportNames || []).map(n => JSON.stringify(n) + ': typeof ' + n + " !== 'undefined' ? " + n + ' : undefined').join(', ');
