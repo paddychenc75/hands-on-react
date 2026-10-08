@@ -4,7 +4,7 @@ export default {
   id: 'delivery',
   stage: 4,
   title: '交付：构建、部署与升级',
-  mins: 40,
+  mins: 45,
   summary: '看懂构建产物和缓存、把项目部署到静态托管、配好单页应用的路由回退、让密钥只留在服务端，再接上持续集成并从 React 18 升级。',
   goals: [
     '能说出构建产物里各文件的作用，并解释为什么带哈希的文件可以长期缓存、index.html 不行',
