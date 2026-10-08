@@ -205,7 +205,7 @@ function App() {
         if (!m) return null;
         const rest = t.source.slice(m.index + m[0].length);
         // 到下一个已知的顶层声明为止（不依赖缩进：学习者的代码可能没有缩进）
-            const end = rest.search(/^[ \t]*(?:export\s+)?(?:function|const|let|var|class)\s+(?:useLocalStorage|Nickname|Theme|App)\b/m);
+        const end = rest.search(/^[ \t]*(?:export\s+)?(?:function|const|let|var|class)\s+(?:useLocalStorage|Nickname|Theme|App)\b/m);
         return end < 0 ? rest : rest.slice(0, end);
       };
       for (const [name, init] of [
@@ -475,8 +475,8 @@ function App() {
         await t.retry(async () => {
           const box = document.createElement('div');
           const root = ReactDOM.createRoot(box);
-          let out     ;
-          const Probe = ({ v }) => {
+          let out: any;
+          const Probe = ({ v }: any) => {
             out = useDebounce(v, 40);
             return null;
           };
@@ -485,7 +485,10 @@ function App() {
             set('x');
             set('xy');
             for (let i = 0; i < 10 && out !== 'xy'; i++) await t.wait(20);
-            t.timing(out === 'xy', `delay 传 40 时，约 40 毫秒后返回值就该更新成 'xy'，等了 200 毫秒，实际是 ${JSON.stringify(out)}。delay 是不是被写死了？计时用的应是参数 delay`);
+            t.timing(
+              out === 'xy',
+              `delay 传 40 时，约 40 毫秒后返回值就该更新成 'xy'，等了 200 毫秒，实际是 ${JSON.stringify(out)}。delay 是不是被写死了？计时用的应是参数 delay`,
+            );
           } finally {
             root.unmount();
           }
