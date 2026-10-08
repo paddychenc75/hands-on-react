@@ -373,7 +373,7 @@ function App() {
       pkey: 'react-19|Activity：隐藏界面，保留 state',
     },
     'ViewTransition：进入和离开的动画': {
-      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。目前只有这一课有 ViewTransition 的示例。',
+      note: '点“展开”和“收起”：卡片带着淡入淡出的动画出现和消失。更新放在 startTransition 里才会触发动画。动画由浏览器的 View Transition API 执行。完整讲解在《动画与过渡》。',
     },
   },
 } satisfies Lesson;

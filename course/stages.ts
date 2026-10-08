@@ -19,7 +19,7 @@ export const STAGES: Stage[] = [
     no: '04',
     name: '应用架构与全栈 React',
     en: 'Architecture & full-stack',
-    desc: '设计模式、无障碍、状态架构、Actions、Server Components 与安全，亲手实现迷你 React，最后用一个看板综合练习把这一阶段串起来。',
+    desc: '设计模式、无障碍、动画与过渡、状态架构、Actions、Server Components 与安全，亲手实现迷你 React，最后用一个看板综合练习把这一阶段串起来。',
   },
   {
     no: '05',

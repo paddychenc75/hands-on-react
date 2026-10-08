@@ -1,10 +1,10 @@
-// CPU 降速测试：4 倍节流下，计时类练习（scheduler、concurrent、use-effect）的参考答案仍要通过。
+// CPU 降速测试：4 倍节流下，计时类练习（scheduler、concurrent、use-effect、suspense-data、animation）的参考答案仍要通过。
 // 做法同 lessons.mjs：打开课页、把 solution 填进练习点“检查答案”，要求 PASS；区别是检查前用 CDP 把 CPU 降速 4 倍。
 // 用法：node tests/e2e/throttle.mjs [课 id ...]      （先 npm run build）
 import { launch, openSite, lessonUrl, lessonData } from './_site.mjs';
 
 const RATE = 4;
-const IDS = ['scheduler', 'concurrent', 'use-effect', 'suspense-data'];
+const IDS = ['scheduler', 'concurrent', 'use-effect', 'suspense-data', 'animation'];
 const only = process.argv.slice(2);
 const ids = IDS.filter(id => !only.length || only.includes(id));
 const { site, close } = await openSite();

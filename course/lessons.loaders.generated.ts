@@ -4,6 +4,7 @@ import type { Lesson } from './types.ts';
 
 export const LESSON_LOADERS: Record<string, () => Promise<{ default: Lesson }>> = {
   'accessibility': () => import(/* webpackChunkName: "lesson-accessibility" */ './lessons/accessibility.ts'),
+  'animation': () => import(/* webpackChunkName: "lesson-animation" */ './lessons/animation.ts'),
   'closures': () => import(/* webpackChunkName: "lesson-closures" */ './lessons/closures.ts'),
   'components-props': () => import(/* webpackChunkName: "lesson-components-props" */ './lessons/components-props.ts'),
   'concurrent': () => import(/* webpackChunkName: "lesson-concurrent" */ './lessons/concurrent.ts'),

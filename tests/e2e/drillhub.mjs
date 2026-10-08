@@ -112,7 +112,7 @@ const mark = (p, id) => sidebarLink(p, id).getAttribute('data-hoc-dr');
   const p = await open(site + 'drills.html', { seed });
   await p.waitForSelector('.drills-page', { timeout: 30000 });
   await p.waitForTimeout(800);
-  ok((await p.locator('.dp-lesson li').count()) === totalDrills && totalDrills === 34, `总览页列出全部 ${totalDrills} 道变式（目前 16 课共 34 道）`);
+  ok((await p.locator('.dp-lesson li').count()) === totalDrills && totalDrills === 36, `总览页列出全部 ${totalDrills} 道变式（目前 17 课共 36 道）`);
   ok((await p.locator('.dp-lesson').count()) === withDrills.length, `按课分组：${withDrills.length} 门课`);
   const titles = await p.locator('.dp-title').allInnerTexts();
   ok(

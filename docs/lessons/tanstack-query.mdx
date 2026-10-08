@@ -267,7 +267,7 @@ function AddTodo() {
 3. 在 `onError` 中把旧数据写回去，并提示用户。
 4. 在 `onSettled` 中调用 `invalidateQueries`，和服务器对齐。
 
-```jsx title="React 19 的 useOptimistic 是另一种写法（第 29 课）"
+```jsx title="React 19 的 useOptimistic 是另一种写法（第 30 课）"
 useMutation({
   mutationFn: addTodo,
   onMutate: async (title) => {

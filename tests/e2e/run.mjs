@@ -1,8 +1,8 @@
 // 浏览器测试入口：npm run test:e2e [-- <套件> [课id ...]] ...
 //   npm run test:e2e                                 三个套件都跑（逐课、学习机制、冒烟），约 2~3 分钟
-//   npm run test:e2e -- lessons                      只跑逐课测试（49 课）
+//   npm run test:e2e -- lessons                      只跑逐课测试（50 课）
 //   npm run test:e2e -- lessons state use-effect     逐课测试只测这两课（课 id 跟在 lessons 后面）
-//   npm run test:e2e -- throttle                     4 倍 CPU 降速下，scheduler / concurrent / use-effect / suspense-data 的参考答案要通过
+//   npm run test:e2e -- throttle                     4 倍 CPU 降速下，scheduler / concurrent / use-effect / suspense-data / animation 的参考答案要通过
 //   npm run test:e2e -- mechanics smoke              只跑学习机制和冒烟
 // 前提：已经 npm run build（测试读 doc_build）；需要联网（实验台从 jsdelivr 加载 Babel、Prism；React 19 开发版在站内）。
 import { spawnSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'drillhub', 'throttle', 'split'];
+const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'drillhub', 'throttle', 'split', 'animation'];
 
 const args = process.argv.slice(2);
 const runs = [];

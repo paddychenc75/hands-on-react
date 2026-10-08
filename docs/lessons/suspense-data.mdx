@@ -152,7 +152,7 @@ const user = use(getPromise('user:' + userId, () => api.fetchUser(userId)));
 
 <CallBox kind="warn" label="常见坑">
 
-这个缓存只增不减，也从不过期。真实的数据层还要处理：过期后重新请求、修改数据后让相关的 key 失效、长时间不用的记录要回收。这些正是第 37 课 TanStack Query 的 staleTime、gcTime 和 invalidateQueries 做的事。自己写的缓存适合学习和小工具；生产环境用成熟的库。
+这个缓存只增不减，也从不过期。真实的数据层还要处理：过期后重新请求、修改数据后让相关的 key 失效、长时间不用的记录要回收。这些正是第 38 课 TanStack Query 的 staleTime、gcTime 和 invalidateQueries 做的事。自己写的缓存适合学习和小工具；生产环境用成熟的库。
 
 </CallBox>
 
@@ -329,7 +329,7 @@ React 18 没有 `use`，也没有这种“先提交 fallback，再预热兄弟�
 
 <CallBox kind="tip" label="要点">
 
-路由库的 loader（第 36 课）和 Next.js 的服务端组件，本质上都是 render-as-you-fetch：在导航开始时就知道下一页要哪些数据，并立刻请求。
+路由库的 loader（第 37 课）和 Next.js 的服务端组件，本质上都是 render-as-you-fetch：在导航开始时就知道下一页要哪些数据，并立刻请求。
 
 </CallBox>
 
@@ -575,7 +575,7 @@ function App() {
 }
 ```
 
-在服务端组件里，Promise 通常由服务端组件创建，再作为 props 传给客户端组件，由 `use` 读取；第 43 课会讲流式渲染怎样利用这些 Suspense 边界。
+在服务端组件里，Promise 通常由服务端组件创建，再作为 props 传给客户端组件，由 `use` 读取；第 44 课会讲流式渲染怎样利用这些 Suspense 边界。
 
 </details>
 

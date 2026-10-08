@@ -102,7 +102,7 @@ useImperativeHandle 像自动售货机。机器外面只有几个按钮：选商
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>能用 props 表达的，就不要用 ref。</strong>例如弹窗不要暴露 `open()` 和 `close()`，而应该接收 `isOpen` prop。ref 只用于命令式的操作：聚焦、滚动、选中文字、触发动画。
+<strong>能用 props 表达的，就不要用 ref。</strong>例如弹窗不要暴露 `open()` 和 `close()`，而应该接收 `isOpen` prop。ref 只用于命令式的操作：聚焦、滚动、选中文字、触发动画（多数动画不需要 ref，见[动画与过渡](/lessons/animation)）。
 
 </CallBox>
 

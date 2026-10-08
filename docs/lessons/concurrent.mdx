@@ -306,6 +306,8 @@ function App() {
 
 Activity 隐藏的是 DOM，不会替你停掉有副作用的 DOM。隐藏的 `<video>` 会继续播放。要在 effect 的清理函数里暂停它。
 
+`hidden` 会立刻给子树加上 `display: none`，所以 CSS 过渡来不及播放。给显示和隐藏加动画（包括用 `<ViewTransition>`，它同样要放进过渡更新），见[动画与过渡](/lessons/animation)。
+
 另外，只渲染文字的组件没有 DOM 元素可以隐藏，所以 `hidden` 时什么也不渲染。保留 state 也有代价：隐藏的子树仍占着内存，还会重新渲染。只对来回切换的界面使用它。
 
 </CallBox>
