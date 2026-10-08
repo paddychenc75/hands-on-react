@@ -54,7 +54,7 @@ export default {
   id: 'nextjs',
   stage: 4,
   title: 'Next.js App Router',
-  mins: 28,
+  mins: 30,
   runtime: 19,
   summary: '用文件夹定义路由，在服务端取数据，用 Server Function 处理表单。',
   goals: [
@@ -101,6 +101,21 @@ export default {
       answer: 1,
       explain:
         "'use server' 函数会暴露为可被网络请求调用的端点。别人不用打开你的页面，也能直接发请求调用它。“Proxy 已经拦截”最有迷惑性：Server Function 是发到所在页面路由的 POST 请求。Proxy 的 matcher 漏掉这条路径，或者函数后来被别的页面使用，拦截就悄悄失效。而且 Proxy 只看请求，不知道这个用户能不能改这条数据。权限要在函数里检查。（Next.js 16 起 middleware 改名为 proxy。）",
+    },
+    {
+      q: `项目的 app 目录如下。访问 <code>/shop/42</code> 时，页面外面一共套了几层 layout？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">app/
+  layout.tsx
+  shop/
+    layout.tsx
+    [id]/
+      page.tsx
+      reviews/
+        layout.tsx
+        page.tsx</code></pre></div>`,
+      options: ['1 层：只有根布局', '3 层：再加上 reviews 的布局', '没有布局：[id] 文件夹里没有 layout.tsx', '2 层：根布局和 shop 布局'],
+      answer: 3,
+      explain:
+        '/shop/42 对应 app/shop/[id]/page.tsx。layout 按“页面所在文件夹和它的每一层上级文件夹”收集：app 和 shop 里各有一个，[id] 里没有。reviews/layout.tsx 只属于 /shop/42/reviews 这类页面，访问 /shop/42 时不会用到它。没有 layout 的文件夹不会让外层布局失效。',
     },
   ],
   exercise: {
