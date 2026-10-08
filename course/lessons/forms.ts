@@ -97,6 +97,170 @@ function App() {
       t.assert(pv() === '你好，陌生人', '清空后应恢复“你好，陌生人”');
     },
   },
+  drills: [
+    {
+      title: '复选框和下拉框：读对属性',
+      task: '<ol class="task-steps"><li>复选框 <b>接收邮件</b> 要能勾上，也能取消。</li><li>下拉框要能选择“每天”“每周”“每月”。没勾选时，下拉框是禁用的。</li><li><code>&lt;p id="summary"&gt;</code> 显示：没勾选时是 <b>未订阅</b>；勾选后是 <b>已订阅，每周</b>（频率跟着下拉框变）。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [subscribed, setSubscribed] = useState(false);
+  const [freq, setFreq] = useState('weekly');
+
+  return (
+    <div>
+      <label>
+        <input id="sub" type="checkbox" checked={subscribed} onChange={e => setSubscribed(e.target.value)} />
+        接收邮件
+      </label>
+      <select id="freq" value={freq}>
+        <option value="daily">每天</option>
+        <option value="weekly">每周</option>
+        <option value="monthly">每月</option>
+      </select>
+      <p id="summary">{subscribed ? '已订阅，' + freq : '未订阅'}</p>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+const LABELS = { daily: '每天', weekly: '每周', monthly: '每月' };
+
+function App() {
+  const [subscribed, setSubscribed] = useState(false);
+  const [freq, setFreq] = useState('weekly');
+
+  return (
+    <div>
+      <label>
+        <input id="sub" type="checkbox" checked={subscribed} onChange={e => setSubscribed(e.target.checked)} />
+        接收邮件
+      </label>
+      <select id="freq" value={freq} disabled={!subscribed} onChange={e => setFreq(e.target.value)}>
+        <option value="daily">每天</option>
+        <option value="weekly">每周</option>
+        <option value="monthly">每月</option>
+      </select>
+      <p id="summary">{subscribed ? '已订阅，' + LABELS[freq] : '未订阅'}</p>
+    </div>
+  );
+}`,
+      hint: '复选框的勾选状态在 <code>e.target.checked</code> 里，它的 <code>value</code> 是固定字符串。下拉框和文本框一样，要同时写 <code>value</code> 和 <code>onChange</code>。摘要里的“每周”是显示文字，state 里存的是 option 的 value，需要对应起来。',
+      test: async t => {
+        const box = t.q('#sub'),
+          sel = t.q('#freq');
+        t.assert(box && box.type === 'checkbox', '找不到 id="sub" 的复选框');
+        t.assert(sel && sel.tagName === 'SELECT', '找不到 id="freq" 的下拉框');
+        const sum = () => t.text('#summary').replace(/\s/g, '');
+        const pick = async label => {
+          sel.value = (Array.from(sel.options) as any[]).find(o => o.text === label).value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          await t.wait(40);
+        };
+        t.assert(!box.checked && sum() === '未订阅', `初始应是未勾选，摘要为“未订阅”，实际是“${sum()}”`);
+        await t.click(box);
+        t.assert(box.checked, '点击复选框后应是勾选状态');
+        await t.click(box);
+        t.assert(!box.checked, '再点一次复选框，应该取消勾选，实际还是勾着。复选框的勾选状态不在 value 里，想想应该读事件对象上的哪个属性');
+        t.assert(sum() === '未订阅', `取消勾选后摘要应是“未订阅”，实际是“${sum()}”`);
+        t.assert(sel.disabled, '没勾选时，下拉框应是禁用的（disabled）');
+        await t.click(box);
+        t.assert(!sel.disabled, '勾选后，下拉框应可以使用');
+        t.assert(sum() === '已订阅，每周', `勾选后摘要应是“已订阅，每周”，实际是“${sum()}”。state 里存的是 option 的 value，显示要用对应的文字`);
+        await pick('每天');
+        t.assert(
+          sel.options[sel.selectedIndex].text === '每天',
+          '选了“每天”之后，下拉框又弹回了别的选项。受控的下拉框要同时写 value 和 onChange，选择变化时更新 state',
+        );
+        t.assert(sum() === '已订阅，每天', `选“每天”后摘要应是“已订阅，每天”，实际是“${sum()}”`);
+        await t.click(box);
+        t.assert(sum() === '未订阅' && sel.disabled, `取消勾选后摘要应是“未订阅”且下拉框禁用，实际摘要是“${sum()}”`);
+        await t.click(box);
+        t.assert(sum() === '已订阅，每天', `再次勾选后应保留刚才选的频率，摘要应是“已订阅，每天”，实际是“${sum()}”`);
+      },
+    },
+    {
+      title: '非受控表单：提交时才读值',
+      task: '<ol class="task-steps"><li>点 <b>提交</b> 之后，<code>&lt;p id="result"&gt;</code> 显示 <b>姓名：小美；城市：上海；通知：是</b> 这样的文字。没勾选“订阅通知”时，最后是 <b>通知：否</b>。</li><li>提交之前，<code>#result</code> 保持空白，输入和勾选过程中也不变。</li><li>不要用 state 一个字段一个字段地跟踪输入，在提交时一次读出所有字段。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [result, setResult] = useState('');
+
+  return (
+    <form>
+      <input name="name" placeholder="姓名" />
+      <select name="city">
+        <option>北京</option>
+        <option>上海</option>
+      </select>
+      <label>
+        <input type="checkbox" name="news" /> 订阅通知
+      </label>
+      <button>提交</button>
+      <p id="result">{result}</p>
+    </form>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [result, setResult] = useState('');
+
+  function save(formData) {
+    const news = formData.get('news') ? '是' : '否';
+    setResult('姓名：' + formData.get('name') + '；城市：' + formData.get('city') + '；通知：' + news);
+  }
+
+  return (
+    <form action={save}>
+      <input name="name" placeholder="姓名" />
+      <select name="city">
+        <option>北京</option>
+        <option>上海</option>
+      </select>
+      <label>
+        <input type="checkbox" name="news" /> 订阅通知
+      </label>
+      <button>提交</button>
+      <p id="result">{result}</p>
+    </form>
+  );
+}`,
+      hint: '<code>&lt;form action={函数}&gt;</code> 提交时，React 调用这个函数，参数是 <code>FormData</code>，用 <code>formData.get("字段名")</code> 取值。复选框没勾选时，FormData 里根本没有这个字段，取到的是什么？勾选时又是什么？',
+      test: async t => {
+        const res = () => t.text('#result').replace(/\s/g, '');
+        const name = t.q('input[name="name"]'),
+          city = t.q('select[name="city"]'),
+          news = t.q('input[name="news"]');
+        t.assert(name && city && news, '请保留起始代码里带 name 属性的姓名、城市、通知三个字段');
+        t.assert(res() === '', '提交之前，#result 应是空的');
+        await t.type(name, '小美');
+        city.value = '上海';
+        city.dispatchEvent(new Event('change', { bubbles: true }));
+        await t.click(news);
+        await t.wait(40);
+        t.assert(res() === '', '输入和勾选的过程中，#result 不应变化。只在点击“提交”之后才显示结果');
+        const submit = t.byText('button', '提交');
+        t.assert(submit, '找不到“提交”按钮');
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(t.unpreventedSubmits() === 0, '提交表单时页面会刷新。用 onSubmit 的话，处理函数里要调用 e.preventDefault()；用 action 属性则由 React 代劳');
+        t.assert(
+          res() === '姓名：小美；城市：上海；通知：是',
+          `勾选后提交，应显示“姓名：小美；城市：上海；通知：是”，实际是“${res() || '（空）'}”。如果通知显示不对：复选框没勾选时，FormData 里没有这个字段；勾选时有，但值不是布尔值`,
+        );
+        // 用 action 提交后 React 会重置表单，所以每次都按需要把各字段设到目标值，不假设上次的状态
+        await t.type(name, '小强');
+        city.value = '北京';
+        city.dispatchEvent(new Event('change', { bubbles: true }));
+        if (news.checked) await t.click(news);
+        await t.click(submit);
+        await t.wait(150);
+        t.assert(res() === '姓名：小强；城市：北京；通知：否', `取消勾选后再提交，应显示“姓名：小强；城市：北京；通知：否”，实际是“${res() || '（空）'}”`);
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `在输入框里打第一个字时，会发生什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [name, setName] = useState();

@@ -350,8 +350,12 @@ function createScheduler() {
         );
       };
 
+      // 计时阈值相对基线（t.limit 只加额外开销，不按倍数放大：任务按墙钟忙等，放大会让一直占用主线程的写法混过去）。
+      // 带计时断言的段落自己创建 scheduler 和数据，才能被 t.retry 安全地整段重测一次
+      const bl = await t.baseline();
+
       // 1. 不打断时：立刻返回、分片执行、一次提交
-      {
+      await t.retry(async () => {
         const s = create();
         const data = { version: 1 },
           rec = newRec();
@@ -361,12 +365,12 @@ function createScheduler() {
         try {
           s.scheduleTransition(makeJob(100, data, rec));
           const dt = performance.now() - t0;
-          t.assert(
-            dt < 10 && rec.commits.length === 0,
+          const syncMsg =
             'scheduleTransition 在调用时就同步做完了全部工作，主线程被占用 ' +
-              Math.round(dt) +
-              'ms。它应该只登记任务，用 MessageChannel 预约到之后的宏任务里一片一片地做（步骤 1）',
-          );
+            Math.round(dt) +
+            'ms。它应该只登记任务，用 MessageChannel 预约到之后的宏任务里一片一片地做（步骤 1）';
+          t.assert(rec.commits.length === 0, syncMsg);
+          t.timing(dt < bl.limit(10), syncMsg);
           await waitFor(() => rec.commits.length > 0, 3000);
         } finally {
           clearInterval(hb);
@@ -378,23 +382,23 @@ function createScheduler() {
         const pts = [t0, ...beats.filter(x => x > t0 && x < rec.commitAt), rec.commitAt];
         let gap = 0;
         for (let k = 1; k < pts.length; k++) gap = Math.max(gap, pts[k] - pts[k - 1]);
-        t.assert(
-          gap < 40,
+        t.timing(
+          gap < bl.limit(40),
           '过渡任务执行期间，主线程最长连续被占用约 ' +
             Math.round(gap) +
             'ms，浏览器插不进来。每片约 5ms 后要让出。注意 Promise.then 和 queueMicrotask 是微任务，不算让出（步骤 2）',
         );
         const total = rec.commitAt - t0;
-        t.assert(
-          total < 260,
+        t.timing(
+          total < bl.limit(260),
           '100 个 1ms 的单元用了 ' +
             Math.round(total) +
             'ms 才完成。让出太频繁，或者每次让出都要等 4ms 以上（例如每个单元都 setTimeout 一次）。每片做满约 5ms 再让出，并用 MessageChannel 预约（步骤 1、2）',
         );
-      }
+      });
 
       // 2. 紧急任务打断过渡任务
-      {
+      await t.retry(async () => {
         const s = create();
         const data = { version: 1 },
           rec = newRec();
@@ -413,8 +417,8 @@ function createScheduler() {
         timers.forEach(clearTimeout);
         t.assert(lat.length === 2, '3 秒内紧急任务没有全部执行。它们可能在排队等过渡任务做完，或者根本没有被执行。每一片开始时，先清空紧急队列（步骤 3）');
         const worst = Math.max(...lat);
-        t.assert(
-          worst < 30,
+        t.timing(
+          worst < bl.limit(30),
           '紧急任务等了约 ' + Math.round(worst) + 'ms 才执行，要求 30ms 以内。过渡任务要分片让出主线程，并且每片开始时先处理紧急队列（步骤 2、3）',
         );
         t.assert(rec.commits.length > 0, '有紧急任务插队后，过渡任务 3 秒内没有提交');
@@ -432,10 +436,10 @@ function createScheduler() {
             '。紧急任务改了数据后，做了一半的结果已经过期，要丢弃并从第 0 个单元重新开始（步骤 3）',
         );
         t.assert(rec.starts >= 2, '紧急任务插队后，过渡任务没有从第 0 个单元重新开始（步骤 3）');
-      }
+      });
 
       // 3. 没有过渡任务时，紧急任务也要尽快执行，并按顺序执行
-      {
+      await t.retry(async () => {
         const s = create();
         const order = [];
         const t0 = performance.now();
@@ -444,8 +448,8 @@ function createScheduler() {
         await waitFor(() => order.length === 2, 500);
         t.assert(order.length === 2, '没有过渡任务时，紧急任务也要执行（步骤 3）');
         t.assert(order[0][0] === 'a' && order[1][0] === 'b', '两个紧急任务要按登记的顺序执行');
-        t.assert(order[1][1] < 30, '没有过渡任务时，紧急任务等了 ' + Math.round(order[1][1]) + 'ms，要求 30ms 以内（步骤 3）');
-      }
+        t.timing(order[1][1] < bl.limit(30), '没有过渡任务时，紧急任务等了 ' + Math.round(order[1][1]) + 'ms，要求 30ms 以内（步骤 3）');
+      });
 
       // 4. 新的过渡任务替换旧的
       {

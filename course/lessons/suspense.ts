@@ -133,6 +133,223 @@ function App() {
       t.assert(t.q('#safe'), '没有出错的子树应正常显示 children，而不是备用界面');
     },
   },
+  drills: [
+    {
+      title: '把 fallback 放到合适的层级',
+      task: '<ol class="task-steps"><li>文章和侧栏都用 <code>use()</code> 读模拟的 Promise。点“文章到了”“侧栏到了”可以让对应的 Promise 完成。</li><li>现在页面加载期间只有一个整页的 fallback，页头也被它盖住了。让加载期间页头 <code>#header</code> 一直显示。</li><li>文章加载期间，文章的位置显示 <code>&lt;p id="post-loading"&gt;</code>。侧栏加载期间，侧栏的位置显示 <code>&lt;p id="side-loading"&gt;</code>。</li><li>谁先到谁先出现，互不等待。</li></ol>',
+      starter: `import { Suspense, use } from 'react';
+
+// —— 模拟两个请求（不用修改）：点按钮才会完成 ——
+function deferred() {
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  return { promise, resolve };
+}
+const gates = { post: deferred(), side: deferred() };
+
+function Header() {
+  return <h1 id="header">我的博客</h1>;
+}
+function Post() {
+  return <article id="post">{use(gates.post.promise)}</article>;
+}
+function Side() {
+  return <aside id="side">{use(gates.side.promise)}</aside>;
+}
+
+function App() {
+  return (
+    <div>
+      <Suspense fallback={<p id="page-loading">页面加载中…</p>}>
+        <Header />
+        <Post />
+        <Side />
+      </Suspense>
+      <button id="arrive-post" onClick={() => gates.post.resolve('文章正文')}>文章到了</button>
+      <button id="arrive-side" onClick={() => gates.side.resolve('相关推荐')}>侧栏到了</button>
+    </div>
+  );
+}`,
+      solution: `import { Suspense, use } from 'react';
+
+// —— 模拟两个请求（不用修改）：点按钮才会完成 ——
+function deferred() {
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  return { promise, resolve };
+}
+const gates = { post: deferred(), side: deferred() };
+
+function Header() {
+  return <h1 id="header">我的博客</h1>;
+}
+function Post() {
+  return <article id="post">{use(gates.post.promise)}</article>;
+}
+function Side() {
+  return <aside id="side">{use(gates.side.promise)}</aside>;
+}
+
+function App() {
+  return (
+    <div>
+      <Header />
+      <Suspense fallback={<p id="post-loading">文章加载中…</p>}>
+        <Post />
+      </Suspense>
+      <Suspense fallback={<p id="side-loading">侧栏加载中…</p>}>
+        <Side />
+      </Suspense>
+      <button id="arrive-post" onClick={() => gates.post.resolve('文章正文')}>文章到了</button>
+      <button id="arrive-side" onClick={() => gates.side.resolve('相关推荐')}>侧栏到了</button>
+    </div>
+  );
+}`,
+      hint: '一个组件挂起时，最近的 Suspense 把<strong>它包住的全部内容</strong>换成 fallback，包括没有挂起的 <code>Header</code>。想让谁不受影响，就别把它放进这个边界。想让两块内容分别出现，就各包一个边界，各配自己的 fallback。',
+      test: async t => {
+        const until = async (cond, ms = 3000) => {
+          for (let i = 0; i * 50 < ms && !cond(); i++) await t.wait(50);
+          return !!cond();
+        };
+        t.assert(t.q('#arrive-post') && t.q('#arrive-side'), '请保留两个“到了”按钮，不要改模拟请求');
+        await t.wait(100);
+        t.assert(t.q('#header'), '加载期间页头 #header 不见了。边界里只要有一个组件挂起，整个边界的内容都会换成 fallback，包括没有挂起的页头。边界要包得更小');
+        t.assert(t.q('#post-loading'), '文章加载期间，文章的位置应显示 <p id="post-loading">');
+        t.assert(t.q('#side-loading'), '侧栏加载期间，侧栏的位置应显示 <p id="side-loading">');
+        t.assert(!t.q('#post') && !t.q('#side'), '请求还没完成，不应显示文章和侧栏的内容');
+        await t.click('#arrive-side');
+        t.assert(
+          await until(() => t.q('#side')),
+          '侧栏的数据已经到了，却一直没显示。它是不是和还没到的文章共用了一个 Suspense 边界？同一个边界里的内容要一起就绪才一起显示',
+        );
+        t.assert(t.text('#side') === '相关推荐', '侧栏应显示它读到的内容“相关推荐”');
+        t.assert(t.q('#post-loading') && !t.q('#post'), '文章还没到，它的位置应继续显示 #post-loading');
+        t.assert(t.q('#header'), '侧栏出现后，页头应一直在');
+        await t.click('#arrive-post');
+        t.assert(await until(() => t.q('#post')), '文章的数据已经到了，却一直没显示');
+        t.assert(t.text('#post') === '文章正文', '文章应显示它读到的内容“文章正文”');
+        t.assert(await until(() => !t.q('#post-loading') && !t.q('#side-loading')), '内容都到了，加载提示应消失');
+        t.assert(t.q('#side') && t.q('#header'), '内容都到了，页头和侧栏应都在');
+      },
+    },
+    {
+      title: '错误边界和 Suspense 配合',
+      task: '<ol class="task-steps"><li>天气和新闻各用 <code>use()</code> 读一个模拟的 Promise，各有自己的 Suspense。点“天气失败”会让天气的 Promise 被拒绝，点“新闻到了”会让新闻的 Promise 完成。</li><li>天气失败时，天气的位置显示 <code>&lt;p id="weather-error"&gt;天气加载失败&lt;/p&gt;</code>。</li><li>天气失败不能影响标题和新闻：新闻仍显示自己的加载提示，到了之后正常显示。</li><li><code>ErrorBoundary</code> 已经写好，接受一个 <code>fallback</code> 属性。你要决定把它放在哪里。</li></ol>',
+      starter: `import { Component, Suspense, use } from 'react';
+
+class ErrorBoundary extends Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+// —— 模拟两个请求（不用修改）：点按钮才会完成或失败 ——
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+const gates = { weather: deferred(), news: deferred() };
+
+function Weather() {
+  return <p id="weather">{use(gates.weather.promise)}</p>;
+}
+function News() {
+  return <p id="news">{use(gates.news.promise)}</p>;
+}
+
+function App() {
+  return (
+    <div>
+      <h1 id="title">今日简报</h1>
+      <Suspense fallback={<p id="weather-loading">天气加载中…</p>}>
+        <Weather />
+      </Suspense>
+      <Suspense fallback={<p id="news-loading">新闻加载中…</p>}>
+        <News />
+      </Suspense>
+      <button id="weather-fail" onClick={() => gates.weather.reject(new Error('天气请求失败'))}>天气失败</button>
+      <button id="news-ok" onClick={() => gates.news.resolve('今日新闻')}>新闻到了</button>
+    </div>
+  );
+}`,
+      solution: `import { Component, Suspense, use } from 'react';
+
+class ErrorBoundary extends Component {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+// —— 模拟两个请求（不用修改）：点按钮才会完成或失败 ——
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+const gates = { weather: deferred(), news: deferred() };
+
+function Weather() {
+  return <p id="weather">{use(gates.weather.promise)}</p>;
+}
+function News() {
+  return <p id="news">{use(gates.news.promise)}</p>;
+}
+
+function App() {
+  return (
+    <div>
+      <h1 id="title">今日简报</h1>
+      <ErrorBoundary fallback={<p id="weather-error">天气加载失败</p>}>
+        <Suspense fallback={<p id="weather-loading">天气加载中…</p>}>
+          <Weather />
+        </Suspense>
+      </ErrorBoundary>
+      <Suspense fallback={<p id="news-loading">新闻加载中…</p>}>
+        <News />
+      </Suspense>
+      <button id="weather-fail" onClick={() => gates.weather.reject(new Error('天气请求失败'))}>天气失败</button>
+      <button id="news-ok" onClick={() => gates.news.resolve('今日新闻')}>新闻到了</button>
+    </div>
+  );
+}`,
+      hint: '被拒绝的 Promise 被 <code>use()</code> 读到时，会像渲染错误一样向上找最近的错误边界。如果一路上没有边界，整个应用都会被卸载。边界包得越大，出错时替换的内容就越多。想想：天气失败时，哪些内容应该被替换？',
+      test: async t => {
+        const until = async (cond, ms = 3000) => {
+          for (let i = 0; i * 50 < ms && !cond(); i++) await t.wait(50);
+          return !!cond();
+        };
+        t.assert(t.q('#weather-fail') && t.q('#news-ok'), '请保留两个按钮，不要改模拟请求');
+        await t.wait(100);
+        t.assert(t.q('#title'), '页面标题 #title 应一直显示');
+        t.assert(t.q('#weather-loading'), '天气加载期间应显示 #weather-loading');
+        t.assert(t.q('#news-loading'), '新闻加载期间应显示 #news-loading');
+        await t.click('#weather-fail');
+        t.assert(
+          await until(() => t.q('#weather-error')),
+          '天气请求失败后，没有出现 #weather-error。被拒绝的 Promise 在渲染时抛出错误。没有错误边界接住，错误会一路冒泡到根，整个应用都被卸载',
+        );
+        t.assert(t.text('#weather-error') === '天气加载失败', '天气的错误提示应是“天气加载失败”');
+        t.assert(t.q('#title'), '天气失败后，标题不见了。错误边界包得太大了');
+        t.assert(
+          t.q('#news-loading'),
+          '天气失败连累了新闻：新闻还没到，它的加载提示却不见了。是不是两个模块共用了一个错误边界？出错时，边界里的内容会整体换成备用界面',
+        );
+        await t.click('#news-ok');
+        t.assert(await until(() => t.q('#news')), '新闻的数据已经到了，却一直没显示');
+        t.assert(t.text('#news') === '今日新闻', '新闻应显示它读到的内容“今日新闻”');
+        t.assert(t.q('#weather-error') && !t.q('#weather-loading'), '新闻到了以后，天气的错误提示应仍在');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `Chart 是 lazy 组件。网络断开，加载它的 import 失败了。页面依次显示什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;ErrorBoundary fallback={&lt;p&gt;出错了&lt;/p&gt;}&gt;

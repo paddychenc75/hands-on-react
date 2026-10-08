@@ -98,6 +98,23 @@ for (const scheme of ['light', 'dark']) {
     await p.waitForTimeout(500);
   });
 }
+// 变式练习区（浅色、深色、390px 手机）:state 课
+const drillShot = async p => {
+  await p.goto(site + 'lessons/state.html');
+  await p.waitForSelector('.selfx');
+  await p.waitForFunction(() => document.querySelectorAll('.drill .pg').length >= 2, null, { timeout: 60000 });
+  await p.locator('#sec-drills').scrollIntoViewIfNeeded();
+  await p.waitForTimeout(2500);
+  await p.evaluate(() => window.scrollBy(0, -20));
+  await p.waitForTimeout(300);
+};
+for (const scheme of ['light', 'dark']) await run('drills', 1280, 1000, scheme, drillShot);
+await run('drills-mobile', 390, 844, 'light', drillShot);
+await run('home-time', 1280, 700, 'light', async p => {
+  await p.goto(site);
+  await p.waitForSelector('.home .stats');
+  await p.waitForTimeout(800);
+});
 await run('lesson-mobile', 390, 844, 'light', async p => {
   await p.goto(site + 'lessons/state.html');
   await p.waitForSelector('.selfx');
@@ -113,6 +130,13 @@ for (const [id, title, pick] of [
     async pg => {
       await pg.locator('.preview a', { hasText: '用户 2' }).click();
       await pg.page().waitForTimeout(350);
+    },
+  ],
+  [
+    'state-architecture',
+    '真库',
+    async pg => {
+      await pg.page().waitForTimeout(300);
     },
   ],
   [

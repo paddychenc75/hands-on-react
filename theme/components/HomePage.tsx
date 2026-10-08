@@ -13,8 +13,16 @@ export default function HomePage() {
   const done = mounted ? doneCount() : 0;
   const due = mounted ? dueCount() : 0;
   const next = (mounted && LESSONS.find((l: any) => !isDone(l.id))) || LESSONS[0];
-  // 毕业设计在课外完成，不计入课内时长（和下面的标签一致）
-  const totalMins = LESSONS.filter((l: any) => l.id !== 'portfolio').reduce((s: number, l: any) => s + l.mins, 0);
+  // 时间分三段：站内学习（各课 mins，不含毕业设计）、本机任务与本机项目（各课 localMins，缺省按 0）、毕业设计（portfolio 的站内时间加本机时间）
+  const sum = (ls: any[], f: (l: any) => number) => ls.reduce((s, l) => s + f(l), 0);
+  const body = LESSONS.filter((l: any) => l.id !== 'portfolio');
+  const inSiteMins = sum(body, l => l.mins);
+  const localMins = sum(body, l => l.localMins || 0);
+  const gradMins = sum(
+    LESSONS.filter((l: any) => l.id === 'portfolio'),
+    l => l.mins + (l.localMins || 0),
+  );
+  const hours = (mins: number) => Math.round((mins / 60) * 10) / 10;
   const exCount = LESSONS.filter((l: any) => l.exercise).length;
   const playCount = LESSONS.reduce((s: number, l: any) => s + Object.keys(l.plays || {}).length, 0);
   const learned = mounted ? Object.keys(progress.__srs || {}).length : 0;
@@ -69,8 +77,16 @@ export default function HomePage() {
           <span>道自动批改练习</span>
         </div>
         <div>
-          <b>{Math.round((totalMins / 60) * 10) / 10}</b>
-          <span>小时（含练习，不含毕业设计）</span>
+          <b>{hours(inSiteMins)}</b>
+          <span>小时站内学习（含练习）</span>
+        </div>
+        <div>
+          <b>{hours(localMins)}</b>
+          <span>小时本机任务与本机项目</span>
+        </div>
+        <div>
+          <b>{hours(gradMins)}</b>
+          <span>小时毕业设计</span>
         </div>
         <div>
           <b>

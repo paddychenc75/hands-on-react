@@ -124,6 +124,150 @@ function App() {
       t.assert(p() === '无', '点击外层空白处应清空为“无”。请保留外层 div 的 onClick');
     },
   },
+  drills: [
+    {
+      title: '链接当按钮用：阻止默认行为',
+      task: '<ol class="task-steps"><li>点链接 <b>展开</b>，下面出现一段内容，链接文字变成 <b>收起</b>。再点一次，内容消失，文字变回 <b>展开</b>。</li><li>链接的 <code>href</code> 是 <code>"#"</code>。点击时浏览器默认会跳转，页面会回到顶部。请让点击只切换内容，不发生跳转。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [open, setOpen] = useState(false);
+
+  function toggle() {
+    setOpen(o => !o);
+  }
+
+  return (
+    <div>
+      <a id="toggle" href="#" onClick={toggle}>
+        {open ? '收起' : '展开'}
+      </a>
+      {open && <p id="more">这是更多内容。</p>}
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [open, setOpen] = useState(false);
+
+  function toggle(e) {
+    e.preventDefault();
+    setOpen(o => !o);
+  }
+
+  return (
+    <div>
+      <a id="toggle" href="#" onClick={toggle}>
+        {open ? '收起' : '展开'}
+      </a>
+      {open && <p id="more">这是更多内容。</p>}
+    </div>
+  );
+}`,
+      hint: '事件对象 <code>e</code> 是 React 传给处理函数的第一个参数。浏览器对链接点击的默认处理（跳转），要在处理函数里调用 <code>e</code> 上的一个方法来阻止。注意它和阻止冒泡是两回事。',
+      test: async t => {
+        const link = t.q('#toggle');
+        t.assert(link, '找不到 id="toggle" 的链接');
+        t.assert(link.tagName === 'A', '请保留 <a> 链接，不要换成按钮');
+        t.assert(t.text('#toggle') === '展开' && !t.q('#more'), '初始应显示“展开”，且看不到内容');
+        // 检查程序在 document 上（晚于 React 的处理函数）记录这次点击的默认行为是否已被阻止，再替学习者拦住跳转
+        let prevented = null;
+        const spy = e => {
+          if (link.contains(e.target)) {
+            prevented = e.defaultPrevented;
+            if (!e.defaultPrevented) e.preventDefault();
+          }
+        };
+        document.addEventListener('click', spy);
+        try {
+          await t.click(link);
+          t.assert(t.text('#toggle') === '收起' && t.q('#more'), '点击后应显示内容，链接文字变成“收起”');
+          t.assert(prevented === true, '点击链接时，浏览器的默认行为（跳转到 href）没有被阻止。阻止默认行为和阻止冒泡是两件事，各有各的方法');
+          await t.click(link);
+          t.assert(t.text('#toggle') === '展开' && !t.q('#more'), '再点一次应收起内容，文字变回“展开”');
+          t.assert(prevented === true, '第二次点击时，浏览器的默认行为也要被阻止');
+        } finally {
+          document.removeEventListener('click', spy);
+        }
+      },
+    },
+    {
+      title: '列表里的按钮：给处理函数传参',
+      task: '<ol class="task-steps"><li>每一行有一个 <b>删除</b> 按钮。点哪一行的按钮，就只删掉那一行。</li><li>现在点了没有任何反应。<code>remove</code> 需要一个 id，请让按钮把本行的 id 交给它。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [fruits, setFruits] = useState([
+    { id: 1, name: '苹果' },
+    { id: 2, name: '香蕉' },
+    { id: 3, name: '橙子' },
+  ]);
+
+  function remove(id) {
+    setFruits(fruits.filter(f => f.id !== id));
+  }
+
+  return (
+    <ul id="list">
+      {fruits.map(f => (
+        <li key={f.id}>
+          <span>{f.name}</span>
+          <button onClick={remove}>删除</button>
+        </li>
+      ))}
+    </ul>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [fruits, setFruits] = useState([
+    { id: 1, name: '苹果' },
+    { id: 2, name: '香蕉' },
+    { id: 3, name: '橙子' },
+  ]);
+
+  function remove(id) {
+    setFruits(fruits.filter(f => f.id !== id));
+  }
+
+  return (
+    <ul id="list">
+      {fruits.map(f => (
+        <li key={f.id}>
+          <span>{f.name}</span>
+          <button onClick={() => remove(f.id)}>删除</button>
+        </li>
+      ))}
+    </ul>
+  );
+}`,
+      hint: 'React 调用处理函数时，传进去的第一个参数是什么？要让 <code>remove</code> 收到 id，得在 <code>onClick</code> 里再包一层函数。别写成 <code>remove(f.id)</code>：那是在渲染时就调用了。',
+      test: async t => {
+        const names = () => t.qa('#list li span').map(x => x.textContent.trim());
+        const del = name => {
+          const li = t.qa('#list li').find(x => x.querySelector('span') && x.querySelector('span').textContent.trim() === name);
+          return li && li.querySelector('button');
+        };
+        t.assert(t.q('#list'), '找不到 id="list" 的元素');
+        t.assert(
+          names().join('、') === '苹果、香蕉、橙子',
+          `初始应有 苹果、香蕉、橙子 三行，实际是：${names().join('、') || '（空）'}。如果行被删掉了：检查 onClick 的值，带括号的调用在渲染时就执行了，而不是等到点击`,
+        );
+        t.assert(del('香蕉'), '每一行要有文字为“删除”的按钮');
+        await t.click(del('香蕉'));
+        t.assert(
+          names().join('、') === '苹果、橙子',
+          `点“香蕉”那一行的删除后，应剩 苹果、橙子，实际是：${names().join('、') || '（空）'}。按钮的处理函数要把本行的 id 交给 remove，而不是别的东西`,
+        );
+        await t.click(del('苹果'));
+        t.assert(names().join('、') === '橙子', `再点“苹果”那一行的删除后，应只剩 橙子，实际是：${names().join('、') || '（空）'}`);
+        await t.click(del('橙子'));
+        t.assert(names().length === 0, `点最后一行的删除后列表应为空，实际还有：${names().join('、')}`);
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `运行这个组件，会发生什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function App() {

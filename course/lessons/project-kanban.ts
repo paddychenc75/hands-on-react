@@ -264,6 +264,439 @@ function boardReducer(state, action) {
       t.assert(!card('写测试'), '删除后卡片应消失');
     },
   },
+  drills: [
+    {
+      title: '补全界面的事件接线',
+      task: '<ol class="task-steps"><li>reducer 已经写好，它认的 action 见课文的表格。界面里的 <code>dispatch</code> 也已经拿到了，但三处事件都没有接线。</li><li>提交表单时，派发 <code>add</code>，带上输入框里的标题，然后清空输入框。</li><li>点 ← 或 →，派发 <code>move</code>：带上<strong>这张卡片</strong>的 id，和方向（← 是 -1，→ 是 1）。</li><li>点“删除”，派发 <code>remove</code>，带上这张卡片的 id。</li></ol>',
+      starter: `import { useReducer, useState, createContext, useContext } from 'react';
+
+const COLUMN_NAMES = { todo: '待办', doing: '进行中', done: '已完成' };
+const initialState = {
+  columns: ['todo', 'doing', 'done'],
+  cards: [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+  ],
+  nextId: 3,
+};
+
+// ===== reducer 已经写好，不用修改 =====
+function boardReducer(state, action) {
+  switch (action.type) {
+    case 'add': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return {
+        ...state,
+        cards: [...state.cards, { id: state.nextId, title, col: state.columns[0] }],
+        nextId: state.nextId + 1,
+      };
+    }
+    case 'move':
+      return {
+        ...state,
+        cards: state.cards.map(c => {
+          if (c.id !== action.id) return c;
+          const i = state.columns.indexOf(c.col) + action.dir;
+          return i >= 0 && i < state.columns.length ? { ...c, col: state.columns[i] } : c;
+        }),
+      };
+    case 'remove':
+      return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    default:
+      return state;
+  }
+}
+
+// ===== 你的任务：补全界面里的事件接线 =====
+const DispatchCtx = createContext(null);
+
+function Card({ card, isFirst, isLast }) {
+  const dispatch = useContext(DispatchCtx);
+  return (
+    <div className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+      <div>{card.title}</div>
+      <button disabled={isFirst} aria-label="移到左边一列">←</button>
+      <button disabled={isLast} aria-label="移到右边一列">→</button>
+      <button>删除</button>
+    </div>
+  );
+}
+
+function Column({ col, index, cards, total }) {
+  return (
+    <div className="column" data-col={col} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8, minWidth: 0 }}>
+      <h4 style={{ margin: 0 }}>{COLUMN_NAMES[col]}（{cards.length}）</h4>
+      {cards.map(c => <Card key={c.id} card={c} isFirst={index === 0} isLast={index === total - 1} />)}
+    </div>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(boardReducer, initialState);
+  const [title, setTitle] = useState('');
+  return (
+    <DispatchCtx value={dispatch}>
+      <form onSubmit={e => { e.preventDefault(); setTitle(''); }}>
+        <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
+        <button>添加卡片</button>
+      </form>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {state.columns.map((col, i) => (
+          <Column key={col} col={col} index={i} total={state.columns.length}
+            cards={state.cards.filter(c => c.col === col)} />
+        ))}
+      </div>
+    </DispatchCtx>
+  );
+}`,
+      solution: `import { useReducer, useState, createContext, useContext } from 'react';
+
+const COLUMN_NAMES = { todo: '待办', doing: '进行中', done: '已完成' };
+const initialState = {
+  columns: ['todo', 'doing', 'done'],
+  cards: [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+  ],
+  nextId: 3,
+};
+
+// ===== reducer 已经写好，不用修改 =====
+function boardReducer(state, action) {
+  switch (action.type) {
+    case 'add': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return {
+        ...state,
+        cards: [...state.cards, { id: state.nextId, title, col: state.columns[0] }],
+        nextId: state.nextId + 1,
+      };
+    }
+    case 'move':
+      return {
+        ...state,
+        cards: state.cards.map(c => {
+          if (c.id !== action.id) return c;
+          const i = state.columns.indexOf(c.col) + action.dir;
+          return i >= 0 && i < state.columns.length ? { ...c, col: state.columns[i] } : c;
+        }),
+      };
+    case 'remove':
+      return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    default:
+      return state;
+  }
+}
+
+// ===== 你的任务：补全界面里的事件接线 =====
+const DispatchCtx = createContext(null);
+
+function Card({ card, isFirst, isLast }) {
+  const dispatch = useContext(DispatchCtx);
+  return (
+    <div className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+      <div>{card.title}</div>
+      <button disabled={isFirst} aria-label="移到左边一列" onClick={() => dispatch({ type: 'move', id: card.id, dir: -1 })}>←</button>
+      <button disabled={isLast} aria-label="移到右边一列" onClick={() => dispatch({ type: 'move', id: card.id, dir: 1 })}>→</button>
+      <button onClick={() => dispatch({ type: 'remove', id: card.id })}>删除</button>
+    </div>
+  );
+}
+
+function Column({ col, index, cards, total }) {
+  return (
+    <div className="column" data-col={col} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8, minWidth: 0 }}>
+      <h4 style={{ margin: 0 }}>{COLUMN_NAMES[col]}（{cards.length}）</h4>
+      {cards.map(c => <Card key={c.id} card={c} isFirst={index === 0} isLast={index === total - 1} />)}
+    </div>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(boardReducer, initialState);
+  const [title, setTitle] = useState('');
+  return (
+    <DispatchCtx value={dispatch}>
+      <form onSubmit={e => { e.preventDefault(); dispatch({ type: 'add', title }); setTitle(''); }}>
+        <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
+        <button>添加卡片</button>
+      </form>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {state.columns.map((col, i) => (
+          <Column key={col} col={col} index={i} total={state.columns.length}
+            cards={state.cards.filter(c => c.col === col)} />
+        ))}
+      </div>
+    </DispatchCtx>
+  );
+}`,
+      hint: 'action 的形状在课文的 action 表里：<code>add</code> 带 <code>title</code>，<code>move</code> 带 <code>id</code> 和 <code>dir</code>，<code>remove</code> 带 <code>id</code>。<code>Card</code> 里已经有 <code>card</code> 和 <code>dispatch</code>，在按钮的 <code>onClick</code> 里把它们用起来。',
+      test: async t => {
+        const titles = col => t.qa(`.column[data-col="${col}"] .card`).map(c => c.firstChild.textContent);
+        const card = title => t.qa('.card').find(c => c.firstChild.textContent === title);
+        const btn = (c, label) => Array.from<HTMLElement>(c.querySelectorAll('button')).find(b => b.textContent === label);
+        t.assert(t.q('#card-input') && t.byText('button', '添加卡片') && card('写 reducer'), '请保留输入框、“添加卡片”按钮和初始的两张卡片');
+        await t.type('#card-input', '写测试');
+        await t.click(t.byText('button', '添加卡片'));
+        t.assert(titles('todo').includes('写测试'), '提交表单后，“写测试”没有出现在“待办”列。提交处理函数要派发 add action，带上输入框里的标题');
+        t.assert(t.q('#card-input').value === '', '添加后输入框应清空');
+        t.assert(t.unpreventedSubmits() === 0, '提交处理函数里要调用 e.preventDefault()，否则页面会刷新');
+        await t.type('#card-input', '   ');
+        await t.click(t.byText('button', '添加卡片'));
+        t.assert(t.qa('.card').length === 3, '空白标题不应添加卡片。reducer 已经处理了这种情况，派发时不用另外判断');
+        await t.click(btn(card('写 reducer'), '→'));
+        t.assert(
+          titles('doing').includes('写 reducer'),
+          '点“写 reducer”的 → 后，它应移到“进行中”。→ 要派发 move，带上这张卡片自己的 id（card.id）和方向 dir: 1',
+        );
+        t.assert(titles('todo').includes('设计数据结构'), '“设计数据结构”没被点，应仍在“待办”。action 里的 id 要取被点击的这张卡片的 id');
+        await t.click(btn(card('写 reducer'), '←'));
+        t.assert(titles('todo').includes('写 reducer') && !titles('doing').includes('写 reducer'), '点 ← 后，卡片应回到“待办”。← 要派发 move，方向 dir 是 -1');
+        await t.click(btn(card('写 reducer'), '→'));
+        await t.click(btn(card('写 reducer'), '→'));
+        t.assert(titles('done').includes('写 reducer'), '再点一次 →，卡片应到“已完成”');
+        await t.click(btn(card('写 reducer'), '删除'));
+        t.assert(!card('写 reducer'), '点“删除”后，卡片应消失。删除要派发 remove，带上这张卡片的 id');
+        t.assert(card('设计数据结构') && card('写测试'), '删除一张卡片，不应影响别的卡片');
+      },
+    },
+    {
+      title: '把层层传递的回调改成 Context',
+      task: '<ol class="task-steps"><li>现在 App 把 <code>onMove</code>、<code>onRemove</code> 传给 Column，Column 再原样传给 Card。<code>DispatchCtx</code> 已经创建好了。</li><li>让 App 通过 <code>DispatchCtx</code> 提供 <code>dispatch</code>。</li><li>让 Card 用 <code>useContext(DispatchCtx)</code> 拿到 <code>dispatch</code>，自己派发 <code>move</code>（带 id 和 dir）和 <code>remove</code>（带 id）。</li><li>删掉 Column 里对 <code>onMove</code>、<code>onRemove</code> 的接收和转发，也删掉 App 里传它们的那两行。</li></ol>',
+      starter: `import { useReducer, useState, createContext, useContext } from 'react';
+
+const COLUMN_NAMES = { todo: '待办', doing: '进行中', done: '已完成' };
+const initialState = {
+  columns: ['todo', 'doing', 'done'],
+  cards: [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+  ],
+  nextId: 3,
+};
+
+// ===== reducer 已经写好，不用修改 =====
+function boardReducer(state, action) {
+  switch (action.type) {
+    case 'add': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return {
+        ...state,
+        cards: [...state.cards, { id: state.nextId, title, col: state.columns[0] }],
+        nextId: state.nextId + 1,
+      };
+    }
+    case 'move':
+      return {
+        ...state,
+        cards: state.cards.map(c => {
+          if (c.id !== action.id) return c;
+          const i = state.columns.indexOf(c.col) + action.dir;
+          return i >= 0 && i < state.columns.length ? { ...c, col: state.columns[i] } : c;
+        }),
+      };
+    case 'remove':
+      return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    default:
+      return state;
+  }
+}
+
+// ===== 你的任务：让 Card 通过 DispatchCtx 拿到 dispatch =====
+const DispatchCtx = createContext(null);
+
+function Card({ card, isFirst, isLast, onMove, onRemove }) {
+  return (
+    <div className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+      <div>{card.title}</div>
+      <button disabled={isFirst} aria-label="移到左边一列" onClick={() => onMove(card.id, -1)}>←</button>
+      <button disabled={isLast} aria-label="移到右边一列" onClick={() => onMove(card.id, 1)}>→</button>
+      <button onClick={() => onRemove(card.id)}>删除</button>
+    </div>
+  );
+}
+
+function Column({ col, index, cards, total, onMove, onRemove }) {
+  return (
+    <div className="column" data-col={col} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8, minWidth: 0 }}>
+      <h4 style={{ margin: 0 }}>{COLUMN_NAMES[col]}（{cards.length}）</h4>
+      {cards.map(c => <Card key={c.id} card={c} isFirst={index === 0} isLast={index === total - 1} onMove={onMove} onRemove={onRemove} />)}
+    </div>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(boardReducer, initialState);
+  const [title, setTitle] = useState('');
+  return (
+    <div>
+      <form onSubmit={e => { e.preventDefault(); dispatch({ type: 'add', title }); setTitle(''); }}>
+        <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
+        <button>添加卡片</button>
+      </form>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {state.columns.map((col, i) => (
+          <Column key={col} col={col} index={i} total={state.columns.length}
+            cards={state.cards.filter(c => c.col === col)}
+            onMove={(id, dir) => dispatch({ type: 'move', id, dir })}
+            onRemove={id => dispatch({ type: 'remove', id })} />
+        ))}
+      </div>
+    </div>
+  );
+}`,
+      solution: `import { useReducer, useState, createContext, useContext } from 'react';
+
+const COLUMN_NAMES = { todo: '待办', doing: '进行中', done: '已完成' };
+const initialState = {
+  columns: ['todo', 'doing', 'done'],
+  cards: [
+    { id: 1, title: '设计数据结构', col: 'todo' },
+    { id: 2, title: '写 reducer', col: 'todo' },
+  ],
+  nextId: 3,
+};
+
+// ===== reducer 已经写好，不用修改 =====
+function boardReducer(state, action) {
+  switch (action.type) {
+    case 'add': {
+      const title = action.title.trim();
+      if (!title) return state;
+      return {
+        ...state,
+        cards: [...state.cards, { id: state.nextId, title, col: state.columns[0] }],
+        nextId: state.nextId + 1,
+      };
+    }
+    case 'move':
+      return {
+        ...state,
+        cards: state.cards.map(c => {
+          if (c.id !== action.id) return c;
+          const i = state.columns.indexOf(c.col) + action.dir;
+          return i >= 0 && i < state.columns.length ? { ...c, col: state.columns[i] } : c;
+        }),
+      };
+    case 'remove':
+      return { ...state, cards: state.cards.filter(c => c.id !== action.id) };
+    default:
+      return state;
+  }
+}
+
+// ===== 你的任务：让 Card 通过 DispatchCtx 拿到 dispatch =====
+const DispatchCtx = createContext(null);
+
+function Card({ card, isFirst, isLast }) {
+  const dispatch = useContext(DispatchCtx);
+  return (
+    <div className="card" style={{ background: '#fff', border: '1px solid #cbd5da', borderRadius: 6, padding: 6, margin: '6px 0' }}>
+      <div>{card.title}</div>
+      <button disabled={isFirst} aria-label="移到左边一列" onClick={() => dispatch({ type: 'move', id: card.id, dir: -1 })}>←</button>
+      <button disabled={isLast} aria-label="移到右边一列" onClick={() => dispatch({ type: 'move', id: card.id, dir: 1 })}>→</button>
+      <button onClick={() => dispatch({ type: 'remove', id: card.id })}>删除</button>
+    </div>
+  );
+}
+
+function Column({ col, index, cards, total }) {
+  return (
+    <div className="column" data-col={col} style={{ flex: 1, background: '#eef3f5', borderRadius: 8, padding: 8, minWidth: 0 }}>
+      <h4 style={{ margin: 0 }}>{COLUMN_NAMES[col]}（{cards.length}）</h4>
+      {cards.map(c => <Card key={c.id} card={c} isFirst={index === 0} isLast={index === total - 1} />)}
+    </div>
+  );
+}
+
+function App() {
+  const [state, dispatch] = useReducer(boardReducer, initialState);
+  const [title, setTitle] = useState('');
+  return (
+    <DispatchCtx value={dispatch}>
+      <form onSubmit={e => { e.preventDefault(); dispatch({ type: 'add', title }); setTitle(''); }}>
+        <input id="card-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="新卡片" />
+        <button>添加卡片</button>
+      </form>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+        {state.columns.map((col, i) => (
+          <Column key={col} col={col} index={i} total={state.columns.length}
+            cards={state.cards.filter(c => c.col === col)} />
+        ))}
+      </div>
+    </DispatchCtx>
+  );
+}`,
+      hint: "先在 App 里用 <code>&lt;DispatchCtx value={dispatch}&gt;</code> 包住界面。再把 Card 改成自己 <code>useContext(DispatchCtx)</code>，按钮里直接 <code>dispatch({ type: 'move', id: card.id, dir: -1 })</code>。最后清理 Column 和 App 里不再需要的 props。",
+      exports: ['DispatchCtx', 'Card', 'Column'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const { DispatchCtx, Card, Column } = t.exports;
+        const titles = col => t.qa(`.column[data-col="${col}"] .card`).map(c => c.firstChild.textContent);
+        const card = title => t.qa('.card').find(c => c.firstChild.textContent === title);
+        const btn = (c, label) => Array.from<HTMLElement>(c.querySelectorAll('button')).find(b => b.textContent === label);
+        t.assert(DispatchCtx && Card && Column, '请保留 DispatchCtx、Card、Column 这三个名字');
+        // 先看整个应用：点按钮要真的改变界面
+        await t.type('#card-input', '写测试');
+        await t.click(t.byText('button', '添加卡片'));
+        t.assert(titles('todo').includes('写测试'), '添加卡片没有生效。App 里的表单应继续派发 add');
+        await t.click(btn(card('写 reducer'), '→'));
+        t.assert(
+          titles('doing').includes('写 reducer'),
+          '点 → 后卡片没有移动。App 提供了 DispatchCtx 吗？没有 Provider 时，useContext 返回创建时的默认值 null，Card 里的 dispatch 就不能调用',
+        );
+        await t.click(btn(card('写 reducer'), '删除'));
+        t.assert(!card('写 reducer'), '点“删除”后卡片没有消失');
+        // 再单独渲染 Card 和 Column：它们必须只靠 Context 拿 dispatch
+        const calls = [];
+        const spy = a => calls.push(JSON.stringify(a));
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        const rt = ReactDOM.createRoot(host);
+        try {
+          const sample = { id: 7, title: '样例', col: 'doing' };
+          rt.render(
+            React.createElement(
+              DispatchCtx,
+              { value: spy },
+              React.createElement(Card, { card: sample, isFirst: false, isLast: false }),
+              React.createElement(Column, { col: 'doing', index: 1, total: 3, cards: [{ id: 8, title: '另一张', col: 'doing' }] }),
+            ),
+          );
+          await t.wait(80);
+          const cards = Array.from<HTMLElement>(host.querySelectorAll('.card'));
+          t.assert(cards.length === 2, 'Card 和 Column 应能单独渲染出卡片');
+          const click = async (c, label) => {
+            btn(c, label).click();
+            await t.wait(30);
+          };
+          await click(cards[0], '→');
+          await click(cards[0], '←');
+          await click(cards[0], '删除');
+          t.assert(
+            calls.length === 3,
+            'Card 没有通过 DispatchCtx 取 dispatch：给它一个 Provider，点三个按钮应各派发一次 action，实际派发了 ' +
+              calls.length +
+              ' 次。Card 不应再依赖 props 传来的回调',
+          );
+          t.assert(calls[0] === JSON.stringify({ type: 'move', id: 7, dir: 1 }), 'Card 点 → 应派发 move，带 id 和 dir: 1，实际是 ' + calls[0]);
+          t.assert(calls[1] === JSON.stringify({ type: 'move', id: 7, dir: -1 }), 'Card 点 ← 应派发 move，带 id 和 dir: -1，实际是 ' + calls[1]);
+          t.assert(calls[2] === JSON.stringify({ type: 'remove', id: 7 }), 'Card 点“删除”应派发 remove，带 id，实际是 ' + calls[2]);
+          await click(cards[1], '→');
+          t.assert(
+            calls.length === 4 && calls[3] === JSON.stringify({ type: 'move', id: 8, dir: 1 }),
+            'Column 里的卡片点 → 没有派发 move。Column 不需要再接收 onMove、onRemove：Card 自己从 Context 取 dispatch',
+          );
+        } finally {
+          rt.unmount();
+          host.remove();
+        }
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `应用包在 <code>&lt;StrictMode&gt;</code> 里，在开发环境运行。卡片在“待办”列，点一次“→”，它会到哪一列？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">case 'move':

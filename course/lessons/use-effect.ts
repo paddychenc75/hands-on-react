@@ -102,57 +102,319 @@ function App() {
       const { React, ReactDOM } = t;
       t.assert(t.text('#seconds') === '0', '初始应为 0');
       t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
-      // 另开一个严格模式的根：React 会做“开始 → 停止 → 再开始”。清理函数没停掉第一个定时器，就会有两个定时器一起加
-      const box = document.createElement('div');
-      const root = ReactDOM.createRoot(box);
-      ReactDOM.flushSync(() => root.render(React.createElement(React.StrictMode, null, React.createElement(t.exports.App))));
+      // 另开一个严格模式的根：React 会做“开始 → 停止 → 再开始”。清理函数没停掉第一个定时器，就会有两个定时器一起加。
+      // 段落自己创建根，才能被 t.retry 整段重测；2.5 秒内的计数偏少可能只是设备忙，所以算计时断言
+      const kept: { box?: HTMLElement; root?: any } = {};
+      await t.retry(async () => {
+        const box = document.createElement('div');
+        const root = ReactDOM.createRoot(box);
+        ReactDOM.flushSync(() => root.render(React.createElement(React.StrictMode, null, React.createElement(t.exports.App))));
+        try {
+          await t.wait(2500);
+          const v = Number(t.text('#seconds'));
+          const sv = Number((box.querySelector('#seconds') || {}).textContent);
+          t.assert(v !== 0, '2.5 秒后还是 0。定时器启动了吗？请在 useEffect 里调用 setInterval');
+          const stale =
+            '2.5 秒后应为 2，实际一直是 1：每秒都在执行 setSeconds(0 + 1)。定时器回调记住的是第一次渲染的 seconds。请用函数式更新 setSeconds(s => s + 1)';
+          t.timing(v !== 1, stale);
+          t.assert(v >= 2 && v <= 3, `2.5 秒后应为 2，实际是 ${v}。是不是同时启动了不止一个定时器？`);
+          const dup = `在严格模式下，2.5 秒后应为 2，实际是 ${sv}。React 做了“开始 → 停止 → 再开始”，但第一个定时器没有被停掉，两个定时器在一起加。请让 effect 返回清理函数：return () => clearInterval(id)`;
+          t.timing(sv >= 2, dup);
+          t.assert(sv === 2, dup);
+        } catch (e) {
+          root.unmount();
+          throw e;
+        }
+        kept.box = box;
+        kept.root = root;
+      });
+      const box = kept.box as HTMLElement;
+      const root = kept.root;
       try {
-        await t.wait(2500);
-        const v = Number(t.text('#seconds'));
-        const sv = Number((box.querySelector('#seconds') || {}).textContent);
-        t.assert(v !== 0, '2.5 秒后还是 0。定时器启动了吗？请在 useEffect 里调用 setInterval');
-        t.assert(
-          v !== 1,
-          '2.5 秒后应为 2，实际一直是 1：每秒都在执行 setSeconds(0 + 1)。定时器回调记住的是第一次渲染的 seconds。请用函数式更新 setSeconds(s => s + 1)',
-        );
-        t.assert(v >= 2 && v <= 3, `2.5 秒后应为 2，实际是 ${v}。是不是同时启动了不止一个定时器？`);
-        t.assert(
-          sv === 2,
-          `在严格模式下，2.5 秒后应为 2，实际是 ${sv}。React 做了“开始 → 停止 → 再开始”，但第一个定时器没有被停掉，两个定时器在一起加。请让 effect 返回清理函数：return () => clearInterval(id)`,
-        );
-        // 卸载这个根，再等 1.2 秒：定时器如果还在跑，就会继续调用 App 的 set 函数
-        const ck = Object.keys(box).find(k => k.startsWith('__reactContainer$'));
-        let app = null;
+        // 卸载这个根，再等 1.2 秒：定时器如果还在跑，就会继续调用 App 的 set 函数。
+        // 这一步读 React 19.3.x 的 fiber 结构（FiberRoot.current → 子树里的 App fiber → Hook 链表的 queue）；
+        // 结构不认识就跳过，上面严格模式下的计数检查已经能发现没写清理函数
+        const inter = t.internals;
+        const fiberRoot = inter.rootOf(box);
+        let app: any = null;
         const find = f => {
           for (; f && !app; f = f.sibling) {
             if (f.type === t.exports.App) app = f;
             else find(f.child);
           }
         };
-        find(ck && box[ck]);
-        const queues = [];
-        for (let h = app && app.memoizedState; h; h = h.next) if (h.queue && typeof h.queue.dispatch === 'function') queues.push(h.queue);
-        let calls = 0;
-        const before = queues.map(q => {
-          const r = q.lastRenderedReducer;
-          q.lastRenderedReducer = function () {
-            calls++;
-            return r.apply(this, arguments);
-          };
-          return q.pending;
-        });
-        root.unmount();
-        await t.wait(1200);
-        const moved = queues.some((q, i) => q.pending !== before[i]);
-        t.assert(
-          !calls && !moved,
-          '组件卸载 1.2 秒后，定时器还在调用 setSeconds：卸载时它没有被停掉。在启动前清除旧定时器不够，组件消失时也要停止同步。请让 effect 返回清理函数：return () => clearInterval(id)',
-        );
+        find(fiberRoot && fiberRoot.current);
+        const hooks = app ? inter.hooksOf(app) : null;
+        if (hooks) {
+          const queues = hooks.filter(h => h.queue && typeof h.queue.dispatch === 'function').map(h => h.queue);
+          let calls = 0;
+          const before = queues.map(q => {
+            const r = q.lastRenderedReducer;
+            q.lastRenderedReducer = function () {
+              calls++;
+              return r.apply(this, arguments);
+            };
+            return q.pending;
+          });
+          root.unmount();
+          await t.wait(1200);
+          const moved = queues.some((q, i) => q.pending !== before[i]);
+          t.assert(
+            !calls && !moved,
+            '组件卸载 1.2 秒后，定时器还在调用 setSeconds：卸载时它没有被停掉。在启动前清除旧定时器不够，组件消失时也要停止同步。请让 effect 返回清理函数：return () => clearInterval(id)',
+          );
+        }
       } finally {
         root.unmount();
       }
     },
   },
+  drills: [
+    {
+      title: '订阅按键事件：加上清理，再修掉旧的 count',
+      task: '<ol class="task-steps"><li>下面的 App 在 <code>window</code> 上监听 keydown，按 Enter 就把 count 加 1。现在有两个问题：监听器从不移除；多按几次后数字停在 1。</li><li>让 effect 在停止同步时移除监听器。</li><li>让每按一次 Enter 都加 1，按其他键不计数。</li><li>检查时，App 会在严格模式下再挂载一次，也会被卸载：严格模式之后 <code>window</code> 上只应剩 1 个 keydown 监听器，卸载之后应剩 0 个。</li></ol>',
+      starter: `import { useState, useEffect } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Enter') setCount(count + 1);
+    }
+    window.addEventListener('keydown', onKey);
+  }, []);
+
+  return <p>按 Enter 的次数：<span id="count">{count}</span></p>;
+}`,
+      solution: `import { useState, useEffect } from 'react';
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'Enter') setCount(c => c + 1);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return <p>按 Enter 的次数：<span id="count">{count}</span></p>;
+}`,
+      hint: '两个问题分开想。监听器是 effect 开始同步时添加的，停止同步时谁来移除它？监听器里的 count 是哪一次渲染的值？可以让 set 函数基于最新值计算，也可以让 effect 在 count 变化时重新同步。',
+      exports: ['App'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
+        const live = new Set();
+        const add = window.addEventListener;
+        const rem = window.removeEventListener;
+        window.addEventListener = function (type, fn, ...rest) {
+          if (type === 'keydown') live.add(fn);
+          return add.call(this, type, fn, ...rest);
+        };
+        window.removeEventListener = function (type, fn, ...rest) {
+          if (type === 'keydown') live.delete(fn);
+          return rem.call(this, type, fn, ...rest);
+        };
+        const press = key => ReactDOM.flushSync(() => window.dispatchEvent(new KeyboardEvent('keydown', { key })));
+        const box = document.createElement('div');
+        const root = ReactDOM.createRoot(box);
+        const shown = () => (box.querySelector('#count') || {}).textContent;
+        try {
+          // 页面上已经挂着的那份 App 也会收到按键。先按一次，让它重新订阅（如果它会重新订阅），记下它占用的监听器数
+          press('Enter');
+          const other = live.size;
+          ReactDOM.flushSync(() => root.render(React.createElement(React.StrictMode, null, React.createElement(t.exports.App))));
+          t.assert(
+            live.size - other === 1,
+            `严格模式做完“开始 → 停止 → 再开始”之后，window 上应只剩 1 个 keydown 监听器，实际有 ${live.size - other} 个。effect 开始同步时添加了监听器，停止同步时没有移除它。请让 effect 返回清理函数`,
+          );
+          press('a');
+          t.assert(shown() === '0', `按 a 键不该计数，实际显示 ${shown()}`);
+          press('Enter');
+          press('Enter');
+          press('Enter');
+          t.assert(
+            shown() === '3',
+            `按 3 次 Enter 应显示 3，实际是 ${shown()}。监听器只在第一次渲染后添加，记住的是那一次的 count。让 set 函数基于最新值计算，或让 effect 随 count 重新同步`,
+          );
+          root.unmount();
+          await t.wait(50);
+          t.assert(live.size - other === 0, `组件卸载后，window 上还剩 ${live.size - other} 个 keydown 监听器：卸载时没有停止同步`);
+        } finally {
+          delete window.addEventListener;
+          delete window.removeEventListener;
+          try {
+            root.unmount();
+          } catch {}
+        }
+      },
+    },
+    {
+      title: '依赖数组漏了 room：房间换了，连接没跟着换',
+      task: '<ol class="task-steps"><li><code>connect(room)</code> 会往 <code>log</code> 里记“连接 房间”，它返回的清理函数会记“断开 房间”。</li><li>现在点“房间 b”，日志里什么都没新增：连接还留在房间 a。找出原因并修好。</li><li>切到 b 之后，日志应依次新增“断开 a”“连接 b”。</li><li>点“无关按钮”只改了 n，不能触发重新连接。</li></ol>',
+      starter: `import { useState, useEffect } from 'react';
+
+const log = [];
+function connect(room) {
+  log.push('连接 ' + room);
+  return () => log.push('断开 ' + room);
+}
+
+function App() {
+  const [room, setRoom] = useState('a');
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    return connect(room);
+  }, []);
+
+  return (
+    <div>
+      <p>当前房间：<span id="room">{room}</span></p>
+      <button id="to-a" onClick={() => setRoom('a')}>房间 a</button>
+      <button id="to-b" onClick={() => setRoom('b')}>房间 b</button>
+      <button id="bump" onClick={() => setN(n + 1)}>无关按钮 {n}</button>
+    </div>
+  );
+}`,
+      solution: `import { useState, useEffect } from 'react';
+
+const log = [];
+function connect(room) {
+  log.push('连接 ' + room);
+  return () => log.push('断开 ' + room);
+}
+
+function App() {
+  const [room, setRoom] = useState('a');
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    return connect(room);
+  }, [room]);
+
+  return (
+    <div>
+      <p>当前房间：<span id="room">{room}</span></p>
+      <button id="to-a" onClick={() => setRoom('a')}>房间 a</button>
+      <button id="to-b" onClick={() => setRoom('b')}>房间 b</button>
+      <button id="bump" onClick={() => setN(n + 1)}>无关按钮 {n}</button>
+    </div>
+  );
+}`,
+      hint: '这个 effect 读了哪个会变的值？依赖数组要列出 effect 读到的全部响应式值。也想想：依赖数组整个不写，会发生什么？',
+      exports: ['App', 'log'],
+      test: async t => {
+        const log = t.exports.log;
+        t.assert(Array.isArray(log), '请保留名为 log 的数组和 connect 函数');
+        t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
+        const run = async sel => {
+          const n0 = log.length;
+          await t.click(sel);
+          return log.slice(n0).join('，');
+        };
+        const bump = await run('#bump');
+        t.assert(bump === '', `点无关按钮不该重新连接，实际日志新增：${bump}。这个 effect 只读 room，没有依赖数组时，每次渲染后都会重新同步。请写上依赖数组`);
+        const toB = await run('#to-b');
+        t.assert(t.text('#room') === 'b', '点“房间 b”后，界面应显示当前房间 b');
+        t.assert(toB !== '', '切到房间 b 后日志没有变化：连接还留在房间 a。effect 读了 room，却没有把它列进依赖数组，所以 room 变了也不会重新同步');
+        t.assert(
+          toB === '断开 a，连接 b',
+          `切到房间 b 后，日志应依次新增“断开 a”“连接 b”，实际新增：${toB}。重新同步前要先停止上一次的同步：effect 需要返回清理函数`,
+        );
+        const toA = await run('#to-a');
+        t.assert(toA === '断开 b，连接 a', `切回房间 a 后，日志应依次新增“断开 b”“连接 a”，实际新增：${toA}`);
+        const bump2 = await run('#bump');
+        t.assert(bump2 === '', `点无关按钮不该重新连接，实际日志新增：${bump2}`);
+      },
+    },
+    {
+      title: '不需要 effect：把派生数据挪到渲染中',
+      task: '<ol class="task-steps"><li>下面的列表由 <code>kind</code> 筛选出来，现在靠 <code>useEffect</code> 和 <code>visible</code> state 同步。</li><li>点一次筛选按钮，App 会渲染两次：先用旧的 visible 渲染，effect 再设置新值，又渲染一次。</li><li>去掉多余的 state 和 effect，让 <code>visible</code> 在渲染时直接算出来。点一次按钮 App 只渲染一次。</li><li>三个按钮的筛选结果要保持正确。</li></ol>',
+      starter: `import { useState, useEffect } from 'react';
+
+const ALL = [
+  { id: 1, name: '苹果', kind: '水果' },
+  { id: 2, name: '西瓜', kind: '水果' },
+  { id: 3, name: '黄瓜', kind: '蔬菜' },
+  { id: 4, name: '白菜', kind: '蔬菜' },
+];
+
+let renders = 0;
+function App() {
+  renders++;
+  const [kind, setKind] = useState('全部');
+  const [visible, setVisible] = useState(ALL);
+
+  useEffect(() => {
+    setVisible(kind === '全部' ? ALL : ALL.filter(x => x.kind === kind));
+  }, [kind]);
+
+  return (
+    <div>
+      <button id="all" onClick={() => setKind('全部')}>全部</button>
+      <button id="fruit" onClick={() => setKind('水果')}>水果</button>
+      <button id="veg" onClick={() => setKind('蔬菜')}>蔬菜</button>
+      <ul id="list">{visible.map(x => <li key={x.id}>{x.name}</li>)}</ul>
+      <p>App 渲染了 <span id="renders">{renders}</span> 次</p>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+const ALL = [
+  { id: 1, name: '苹果', kind: '水果' },
+  { id: 2, name: '西瓜', kind: '水果' },
+  { id: 3, name: '黄瓜', kind: '蔬菜' },
+  { id: 4, name: '白菜', kind: '蔬菜' },
+];
+
+let renders = 0;
+function App() {
+  renders++;
+  const [kind, setKind] = useState('全部');
+  const visible = kind === '全部' ? ALL : ALL.filter(x => x.kind === kind);
+
+  return (
+    <div>
+      <button id="all" onClick={() => setKind('全部')}>全部</button>
+      <button id="fruit" onClick={() => setKind('水果')}>水果</button>
+      <button id="veg" onClick={() => setKind('蔬菜')}>蔬菜</button>
+      <ul id="list">{visible.map(x => <li key={x.id}>{x.name}</li>)}</ul>
+      <p>App 渲染了 <span id="renders">{renders}</span> 次</p>
+    </div>
+  );
+}`,
+      hint: 'visible 完全由 kind 决定，它不是需要单独记住的 state。直接在组件函数体里算出它，就不需要 effect 来同步了。',
+      exports: ['App'],
+      test: async t => {
+        const list = () =>
+          t
+            .qa('#list li')
+            .map(li => li.textContent.trim())
+            .join('、');
+        const cases = [
+          ['#fruit', '苹果、西瓜'],
+          ['#veg', '黄瓜、白菜'],
+          ['#all', '苹果、西瓜、黄瓜、白菜'],
+        ];
+        for (const [sel, want] of cases) {
+          const before = Number(t.text('#renders'));
+          await t.click(sel);
+          await t.wait(30);
+          t.assert(list() === want, `点“${t.q(sel).textContent}”后，列表应为“${want}”，实际是“${list() || '空'}”`);
+          const delta = Number(t.text('#renders')) - before;
+          t.assert(
+            delta === 1,
+            `点一次“${t.q(sel).textContent}”，App 渲染了 ${delta} 次，应只有 1 次。visible 能由 kind 直接算出来，不需要 state，也不需要 effect。请在渲染时计算它`,
+          );
+        }
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `roomId 从 'a' 变成 'b'。变化后，控制台按顺序新增哪些输出？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">useEffect(() =&gt; {

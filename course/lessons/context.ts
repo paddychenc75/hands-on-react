@@ -156,6 +156,204 @@ function App() {
       );
     },
   },
+  drills: [
+    {
+      title: '把层层传递的 props 改成 Context',
+      task: "<ol class=\"task-steps\"><li>现在 <code>lang</code> 从 <code>App</code> 一路经过 <code>Layout</code>、<code>Sidebar</code>，才到 <code>Greeting</code>。中间两层自己用不到它，只是在转发。</li><li>创建 <code>LangContext</code>，默认值写 <code>'zh'</code>。它的值就是语言字符串，<code>'zh'</code> 或 <code>'en'</code>。</li><li><code>App</code> 把自己的 <code>lang</code> state 作为 Provider 的值提供出去。</li><li><code>Greeting</code> 用 <code>useContext</code> 读取语言。<code>Layout</code> 和 <code>Sidebar</code> 不再接收、也不再转发 <code>lang</code>。</li><li>结果：点“切换语言”，问候语在中文和英文之间切换。</li></ol>",
+      starter: `import { useState } from 'react';
+
+const TEXT = { zh: '你好，欢迎回来', en: 'Hello, welcome back' };
+
+function Greeting({ lang }) {
+  return <p id="greeting">{TEXT[lang]}</p>;
+}
+
+function Sidebar({ lang }) {
+  return <aside><Greeting lang={lang} /></aside>;
+}
+
+function Layout({ lang }) {
+  return <main><Sidebar lang={lang} /></main>;
+}
+
+function App() {
+  const [lang, setLang] = useState('zh');
+  return (
+    <div>
+      <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}>切换语言</button>
+      <Layout lang={lang} />
+    </div>
+  );
+}`,
+      solution: `import { createContext, useContext, useState } from 'react';
+
+const TEXT = { zh: '你好，欢迎回来', en: 'Hello, welcome back' };
+
+const LangContext = createContext('zh');
+
+function Greeting() {
+  const lang = useContext(LangContext);
+  return <p id="greeting">{TEXT[lang]}</p>;
+}
+
+function Sidebar() {
+  return <aside><Greeting /></aside>;
+}
+
+function Layout() {
+  return <main><Sidebar /></main>;
+}
+
+function App() {
+  const [lang, setLang] = useState('zh');
+  return (
+    <LangContext value={lang}>
+      <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}>切换语言</button>
+      <Layout />
+    </LangContext>
+  );
+}`,
+      hint: '回到“三步使用 Context”：创建、提供、消费。Provider 的 value 要放 App 里会变化的 <code>lang</code>，不要写死一个字符串。',
+      exports: ['Layout', 'LangContext'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const g = () => t.text('#greeting');
+        t.assert(g() === '你好，欢迎回来', '一开始应显示“你好，欢迎回来”，实际是“' + g() + '”。');
+        await t.click(t.byText('button', '切换语言'));
+        t.assert(
+          g() === 'Hello, welcome back',
+          '点“切换语言”后应显示“Hello, welcome back”，实际是“' + g() + '”。Provider 的 value 要用 App 里的 lang state，这样 lang 变化时读取它的组件才会更新。',
+        );
+        await t.click(t.byText('button', '切换语言'));
+        t.assert(g() === '你好，欢迎回来', '再点一次“切换语言”应切回中文，实际是“' + g() + '”。');
+        const Ctx = t.exports.LangContext;
+        t.assert(Ctx && Ctx.Provider, "找不到 LangContext。请用 const LangContext = createContext('zh') 创建它");
+        t.assert(typeof t.exports.Layout === 'function', '请保留名为 Layout 的组件');
+        // 不给任何 props：Layout 放进 value 为 'en' 的 Provider，里面的 Greeting 应读到 'en'
+        const renderText = value => {
+          const box = document.createElement('div');
+          const root = ReactDOM.createRoot(box);
+          try {
+            const layout = React.createElement(t.exports.Layout);
+            ReactDOM.flushSync(() => root.render(value === undefined ? layout : React.createElement(Ctx, { value }, layout)));
+            return box.textContent.trim();
+          } finally {
+            root.unmount();
+          }
+        };
+        const inEn = renderText('en');
+        t.assert(
+          inEn === 'Hello, welcome back',
+          '不给 Layout 传任何 props，把它放进 value 为“en”的 Provider，应显示“Hello, welcome back”，实际是“' +
+            inEn +
+            '”。Greeting 要用 useContext(LangContext) 读语言，不要再从 props 里取。',
+        );
+        const bare = renderText(undefined);
+        t.assert(
+          bare === '你好，欢迎回来',
+          '把 Layout 放在任何 Provider 外面，应读到默认值“zh”并显示“你好，欢迎回来”，实际是“' + bare + "”。createContext 的默认值应是 'zh'。",
+        );
+      },
+    },
+    {
+      title: '没有 Provider 时读到什么',
+      task: '<ol class="task-steps"><li><code>UserContext</code> 的值是 <code>{ name }</code> 形状的对象。<code>UserBadge</code> 显示 <code>user.name</code>。</li><li>现在把 <code>UserBadge</code> 单独放在任何 Provider 外面会报错。想一想：<code>useContext</code> 找不到 Provider 时返回什么？</li><li>修复它：没有 Provider 时，<code>UserBadge</code> 显示“游客”。不要给 <code>UserBadge</code> 传 props。</li><li>在 <code>App</code> 外层 Provider 里面再嵌套一层 Provider，值为 <code>{ name: \'小王\' }</code>，里面放一个 <code>UserBadge</code>。</li><li>结果：页面上有两个 <code>.badge</code>，依次显示“小李”“小王”。里层的 Provider 覆盖外层的值。</li></ol>',
+      starter: `import { createContext, useContext } from 'react';
+
+const UserContext = createContext(null);
+
+function UserBadge() {
+  const user = useContext(UserContext);
+  return <span className="badge">{user.name}</span>;
+}
+
+function App() {
+  return (
+    <UserContext value={{ name: '小李' }}>
+      <p>外层：<UserBadge /></p>
+      {/* 在这里再嵌套一层 Provider，值为 { name: '小王' }，里面放一个 UserBadge */}
+    </UserContext>
+  );
+}`,
+      solution: `import { createContext, useContext } from 'react';
+
+const UserContext = createContext({ name: '游客' });
+
+function UserBadge() {
+  const user = useContext(UserContext);
+  return <span className="badge">{user.name}</span>;
+}
+
+function App() {
+  return (
+    <UserContext value={{ name: '小李' }}>
+      <p>外层：<UserBadge /></p>
+      <UserContext value={{ name: '小王' }}>
+        <p>里层：<UserBadge /></p>
+      </UserContext>
+    </UserContext>
+  );
+}`,
+      hint: '没有 Provider 时，<code>useContext</code> 返回 <code>createContext</code> 的默认值。现在默认值是 <code>null</code>，读它的 <code>name</code> 就报错。把默认值换成合适的对象，或者在读取处处理 <code>null</code>，都可以。',
+      exports: ['UserBadge', 'UserContext'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        t.assert(typeof t.exports.UserBadge === 'function', '请保留名为 UserBadge 的组件');
+        const Ctx = t.exports.UserContext;
+        t.assert(Ctx && Ctx.Provider, '请保留名为 UserContext 的 Context');
+        // 单独渲染，放在错误边界里，报错时给出原因
+        class Boundary extends React.Component {
+          constructor(p) {
+            super(p);
+            this.state = { err: null };
+          }
+          static getDerivedStateFromError(err) {
+            return { err };
+          }
+          render() {
+            return this.state.err ? React.createElement('i', { className: 'err' }, String(this.state.err.message)) : this.props.children;
+          }
+        }
+        const renderBadge = value => {
+          const box = document.createElement('div');
+          const root = ReactDOM.createRoot(box);
+          try {
+            const badge = React.createElement(t.exports.UserBadge);
+            const inner = value === undefined ? badge : React.createElement(Ctx, { value }, badge);
+            ReactDOM.flushSync(() => root.render(React.createElement(Boundary, null, inner)));
+            const err = box.querySelector('.err');
+            return err ? { err: err.textContent } : { text: box.textContent.trim() };
+          } finally {
+            root.unmount();
+          }
+        };
+        const originalError = console.error;
+        let bare: any;
+        try {
+          console.error = () => {};
+          bare = renderBadge(undefined);
+        } finally {
+          console.error = originalError;
+        }
+        t.assert(
+          !bare.err,
+          'UserBadge 放在 Provider 外面时报错了（' +
+            bare.err +
+            '）。useContext 找不到 Provider 时返回 createContext 的默认值，现在默认值是 null。让它在没有 Provider 时也能显示。',
+        );
+        t.assert(bare.text === '游客', 'UserBadge 放在 Provider 外面时应显示“游客”，实际是“' + bare.text + '”。');
+        const withValue = renderBadge({ name: '小陈' });
+        t.assert(
+          withValue.text === '小陈',
+          "放进值为 { name: '小陈' } 的 Provider，应显示“小陈”，实际是“" + (withValue.text || withValue.err) + '”。有 Provider 时要读 Provider 的值。',
+        );
+        const badges = t.qa('.badge').map(b => b.textContent.trim());
+        t.assert(badges.length === 2, '页面上应有两个 .badge，实际有 ' + badges.length + ' 个。在外层 Provider 里再嵌套一层 Provider，放一个 UserBadge。');
+        t.assert(badges[0] === '小李', '第一个 .badge 应显示“小李”，实际是“' + badges[0] + '”。');
+        t.assert(badges[1] === '小王', '第二个 .badge 应显示“小王”，实际是“' + badges[1] + "”。里层的 Provider 会覆盖外层的值，值要写成 { name: '小王' }。");
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `Footer 里调用 <code>useContext(ThemeCtx)</code>，读到什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const ThemeCtx = createContext('light');
