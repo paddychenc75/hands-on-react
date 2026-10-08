@@ -13,12 +13,13 @@ export default {
   stage: 3,
   title: '动画与过渡',
   mins: 47,
-  summary: '用类名驱动 CSS 过渡，写出“先播放离场动画再卸载”的状态机，用 <ViewTransition> 做页面、共享元素和列表动画，并让动画尊重“减少动画”设置。',
+  summary:
+    '用类名驱动 CSS 过渡，写出“先播放离场动画再卸载”的状态机，用 <code>&lt;ViewTransition&gt;</code> 做页面、共享元素和列表动画，并让动画尊重“减少动画”设置。',
   goals: [
     '能写出由 state 驱动的 CSS 过渡，并解释条件渲染为什么没有离场动画',
     '能写出“进入中、已进入、离开中”的状态机，并处理打断和 transitionend 不触发的情况',
-    '能判断 <ViewTransition> 什么时候有动画（过渡更新、enter、exit、update、share），并用 CSS 定制',
-    '能按需求选择 CSS 过渡、状态机、<ViewTransition> 或动画库，并让动画尊重“减少动画”设置',
+    '能判断 <code>&lt;ViewTransition&gt;</code> 什么时候有动画（过渡更新、enter、exit、update、share），并用 CSS 定制',
+    '能按需求选择 CSS 过渡、状态机、<code>&lt;ViewTransition&gt;</code> 或动画库，并让动画尊重“减少动画”设置',
   ],
   keyPoints: [
     'CSS 过渡需要“变化前”和“变化后”两个值，所以元素要一直留在 DOM 里。条件渲染一卸载就没有离场动画；新挂载的节点没有入场动画，除非用 <code>@starting-style</code> 或等浏览器画过一帧再改类名。',
@@ -50,10 +51,10 @@ export default {
     {
       q: '下面哪个更新会让 <code>&lt;ViewTransition&gt;</code> 播放动画？',
       options: [
-        '点击处理函数里直接调用 <code>setShow(true)</code>',
-        '点击处理函数里调用 <code>startTransition(() =&gt; setShow(true))</code>',
-        '<code>useEffect</code> 里调用 <code>setShow(true)</code>',
-        '点击处理函数里调用 <code>flushSync(() =&gt; setShow(true))</code>',
+        '点击处理函数里直接调用 setShow(true)',
+        '点击处理函数里调用 startTransition(() => setShow(true))',
+        'useEffect 里调用 setShow(true)',
+        '点击处理函数里调用 flushSync(() => setShow(true))',
       ],
       answer: 1,
       explain:
@@ -62,10 +63,10 @@ export default {
     {
       q: '一个侧栏要从屏幕左边滑入。哪种动画写法让浏览器不必重新计算页面布局？',
       options: [
-        '把 <code>left</code> 从 -300px 动画到 0',
-        '把 <code>width</code> 从 0 动画到 300px',
-        '把 <code>transform: translateX(-300px)</code> 动画到 <code>none</code>',
-        '把 <code>margin-left</code> 从 -300px 动画到 0',
+        '把 left 从 -300px 动画到 0',
+        '把 width 从 0 动画到 300px',
+        '把 transform: translateX(-300px) 动画到 none',
+        '把 margin-left 从 -300px 动画到 0',
       ],
       answer: 2,
       explain:
@@ -74,10 +75,10 @@ export default {
     {
       q: '用户系统里打开了“减少动态效果”。你的页面用了 <code>&lt;ViewTransition&gt;</code>，什么都没额外写。会怎样？',
       options: [
-        'React 检测到这个设置，自动关闭所有 <code>&lt;ViewTransition&gt;</code> 动画',
+        'React 检测到这个设置，自动关闭所有 <ViewTransition> 动画',
         '浏览器自动关闭所有 View Transition 动画',
-        '动画照常播放，要自己用 <code>prefers-reduced-motion</code> 媒体查询关掉',
-        '<code>&lt;ViewTransition&gt;</code> 报错，要求你先处理这个设置',
+        '动画照常播放，要自己用 prefers-reduced-motion 媒体查询关掉',
+        '<ViewTransition> 报错，要求你先处理这个设置',
       ],
       answer: 2,
       explain:
@@ -485,7 +486,7 @@ function App() {
       q: '<code>{show &amp;&amp; &lt;div&gt;&lt;ViewTransition&gt;&lt;p&gt;你好&lt;/p&gt;&lt;/ViewTransition&gt;&lt;/div&gt;}</code>。在 <code>startTransition</code> 里把 <code>show</code> 设成 true，会有进入动画吗？',
       options: [
         '有，只要在过渡更新里就有',
-        '没有，<code>&lt;ViewTransition&gt;</code> 上面还有一个 <code>div</code> 节点，不会触发 enter',
+        '没有，<ViewTransition> 上面还有一个 div 节点，不会触发 enter',
         '有，但只有淡入没有淡出',
         '报错：ViewTransition 不能放在 div 里面',
       ],

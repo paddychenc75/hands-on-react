@@ -434,6 +434,10 @@
     "profiling|读懂 actualDuration 和 baseDuration",
     "patterns|同一段逻辑的三种写法",
     "accessibility|三个“按钮”",
+    "animation|条件渲染：入场有动画，离场没有",
+    "animation|先播放离场动画，再卸载",
+    "animation|ViewTransition：放不放进 startTransition",
+    "animation|只动 transform：每帧的布局代价",
     "state-architecture|亲手实现 Zustand",
     "state-architecture|真库：create、选择器与组件外读写",
     "state-architecture|真库：persist 持久化",
@@ -500,10 +504,6 @@
     "error-handling|根级回调：谁收到错误？",
     "error-handling|不传回调：window 收到几次 error？",
     "error-handling|一次能恢复的渲染错误",
-    "perf-clinic|memo 挡得住 Context 吗？",
-    "animation|条件渲染：入场有动画，离场没有",
-    "animation|先播放离场动画，再卸载",
-    "animation|ViewTransition：放不放进 startTransition",
-    "animation|只动 transform：每帧的布局代价"
+    "perf-clinic|memo 挡得住 Context 吗？"
   ]
 }
