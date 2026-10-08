@@ -49,13 +49,18 @@ npm run new-lesson -- <课id> --stage <0-5> --after <已有课id> --title "标�
 
 1. 把仓库推到 GitHub，仓库名是 `hands-on-react`（换名字要同步改 `course/site.ts` 里的 `BASE`）。
 2. 在仓库 **Settings → Pages**，把 **Source** 设为 **GitHub Actions**。
-3. 推送到 `main`。`.github/workflows/ci.yml` 先跑检查、构建和浏览器测试；全部通过后 `deploy.yml` 发布站点，地址是 `https://<用户>.github.io/hands-on-react/`。
+3. 推送到 `main`。`.github/workflows/ci.yml` 先跑检查、构建和浏览器测试；全部通过后 `deploy.yml` 发布站点，地址是 `https://paddychenc75.github.io/hands-on-react/`。
 
 Pull request 只跑 CI，不会部署。
 
 ## 许可证
 
-还没有选择许可证。公开仓库之前，请自己决定并添加 `LICENSE`。
+本仓库有两种许可证：
+
+- **代码**用 [MIT](LICENSE)：`course/engine/`、`theme/`、`plugins/`、`scripts/`、`tests/` 和各配置文件。
+- **课程内容**用 [CC BY-NC-SA 4.0](LICENSE-CONTENT)：`docs/`、`course/lessons/`、`course/glossary.ts` 和 `review/`。你可以转载和改编，但要署名、不能商用，改编后的作品要用同样的许可证。
+
+课文里的示例代码片段可以按 MIT 使用。
 
 ## 交给 AI 助手维护
 
