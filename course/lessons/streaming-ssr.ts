@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'streaming-ssr',
   stage: 5,
+  runtime: 19,
   title: '流式 SSR、选择性水合与 RSC 缓存',
   mins: 40,
   summary: 'HTML 怎样分批到达，哪一块先能点，服务端数据缓存多久。在浏览器里亲手水合一段“服务端 HTML”，再修好一个水合不匹配。',
@@ -14,8 +15,8 @@ export default {
   ],
   keyPoints: [
     'renderToString 一次性返回整页 HTML，不能流式发送。renderToPipeableStream 先发“外壳”（Suspense 边界之外的部分），每个边界的内容准备好后再单独发送。',
-    'Suspense 边界是流式发送和水合的最小单位。React 18 逐个边界水合，用户与哪个边界交互，哪个边界就先水合。',
-    '水合要求首次渲染与服务端 HTML 一致。React 18 遇到文字不一致时，把最近的 Suspense 边界（没有边界就是整个根）改为客户端渲染，并调用 onRecoverableError。属性不一致只在开发版警告一次，也不会被修正。',
+    'Suspense 边界是流式发送和水合的最小单位。每个边界独立水合，内容没准备好的边界保留服务端 HTML；用户与哪个边界交互，哪个边界就先水合。',
+    '水合要求首次渲染与服务端 HTML 一致。React 遇到文字不一致时，把最近的 Suspense 边界（没有边界就是整个根）改为客户端渲染，并调用 onRecoverableError。属性不一致只在开发版警告一次，也不会被修正。',
     '修复方法：首次渲染输出服务端能算出的值，水合后再换成客户端的值。用 useEffect，或用 useSyncExternalStore 的 getServerSnapshot。id 用 useId，HTML 嵌套要有效。',
     "RSC 的缓存分层：React 的 cache() 只在一次请求内去重；Next.js 的数据缓存跨请求。默认值随版本变化：14 默认缓存 fetch，15 默认不缓存，16 用 'use cache' 显式声明。",
   ],
@@ -33,11 +34,11 @@ export default {
         '爬虫不执行 JS，收不到替换脚本带来的评论内容，所以要等全部就绪再发。onShellReady 对真人用户最好，但给爬虫的是 fallback。renderToString 不会等待数据：遇到挂起的边界，它直接输出 fallback。',
     },
     {
-      q: 'React 18 中，组件渲染 &lt;nav className={isMobile ? "m" : "d"}&gt;，isMobile 读的是 window.innerWidth。服务端输出 class="d"，用户用手机打开。水合后会怎样？',
+      q: '组件渲染 &lt;nav className={isMobile ? "m" : "d"}&gt;，isMobile 读的是 window.innerWidth。服务端输出 class="d"，用户用手机打开。水合后会怎样？',
       options: ['React 发现不一致，把 class 改成 m', '整个根改为客户端渲染，class 变成 m', 'class 仍是 d。开发版警告，生产版没有提示', '页面报错，nav 不显示'],
       answer: 2,
       explain:
-        '属性不一致时，React 18 只在开发版警告（每页只警告第一次），不会修正属性。DOM 里留着服务端的 d，直到这个属性的值在之后的渲染中变化。文字不一致才会触发客户端重新渲染。所以属性不一致更隐蔽：它不报错，界面却是错的。',
+        '属性不一致时，React 只在开发版警告（每页只警告第一次），不会修正属性。DOM 里留着服务端的 d，直到这个属性的值在之后的渲染中变化。文字不一致才会触发客户端重新渲染。所以属性不一致更隐蔽：它不报错，界面却是错的。',
     },
     {
       q: 'Next.js 14 中 fetch 设置了 next: { revalidate: 60 }。数据在第 0 秒被修改。第 70 秒来了一个请求，它拿到什么？',
@@ -52,7 +53,7 @@ export default {
         '按时间重新验证是“先返回旧的，后台更新”。过期后的第一个请求仍拿到缓存，并触发重新获取。最迷惑的是第一项：很多人以为过期后的请求会等待新数据。需要改完马上可见时，在 Server Action 里按标签或路径手动失效。',
     },
     {
-      q: '页面有三个 Suspense 边界，代码都已下载。React 18 正在水合第一个边界时，用户点了第三个边界里的按钮。会发生什么？',
+      q: '页面有三个 Suspense 边界，代码都已下载，但还没有水合完。React 正在水合第一个边界时，用户点了第三个边界里的按钮。会发生什么？',
       options: [
         '点击丢失，用户要等全部水合完再点一次',
         'React 等三个边界按顺序都水合完，再重放这次点击',
@@ -61,7 +62,7 @@ export default {
       ],
       answer: 2,
       explain:
-        '这就是选择性水合：用户交互的边界优先。React 完成当前工作单元后让出主线程，处理点击时同步水合目标边界，然后分发点击。第一项只在该边界的代码还没下载完时发生：18.3.1 会丢弃这次点击，只提高该边界的优先级。',
+        '这就是选择性水合：用户交互的边界优先。React 完成当前工作单元后让出主线程，处理点击时同步水合目标边界，然后分发点击。第一项只在该边界的代码还没下载完时发生：React 会丢弃这次点击，只提高该边界的优先级。',
     },
     {
       q: '客户端组件 Tabs 要显示一个查数据库的服务端组件 SalesStats。下面哪种写法正确？',
@@ -119,7 +120,7 @@ function App() {
     el.innerHTML = SERVER_HTML;
     box.current.replaceChildren(el);
     const errors = [];
-    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message) });
+    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message + (e.cause ? '：' + e.cause.message : '')) });
     const timer = setTimeout(() => setLog(errors.length ? errors : ['没有水合错误']), 300);
     return () => { clearTimeout(timer); Promise.resolve().then(() => root.unmount()); };
   }, []);
@@ -188,7 +189,7 @@ function App() {
     el.innerHTML = SERVER_HTML;
     box.current.replaceChildren(el);
     const errors = [];
-    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message) });
+    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message + (e.cause ? '：' + e.cause.message : '')) });
     const timer = setTimeout(() => setLog(errors.length ? errors : ['没有水合错误']), 300);
     return () => { clearTimeout(timer); Promise.resolve().then(() => root.unmount()); };
   }, []);
@@ -255,7 +256,7 @@ function App() {
     el.innerHTML = SERVER_HTML;
     box.current.replaceChildren(el);
     const errors = [];
-    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message) });
+    const root = hydrateRoot(el, <PostMeta />, { onRecoverableError: (e) => errors.push(e.message + (e.cause ? '：' + e.cause.message : '')) });
     const timer = setTimeout(() => setLog(errors.length ? errors : ['没有水合错误']), 300);
     return () => { clearTimeout(timer); Promise.resolve().then(() => root.unmount()); };
   }, []);
@@ -269,6 +270,7 @@ function App() {
     hint: '问自己两个问题：服务端渲染时能算出什么值？浏览器的值最早什么时候可以用？时间只需要在水合后算一次；窗口宽度会变，需要订阅。回看第四节 useOnline 的三个参数。',
     exports: ['PostMeta'],
     test: async t => {
+      const { React, ReactDOM } = t;
       const PostMeta = t.exports.PostMeta;
       t.assert(typeof PostMeta === 'function', '没有找到 PostMeta 组件。请保留这个名字');
       t.assert(
@@ -293,7 +295,9 @@ function App() {
         box.innerHTML = SERVER;
         const nodes = [box.querySelector('time'), box.querySelector('.layout b'), ...box.children];
         const errors = [];
-        const root = ReactDOM.hydrateRoot(box, React.createElement(PostMeta), { onRecoverableError: e => errors.push((e && e.message) || String(e)) });
+        const root = ReactDOM.hydrateRoot(box, React.createElement(PostMeta), {
+          onRecoverableError: e => errors.push(((e && e.message) || String(e)) + (e && e.cause ? ' ' + e.cause.message : '')),
+        });
         roots.push(root);
         await t.wait(200);
         const time = box.querySelector('time'),
@@ -349,7 +353,7 @@ function App() {
   },
   checkOnly: [
     {
-      q: `服务器的时区是 UTC。北京时间 15:00（UTC 07:00），用户打开页面，React 18 用 hydrateRoot 水合。页面上没有 Suspense 边界。结果是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Greeting() {
+      q: `服务器的时区是 UTC。北京时间 15:00（UTC 07:00），用户打开页面，用 hydrateRoot 水合。页面上没有 Suspense 边界。结果是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Greeting() {
   const hour = new Date().getHours();
   return &lt;p&gt;{hour &lt; 12 ? '早上好' : '下午好'}&lt;/p&gt;;
 }</code></pre></div>`,
@@ -361,7 +365,7 @@ function App() {
       ],
       answer: 1,
       explain:
-        '服务器算出 7 点，输出“早上好”；浏览器算出 15 点，渲染“下午好”。文字不一致，React 18 在并发根上抛出错误，丢弃最近 Suspense 边界内的服务端 HTML。这里没有边界，所以整个根改为客户端渲染，并调用 onRecoverableError。它不会就地只改这段文字，也不会交给错误边界。',
+        '服务器算出 7 点，输出“早上好”；浏览器算出 15 点，渲染“下午好”。文字不一致，React 抛出错误，丢弃最近 Suspense 边界内的服务端 HTML。这里没有边界，所以整个根改为客户端渲染，并调用 onRecoverableError。它不会就地只改这段文字，也不会交给错误边界。',
     },
     {
       q: `服务器用 renderToPipeableStream，在 onShellReady 里 pipe。Reviews 要等 2 秒。第一批发出的 HTML 包含哪些内容？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;Layout&gt;
@@ -382,7 +386,7 @@ function App() {
         '外壳是 Suspense 边界之外的部分，Footer 也在外壳里。边界的位置先发 fallback（Spinner）。Reviews 好了以后，作为隐藏的 div 加一段替换脚本追加到流里。第一项是常见误解：以为 HTML 必须按顺序发送，后面的内容要等前面的。',
     },
     {
-      q: `用户离线时打开服务端渲染的页面。React 18 水合时，这个组件第一次渲染显示什么？之后呢？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const online = useSyncExternalStore(
+      q: `用户离线时打开服务端渲染的页面。水合时，这个组件第一次渲染显示什么？之后呢？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const online = useSyncExternalStore(
   subscribe,
   () =&gt; navigator.onLine,
   () =&gt; true,
@@ -413,7 +417,7 @@ return &lt;span&gt;{online ? '在线' : '离线'}&lt;/span&gt;;</code></pre></di
   ],
   plays: {
     '选择性水合：点哪块，哪块先水合': {
-      note: '只要在 1.5 秒内点了“页脚”，它就第一个“水合完成”，并立刻“收到点击”。过程是：React 每渲染完一个区块就让出主线程，浏览器趁机处理点击。React 发现目标在未水合的边界里，就同步水合这个边界，再把点击交给它。之前渲染了一半的区块还没有提交，要重新渲染。所以总时间变长了，但用户点的那块最早能用。不点的话，三块按顺序渲染，一起提交。',
+      note: '只要在 1 秒内点了“页脚”，它就第一个“水合完成”，并立刻“收到点击”。过程是：区块由很多小组件组成，React 每渲染完一个小组件就让出主线程，浏览器趁机处理点击。React 发现目标在未水合的边界里，就同步水合这个边界，再把点击交给它。之前渲染了一半的区块还没有提交，要重新渲染，所以总时间变长了，但用户点的那块最早能用。不点的话，三块在同一次提交里一起完成。',
       predict: {
         q: '点“载入服务端 HTML 并开始水合”，然后立刻点“页脚”按钮。控制台里哪一块最先打印“水合完成”？',
         options: [
@@ -424,12 +428,12 @@ return &lt;span&gt;{online ? '在线' : '离线'}&lt;/span&gt;;</code></pre></di
         ],
         answer: 1,
         explain:
-          '用户点击未水合的边界时，React 18 会同步水合这个边界，再分发这次点击。最迷惑的是“三块同时”：不点击时确实如此，因为三个边界在同一次低优先级渲染里完成。点击会打断这次渲染，“页脚”单独先提交。',
+          '用户点击未水合的边界时，React 会同步水合这个边界，再分发这次点击。最迷惑的是“三块同时”：不点击时确实如此，三个边界在同一次提交里完成。点击会打断正在做的工作，“页脚”单独先提交。',
       },
       pkey: 'streaming-ssr|选择性水合：点哪块，哪块先水合',
     },
     '同一段 HTML，三种客户端数据': {
-      note: '甲：两个段落都保留，没有错误。乙：库存在边界外，不一致导致整个根改为客户端渲染，两个段落都被替换。丙：评分在边界内，只替换这个边界，库存段落保留。控制台列出了每条可恢复错误：第一条说文字不一致，最后一条说明 React 改为客户端渲染的范围（整个根，或这个边界）。Suspense 边界既是流式和水合的单位，也是“出错后重做多大范围”的单位。',
+      note: '甲：两个段落都保留，没有错误。乙：库存在边界外，不一致导致整个根改为客户端渲染，两个段落都被替换。丙：评分在边界内，只替换这个边界，库存段落保留。控制台里每个案例有一条可恢复错误，后面的差异里，+ 行是客户端的值，- 行是服务端的值，组件路径能看出不一致发生在边界外还是边界内。Suspense 边界既是流式和水合的单位，也是“出错后重做多大范围”的单位。',
       predict: {
         q: '看“丙”：评分在 Suspense 边界内，客户端是 4.9，服务端是 4.8。水合后，哪些服务端节点还在页面上？',
         options: [
@@ -440,7 +444,7 @@ return &lt;span&gt;{online ? '在线' : '离线'}&lt;/span&gt;;</code></pre></di
         ],
         answer: 1,
         explain:
-          '文字不一致时，React 18 不会就地修补文字，而是丢弃最近的 Suspense 边界里的服务端 HTML，在客户端重新渲染这一块。边界外的库存段落不受影响。“整个根”是乙的情况：错误发生在边界外。“只改文字”是最常见的误解：React 18 中，只有加了 suppressHydrationWarning 的那一层会这样处理；React 19 连这一层也不改，保留服务端的文字。',
+          '文字不一致时，React 不会就地修补文字，而是丢弃最近的 Suspense 边界里的服务端 HTML，在客户端重新渲染这一块。边界外的库存段落不受影响。“整个根”是乙的情况：错误发生在边界外。“只改文字”是最常见的误解：连加了 suppressHydrationWarning 的元素，React 19 也只是不报错，保留服务端的文字。',
       },
       pkey: 'streaming-ssr|同一段 HTML，三种客户端数据',
     },

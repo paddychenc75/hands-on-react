@@ -18,11 +18,11 @@ title: "流式 SSR、选择性水合与 RSC 缓存"
 2. 哪一块先能点？
 3. 服务端拿到的数据，能缓存多久？
 
-**哪些能运行：**`ReactDOM.hydrateRoot` 在本页的 React 18.3.1 中可以运行。本页没有加载 `react-dom/server`，所以示例里的“服务端 HTML”是手写的字符串，格式与 React 18 的真实输出相同。服务端 API 和 Next.js 的代码只能阅读。
+**哪些能运行：**`hydrateRoot` 在本页的 React 19 实验台里可以运行。本页没有加载 `react-dom/server`，所以示例里的“服务端 HTML”是手写的字符串，用 `<!--$-->` 这样的记号标出 Suspense 边界，与真实输出的格式一致。服务端 API 和 Next.js 的代码只能阅读。
 
 ## 一、renderToString 与流式渲染
 
-**流式 SSR** 指服务器边渲染边发送 HTML，不等整页都准备好。React 18 提供了两类服务端 API：
+**流式 SSR** 指服务器边渲染边发送 HTML，不等整页都准备好。React 提供了两类服务端 API：
 
 |  | renderToString | renderToPipeableStream（Node）/ renderToReadableStream（Web Streams） |
 |---|---|---|
@@ -31,7 +31,7 @@ title: "流式 SSR、选择性水合与 RSC 缓存"
 | 首字节时间 | 取决于最慢的数据（渲染前要先自己取齐数据） | 取决于外壳 |
 | 适合 | 旧项目、无数据依赖的页面 | 有慢数据的页面；框架（Next.js、Remix）内部都用它 |
 
-React 19 另有 `react-dom/static` 的 `prerender`：它等所有数据就绪再输出完整 HTML，用于构建时的静态生成，也可以用来给爬虫输出。只能阅读。
+React 19 还有 `react-dom/static` 的 `prerender`：它等所有数据就绪再输出完整 HTML，用于构建时的静态生成，也可以用来给爬虫输出。只能阅读。
 
 **外壳**（shell）指所有 Suspense 边界之外的部分。外壳渲染完，`onShellReady` 就会被调用，服务器开始发送。
 
@@ -63,7 +63,7 @@ app.get('/product/:id', (req, res) => {
 
 流里的 HTML 大致分两批。第一批里，没准备好的边界只是一个占位：
 
-```jsx title="只能阅读：React 18 流式输出的简化形式。<!--$--> 表示已完成的边界，<!--$?--> 表示还在等待"
+```jsx title="只能阅读：流式输出的简化形式。<!--$--> 表示已完成的边界，<!--$?--> 表示还在等待"
 <!-- 第一批：外壳 + fallback -->
 <header>…</header>
 <!--$?--><template id="B:0"></template><p>评论加载中…</p><!--/$-->
@@ -84,28 +84,35 @@ app.get('/product/:id', (req, res) => {
 
 React 17 的水合是整页一次完成。任何一块的 JS 没下载完，整页都不能交互。
 
-React 18 把每个 Suspense 边界当作独立的水合单位。外壳先水合，各边界随后以低优先级逐个水合。**选择性水合**指：用户点击一个还没水合的边界，React 就先水合这个边界。
+React 18 起，每个 Suspense 边界是独立的水合单位。外壳先水合。内容已经就绪的边界随外壳一起完成；内容还没准备好的边界（例如懒加载的代码还没到）保留服务端 HTML，等准备好后各自水合。**选择性水合**指：用户点击一个还没水合的边界，React 就先水合这个边界。
 
-下面每个区块的渲染故意占用主线程 500 毫秒。点按钮开始水合，然后立刻点“页脚”。
+下面三个区块的代码是懒加载的，约 0.1 秒后到达。每个区块由 10 个小组件组成，渲染各占用主线程 50 毫秒，共 500 毫秒。点按钮开始水合，然后立刻点“页脚”。
 
 ```jsx play title="选择性水合：点哪块，哪块先水合"
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 
 const BLOCKS = ['评论', '推荐', '页脚'];
 let t0 = 0;
 const stamp = () => Math.round(performance.now() - t0) + 'ms';
 
-// 故意很慢的组件：每次渲染占用主线程 500 毫秒
-function SlowBlock({ name }) {
-  const [clicks, setClicks] = useState(0);
-  const end = performance.now() + 500;
+// 故意很慢的小组件：每次渲染占用主线程 50 毫秒
+function Slow() {
+  const end = performance.now() + 50;
   while (performance.now() < end) {}
+  return null;
+}
+
+function Block({ name }) {
+  const [clicks, setClicks] = useState(0);
   useEffect(() => { console.log(stamp(), name + '：水合完成'); }, []);
   return (
-    <button onClick={() => { console.log(stamp(), name + '：收到点击'); setClicks(clicks + 1); }}>
-      {name + '（点击 ' + clicks + '）'}
-    </button>
+    <>
+      {Array.from({ length: 10 }, (_, i) => <Slow key={i} />)}
+      <button onClick={() => { console.log(stamp(), name + '：收到点击'); setClicks(clicks + 1); }}>
+        {name + '（点击 ' + clicks + '）'}
+      </button>
+    </>
   );
 }
 
@@ -123,13 +130,18 @@ function App() {
     el.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
     el.innerHTML = SERVER_HTML;
     box.current.replaceChildren(el);
+    // 模拟代码分块：每个区块的代码 100 毫秒后才到达
+    const Lazy = BLOCKS.map(n => lazy(() => new Promise(resolve => {
+      setTimeout(() => resolve({ default: () => <Block name={n} /> }), 100);
+    })));
     t0 = performance.now();
     console.log('0ms 开始水合');
     const root = hydrateRoot(el, (
       <>
-        {BLOCKS.map(n => (
-          <Suspense key={n} fallback={null}><SlowBlock name={n} /></Suspense>
-        ))}
+        {BLOCKS.map((n, i) => {
+          const Part = Lazy[i];
+          return <Suspense key={n} fallback={null}><Part /></Suspense>;
+        })}
       </>
     ), { onRecoverableError: (e) => console.log('可恢复错误：' + e.message) });
     return () => { Promise.resolve().then(() => root.unmount()); };
@@ -145,18 +157,18 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-React 18.3.1 的源码里，点击（离散事件）落在未水合的边界上时，React 尝试同步水合它。如果该边界的代码还没下载完（例如 `lazy` 组件），这次点击会被丢弃，React 只是提高该边界的优先级。悬停这类连续事件会排队，水合后重放。所以首屏关键按钮的代码不要放进懒加载的块里。
+点击（离散事件）落在未水合的边界上时，React 尝试同步水合它。如果该边界的代码还没下载完（例如 `lazy` 组件），这次点击会被丢弃，React 只是提高该边界的优先级。悬停这类连续事件会排队，水合后重放。所以首屏关键按钮的代码不要放进懒加载的块里。
 
 </CallBox>
 
 ## 三、水合不匹配：React 实际做了什么
 
-水合时，React 不重新创建 DOM。它沿着服务端 HTML 逐个节点“认领”，并假设内容一致。不一致时，React 18 的处理分两种：
+水合时，React 不重新创建 DOM。它沿着服务端 HTML 逐个节点“认领”，并假设内容一致。不一致时，React 的处理分两种：
 
 - **文字或结构不一致**：抛出错误。React 丢弃最近的 Suspense 边界里的服务端 HTML，在浏览器重新渲染这一块。没有边界时，丢弃整个根。错误交给 `onRecoverableError`。
 - **属性不一致**（className、href、id）：只在开发版里警告，生产版没有任何提示。React **不会修正**属性，DOM 里留着服务端的值。
 
-下面三个容器使用同一段服务端 HTML，客户端组件收到的数据不同。
+下面三个容器使用同一段服务端 HTML，客户端组件收到的数据不同。文字不一致时，React 19 的错误信息是 “Hydration failed because the server rendered text didn't match the client”，后面附一份差异：`+` 行是客户端渲染的值，`-` 行是服务端 HTML 里的值。
 
 ```jsx play title="同一段 HTML，三种客户端数据"
 import { useState, useEffect, useRef, Suspense } from 'react';
@@ -258,7 +270,7 @@ function App() {
 
 读浏览器值的组件，推荐用 `useSyncExternalStore`。水合时 React 调用 `getServerSnapshot`，保证与服务端一致；水合后发现 `getSnapshot` 的值不同，再重新渲染一次。
 
-```jsx title="漏掉第三个参数时，React 18 在水合时报错：Missing getServerSnapshot"
+```jsx title="漏掉第三个参数时，水合会报告可恢复错误（原因是缺少 getServerSnapshot），整个根改为客户端渲染"
 function subscribe(callback) {
   window.addEventListener('online', callback);
   window.addEventListener('offline', callback);
@@ -281,7 +293,13 @@ function useOnline() {
 
 `suppressHydrationWarning` 只作用于一个元素的文字和属性，不作用于子元素。它适合“一个时间戳”这类无法避免的差异。把它加在外层容器上，下面的不匹配照样报错。用它掩盖结构差异，等于把问题留到生产环境。
 
-React 19 中它只是不报错，不会把文字换成客户端的值。要显示客户端的值，仍然要在水合后用 effect 更新。
+它只是不报错，不会把文字换成客户端的值：时间戳仍显示服务端的文字。要显示客户端的值，仍然要在水合后用 effect 更新。
+
+<CallBox kind="deep" label="维护 React 18 项目时">
+
+React 18 里，加了 `suppressHydrationWarning` 的元素在水合后会把文字改成客户端的值。从 18 升级到 19 后，这类时间戳会一直显示服务端生成时的文字，要改成在 effect 里更新。
+
+</CallBox>
 
 </CallBox>
 
