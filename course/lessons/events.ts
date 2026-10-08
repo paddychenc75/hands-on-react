@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'events',
   stage: 0,
+  runtime: 19,
   title: '事件处理',
   mins: 18,
   summary: '响应点击、输入、键盘等用户操作。',
@@ -165,7 +166,7 @@ function App() {
   plays: {
     三种常见写法: {},
     事件对象与冒泡: {
-      note: '按钮 B 的点击先由按钮处理，再冒泡到外层 div，所以新增 2 条。按钮 A 调用了 e.stopPropagation()，事件停在按钮上，只新增 1 条。日志列表用了 <code>.map()</code> 和 <code>key</code>，第 7 课会讲。',
+      note: '按钮 B 的点击先由按钮处理，再冒泡到外层 div，所以新增 2 条。按钮 A 调用了 e.stopPropagation()，事件停在按钮上，只新增 1 条。日志列表用了 <code>.map()</code> 和 <code>key</code>，“列表渲染与 key”一课会讲。',
       predict: {
         q: '点击“按钮 B”一次，日志列表会新增几条？',
         options: ['1 条', '2 条', '0 条', '3 条'],

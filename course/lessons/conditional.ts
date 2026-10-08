@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'conditional',
   stage: 0,
+  runtime: 19,
   title: '条件渲染',
   mins: 16,
   summary: '根据条件显示不同的内容。',
@@ -96,7 +97,7 @@ function App() {
   },
   checkOnly: [
     {
-      q: `在 React 18 及以后，<code>&lt;Status online={false} /&gt;</code> 会渲染什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Status({ online }) {
+      q: `在 React 19 中，<code>&lt;Status online={false} /&gt;</code> 会渲染什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Status({ online }) {
   if (online) return &lt;b&gt;在线&lt;/b&gt;;
 }</code></pre></div>`,
       options: ['什么都不渲染', '报错：组件必须返回 null，不能返回 undefined', '显示文字 undefined', '显示文字 false'],

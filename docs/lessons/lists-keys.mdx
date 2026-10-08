@@ -101,7 +101,7 @@ key 不会作为 prop 传给组件。如果子组件也需要这个 id，要另�
 
 <CallBox kind="warn" label="常见坑">
 
-你可能看到的报错：`Warning: Each child in a list should have a unique "key" prop.`<br />原因：map 返回的元素没有 key。<br />去看：`.map()` 回调返回的最外层元素。在它上面写 `key={item.id}`。如果它是一个组件，就写在组件上：`<TodoItem key={t.id} … />`。<br />如果看到的是 `Encountered two children with the same key`：有两项的 key 相同。去检查 id 是怎么生成的。
+你可能看到的警告：`Each child in a list should have a unique "key" prop.`（React 18 的警告以 `Warning: ` 开头，React 19 没有这个前缀）<br />原因：map 返回的元素没有 key。<br />去看：`.map()` 回调返回的最外层元素。在它上面写 `key={item.id}`。如果它是一个组件，就写在组件上：`<TodoItem key={t.id} … />`。<br />如果看到的是 `Encountered two children with the same key`：有两项的 key 相同。去检查 id 是怎么生成的。
 
 </CallBox>
 

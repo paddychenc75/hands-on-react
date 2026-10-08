@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'state',
   stage: 0,
+  runtime: 19,
   title: 'State：让组件“记住”东西',
   mins: 25,
   summary: '用 useState 保存会变化的数据，理解为什么普通变量不行。',

@@ -88,7 +88,7 @@ function App() {
 }
 ```
 
-每个 `<Counter />` 是一个独立的**组件实例**，每个实例有自己的 state。想让两个计数器共用一个数，要把 state 放到它们共同的父组件里。第 10 课《状态提升》会讲。
+每个 `<Counter />` 是一个独立的**组件实例**，每个实例有自己的 state。想让两个计数器共用一个数，要把 state 放到它们共同的父组件里。[状态提升](/lessons/lifting-state)一课会讲。
 
 ## 一次渲染 = 一张快照
 
@@ -163,7 +163,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-`useState` 要在组件函数的**顶层**调用：不要放在 if、循环或嵌套函数里，也不要放在提前 return 之后。原因在第 15 课讲。
+`useState` 要在组件函数的**顶层**调用：不要放在 if、循环或嵌套函数里，也不要放在提前 return 之后。原因在[自定义 Hook：复用逻辑](/lessons/custom-hooks)一课讲。
 
 </CallBox>
 

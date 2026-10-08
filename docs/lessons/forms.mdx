@@ -95,13 +95,13 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-你可能看到的报错：`Warning: A component is changing an uncontrolled input to be controlled.`<br />原因：value 一开始是 undefined（例如写了 `useState()`），后来才变成字符串。React 认为输入框从“非受控”变成了“受控”。<br />去看：这个输入框对应的 useState。给它一个初始值，例如 `useState('')`。
+你可能看到的警告：`A component is changing an uncontrolled input to be controlled.`<br />原因：value 一开始是 undefined（例如写了 `useState()`），后来才变成字符串。React 认为输入框从“非受控”变成了“受控”。<br />去看：这个输入框对应的 useState。给它一个初始值，例如 `useState('')`。
 
 </CallBox>
 
 <CallBox kind="warn" label="常见坑">
 
-你可能看到的报错：``Warning: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.``<br />原因：输入框的 `value` 来自 state，却没有 `onChange` 去更新 state。每次渲染它都被强制设回 state 的值。<br />去看：上面《只有 value，没有 onChange》里的输入框。加上 `onChange`；如果确实只读，写 `readOnly`；如果只想要初始值，用 `defaultValue`。
+你可能看到的警告：``You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field.``<br />原因：输入框的 `value` 来自 state，却没有 `onChange` 去更新 state。每次渲染它都被强制设回 state 的值。<br />去看：上面《只有 value，没有 onChange》里的输入框。加上 `onChange`；如果确实只读，写 `readOnly`；如果只想要初始值，用 `defaultValue`。
 
 </CallBox>
 
@@ -113,9 +113,35 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-另一种做法是**非受控组件**。它不绑定 value。需要值时，用 ref 或表单的 FormData 读取 DOM。它代码更少，适合简单表单和文件上传 `<input type="file">`。React 19 的表单 Actions 也鼓励这种方式，第 28 课会讲。
+另一种做法是**非受控组件**。它不绑定 value。需要值时，用 ref 或表单的 FormData 读取 DOM。它代码更少，适合简单表单和文件上传 `<input type="file">`。下一节的 `action` 就是这种思路。
 
 </CallBox>
+
+## 认识 form 的 action：提交时才读值
+
+React 19 里，`<form>` 的 `action` 属性可以直接接收一个函数。用户提交时，React 会阻止页面刷新，再调用这个函数，参数是 **`FormData`**：表单里每个带 `name` 的字段的值。写法上，字段不必绑定 state，提交时一次取出：`formData.get('name')`。
+
+```jsx play title="form 的 action 属性"
+import { useState } from 'react';
+
+function App() {
+  const [msg, setMsg] = useState('还没有提交');
+
+  function save(formData) {
+    setMsg('你好，' + formData.get('name'));
+  }
+
+  return (
+    <form action={save}>
+      <input name="name" placeholder="姓名" />
+      <button>提交</button>
+      <p>{msg}</p>
+    </form>
+  );
+}
+```
+
+怎么选？需要边输入边校验、字段之间互相联动，用受控组件。只在提交时读一次值，用 `action`。这里只是入门。`action` 配合等待状态、乐观更新和出错处理的完整用法，见[React 19 新特性](/lessons/react-19)一课。
 
 </LessonProse>
 

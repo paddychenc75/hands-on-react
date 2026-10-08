@@ -4,6 +4,7 @@ import { prepare, compile } from '../engine/exec.ts';
 export default {
   id: 'jsx',
   stage: 0,
+  runtime: 19,
   title: 'JSX：在 JS 里写界面',
   mins: 22,
   summary: '学会 JSX 的语法规则，以及如何用 {} 嵌入 JavaScript 表达式。',
@@ -79,6 +80,8 @@ export default {
   );
 }`,
     test: async t => {
+      // 这一课跑在 React 19：用 t.React / t.ReactDOM，不读全局的 React / ReactDOM（全局的是 18）
+      const { React, ReactDOM } = t;
       const h2 = t.q('h2');
       t.assert(h2 && h2.textContent.trim() === '小明', '需要一个内容为“小明”的 <h2>');
       const ps = t.qa('p');
@@ -91,7 +94,7 @@ export default {
       t.assert(changed !== t.rawSource, '请保留起始代码里的 user 数据（name: 小明，age: 18）。检查程序会改动它，看页面会不会跟着变');
       let App2: any;
       try {
-        App2 = compile(['React', 'ReactDOM'], prepare(changed, []))(React, ReactDOM).App;
+        App2 = compile(['React', 'ReactDOM'], prepare(changed, [], { version: 19, React, ReactDOM }))(React, ReactDOM).App;
       } catch (e) {}
       if (typeof App2 === 'function') {
         const box = document.createElement('div');

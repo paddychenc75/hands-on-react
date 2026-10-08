@@ -57,6 +57,12 @@ function App() {
 
 上面用到了 **解构**：`function UserCard({ name, role })` 等价于先接收一个 `props` 对象，再取出 `props.name`、`props.role`。`emoji = '🙂'` 是解构时的默认值。
 
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+旧项目里可能见到给函数组件设置 `UserCard.defaultProps = { emoji: '🙂' }`。React 19 已移除函数组件的 `defaultProps`（和 `propTypes`），这样写不再生效。统一用解构默认值。
+
+</CallBox>
+
 <CallBox kind="like" label="打个比方">
 
 组件像一个模具，props 像往模具里倒的材料。同一个“卡片模具”，倒入不同的名字和职位，就做出不同的卡片。
@@ -75,7 +81,7 @@ function App() {
 
 ## 组件必须是纯函数
 
-组件要像**纯函数**：同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。第 14 课会讲剩下的情况。
+组件要像**纯函数**：同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。[useEffect 与副作用](/lessons/use-effect)一课会讲剩下的情况。
 
 React 怎么帮你发现违反这条规则的代码？开发环境里的**严格模式**（`<StrictMode>`）会把每个组件函数调用两次。纯函数调用两次，结果和调用一次相同。不纯的函数就会露馅。生产环境没有这个检查。
 

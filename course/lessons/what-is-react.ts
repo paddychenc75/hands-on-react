@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'what-is-react',
   stage: 0,
+  runtime: 19,
   title: 'React 是什么',
   mins: 14,
   summary: '理解 React 解决的问题，以及“UI = f(state)”这个核心思想。',

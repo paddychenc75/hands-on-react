@@ -3,8 +3,9 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'forms',
   stage: 0,
+  runtime: 19,
   title: '表单与受控组件',
-  mins: 19,
+  mins: 23,
   summary: '让 React state 成为表单数据的唯一数据源。',
   goals: [
     '能把输入框写成受控组件：value 来自 state，onChange 更新 state',
@@ -33,6 +34,18 @@ export default {
       answer: 0,
       explain:
         '受控组件里 state 是唯一数据源，输入框只负责显示它、通知变化。最迷惑的是第二项：那是非受控输入框的行为，它的值保存在 DOM 里，代码改 state 也影响不到它。',
+    },
+    {
+      q: '<code>&lt;form action={save}&gt;</code> 里的 <code>save</code> 是一个函数。用户提交表单时，它会收到什么参数？',
+      options: [
+        '提交事件对象 e，要自己调用 e.preventDefault()',
+        '一个 FormData 对象，里面是各个带 name 的字段的值',
+        '包含所有字段的 state 对象',
+        '什么参数都没有，要用 ref 读输入框',
+      ],
+      answer: 1,
+      explain:
+        "React 19 会阻止页面刷新，再用 <code>FormData</code> 调用 action 函数，用 <code>formData.get('name')</code> 取值。没有 <code>name</code> 的字段不会出现在里面。最容易误选的是第一项：那是 <code>onSubmit</code> 的参数。<code>action</code> 不需要 preventDefault，也不依赖 state。",
     },
   ],
   exercise: {
@@ -124,5 +137,15 @@ function App() {
       pkey: 'forms|只有 value，没有 onChange',
     },
     一个完整的表单: {},
+    'form 的 action 属性': {
+      note: '输入框被清空了。<code>action</code> 函数跑完后，React 会把表单里没有绑定 state 的字段重置为初始值。这和 <code>onSubmit</code> 不同：用 <code>onSubmit</code> 时，输入框的内容提交后原样保留。如果希望保留，就把字段做成受控组件。',
+      predict: {
+        q: '输入“小美”，点“提交”。下面显示“你好，小美”之后，输入框里的“小美”会怎样？',
+        options: ['还留在输入框里', '被清空', '变成“你好，小美”', '输入框消失'],
+        answer: 1,
+        explain: 'action 函数执行完，React 会重置表单里非受控的字段，所以输入框变空。页面不会刷新，msg 已经更新。',
+      },
+      pkey: 'forms|form 的 action 属性',
+    },
   },
 } satisfies Lesson;

@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'project-todo',
   stage: 0,
+  runtime: 19,
   title: '实战一：完整的待办应用',
   mins: 41,
   summary: '综合 state、表单、列表、条件渲染和派生数据，从零写一个功能完整的小应用。',

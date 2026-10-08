@@ -71,7 +71,7 @@ function App() {
 
 组件返回 `null`、`false` 或 `undefined` 时什么也不渲染。比如一个 `Modal` 组件，在 `open` 为 false 时直接 `return null`。
 
-提前 return 要写在所有 Hook（例如 useState）之后。原因第 15 课会讲，这里先记住这条规则。
+提前 return 要写在所有 Hook（例如 useState）之后。原因在[自定义 Hook：复用逻辑](/lessons/custom-hooks)一课讲，这里先记住这条规则。
 
 条件变成 false 时，React 会把对应的元素从页面上移除。元素里输入的内容、组件里的 state 都会丢失。条件再变回 true，得到的是一个全新的元素。
 

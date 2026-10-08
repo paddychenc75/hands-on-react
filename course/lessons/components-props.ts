@@ -3,6 +3,7 @@ import type { Lesson } from '../types.ts';
 export default {
   id: 'components-props',
   stage: 0,
+  runtime: 19,
   title: '组件与 Props',
   mins: 24,
   summary: '把界面拆成组件，用 props 给组件传数据。',
