@@ -4,20 +4,20 @@ export default {
   id: 'router',
   stage: 4,
   title: '路由：React Router',
-  mins: 30,
+  mins: 38,
   runtime: 19,
   summary: '让单页应用拥有多个“页面”：路由表、动态参数、嵌套布局与跳转。',
   goals: [
     '能解释客户端路由的三步：URL 变化、路由库读 URL、渲染匹配的组件',
-    '能写出路由表：静态路径、动态参数 <code>:id</code>、兜底 <code>*</code>，并能说出 React Router 怎样在多条匹配里选一条',
+    '能写出路由表：静态路径、动态参数 <code>:id</code>、兜底 <code>*</code> 和带 <code>&lt;Outlet /&gt;</code> 的嵌套布局，并能说出 React Router 怎样在多条匹配里选一条',
     '能用 Link、useParams、useNavigate 完成“列表 → 详情 → 返回”的流程',
-    '能判断哪些状态该放进 URL 的查询参数，以及什么时候用 <code>{ replace: true }</code>',
+    '能判断哪些状态该放进 URL 的查询参数，并解释 <code>loader</code> 在导航中的时机：取到数据之前，页面停留在旧位置',
   ],
   keyPoints: [
     '问题：单页应用只有一个 HTML。路由库读取 URL，决定渲染哪个组件，浏览器不刷新。',
     '站内跳转用 <code>&lt;Link to&gt;</code>。普通 <code>&lt;a href&gt;</code> 会整页刷新，所有 state 丢失。',
     '动态段 <code>users/:id</code> 用 <code>useParams()</code> 读出；值是字符串，和数字比较前要转换。',
-    '嵌套路由：父路由渲染公共布局，子路由的内容出现在 <code>&lt;Outlet /&gt;</code> 的位置。',
+    '嵌套路由：父路由渲染公共布局，子路由的内容出现在 <code>&lt;Outlet /&gt;</code> 的位置。<code>loader</code> 在导航开始时运行，没返回之前页面停留在旧位置；嵌套路由的 loader 同时运行。',
     '最常见的坑：部署后在 <code>/users/2</code> 刷新得到 404。服务器要把所有路径都返回 index.html。',
   ],
   quiz: [
@@ -77,10 +77,10 @@ const ParamsCtx = createContext({});
 function Router({ children }) {
   const [path, setPath] = useState('/');   // 真实的库会读写 window.location
   return (
-    <RouterCtx.Provider value={{ path, navigate: setPath }}>
+    <RouterCtx value={{ path, navigate: setPath }}>
       <div id="address" style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>https://example.com{path}</div>
       {children}
-    </RouterCtx.Provider>
+    </RouterCtx>
   );
 }
 
@@ -102,7 +102,7 @@ function Routes({ routes }) {
   const { path } = useContext(RouterCtx);
   for (const r of routes) {
     const params = matchPath(r.path, path);
-    if (params) return <ParamsCtx.Provider value={params}>{r.element}</ParamsCtx.Provider>;
+    if (params) return <ParamsCtx value={params}>{r.element}</ParamsCtx>;
   }
   return null;
 }
@@ -172,10 +172,10 @@ const ParamsCtx = createContext({});
 function Router({ children }) {
   const [path, setPath] = useState('/');   // 真实的库会读写 window.location
   return (
-    <RouterCtx.Provider value={{ path, navigate: setPath }}>
+    <RouterCtx value={{ path, navigate: setPath }}>
       <div id="address" style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>https://example.com{path}</div>
       {children}
-    </RouterCtx.Provider>
+    </RouterCtx>
   );
 }
 
@@ -197,7 +197,7 @@ function Routes({ routes }) {
   const { path } = useContext(RouterCtx);
   for (const r of routes) {
     const params = matchPath(r.path, path);
-    if (params) return <ParamsCtx.Provider value={params}>{r.element}</ParamsCtx.Provider>;
+    if (params) return <ParamsCtx value={params}>{r.element}</ParamsCtx>;
   }
   return null;
 }
@@ -432,6 +432,33 @@ const page = params.get('page') ?? 1;
       explain:
         'React Router 按“谁更具体”给路由排名：静态段优先于动态段，动态段优先于 <code>*</code>，和书写顺序无关。所以 /users/2 渲染 UserDetail。“* 先匹配”是迷你路由的行为（它按数组顺序取第一个），不是真库的行为。',
     },
+    {
+      q: `父路由 <code>/</code> 有 <code>loader</code>（耗时 1 秒），子路由 <code>/c</code> 也有 <code>loader</code>（耗时 1 秒）。用户直接打开 <code>/c</code>，两个 loader 都返回、页面完整显示，大约要多久？`,
+      options: [
+        '约 1 秒：父子路由的 loader 同时运行',
+        '约 2 秒：先等父路由，再运行子路由的 loader',
+        '约 1 秒，但子路由的数据会丢失',
+        '约 0 秒：loader 不会阻塞页面',
+      ],
+      answer: 0,
+      explain:
+        'React Router 在导航开始时，把匹配到的每一层路由的 loader 一起启动，所以总时间约等于最慢的那一个。“约 2 秒”是用 useEffect 取数据时的情形：如果父组件在数据到达前不渲染 Outlet，子组件要等父组件的数据回来才挂载，请求才会排成队（这叫“瀑布”）。“约 0 秒”不对：loader 返回之前，路由不会切换到新页面。',
+    },
+    {
+      q: `路由表如下。用户访问 <code>/</code>，页面上只有导航栏，中间是空白。最合适的修复是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">{ path: '/', element: &lt;Layout /&gt;, children: [
+  { path: 'users', element: &lt;Users /&gt; },
+  { path: 'users/:id', element: &lt;UserDetail /&gt; },
+] }</code></pre></div>`,
+      options: [
+        '给 children 加一条 index 路由：{ index: true, element: <Home /> }',
+        '把 Layout 的 path 改成 "*"',
+        '在 Layout 里用 useParams 读出当前页面',
+        '把 users 改成 "/users"',
+      ],
+      answer: 0,
+      explain:
+        '访问 / 时，只有父路由匹配，没有任何子路由，所以 Layout 里的 Outlet 什么也不渲染。index 路由就是“父路径本身”的默认子页面。把 Layout 改成 "*" 会让它匹配所有路径，问题更多；useParams 只能读 URL 里的动态段；把 users 改成绝对路径对这个问题没有帮助。',
+    },
   ],
   plays: {
     '迷你路由（Link 和 Hook 的用法与 React Router 一致）': {
@@ -443,7 +470,34 @@ const page = params.get('page') ?? 1;
         explain:
           '迷你 Routes 逐条匹配，一条都没匹配上时走最后的 return，显示“404：没有页面匹配 /about”。“空白”有迷惑性：练习里的 Routes 才是没匹配就返回 null，这里的写法多了一行兜底文字。',
       },
-      note: '这是原理演示。真实项目从 <code>react-router</code> 导入，写法见上面的代码块。迷你版和真库有四点不同：1. 路由表用数组传入，不是 <code>&lt;Route&gt;</code> 子元素；2. 不支持嵌套路由和 <code>&lt;Outlet /&gt;</code>；3. 不同步浏览器地址栏，也不支持前进后退；4. 迷你版按数组顺序取第一个匹配，所以 <code>*</code> 必须放最后。真库按“谁更具体”排名（静态段 &gt; 动态段 &gt; <code>*</code>），和书写顺序无关。',
+      note: '这是原理演示。真实项目从 <code>react-router</code> 导入，写法见上面的代码块。迷你版和真库有四点不同：1. 路由表用数组传入，不是 <code>&lt;Route&gt;</code> 子元素；2. 不支持嵌套路由和 <code>&lt;Outlet /&gt;</code>（下一个示例补上）；3. 不同步浏览器地址栏，也不支持前进后退；4. 迷你版按数组顺序取第一个匹配，所以 <code>*</code> 必须放最后。真库按“谁更具体”排名（静态段 &gt; 动态段 &gt; <code>*</code>），和书写顺序无关。',
+    },
+    '嵌套路由：Link 与普通 a 标签': {
+      pkey: 'router|嵌套路由：Link 与普通 a 标签',
+      predict: {
+        q: '先点 3 次“布局里的计数器”，再点导航里的“用户”（Link），最后点“关于（普通 a 标签）”。计数器依次显示什么？',
+        options: ['3，然后 3', '3，然后 0', '0，然后 0', '0，然后 3'],
+        answer: 1,
+        explain:
+          '点 Link 时，只有路径变了：Layout 还在树上同一个位置，它的 state 保留，计数器仍是 3。普通 a 标签让浏览器请求新页面，整个应用从头启动，所有 state 回到初始值，计数器变成 0。这也是嵌套路由的好处：切换子页面时，父层的布局不会重新挂载。',
+      },
+      note: '迷你版用 <code>key</code> 让整个应用重新挂载，来模拟浏览器的整页加载。真库的 <code>Link</code> 拦截点击，调用浏览器的 history 接口改地址栏，不请求新页面。',
+    },
+    'loader：先取数据，还是先换页面': {
+      pkey: 'router|loader：先取数据，还是先换页面',
+      predict: {
+        q: '点“用户 2（loader 版）”，等 300 毫秒（请求要 900 毫秒才返回）。此时地址栏和页面分别是什么？',
+        options: [
+          '地址栏是 /loader/users/2，页面显示“加载中…”',
+          '地址栏仍是 /，页面仍是首页',
+          '地址栏是 /loader/users/2，页面仍是首页',
+          '地址栏仍是 /，页面显示“加载中…”',
+        ],
+        answer: 1,
+        explain:
+          'loader 在导航开始时运行，返回之前路由不更新位置，所以地址栏和页面都停留在旧位置，只有“导航状态”变成 loading。数据到手后，位置和页面一起切换，新页面一出现就有数据。再点“effect 版”对比：新页面马上出现，里面显示“加载中…”，数据由组件自己在 effect 里取。选哪种取决于你想让用户在等待时看到什么。',
+      },
+      note: '对比两种链接：loader 版先等数据，再一起切换；effect 版先切换页面，页面里再显示“加载中…”。真库里，旧页面上通常用 <code>useNavigation().state</code> 显示一个进度条。',
     },
   },
 } satisfies Lesson;

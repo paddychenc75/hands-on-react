@@ -64,7 +64,13 @@ function UserDetail() {
 
 ## 自己动手：一个 40 行的迷你路由
 
-本页的沙箱不能加载 React Router。所以我们用学过的 Context 和 state 写一个**迷你版**。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。它和真库有两点不同：路由表用数组传入（写法类似 `createBrowserRouter`）；不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
+实验台里不安装第三方库，所以我们用学过的 Context 和 state 写**迷你版**。本课分三层：
+
+1. **迷你实现**（本节和后面两个示例）：弄懂原理，并通过预测检验自己的理解。`Link`、`useParams`、`useNavigate` 的用法和 React Router 一致。
+2. **本机任务**（课末）：在你自己的电脑上装真库，把同样的功能再做一遍，并按清单自查。
+3. **项目课**：[《实战四：城市天气应用》](/lessons/project-weather)用真库把路由、数据请求和测试接成一个完整应用。
+
+第一个迷你路由很小：路由表用数组传入（写法类似 `createBrowserRouter`），暂时不支持嵌套路由。理解了它，你就理解了路由库的工作原理。
 
 ```jsx play title="迷你路由（Link 和 Hook 的用法与 React Router 一致）"
 import { createContext, useContext, useState } from 'react';
@@ -75,7 +81,7 @@ const ParamsCtx = createContext({});
 
 function Router({ children }) {
   const [path, setPath] = useState('/');   // 真实的库会读写 window.location
-  return <RouterCtx.Provider value={{ path, navigate: setPath }}>{children}</RouterCtx.Provider>;
+  return <RouterCtx value={{ path, navigate: setPath }}>{children}</RouterCtx>;
 }
 
 // 把 '/users/:id' 和 '/users/42' 匹配，得到 { id: '42' }
@@ -94,7 +100,7 @@ function Routes({ routes }) {
   const { path } = useContext(RouterCtx);
   for (const r of routes) {
     const params = matchPath(r.path, path);
-    if (params) return <ParamsCtx.Provider value={params}>{r.element}</ParamsCtx.Provider>;
+    if (params) return <ParamsCtx value={params}>{r.element}</ParamsCtx>;
   }
   return <p>404：没有页面匹配 {path}</p>;
 }
@@ -151,6 +157,110 @@ function App() {
 }
 ```
 
+## 嵌套路由与 Outlet：布局只渲染一次
+
+上面的迷你版只能匹配一条路径。真实应用的页面常常共用一个布局（导航栏、侧栏），只有中间的内容在变。嵌套路由就是为此设计的：路由表是一棵树，一个 URL 匹配树上的一条**分支**，每一层的组件依次嵌套，子层出现在父层的 `<Outlet />` 位置。
+
+下面的迷你版补上了嵌套和 `Outlet`。导航里有两种链接：`Link` 只更新路径；“普通 a 标签”模拟浏览器的默认行为，向服务器请求一个新页面。先预测，再运行。
+
+```jsx play title="嵌套路由：Link 与普通 a 标签"
+import { createContext, useContext, useState } from 'react';
+
+// ===== 迷你路由库：路由表是一棵树 =====
+const RouterCtx = createContext(null);
+const OutletCtx = createContext(null);
+const ParamsCtx = createContext({});
+
+// 找出匹配路径的一条分支：[{ r: 父路由, params }, { r: 子路由, params }]
+function matchBranch(routes, segs) {
+  for (const r of routes) {
+    if (r.index) { if (segs.length === 0) return [{ r, params: {} }]; continue; }
+    if (r.path === '*') return [{ r, params: {} }];
+    const pat = (r.path ?? '').split('/').filter(Boolean);
+    if (pat.length > segs.length) continue;
+    const params = {};
+    const ok = pat.every((p, i) => (p.startsWith(':') ? ((params[p.slice(1)] = segs[i]), true) : p === segs[i]));
+    if (!ok) continue;
+    const rest = segs.slice(pat.length);
+    if (r.children) {
+      const sub = matchBranch(r.children, rest);
+      if (sub) return [{ r, params }, ...sub];
+    } else if (rest.length === 0) return [{ r, params }];
+  }
+  return null;
+}
+
+function Router({ initialPath, reload, children }) {
+  const [path, navigate] = useState(initialPath);
+  return <RouterCtx value={{ path, navigate, reload }}>{children}</RouterCtx>;
+}
+
+function Routes({ routes }) {
+  const { path } = useContext(RouterCtx);
+  const branch = matchBranch(routes, path.split('/').filter(Boolean));
+  if (!branch) return <p>404</p>;
+  const params = Object.assign({}, ...branch.map(b => b.params));
+  // 从最里层往外包：每一层把“里面那一层”放进 OutletCtx
+  const tree = branch.reduceRight((inner, { r }) => <OutletCtx value={inner}>{r.element}</OutletCtx>, null);
+  return <ParamsCtx value={params}>{tree}</ParamsCtx>;
+}
+const Outlet = () => useContext(OutletCtx);
+const useParams = () => useContext(ParamsCtx);
+
+function Link({ to, children }) {
+  const { navigate } = useContext(RouterCtx);
+  return <a href={to} onClick={e => { e.preventDefault(); navigate(to); }} style={{ marginRight: 10 }}>{children}</a>;
+}
+// 模拟浏览器对 <a href> 的默认行为：向服务器请求新页面
+function PlainLink({ to, children }) {
+  const { reload } = useContext(RouterCtx);
+  return <a href={to} onClick={e => { e.preventDefault(); reload(to); }} style={{ marginRight: 10 }}>{children}</a>;
+}
+
+// ===== 应用代码 =====
+const USERS = [{ id: '1', name: '张三' }, { id: '2', name: '李四' }];
+
+function Layout() {
+  const [n, setN] = useState(0);
+  return (
+    <div>
+      <button onClick={() => setN(n + 1)}>布局里的计数器：{n}</button>
+      <nav style={{ margin: '8px 0' }}>
+        <Link to="/">首页</Link>
+        <Link to="/users">用户</Link>
+        <PlainLink to="/about">关于（普通 a 标签）</PlainLink>
+      </nav>
+      <Outlet />
+    </div>
+  );
+}
+const Home = () => <h3>🏠 首页</h3>;
+const About = () => <h3>ℹ️ 关于</h3>;
+const Users = () => <ul>{USERS.map(u => <li key={u.id}><Link to={'/users/' + u.id}>{u.name}</Link></li>)}</ul>;
+function UserDetail() {
+  const { id } = useParams();
+  return <h3>👤 用户 {id}：{USERS.find(u => u.id === id)?.name}</h3>;
+}
+
+function App() {
+  const [boot, setBoot] = useState({ n: 0, path: '/' });
+  return (
+    <Router key={boot.n} initialPath={boot.path} reload={to => setBoot(b => ({ n: b.n + 1, path: to }))}>
+      <Routes routes={[
+        { path: '/', element: <Layout />, children: [
+          { index: true, element: <Home /> },
+          { path: 'users', element: <Users /> },
+          { path: 'users/:id', element: <UserDetail /> },
+          { path: 'about', element: <About /> },
+        ] },
+      ]} />
+    </Router>
+  );
+}
+```
+
+迷你版和真库的差别：真库的 `Link` 在点击时调用浏览器的 history 接口改地址栏，并支持前进、后退；迷你版没有地址栏。真库用“谁更具体”给路由排名，迷你版按顺序取第一个能匹配的。真库的 `Link` 支持相对路径，迷你版只认完整路径。
+
 ## URL 也是状态
 
 搜索词、页码、筛选条件最适合放在 URL 的查询参数里。这样用户刷新页面不会丢失，复制链接发给别人能看到同样的结果。
@@ -179,10 +289,10 @@ function ProductList() {
 
 ## 数据模式：让路由来加载数据
 
-`createBrowserRouter` 让你把 `loader` 写在路由表里。`loader` 是进入页面前运行的函数，返回的数据用 `useLoaderData()` 读取。下面的代码只能阅读。
+`createBrowserRouter` 让你把 `loader` 写在路由表里。`loader` 是**导航开始时**运行的函数，返回的数据用 `useLoaderData()` 读取。在 `loader` 返回之前，地址栏和页面都停留在旧位置，`useNavigation().state` 是 `'loading'`。下面是真库的写法，只读。
 
 ```jsx
-import { createBrowserRouter, RouterProvider, useLoaderData } from 'react-router';
+import { createBrowserRouter, useLoaderData, useNavigation } from 'react-router';
 
 const router = createBrowserRouter([
   {
@@ -196,10 +306,122 @@ function UserDetail() {
   const user = useLoaderData();         // 进入页面时数据已经取好
   return <h3>{user.name}</h3>;
 }
+
+function Layout() {
+  const navigation = useNavigation();   // 'idle' | 'loading' | 'submitting'
+  return navigation.state === 'loading' ? <p>导航中…</p> : null;
+}
 // 浏览器里：<RouterProvider router={router} />，从 'react-router/dom' 导入
 ```
 
-这样组件里不用 `useEffect` 取数据，页面也不会先闪一下空白。它和第 34 课的 TanStack Query 分工不同：`loader` 解决“进入页面前取到数据”，Query 解决“缓存、过期和后台刷新”。两者也可以一起用。
+这样组件里不用 `useEffect` 取数据，新页面一出现就有数据。嵌套路由的 `loader` 会**同时**运行，不会一个等一个。它和第 34 课的 TanStack Query 分工不同：`loader` 解决“进入页面前取到数据”，Query 解决“缓存、过期和后台刷新”。两者也可以一起用。
+
+下面的迷你数据路由把 `loader` 的时机做成了可运行的版本。页面上有两种取数据的方式：“loader 版”的数据由路由在导航时取；“effect 版”的组件自己在 `useEffect` 里取。两个请求都要 900 毫秒。先预测，再运行。
+
+```jsx play title="loader：先取数据，还是先换页面"
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+
+// ===== 迷你数据路由 =====
+const RouterCtx = createContext(null);
+const ParamsCtx = createContext({});
+const DataCtx = createContext(undefined);
+
+function match(pattern, path) {
+  const a = pattern.split('/').filter(Boolean), b = path.split('/').filter(Boolean);
+  if (a.length !== b.length) return null;
+  const params = {};
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startsWith(':')) params[a[i].slice(1)] = b[i];
+    else if (a[i] !== b[i]) return null;
+  }
+  return params;
+}
+
+function Router({ routes, children }) {
+  const [loc, setLoc] = useState({ path: '/', params: {}, data: undefined });
+  const [pendingTo, setPendingTo] = useState(null);
+  const latest = useRef(0);
+  async function navigate(to) {
+    const mine = ++latest.current;
+    const route = routes.find(r => match(r.path, to));
+    const params = route ? match(route.path, to) : {};
+    setPendingTo(to);
+    const data = route && route.loader ? await route.loader({ params }) : undefined;
+    if (mine !== latest.current) return;              // 又点了别的链接：放弃这一次
+    setLoc({ path: to, params, data });
+    setPendingTo(null);
+  }
+  return <RouterCtx value={{ routes, loc, pendingTo, navigate }}>{children}</RouterCtx>;
+}
+
+function Routes() {
+  const { routes, loc } = useContext(RouterCtx);
+  const route = routes.find(r => match(r.path, loc.path));
+  if (!route) return <p>404</p>;
+  return <ParamsCtx value={loc.params}><DataCtx value={loc.data}>{route.element}</DataCtx></ParamsCtx>;
+}
+function Link({ to, children }) {
+  const { navigate } = useContext(RouterCtx);
+  return <a href={to} onClick={e => { e.preventDefault(); navigate(to); }} style={{ marginRight: 10 }}>{children}</a>;
+}
+const useParams = () => useContext(ParamsCtx);
+const useLoaderData = () => useContext(DataCtx);
+const useNavigation = () => ({ state: useContext(RouterCtx).pendingTo ? 'loading' : 'idle' });
+
+// ===== 模拟后端 =====
+const fetchUser = (id, who) => new Promise(resolve => {
+  console.log('🌐 开始请求用户 ' + id + '（' + who + '）');
+  setTimeout(() => resolve({ id, name: ['张三', '李四', '王五'][id - 1] }), 900);
+});
+
+// ===== 应用代码 =====
+function Home() { return <h3>🏠 首页</h3>; }
+
+function LoaderUser() {
+  const user = useLoaderData();
+  return <h3>👤 {user.name}（loader 版）</h3>;
+}
+
+function EffectUser() {
+  const { id } = useParams();
+  const [got, setGot] = useState(null);
+  useEffect(() => {
+    let ignore = false;
+    fetchUser(id, 'effect 版').then(u => { if (!ignore) setGot(u); });
+    return () => { ignore = true; };
+  }, [id]);
+  if (!got || got.id !== id) return <p>⏳ 加载中…</p>;
+  return <h3>👤 {got.name}（effect 版）</h3>;
+}
+
+function Shell() {
+  const { loc } = useContext(RouterCtx);
+  const { state } = useNavigation();
+  return (
+    <div>
+      <div style={{ fontFamily: 'monospace', background: '#eef2f4', padding: '4px 8px', borderRadius: 6 }}>https://example.com{loc.path}</div>
+      <nav style={{ margin: '8px 0' }}>
+        <Link to="/">首页</Link>
+        <Link to="/loader/users/2">用户 2（loader 版）</Link>
+        <Link to="/effect/users/3">用户 3（effect 版）</Link>
+      </nav>
+      <p style={{ fontSize: 13, color: 'gray' }}>导航状态：{state}</p>
+      <Routes />
+    </div>
+  );
+}
+
+function App() {
+  const routes = [
+    { path: '/', element: <Home /> },
+    { path: '/loader/users/:id', loader: ({ params }) => fetchUser(params.id, 'loader 版'), element: <LoaderUser /> },
+    { path: '/effect/users/:id', element: <EffectUser /> },
+  ];
+  return <Router routes={routes}><Shell /></Router>;
+}
+```
+
+迷你版和真库的差别：真库的 `loader` 能被取消（用户又点了别的链接，旧请求收到中止信号），能返回 `Response` 或抛出错误，错误由路由的 `errorElement` 显示；提交表单后会自动重新运行相关 `loader`。迷你版都没有做。
 
 ## 选哪种模式？
 
@@ -209,7 +431,13 @@ function UserDetail() {
 | 要在进入页面前取数据，或要显示待定状态 | 数据模式（`createBrowserRouter`） |
 | 新项目，需要服务端渲染 | 框架模式（react.dev 推荐从框架开始） |
 
-版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2 以上，并且只提供 ESM。还在用 React 18 的项目请用 v7，导入写法相同。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
+版本说明：从 v7 起，原 Remix v2 的能力并入了 React Router 的“框架模式”。v8 起统一从 `react-router` 包导入，不再使用 `react-router-dom`。网上的旧教程常写 `react-router-dom`，用法基本相同。v8 要求 React 19.2 以上，并且只提供 ESM。数据模式的 `RouterProvider` 从 `react-router/dom` 导入。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React Router v8 不支持 React 18。还在用 React 18 的项目请用 v7，导入写法相同。
+
+</CallBox>
 
 ## 上线前必遇的三件事
 
@@ -237,6 +465,29 @@ const UserDetail = lazy(() => import('./UserDetail'));
 React Router 的数据模式（`createBrowserRouter`）和框架模式还提供两个功能。`loader` 在进入页面前加载数据。路由 `action` 处理表单提交。本课用的 `<BrowserRouter>` 属于声明式模式，不支持这两个功能。`loader` 和路由 `action` 的思路，与第 29 课的 Server Components、Server Functions 相同：**数据跟着路由加载**，不在组件里用 effect 请求。
 
 </CallBox>
+
+## 本机任务：用真库再做一遍
+
+迷你版讲清了原理，真库还有它没有的东西：排名规则、相对链接、`loader` 的取消和错误处理。请在[《项目搭建与交付》](/lessons/engineering)里创建的 Vite 项目（或任何 React 19.2 以上的项目）里做下面几步。
+
+1. 运行 `npm install react-router`，再运行 `npm ls react-router`，确认版本是 8.x。
+2. 用 `createBrowserRouter` 写一棵路由树：根路由渲染 `Layout`（导航栏、一个 `useState` 计数器、`<Outlet />`），子路由有首页（`index`）、`users`、`users/:id` 和 `*`。在 `main.tsx` 里渲染 `<RouterProvider router={router} />`，它从 `react-router/dom` 导入。
+3. 给 `users/:id` 加一个 `loader`，里面等 1 秒再返回用户，详情页用 `useLoaderData()` 读取。
+4. 在 `Layout` 里用 `useNavigation()` 显示“导航中…”。
+5. 用 `useSearchParams` 在用户列表上加一个搜索框，搜索词存进 `?q=`。
+
+对照下面的表自查：
+
+| 做什么 | 应该看到 |
+|---|---|
+| 点计数器 3 次，再点导航里的“用户”链接 | 计数器仍是 3；开发者工具的 Network 面板里没有新的页面（Doc）请求 |
+| 把一个 `Link` 换成 `<a href>`，再点它 | 计数器回到 0；Network 里出现页面请求。试完换回 `Link` |
+| 点进 `/users/2`（`loader` 要 1 秒） | 点击后 1 秒内地址栏和页面都不变，“导航中…”出现；1 秒后一起切换 |
+| 在 `loader` 里 `throw new Error('x')`，路由上不写 `errorElement` | 页面显示 React Router 自带的错误页（标题 `Unexpected Application Error!`）。再给路由加 `errorElement` 换成自己的 |
+| 直接打开 `/users/2` | 控制台提示没有提供 `HydrateFallback`：初次加载时 `loader` 还没返回，React Router 需要一个先显示的内容，给根路由加一个 `HydrateFallback` 组件即可 |
+| 在搜索框里输入几个字，再按浏览器的“后退” | 用 `{ replace: true }` 时，一次后退就离开这个页面；不加时要按很多次 |
+
+做完后，你就有了一个可以直接放进[《实战四：城市天气应用》](/lessons/project-weather)的路由骨架。
 
 </LessonProse>
 
