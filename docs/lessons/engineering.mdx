@@ -1,8 +1,8 @@
 ---
-title: "项目搭建与交付"
+title: "项目搭建与工具链"
 ---
 
-# 项目搭建与交付
+# 项目搭建与工具链
 
 <LessonHeader />
 
@@ -12,11 +12,11 @@ title: "项目搭建与交付"
 
 <LessonProse>
 
-前面所有代码都跑在本站的实验台里：一个文件，一个 `App`，不用安装任何东西。真实项目不是这样。它有几十个文件，要装依赖，要检查代码，最后要放到一个别人能打开的网址上。这一课讲这条路：**搭起来，写对，检查好，发出去**。
+前面所有代码都跑在本站的实验台里：一个文件，一个 `App`，不用安装任何东西。真实项目不是这样。它有几十个文件，要装依赖，要检查代码，最后要放到一个别人能打开的网址上。这条路分两课：这一课讲前半程，**搭起来，写对，检查好**；后半程“构建、部署、升级”在[《交付：构建、部署与升级》](/lessons/delivery)。
 
 <CallBox kind="tip" label="这一课怎样学">
 
-课文里带“**在本机终端里做**”标记的命令和配置，只能在你自己的电脑上运行，实验台做不了，所以用普通代码块展示。站内有 3 个可运行示例和 1 道练习，用来练习其中最容易搞混的几个机制。“样式方案”和“持续集成”两节是选读，先学主线也可以。课末有一份“本机任务清单”，请照着在自己的电脑上做完，并对照“应该看到”自查。
+课文里带“**在本机终端里做**”标记的命令和配置，只能在你自己的电脑上运行，实验台做不了，所以用普通代码块展示。站内有 3 个可运行示例和 1 道练习，用来练习其中最容易搞混的几个机制。“CSS Modules 做了什么”一节是选读，先学主线也可以。课末有一份“本机任务清单”，请照着在自己的电脑上做完，并对照“应该看到”自查。
 
 </CallBox>
 
@@ -27,14 +27,14 @@ title: "项目搭建与交付"
 ```bash title="在本机终端里做：创建并启动项目"
 # 先确认 Node 版本
 node -v
-npm create vite@latest my-app -- --template react-ts --eslint
+npm create vite@latest my-app -- --template react-compiler-ts --eslint
 cd my-app
 npm install
 # 启动后，打开终端里显示的地址，通常是 http://localhost:5173
 npm run dev
 ```
 
-`--template react-ts` 是“React + TypeScript”模板。省略它，命令会在终端里问你。Vite 也有一个带 React Compiler 的模板：`react-compiler-ts`。
+`--template react-compiler-ts` 是“React + TypeScript + React Compiler”模板，编译器已经配好（见下面“代码质量”一节）。只想要 React + TypeScript，用 `react-ts`。省略 `--template`，命令会在终端里问你。
 
 `--eslint` 让模板用 ESLint，并配好 `eslint-plugin-react-hooks`（配置文件是 `eslint.config.js`）。本课和后面的课都按这个配置讲。省略它，目前的模板改用 Oxlint：`npm run lint` 跑的是 `oxlint`，配置文件是 `.oxlintrc.json`。Oxlint 默认也会对漏写的 effect 依赖给出警告，但规则的名字和提示文字与 ESLint 不同。Vite 的模板会随版本变化，**以命令运行时的提示和 [vite.dev/guide](https://vite.dev/guide/) 为准。**
 
@@ -75,7 +75,7 @@ my-app/
 | `npm run build` | 生成生产版本，放进 `dist/` 目录。模板里的这条命令会先跑 `tsc -b` 做类型检查，再构建 |
 | `npm run preview` | 在本机启动一个静态服务器，打开 `dist/` 里的产物（默认 `http://localhost:4173`）。部署前先在这里看一眼 |
 
-`dist/` 里只有 HTML、JS、CSS 和图片，是纯静态文件。任何能放静态文件的服务器都能托管它。这就是“纯客户端应用”部署简单的原因。
+`dist/` 里只有 HTML、JS、CSS 和图片，是纯静态文件，任何能放静态文件的服务器都能托管它。产物里有什么、怎样放到网上，在[《交付：构建、部署与升级》](/lessons/delivery)里讲。
 
 ## 从单文件到多文件：模块
 
@@ -165,7 +165,7 @@ function App() {
 
 选哪一种？没有绝对的答案，一个常见的约定：**组件文件用默认导出，工具函数、常量、类型用具名导出**。团队里先约定，再统一。
 
-另外，模板里的 `only-export-components` 规则会提醒你（ESLint 里叫 `react-refresh/only-export-components`，Oxlint 里叫 `react/only-export-components`）：一个文件如果导出了组件，就别同时导出 Hook 或常量。否则开发时改这个文件，页面会整页刷新，而不是局部更新。把它们放进单独的文件即可。
+另外，模板里的 `only-export-components` 规则会拦住这种写法（ESLint 里叫 `react-refresh/only-export-components`，Oxlint 里叫 `react/only-export-components`）：一个文件导出了组件，就别同时导出 Hook 或普通函数。实测报错是 `Fast refresh only works when a file only exports components`。否则开发时改这个文件，页面会整页刷新，而不是局部更新。把 Hook 和函数放进单独的文件即可（模板的配置允许同时导出常量）。
 
 文件多了怎么放？**按功能组织**，不要把所有文件按类型堆在一起：
 
@@ -181,18 +181,9 @@ src/
 改一个功能时，只需要打开一个目录。
 
 <details className="optional">
-<summary><span className="opt-tag">选读</span>样式方案怎么选<small>可以先跳过，需要时再展开</small></summary>
+<summary><span className="opt-tag">选读</span>CSS Modules 做了什么<small>可以先跳过，需要时再展开</small></summary>
 
-第 3 课已经讲了 `className`、条件类名和内联 `style`。那是写法。这里讲的是：**样式写在哪里、怎样不互相冲突**。常用的有四种。
-
-| 方案 | 怎么写 | 冲突怎么避免 | 代价 |
-|---|---|---|---|
-| 全局 CSS | `import './index.css'`，用 `className="card"` | 靠命名约定（例如 BEM） | 项目大了容易重名、难以删除 |
-| **CSS Modules** | 文件名以 `.module.css` 结尾，导入得到一个对象 | 构建时把类名改成唯一的名字 | 要多写 `styles.` 前缀；不能直接写动态值 |
-| **Tailwind** | 在 `className` 里直接写原子类，例如 `p-4 text-lg font-bold` | 没有自定义类名，就没有冲突 | 类名串很长；要学一套命名 |
-| 运行时 CSS-in-JS | 在组件里用 JS 写样式（styled-components、Emotion 一类） | 库在运行时生成唯一类名 | 要在浏览器里多做一轮工作；通常只能用在客户端组件里 |
-
-最小例子：
+样式怎么写、怎么选，在[《样式：给组件穿上外观》](/lessons/styling)里讲。这里只看和构建工具有关的一件事：**CSS Modules** 的文件名以 `.module.css` 结尾，构建时工具把里面的类名改写成唯一的名字，`import` 得到的是“原名 → 唯一名字”的对象。
 
 ```css title="在本机项目里：Button.module.css"
 .button { background: royalblue; color: white; border: 0; padding: 6px 14px; }
@@ -209,26 +200,7 @@ export default function Button({ danger, children }: { danger?: boolean; childre
 }
 ```
 
-```bash title="在本机终端里做：安装 Tailwind（v4 的 Vite 方式）"
-npm install tailwindcss @tailwindcss/vite
-```
-
-```ts title="在本机项目里：vite.config.ts 加一个插件"
-import tailwindcss from '@tailwindcss/vite';
-// 在 plugins 数组里加上 tailwindcss()，和原来的 react() 并列
-```
-
-```css title="在本机项目里：src/index.css 第一行"
-@import "tailwindcss";
-```
-
-```tsx title="在本机项目里：直接在 className 里写原子类"
-<h1 className="p-4 text-lg font-bold text-blue-600">天气</h1>
-```
-
-Tailwind 的安装方式随大版本变化，**以 [tailwindcss.com/docs/installation](https://tailwindcss.com/docs/installation) 为准**。
-
-CSS Modules 到底做了什么？下面的示例用一个函数模拟构建这一步。两个文件里都写了 `.button`，先预测页面上两个按钮各是什么颜色。
+下面的示例用一个函数模拟这一步。两个文件里都写了 `.button`，先预测页面上两个按钮各是什么颜色。
 
 ```jsx play title="CSS Modules：类名被改写成唯一名字"
 // 构建时，每个 .module.css 里的类名都会加上文件相关的哈希，
@@ -263,17 +235,9 @@ function App() {
 }
 ```
 
-怎么选？
-
-- **小项目、第一次写**：全局 CSS 加 CSS Modules。Vite 开箱即用，不用学新东西。
-- **团队已经在用 Tailwind**，或者想让设计规范靠“只能用预设的值”来约束：Tailwind。
-- **用现成的组件库**：先看它自己的样式方案，跟着它走。
-- **运行时 CSS-in-JS**：新项目一般不首选。已有的项目继续用即可。
-- 切换主题（浅色、深色）：用 CSS 变量（`--bg`、`--text`）。改变量的值，页面就换主题，React 不需要重新渲染任何组件。
-
 </details>
 
-## 代码质量：类型检查、ESLint、格式化与 React Compiler
+## 代码质量：类型检查、ESLint、测试与 React Compiler
 
 写得对不对，不能只靠人眼。四类工具各管一件事：
 
@@ -281,7 +245,7 @@ function App() {
 |---|---|---|
 | **TypeScript** | 类型对不上：传错 prop、拼错字段（第 35 课） | `npx tsc -b`（模板的 `npm run build` 已包含）。注意：`vite build` 本身只去掉类型，不做类型检查 |
 | **ESLint** | 规则违反：Hook 用错、依赖数组缺项、导出方式不对 | `npm run lint` |
-| **格式化工具** | 缩进、引号、分号不统一 | Prettier 或 Biome，二选一，团队统一 |
+| **格式化工具** | 缩进、引号、分号不统一 | Prettier 或 Biome，二选一，团队统一（模板没有自带） |
 | **测试** | 行为改坏了（第 38 课） | `npx vitest run` |
 
 关于测试，这里只记一个原则：**测用户看到的和做的，不测实现细节**。把组件从 `useState` 改成 `useReducer`，界面行为没变，测试就不该失败。
@@ -301,23 +265,27 @@ export default defineConfig([
 
 预设的名字和包含的规则随插件版本变化，**以 [插件的 README](https://github.com/facebook/react/tree/main/packages/eslint-plugin-react-hooks) 和 react.dev 为准**。遇到依赖数组警告，不要用 `eslint-disable` 让它闭嘴，要改代码。第 22 课讲过原因：它在提醒你过期闭包。
 
-**React Compiler** 的原理在第 21 课讲过。在项目里启用它只需要两步（Vite，`@vitejs/plugin-react` 6 以上）：
+**React Compiler** 的原理在第 21 课讲过。用 `react-compiler-ts` 模板创建的项目已经启用了它：`vite.config.ts` 是下面这样（实测 create-vite 9.2.1 生成），不需要再做什么。
 
-```bash title="在本机终端里做：安装"
-npm install -D babel-plugin-react-compiler@latest @rolldown/plugin-babel
-```
-
-```ts title="在本机项目里：vite.config.ts"
-import { defineConfig } from 'vite';
+```ts title="在本机项目里：vite.config.ts（react-compiler-ts 模板）"
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
 });
 ```
 
-Next.js 项目则在 `next.config.ts` 里写 `reactCompiler: true`，同样要先安装 `babel-plugin-react-compiler`。配置方式以 [react.dev 的安装文档](https://react.dev/learn/react-compiler/installation) 为准。
+怎么确认它真的在工作？运行 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索 `react.memo_cache_sentinel`：编译器给组件插入的缓存代码带有这个标记，搜得到就说明编译过了。
+
+已有的项目（例如用 `react-ts` 创建的）要手动加上。需要 `@vitejs/plugin-react` 6 以上：
+
+```bash title="在本机终端里做：安装"
+npm install -D babel-plugin-react-compiler@latest @rolldown/plugin-babel
+```
+
+然后把上面 `vite.config.ts` 里的 `babel(...)` 一行加进 `plugins`。Next.js 项目则在 `next.config.ts` 里写 `reactCompiler: true`，同样要先安装 `babel-plugin-react-compiler`。配置方式以 [react.dev 的安装文档](https://react.dev/learn/react-compiler/installation) 为准。
 
 ## 环境变量与密钥
 
@@ -337,7 +305,7 @@ const base = import.meta.env.VITE_API_BASE;   // 字符串
 但要注意“进入前端代码”是什么意思。构建时，Vite 把 `import.meta.env.VITE_API_BASE` **直接替换成字面量**，写进 JS 文件。所有访客都能下载这个文件，读到这个值。所以：
 
 - **`VITE_` 变量是公开的**。只放本来就公开的值，例如接口的基础地址。
-- **密钥绝对不要加 `VITE_` 前缀**，更不能写进前端代码的任何地方。需要密钥的请求，让自己的服务端（或 serverless 函数）转发：浏览器请求你的服务端，服务端带着密钥去请求第三方。密钥只存在服务端。
+- **密钥绝对不要加 `VITE_` 前缀**，更不能写进前端代码的任何地方。需要密钥的请求，让自己的服务端（或 serverless 函数）转发：浏览器请求你的服务端，服务端带着密钥去请求第三方。转发层怎么写、怎样不被滥用，在[《交付：构建、部署与升级》](/lessons/delivery)里讲。
 - 学习时可以临时把令牌放进 `VITE_` 变量跑通，但不要提交到 GitHub，上线前一定要改成服务端转发。模板的 `.gitignore` 已经忽略 `*.local` 文件，可以把个人的值放在 `.env.local`。
 - 值是在**构建时**固定下来的。部署以后改了 `.env`，线上的包不会变，要重新构建。
 
@@ -369,123 +337,13 @@ function App() {
 }
 ```
 
-## 交付：部署、路由回退与 CI
-
-`npm run build` 得到 `dist/`，部署就是把它放到一个能访问的地方。静态托管有多种选择，**这里细讲 Vercel**，Netlify 的流程相近，GitHub Pages 稍有不同。
-
-**在本机和网页上做：用 Vercel 部署**
-
-1. 把项目推送到 GitHub 仓库。
-2. 在 vercel.com 用 GitHub 账号登录，选择“导入项目”，选中这个仓库。
-3. Vercel 会自动识别 Vite 项目：构建命令是 `npm run build`，输出目录是 `dist`。保持默认，点“部署”。
-4. 完成后得到一个网址。以后每次推送到 `main`，它自动重新部署；每个 pull request 还会得到一个预览网址。
-5. 如果项目有环境变量，在 Vercel 的项目设置里添加。规则不变：`VITE_` 变量会进入前端包。
-
-Netlify 的流程相同，识别的构建命令和输出目录也一样。GitHub Pages 要在 `vite.config.ts` 里把 `base` 设成 `'/<仓库名>/'`，再用 GitHub Actions 发布，步骤见 [Vite 的静态部署文档](https://vite.dev/guide/static-deploy)。
-
-### 单页应用的路由回退
-
-如果你的应用用了 React Router（第 36 课），部署后会遇到这个问题：从首页点链接去 `/city/123` 一切正常，但**直接打开或刷新**这个网址得到 404。因为服务器上没有 `city/123` 这个文件。解决办法：让服务器对找不到的路径一律返回 `index.html`，再由前端路由接管。
-
-```json title="在本机项目里：vercel.json（放在项目根目录）"
-{
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}
-```
-
-这条规则不会挡住真实存在的文件（例如 `/assets/index-xxx.js`），服务器会先返回它们。
-
-Netlify 用 `public/_redirects` 文件（构建时会复制到 `dist/`）：
-
-```text title="在本机项目里：public/_redirects"
-/*  /index.html  200
-```
-
-GitHub Pages 没有这种回退配置，所以有多级路由的应用不适合放在它上面，优先选 Vercel 或 Netlify。（变通办法是把 `index.html` 复制成 `404.html`，或者改用 hash 路由；都不如真正的回退规则干净。）
-
-<details className="optional">
-<summary><span className="opt-tag">选读</span>最小的持续集成<small>可以先跳过，需要时再展开</small></summary>
-
-**持续集成**（CI）是每次推送代码，由服务器自动把检查跑一遍。有了它，没通过检查的代码不会悄悄进入 `main`。先在 `package.json` 里准备好命令：
-
-```json title="在本机项目里：package.json 的 scripts"
-{
-  "scripts": {
-    "typecheck": "tsc -b",
-    "lint": "eslint .",
-    "test": "vitest run",
-    "build": "tsc -b && vite build"
-  }
-}
-```
-
-再写一个工作流文件：
-
-```yaml title="在本机项目里：.github/workflows/ci.yml"
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
-```
-
-逐行看：`on` 表示什么时候运行；`actions/checkout` 取出代码；`actions/setup-node` 安装 Node 并缓存依赖；`npm ci` 严格按 `package-lock.json` 安装，比 `npm install` 更适合服务器；后面四步依次是类型检查、lint、测试、构建，任何一步失败，整个检查就变红。
-
-</details>
-
 <CallBox kind="warn" label="常见坑">
 
 1. 改了环境变量，页面没变化：开发服务器要重启；线上要重新构建。
-2. CI 里 Node 版本和本机差别太大，出现“本机能过，CI 不过”：让 `node-version` 的大版本和 `node -v` 一致。
+2. `npm run build` 报类型错误，但开发服务器一切正常：开发服务器和 `vite build` 都只去掉类型，不检查类型。类型检查在 `tsc -b` 这一步，要靠它或编辑器发现。
 3. 在 Node.js 25 及以后的版本上，旧版 Vitest 搭配 jsdom 跑测试时，浏览器环境的 `localStorage` 会被 Node 自带的同名对象盖住，报 `localStorage.setItem is not a function`（实测 Vitest 4.1.11 加 jsdom 27，Node 25.6.0）。Vitest 5.0.3 已经修好：同样的环境、同一个测试通过。遇到时升级 Vitest，或者用 Node 24，或者把 `package.json` 里的 `test` 脚本改成 `NODE_OPTIONS=--no-experimental-webstorage vitest run`（在 Vitest 4 上实测有效；Windows 的 PowerShell 要先单独设置这个环境变量）。
-4. Actions 的版本标签（例如 `@v7`）会更新。以各个 Action 仓库的最新发布为准，Dependabot 可以帮你自动升级。
 
 </CallBox>
-
-下面是这一课的收尾：在你的电脑上把它们全部做一遍。
-
-<details className="optional">
-<summary><span className="opt-tag">选读</span>维护 React 18 项目：升级到 React 19<small>可以先跳过，需要时再展开</small></summary>
-
-本站的示例都是 React 19 的写法。你接手的旧项目可能还在 React 18。官方推荐的升级路线是三步：
-
-1. 先升到 **React 18.3.1**。它和 18.2 行为相同，但会对 19 将移除的 API 打印弃用警告。把这些警告清掉。
-2. 运行官方 codemod：`npx codemod@latest react/19/migration-recipe`。它会自动改写其中大部分写法。用 TypeScript 的项目，还要升级类型包，并运行类型的 codemod：`npx types-react-codemod@latest preset-19 ./src`。
-3. 再升到 React 19：`npm install react@19 react-dom@19`，类型包用 `@types/react@19`、`@types/react-dom@19`。
-
-React 19 移除了下面这些 API：
-
-| 被移除的 API | 替代写法 |
-|---|---|
-| 函数组件的 `defaultProps` | 参数默认值：`function Heading({ text = '你好' })` |
-| 函数组件的 `propTypes` | TypeScript 类型 |
-| 字符串 ref：`ref="input"` | ref 回调或 `useRef` |
-| `ReactDOM.render`、`ReactDOM.hydrate` | `createRoot`、`hydrateRoot` |
-| `ReactDOM.findDOMNode` | 用 ref 拿 DOM 节点 |
-| `react-dom/test-utils` 里的 `act` | 从 `react` 导入 `act` |
-| 全局的 `JSX` 类型命名空间 | `React.JSX.Element` |
-
-`forwardRef` 和 `<Context.Provider>` 在 19 中仍然能用，只是函数组件现在可以直接把 `ref` 当 prop 接收，Context 对象也可以直接当 Provider，通常不再需要它们。具体步骤和已知的变化，以 [React 19 升级指南](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) 为准。
-
-升级后的自查：`npm run build` 通过；`npx tsc -b` 零错误；`npm run lint` 里没有新增的警告；打开开发服务器，控制台没有红色报错。
-
-</details>
 
 ## 本机任务清单
 
@@ -493,17 +351,16 @@ React 19 移除了下面这些 API：
 
 | 任务 | 怎样做 | 应该看到 |
 |---|---|---|
-| 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-ts --eslint`，创建 React + TypeScript 项目，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
+| 1. 创建项目 | `node -v` 确认版本，再运行 `npm create vite@latest my-app -- --template react-compiler-ts --eslint`，创建 React + TypeScript 项目，`npm install`，`npm run dev` | 浏览器里打开了模板页面，改 `App.tsx` 里的文字，页面立刻更新 |
 | 2. 搬代码并拆文件 | 把第 10 课的待办应用搬进来，拆成至少 3 个文件（`App.tsx`、`TodoItem.tsx`、一个放类型或工具函数的文件）。模板开启了严格的类型检查，原样搬进来的 JS 写法会让 `npm run build` 在 `tsc -b` 这一步失败（开发服务器不受影响，因为它只去掉类型）。先补上最少的类型：在类型文件里写 `export type Todo = { id: number; text: string; done: boolean }`，把 `useState([])` 改成 `useState<Todo[]>([])`，给函数参数标上类型，提交表单的处理函数参数写 `React.SubmitEvent<HTMLFormElement>`。类型的完整写法在[《TypeScript》](/lessons/typescript)里讲 | 页面功能和实验台里一样；终端和浏览器控制台没有红色报错；`npx tsc -b` 和 `npm run build` 通过 |
 | 3. 故意写错一次 | 把 `import Counter from` 改成 `import { Counter } from`，保存 | 编辑器标红；`npx tsc -b` 报 `has no exported member`；浏览器页面变空白，控制台报 `does not provide an export named`；改回后恢复。（`Counter` 换成你自己的组件名。直接运行 `npx vite build` 会报 `Missing export`） |
-| 4. 样式（选读） | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
-| 5. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如先在组件里定义变量 `title`，再写 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
-| 6. 环境变量 | 新建 `.env`，写 `VITE_API_BASE=...` 和 `SECRET_TOKEN=abc`，在代码里分别读取并显示，再 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索这两个值 | 能搜到 `VITE_API_BASE` 的值；搜不到 `SECRET_TOKEN` 的值，代码里读到 `undefined` |
-| 7. 部署 | 推送到 GitHub，在 Vercel 导入项目 | 得到一个网址，用手机也能打开 |
-| 8. 路由回退 | 如果应用有多个路由，在线上网址直接打开一个子路径，再刷新 | 不出现 404；没有 `vercel.json` 时对比一下 |
-| 9. CI（选读） | 加上 `.github/workflows/ci.yml`，推送，在 GitHub 仓库的 Actions 页面查看 | 出现绿色的对勾；故意让一个测试失败再推送，变成红色 |
+| 4. 检查工具 | 运行 `npx tsc -b` 和 `npm run lint`；再故意写一个漏依赖的 effect，例如先在组件里定义变量 `title`，再写 `useEffect(() => { document.title = title; }, [])` | 前两个命令一开始都通过；漏写依赖后 `npm run lint` 报警告：`React Hook useEffect has a missing dependency: 'title'`（规则 `react-hooks/exhaustive-deps`） |
+| 5. 类型错误只在 tsc 里出现 | 给某个组件传一个类型不对的 prop，例如把需要数字的 `n` 传成字符串。分别运行 `npx vite build` 和 `npx tsc -b` | `vite build` 照常成功；`tsc -b` 报 `Type 'string' is not assignable to type 'number'` |
+| 6. 确认 React Compiler | 运行 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索 `react.memo_cache_sentinel` | 搜得到，说明组件被编译器处理过 |
+| 7. 环境变量 | 新建 `.env`，写 `VITE_API_BASE=...` 和 `SECRET_TOKEN=abc`，在代码里分别读取并显示，再 `npm run build`，在 `dist/assets/` 的 JS 文件里搜索这两个值 | 能搜到 `VITE_API_BASE` 的值；搜不到 `SECRET_TOKEN` 的值，代码里读到 `undefined` |
+| 8. 样式（选读） | 把某个组件的样式改成 CSS Modules | 在开发者工具的 Elements 面板里，类名形如 `_button_xxx_1` |
 
-全部做完，你就有了一个“从空文件夹到线上网址”的完整流程。后面的路由、数据请求、测试都可以在这个项目里继续练。毕业设计的验收清单里“交付”那几行，也是这里的内容。
+全部做完，项目就搭好了，类型、lint、编译器和环境变量都在掌控之中。下一步是[《交付：构建、部署与升级》](/lessons/delivery)：把它放到一个网址上。
 
 </LessonProse>
 
