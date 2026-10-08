@@ -14,6 +14,7 @@
       "!course/lessons.generated.ts",
       "!package-lock.json",
       "!**/*.mdx",
+      "!docs/public/downloads", // 给学习者下载的文件，按学习者项目（模板）的风格写，不按本仓库的风格
       "!theme/style.css"
     ]
   },
