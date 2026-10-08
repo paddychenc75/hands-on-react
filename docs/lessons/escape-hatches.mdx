@@ -42,7 +42,7 @@ React 19 仍然支持 `forwardRef`，官方说明以后会弃用它。读到旧�
 
 </CallBox>
 
-两种写法下，父组件拿到的都是**整个 input DOM 节点**。父组件可以改它的样式、内容，甚至删除它。这暴露得太多了。
+两种写法下，父组件拿到的都是**整个 input DOM 节点**，可以改它的样式、内容，甚至删除它。这样暴露得太多了。
 
 `ref` 属性也可以接收函数，并在函数里返回清理函数，见 [useRef](/lessons/use-ref) 一课的“ref 回调”一节。
 
@@ -96,7 +96,7 @@ function App() {
 
 <CallBox kind="like" label="打个比方">
 
-useImperativeHandle 像自动售货机。机器外面只有几个按钮：选商品、投币、退币。机器里的货架和电机，你看不到也碰不到。厂家换了内部零件，按钮的用法也不变。
+useImperativeHandle 像自动售货机。机器外面只有几个按钮：选商品、投币、退币。机器里的货架和电机，你看不到也碰不到，所以厂家换了内部零件，按钮的用法也不变。
 
 </CallBox>
 
@@ -175,13 +175,13 @@ function App() {
 
 <CallBox kind="deep" label="深入一点">
 
-有一个细节：如果更新由点击、按键等离散事件触发，useEffect 也会在绘制前同步执行。所以本演示用了鼠标悬停。不要依赖这个细节。需要在绘制前测量时，就明确使用 useLayoutEffect。
+有一个细节：如果更新由点击、按键等离散事件触发，useEffect 也会在绘制前同步执行。所以本演示用了鼠标悬停。不要依赖这个细节：需要在绘制前测量时，就明确使用 useLayoutEffect。
 
 </CallBox>
 
 <CallBox kind="warn" label="常见坑">
 
-<strong>默认用 useEffect。</strong>useLayoutEffect 会阻塞绘制。代码慢，整个页面就卡住（上面右边按钮的延迟就是这样来的）。只有“读布局，再同步修改 DOM 或 state”时才用它。另外，useLayoutEffect 不会在服务端执行。React 18 及更早的版本在服务端渲染时会为此打印警告，React 19 不再警告。
+<strong>默认用 useEffect。</strong>useLayoutEffect 会阻塞绘制，代码一慢整个页面就卡住（上面右边按钮的延迟就是这样来的）。只有“读布局，再同步修改 DOM 或 state”时才用它。另外，useLayoutEffect 不会在服务端执行。React 18 及更早的版本在服务端渲染时会为此打印警告，React 19 不再警告。
 
 </CallBox>
 
@@ -202,7 +202,7 @@ function Modal({ children }) {
 }
 ```
 
-Portal 改变了 DOM 的位置。下面的示例里，外层 div 有一个 onClick。弹窗渲染到了 body 里。先预测，再运行。
+Portal 改变了 DOM 的位置。下面的示例里，外层 div 有一个 onClick，而弹窗渲染到了 body 里。先预测，再运行。
 
 ```jsx play title="Portal 里的点击会冒泡到哪里？"
 import { useState } from 'react';
@@ -257,7 +257,7 @@ Portal 解决的是**位置**问题，不解决**无障碍**问题。一个合�
 
 `<label htmlFor>` 和 `aria-labelledby`、`aria-describedby` 都需要一个 id。同一个组件可能在页面上出现多次，所以 id 不能写死。
 
-`useId()` 为每个组件实例返回一个唯一的字符串。这个字符串在组件的整个生命周期内不变。
+`useId()` 为每个组件实例返回一个唯一的字符串，这个字符串在组件的整个生命周期内不变。
 
 ```jsx play title="useId 与 Math.random 对比"
 import { useState, useId } from 'react';
@@ -292,8 +292,8 @@ function App() {
 
 为什么不用 Math.random 或自增计数器？有两个原因：
 
-1. Math.random 每次渲染都产生新值。id 一直在变，读屏软件和测试都难以依赖它。
-2. 使用服务端渲染时，服务器和浏览器各生成一次 id。两边的值不同，**水合**就会出错。useId 根据组件在树中的位置生成 id，两边结果一致。
+1. Math.random 每次渲染都产生新值，id 一直在变，读屏软件和测试都难以依赖它。
+2. 使用服务端渲染时，服务器和浏览器各生成一次 id，两边的值不同，**水合**就会出错。useId 根据组件在树中的位置生成 id，两边结果一致。
 
 <CallBox kind="warn" label="常见坑">
 

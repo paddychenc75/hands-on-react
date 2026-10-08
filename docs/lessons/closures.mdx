@@ -121,7 +121,7 @@ function App() {
 
 依赖写得没错：effect 用了 `theme`，就必须依赖它。问题出在设计上：`theme` 在这里只是被“读取”，它不是“要不要重新连接”的理由。
 
-**Effect Event** 解决这个问题。`useEffectEvent`（React 19.2 起稳定）把“读最新值”的那段逻辑提取成一个函数。这个函数总能读到最新的 props 和 state，而且不是 effect 的依赖。
+**Effect Event** 解决这个问题。`useEffectEvent`（React 19.2 起稳定）把“读最新值”的那段逻辑提取成一个函数，这个函数总能读到最新的 props 和 state，而且不是 effect 的依赖。
 
 ```jsx play title="聊天室：读到最新主题"
 import { useState, useEffect, useEffectEvent } from 'react';
@@ -161,7 +161,7 @@ Effect Event 有三条限制：
 
 1. 只在 effect 内部（或另一个 Effect Event 里）调用。在渲染期间调用，React 会报错：`A function wrapped in useEffectEvent can't be called during rendering.`
 2. 不要把它传给别的组件。
-3. 不要把它写进依赖数组。它每次渲染都是新函数，写进去会让 effect 每次渲染都重新运行。
+3. 不要把它写进依赖数组：它每次渲染都是新函数，写进去会让 effect 每次渲染都重新运行。
 
 <CallBox kind="warn" label="常见坑">
 
