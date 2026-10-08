@@ -12,13 +12,13 @@ title: "JSX：在 JS 里写界面"
 
 <LessonProse>
 
-JSX 是一种看起来像 HTML 的 JavaScript 语法扩展。它让你在 JS 代码中直接写出界面结构，读起来非常直观。
+JSX 是一种看起来像 HTML 的 JavaScript 语法扩展。它让你在 JS 代码中直接写出界面结构，读起来很直观。
 
 ```jsx
 const element = <h1 className="title">你好</h1>;
 ```
 
-浏览器其实不认识 JSX。在运行前，编译工具（如 Babel）会把它翻译成普通的函数调用。现代工具链（Vite、Next.js）生成 `jsx()` 调用。旧写法是 `React.createElement()`。两者作用相同。下面用旧写法演示：
+浏览器不认识 JSX，所以运行前，编译工具（如 Babel）会把它翻译成普通的函数调用。现代工具链（Vite、Next.js）生成 `jsx()` 调用，旧写法是 `React.createElement()`，两者作用相同。下面用旧写法演示：
 
 ```jsx title="JSX 是创建元素函数的语法糖"
 // 上面那行 JSX 会被编译成（旧写法）：
@@ -29,7 +29,7 @@ const element = React.createElement('h1', { className: 'title' }, '你好');
 
 <CallBox kind="tip" label="要点">
 
-记住：**JSX 最终就是一个 JS 对象**。所以它可以赋值给变量、作为函数参数、从函数中返回、放进数组里。
+记住：**JSX 最终就是一个 JS 对象**。因此它可以赋值给变量、作为函数参数、从函数中返回、放进数组里。
 
 </CallBox>
 
@@ -84,7 +84,7 @@ function App() {
 | 属性用驼峰命名（例外：`aria-*` 和 `data-*` 保留短横线） | `onclick`、`tabindex` | `onClick`、`tabIndex` |
 | style 接收对象 | `style="color:red"` | `style={{ color: 'red' }}` |
 
-JSX 里的注释要写成 `{/* 注释 */}`：花括号进入 JS，里面是普通的块注释。直接写 `// 注释` 会被当成文字显示出来。
+JSX 里的注释要写成 `{/* 注释 */}`：花括号进入 JS，里面是普通的块注释。如果直接写 `// 注释`，它会被当成文字显示出来。
 
 为什么 `style` 有两层花括号？外层 `{}` 表示“这里是 JS”，内层 `{}` 是一个 JS 对象字面量。CSS 属性名也要改成驼峰：`font-size` → `fontSize`。
 
@@ -117,9 +117,9 @@ function App() {
 
 ## 安全：花括号会转义文字
 
-`{}` 中的字符串只会显示为文字。即使字符串里有 `<script>` 或 `<img onerror>`，React 也会先转义。所以用 `{}` 显示用户输入是安全的。下面三种写法会绕过这层保护：
+`{}` 中的字符串只会显示为文字。即使字符串里有 `<script>` 或 `<img onerror>`，React 也会先转义，所以用 `{}` 显示用户输入是安全的。但下面三种写法会绕过这层保护：
 
-- **dangerouslySetInnerHTML**：它把字符串当作 HTML 插入，不转义。只用于可信的内容。用户提供的 HTML，先用 DOMPurify 清洗，或者不用它。
+- **dangerouslySetInnerHTML**：它把字符串当作 HTML 插入，不转义，所以只用于可信的内容。用户提供的 HTML 要先用 DOMPurify 清洗，或者干脆不用它。
 - **href 中的 javascript: 网址**：点击时会执行代码。React 19 会拦住这种网址：点击时只抛出错误 `React has blocked a javascript: URL as a security precaution.`，不执行里面的代码（维护 React 18 项目时，它只在控制台警告，点击仍会执行）。使用用户提供的网址前，先检查它以 https:// 或 http:// 开头。
 - **拼接 HTML 字符串**：不要写 `'<b>' + name + '</b>'` 再插入页面。用 JSX 描述结构。
 

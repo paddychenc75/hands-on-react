@@ -14,7 +14,7 @@ title: "实战三：看板应用"
 
 看板（Kanban）把任务分成三列：待办、进行中、已完成。卡片可以在列之间移动。Trello、Jira、飞书项目都是这种形态。
 
-这个项目的界面已经写好了，你的任务是实现最核心的**状态逻辑**：一个 reducer。真实团队经常这样分工。组件只负责显示和派发 action。所有规则集中在 reducer 里，可以单独测试。
+这个项目的界面已经写好了，你的任务是实现最核心的**状态逻辑**：一个 reducer。真实团队经常这样分工：组件只负责显示和派发 action，所有规则集中在 reducer 里，可以单独测试。
 
 ## 状态设计
 
@@ -62,7 +62,7 @@ const dispatch = useContext(DispatchCtx);
 dispatch({ type: 'remove', id: card.id });
 ```
 
-`dispatch` 的引用在组件的整个生命周期内不变。所以这个 Context 的 value 不会变，不会因为它而让读取者重新渲染。这是把 `dispatch` 放进 Context 比较安全的原因。第 12 课说过 reducer 可以和 Context 组合，这里就是一个完整的例子。
+`dispatch` 的引用在组件的整个生命周期内不变，所以这个 Context 的 value 不会变，读取者不会因此重新渲染。这是把 `dispatch` 放进 Context 比较安全的原因。第 12 课说过 reducer 可以和 Context 组合，这里就是一个完整的例子。
 
 <CallBox kind="tip" label="要点">
 
@@ -76,7 +76,7 @@ dispatch({ type: 'remove', id: card.id });
 
 <CallBox kind="deep" label="深入一点">
 
-应用变大后，这个 reducer 几乎不用修改。它可以直接迁移到 Zustand 或 Redux Toolkit。这说明一个观点：**先把状态逻辑写成纯函数，用什么库只是“接线”问题**。第 29 课《状态管理架构》和第 45 课会展开讲。<br />严格模式（`<StrictMode>`）是 React 提供的开发环境检查工具。开启后，React 会把 reducer 这类应该是纯函数的代码调用两次，用来暴露副作用。如果 reducer 修改了原 state，卡片就会被加两次。生产环境不会这样。
+应用变大后，这个 reducer 几乎不用修改，可以直接迁移到 Zustand 或 Redux Toolkit。这说明一个观点：**先把状态逻辑写成纯函数，用什么库只是“接线”问题**。第 29 课《状态管理架构》和第 45 课会展开讲。<br />严格模式（`<StrictMode>`）是 React 提供的开发环境检查工具。开启后，React 会把 reducer 这类应该是纯函数的代码调用两次，用来暴露副作用。如果 reducer 修改了原 state，卡片就会被加两次。生产环境不会这样。
 
 </CallBox>
 

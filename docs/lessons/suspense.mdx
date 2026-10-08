@@ -62,13 +62,13 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js、Relay、TanStack Query 和 React 19 的 `use()`。使用它们时，组件会“暂停”，直到数据准备好。你不需要在每个组件里写 `if (loading)`。注意：在 effect 或事件处理函数里请求数据，不会触发 Suspense。
+Suspense 也可以用于**数据加载**。支持 Suspense 的工具有 Next.js、Relay、TanStack Query 和 React 19 的 `use()`。使用它们时，组件会“暂停”，直到数据准备好，所以你不需要在每个组件里写 `if (loading)`。注意：在 effect 或事件处理函数里请求数据，不会触发 Suspense。
 
 </CallBox>
 
 ## 用 use() 读取数据
 
-`lazy` 等待的是组件的代码。`use()` 让组件等待数据。`use(promise)` 读取一个 Promise：没完成时，组件挂起，最近的 Suspense 显示 fallback。完成后，组件拿到结果，继续渲染。先看代码，再预测：
+`lazy` 等待的是组件的代码，而 `use()` 让组件等待数据。`use(promise)` 读取一个 Promise：没完成时，组件挂起，最近的 Suspense 显示 fallback。完成后，组件拿到结果，继续渲染。先看代码，再预测：
 
 ```jsx play title="use() 读取 Promise"
 import { Suspense, use, useState } from 'react';
@@ -252,7 +252,7 @@ function App() {
 }
 ```
 
-fallback 一旦显示出来，React 会让它至少停留约 300 毫秒，再换成内容。这是为了避免界面一闪而过。数据比这更晚到，就一到就显示。
+fallback 一旦显示出来，React 会让它至少停留约 300 毫秒，再换成内容。这是为了避免界面一闪而过。数据到得更晚时，一到就显示。
 
 ### 切换时保留旧界面：startTransition
 
@@ -298,7 +298,7 @@ function App() {
 
 ## 错误边界：防止一个组件崩溃拖垮整个页面
 
-如果某个组件在渲染时抛出错误，默认情况下**整个应用都会白屏**。错误边界可以捕获子树中的渲染错误，显示一个备用界面。目前错误边界**只能用 class 组件**编写。你也可以使用 react-error-boundary 库。
+如果某个组件在渲染时抛出错误，默认情况下**整个应用都会白屏**。错误边界可以捕获子树中的渲染错误，显示一个备用界面。目前错误边界**只能用 class 组件**编写，你也可以使用 react-error-boundary 库。
 
 <CallBox kind="deep" label="五分钟读懂 class 组件">
 
@@ -369,7 +369,7 @@ function App() {
 3. 服务端渲染中的错误。
 4. 错误边界自身的错误。
 
-它捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：传给 `useTransition` 返回的 `startTransition` 的函数抛出的错误（包括它返回的 Promise 被拒绝），以及 `use()` 读取的被拒绝的 Promise，会被错误边界捕获。从 react 直接导入的 `startTransition` 没有这个行为：错误成为未捕获的错误。下面的示例对比这两种写法。
+错误边界捕获**渲染期间**、生命周期和 effect 中的错误。React 19 中有两个例外：传给 `useTransition` 返回的 `startTransition` 的函数抛出的错误（包括它返回的 Promise 被拒绝），以及 `use()` 读取的被拒绝的 Promise，会被错误边界捕获。从 react 直接导入的 `startTransition` 没有这个行为：错误成为未捕获的错误。下面的示例对比这两种写法。
 
 </CallBox>
 

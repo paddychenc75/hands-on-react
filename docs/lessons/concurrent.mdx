@@ -17,7 +17,7 @@ React 18 引入了**并发渲染**。核心思想是：并非所有更新都同�
 - **紧急更新**：打字、点击、按键。用户期望立刻有反馈，哪怕慢 100ms 都能感觉到卡顿。
 - **过渡更新（Transition）**：根据输入筛选一个大列表、切换标签页内容。稍微慢一点用户可以接受。
 
-以前，所有更新都是同步的，不能中断。一次耗时的渲染会“冻住”整个页面，连输入框都不能打字。并发渲染让 React 可以**中断**正在进行的低优先级渲染，先处理紧急的用户输入。
+以前，所有更新都是同步的，不能中断，所以一次耗时的渲染会“冻住”整个页面，连输入框都不能打字。并发渲染让 React 可以**中断**正在进行的低优先级渲染，先处理紧急的用户输入。
 
 <CallBox kind="like" label="打个比方">
 
@@ -27,7 +27,7 @@ React 18 引入了**并发渲染**。核心思想是：并非所有更新都同�
 
 ## useDeferredValue：延迟一个值
 
-`useDeferredValue(value)` 返回一个“滞后”的版本。紧急渲染时它保持旧值。这次渲染提交后，React 立即在后台用新值再渲染一次。如果期间又有新输入，就丢弃这次后台渲染。
+`useDeferredValue(value)` 返回一个“滞后”的版本。紧急渲染时它保持旧值；这次渲染提交后，React 立即在后台用新值再渲染一次。如果期间又有新输入，就丢弃这次后台渲染。
 
 ```jsx play title="对比开启与关闭的输入体验"
 import { useState, useDeferredValue, memo } from 'react';
@@ -65,7 +65,7 @@ function App() {
 
 <CallBox kind="tip" label="要点">
 
-注意 SlowList 用了 `memo`。这一点很关键。紧急渲染时，deferredText 还是旧值。memo 让列表跳过这次渲染，所以输入框能立即更新。
+注意 SlowList 用了 `memo`，这一点很关键：紧急渲染时，deferredText 还是旧值，memo 让列表跳过这次渲染，所以输入框能立即更新。
 
 </CallBox>
 
@@ -149,7 +149,7 @@ function App() {
 
 ## 异步过渡：startTransition 接收 async 函数
 
-React 19 起，`startTransition` 可以接收 async 函数。这样的函数叫 **Action**（见[Actions:异步提交、表单与乐观更新](/lessons/react-19)一课）。`isPending` 在整个异步过程中都是 true，直到函数结束。先看代码，再预测：
+React 19 起，`startTransition` 可以接收 async 函数。这样的函数叫 **Action**（见[Actions：异步提交、表单与乐观更新](/lessons/react-19)一课）。`isPending` 在整个异步过程中都是 true，直到函数结束。先看代码，再预测：
 
 ```jsx play title="异步过渡的 isPending"
 import { useState, useTransition } from 'react';
@@ -186,7 +186,7 @@ function App() {
 }
 ```
 
-`await` 之后的 set 函数调用不再属于这次过渡。要让它仍是过渡更新，就再包一层 `startTransition`，像“保存 B”那样。这是最常见的坑。对照控制台：A 的 `name` 变成新值的那次渲染里，`isPending` 还是 true，下一次渲染才变回 false，是两次渲染。B 只有一次。
+`await` 之后的 set 函数调用不再属于这次过渡。要让它仍是过渡更新，就再包一层 `startTransition`，像“保存 B”那样。这是最常见的坑。对照控制台：A 的 `name` 变成新值的那次渲染里，`isPending` 还是 true，下一次渲染才变回 false，所以 A 有两次渲染，B 只有一次。
 
 ## useDeferredValue 的初始值
 
@@ -208,7 +208,7 @@ function App() {
 
 初始值常用来在首次渲染时跳过昂贵的内容，先显示一个轻量的占位，再在后台渲染完整的结果。
 
-`useDeferredValue` 还能和 Suspense 配合。Suspense 在下一课讲：内容还没准备好时，它显示一个备用界面（fallback）。配合时，新值的内容挂起，用户看到的是旧内容，而不是 fallback。这是它在真实项目里最常见的用法。
+`useDeferredValue` 还能和 Suspense 配合。Suspense 在下一课讲：内容还没准备好时，它显示一个备用界面（fallback）。配合时，新值的内容挂起，用户看到的是旧内容，而不是 fallback。这是这个 Hook 在真实项目里最常见的用法。
 
 <CallBox kind="tip" label="维护 React 18 项目时">
 
@@ -218,7 +218,7 @@ React 18 中，`startTransition` 只能接收同步函数，`useDeferredValue` �
 
 <CallBox kind="deep" label="深入一点">
 
-并发特性和防抖（debounce）不同，它没有固定的延迟。设备快，更新几乎立刻发生。设备慢，更新自动推迟。后台渲染还可以被中断，不浪费计算。注意：并发特性不会减少计算量，它只让慢的渲染可以被打断。要真正减少计算，仍要靠 memo、虚拟列表，或减少渲染的内容。
+并发特性和防抖（debounce）不同，它没有固定的延迟：设备快，更新几乎立刻发生；设备慢，更新自动推迟。后台渲染还可以被中断，不浪费计算。注意：并发特性不会减少计算量，它只让慢的渲染可以被打断。要真正减少计算，仍要靠 memo、虚拟列表，或减少渲染的内容。
 
 </CallBox>
 
@@ -226,7 +226,7 @@ React 18 中，`startTransition` 只能接收同步函数，`useDeferredValue` �
 
 前面讲的是“更新有轻重缓急”。隐藏一块界面时也有同样的问题：隐藏的内容该占多少优先级？
 
-先看需求。切换标签页或收起侧边栏时，你想“隐藏”一块界面，又不想丢掉用户已经输入的内容。组件的 state 跟着它在树里的位置走（见[渲染机制](/lessons/rendering)）。条件渲染把组件卸载了，state 随之丢失。React 19.2 起稳定的 `<Activity>` 能做到保留。它的 `mode` 属性只有两个值：`"visible"` 和 `"hidden"`。
+先看需求。切换标签页或收起侧边栏时，你想“隐藏”一块界面，又不想丢掉用户已经输入的内容。组件的 state 跟着它在树里的位置走（见[渲染机制](/lessons/rendering)）。条件渲染会卸载组件，state 随之丢失；React 19.2 起稳定的 `<Activity>` 能做到保留。它的 `mode` 属性只有两个值：`"visible"` 和 `"hidden"`。
 
 ```jsx play title="三种隐藏方式"
 import { Activity, useState, useEffect } from 'react';
@@ -304,7 +304,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-Activity 隐藏的是 DOM，不会替你停掉有副作用的 DOM。隐藏的 `<video>` 会继续播放。要在 effect 的清理函数里暂停它。
+Activity 隐藏的是 DOM，不会替你停掉有副作用的 DOM。隐藏的 `<video>` 会继续播放，所以要在 effect 的清理函数里暂停它。
 
 `hidden` 会立刻给子树加上 `display: none`，所以 CSS 过渡来不及播放。给显示和隐藏加动画（包括用 `<ViewTransition>`，它同样要放进过渡更新），见[动画与过渡](/lessons/animation)。
 

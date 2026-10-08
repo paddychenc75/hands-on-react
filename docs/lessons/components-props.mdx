@@ -12,7 +12,7 @@ title: "组件与 Props"
 
 <LessonProse>
 
-**组件就是一个返回 JSX 的函数**。组件名必须以**大写字母**开头。React 用这一点区分组件和 HTML 标签：`<div>` 是标签，`<Card>` 是组件。
+**组件就是一个返回 JSX 的函数**。组件名必须以**大写字母**开头，React 靠这一点区分组件和 HTML 标签：`<div>` 是标签，`<Card>` 是组件。
 
 ```jsx play title="定义一次，到处使用"
 function Avatar() {
@@ -32,7 +32,7 @@ function App() {
 
 ## Props：组件的参数
 
-如果每个组件都只能显示一模一样的内容，用处就不大了。**props**（properties 的缩写）让父组件把数据传给子组件。这就像给函数传参数。
+如果每个组件都只能显示一模一样的内容，用处就不大了。**props**（properties 的缩写）让父组件把数据传给子组件，就像给函数传参数。
 
 ```jsx play title="通过 props 传入数据"
 function UserCard({ name, role, emoji = '🙂' }) {
@@ -81,9 +81,9 @@ function App() {
 
 ## 组件必须是纯函数
 
-组件要像**纯函数**：同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里。[useEffect 与副作用](/lessons/use-effect)一课会讲剩下的情况。
+组件要像**纯函数**：同样的 props 和 state，返回同样的 JSX。渲染时不要修改组件外的变量，不要发请求，不要改 DOM。这些事放在事件处理函数里，其余情况留到[useEffect 与副作用](/lessons/use-effect)一课讲。
 
-React 怎么帮你发现违反这条规则的代码？开发环境里的**严格模式**（`<StrictMode>`）会把每个组件函数调用两次。纯函数调用两次，结果和调用一次相同。不纯的函数就会露馅。生产环境没有这个检查。
+React 怎么帮你发现违反这条规则的代码？开发环境里的**严格模式**（`<StrictMode>`）会把每个组件函数调用两次。纯函数调用两次，结果和调用一次相同，不纯的函数就会露馅。生产环境没有这个检查。
 
 下面的 `Cup` 在渲染时修改了模块变量 `guest`，并包在 `<StrictMode>` 里。
 
@@ -118,7 +118,7 @@ function App() {
 
 ## 特殊的 prop：children
 
-写在组件开闭标签之间的内容，会作为 `children` prop 传进去。这让你可以做出“容器”类组件，比如面板、弹窗、布局。
+写在组件开闭标签之间的内容，会作为 `children` prop 传进去。用它可以做出“容器”类组件，比如面板、弹窗、布局。
 
 ```jsx play title="children 让组件可以“包裹”任意内容"
 function Panel({ title, children }) {

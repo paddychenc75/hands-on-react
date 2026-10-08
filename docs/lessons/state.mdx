@@ -36,7 +36,7 @@ function App() {
 1. 修改普通变量**不会通知 React** 重新渲染。
 2. 就算重新渲染了，函数重新执行时 `let count = 0` 又会把它重置为 0。
 
-`useState` 解决这两个问题。第一，React 替你**保存**这个值，重新渲染后值还在。第二，你得到一个 **set 函数**。调用 set 函数，React 就会重新渲染。
+`useState` 解决这两个问题。第一，React 替你**保存**这个值，所以重新渲染后值还在。第二，你得到一个 **set 函数**，调用它，React 就会重新渲染。
 
 ```jsx play title="正确的计数器"
 import { useState } from 'react';
@@ -88,11 +88,11 @@ function App() {
 }
 ```
 
-每个 `<Counter />` 是一个独立的**组件实例**，每个实例有自己的 state。想让两个计数器共用一个数，要把 state 放到它们共同的父组件里。[状态提升](/lessons/lifting-state)一课会讲。
+每个 `<Counter />` 是一个独立的**组件实例**，有自己的 state。想让两个计数器共用一个数，要把 state 放到它们共同的父组件里。[状态提升](/lessons/lifting-state)一课会讲。
 
 ## 一次渲染 = 一张快照
 
-新手最容易在这里困惑。下面有两个“+3”按钮。写法 A 连续调用三次 `setCount(count + 1)`；写法 B 连续调用三次 `setCount(c => c + 1)`。
+新手最容易在这里困惑。下面有两个“+3”按钮：写法 A 连续调用三次 `setCount(count + 1)`，写法 B 连续调用三次 `setCount(c => c + 1)`。
 
 ```jsx play title="连续调用三次 set 函数"
 import { useState } from 'react';
@@ -133,7 +133,7 @@ function App() {
 
 ## 状态是对象或数组时
 
-React 通过 `Object.is` 比较新旧值来判断是否需要更新。如果你直接修改对象再传回去，引用没变，React 会认为“什么都没变”。所以**必须创建一个新对象**。
+React 通过 `Object.is` 比较新旧值来判断是否需要更新。如果你直接修改对象再传回去，引用没变，React 就会认为“什么都没变”，所以**必须创建一个新对象**。
 
 ```jsx play title="不可变更新"
 import { useState } from 'react';
@@ -169,7 +169,7 @@ function App() {
 
 <CallBox kind="warn" label="常见坑">
 
-你可能看到的报错：`Too many re-renders. React limits the number of renders to prevent an infinite loop.`<br />原因：渲染时直接调用了 set 函数。set 函数触发渲染，渲染又调用它，形成死循环。<br />去看：常见的是 `onClick={setCount(count + 1)}`。改成传一个函数：`onClick={() => setCount(count + 1)}`。
+你可能看到的报错：`Too many re-renders. React limits the number of renders to prevent an infinite loop.`<br />原因：渲染时直接调用了 set 函数。set 函数触发渲染，渲染又调用 set 函数，形成死循环。<br />去看：常见的是 `onClick={setCount(count + 1)}`。改成传一个函数：`onClick={() => setCount(count + 1)}`。
 
 </CallBox>
 

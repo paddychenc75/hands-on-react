@@ -33,13 +33,13 @@ function greet(name) { console.log('你好，' + name); }
 
 <CallBox kind="warn" label="常见坑">
 
-`onClick={handleClick()}` 是错的！加了括号，函数会**在渲染时立刻执行**。React 拿到的是它的返回值，通常是 undefined。要传的是**函数本身**：`onClick={handleClick}` 或 `onClick={() => handleClick(x)}`。
+`onClick={handleClick()}` 是错的！加了括号，函数会**在渲染时立刻执行**，React 拿到的就是它的返回值，通常是 undefined。要传的是**函数本身**：`onClick={handleClick}` 或 `onClick={() => handleClick(x)}`。
 
 </CallBox>
 
 ## 事件对象
 
-处理函数会收到一个事件对象 `e`。React 包装了浏览器的原生事件，叫合成事件（SyntheticEvent）。它遵循 DOM 事件标准，并修复了一些浏览器差异。常用属性：
+处理函数会收到一个事件对象 `e`。React 包装了浏览器的原生事件，叫合成事件（SyntheticEvent）。它遵循 DOM 事件标准，并修复了一些浏览器差异。常用属性有：
 
 - `e.target`：触发事件的元素，`e.target.value` 拿到输入框的值
 - `e.preventDefault()`：阻止默认行为，比如表单提交时刷新页面

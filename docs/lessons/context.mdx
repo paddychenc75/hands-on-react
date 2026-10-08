@@ -12,7 +12,7 @@ title: "Context：跨层级共享数据"
 
 <LessonProse>
 
-主题色、当前用户、语言设置这类数据，会被**很多层的很多个组件**使用。一层一层传 props 非常繁琐。**Context** 让父组件把数据“广播”给整棵子树。任何深度的组件都能直接读取。
+主题色、当前用户、语言设置这类数据，会被**很多层的很多个组件**使用，一层一层传 props 很繁琐。**Context** 让父组件把数据“广播”给整棵子树，任何深度的组件都能直接读取。
 
 ## 三步使用 Context
 
@@ -126,7 +126,7 @@ function ClearButton() {
 
 ## React 19 新增：用 use 读取 Context
 
-React 19 的 `use` 函数也能读取 Context：`use(ThemeContext)` 读到的值和 `useContext(ThemeContext)` 一样。区别在于调用位置。Hooks 规则要求 `useContext` 写在组件顶层，不能放在 `if` 或提前 `return` 的后面。`use` 不受这条规则限制，可以放在条件分支、循环里，也可以放在提前 `return` 之后。
+React 19 的 `use` 函数也能读取 Context：`use(ThemeContext)` 读到的值和 `useContext(ThemeContext)` 一样。区别在于调用位置：Hooks 规则要求 `useContext` 写在组件顶层，不能放在 `if` 或提前 `return` 的后面；`use` 不受这条规则限制，可以放在条件分支、循环里，也可以放在提前 `return` 之后。
 
 ```jsx play title="用 use 读取 Context"
 import { createContext, use, useState } from 'react';
@@ -236,7 +236,7 @@ function App() {
 }
 ```
 
-点“切换语言”：读了 Context 的 `Greeting` 和 `LangButton` 重新渲染，没读 Context 的 `Unrelated` 渲染次数不变。因为 `LangProvider` 通过 `children` 接收子树，子树的元素是 `App` 创建的，`LangProvider` 的 state 变化时，React 复用它们，只更新读了 Context 的组件。
+点“切换语言”：读了 Context 的 `Greeting` 和 `LangButton` 重新渲染，没读 Context 的 `Unrelated` 渲染次数不变，这是因为 `LangProvider` 通过 `children` 接收子树，子树的元素是 `App` 创建的，所以 `LangProvider` 的 state 变化时，React 复用它们，只更新读了 Context 的组件。
 
 ### 用平台自带的 Intl
 
