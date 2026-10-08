@@ -93,6 +93,18 @@ export default {
       t.assert(t.text('#title') === '你好', 'h1 的内容应该是“你好”，现在是“' + t.text('#title') + '”');
     },
   },
+  // 变式练习（可选）：2–3 道 3–8 分钟的小任务，练同一概念的不同情境；不影响“本课完成”。
+  // 要用时取消注释，并在课文里的 <Exercise /> 后面加一行 <Drills />。字段说明见 AGENTS.md「变式练习」。
+  // drills: [
+  //   {
+  //     title: '换成对象状态',
+  //     task: '<ol class="task-steps"><li>…</li></ol>',
+  //     starter: 'function App() {\\n  return null;\\n}\\n',
+  //     solution: 'function App() {\\n  return <h1 id="title">你好</h1>;\\n}\\n',
+  //     hint: '失败 1 次后显示的提示',
+  //     test: async t => { /* 同样检查行为；用 t.retry / t.baseline 处理计时 */ },
+  //   },
+  // ],
   // 阶段测验专用的读代码题。下标是复习卡片键 课id#cN 的 N：以后只能在末尾追加，不能调换、删除
   checkOnly: [
     {

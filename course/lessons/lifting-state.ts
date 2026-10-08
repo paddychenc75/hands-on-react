@@ -158,26 +158,22 @@ function App() {
       t.assert(showBtn('p1'), 'p1 收起后应显示“展开”按钮');
       await t.click(showBtn('p1'));
       t.assert(isOpen('p1') && !isOpen('p2'), '再点 p1 的“展开”，应只展开 p1，p2 收起');
-      // 检查 state 放在哪里：渲染 <section> 的组件（Panel）不应再有自己的 state，它的上层组件（App）要有
-      const fiberOf = node => {
-        const k = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
-        return k && node[k];
-      };
-      const isComp = f => !!f && [0, 11, 15].includes(f.tag); // 函数组件、forwardRef、memo
-      const hasState = f => {
-        for (let h = f.memoizedState; h && typeof h === 'object' && 'next' in h; h = h.next) if (h.queue && typeof h.queue.dispatch === 'function') return true;
-        return false;
-      };
-      let panel = fiberOf(sec('p1'));
-      while (panel && !isComp(panel)) panel = panel.return;
-      t.assert(panel, '找不到渲染 <section> 的组件。请保留 Panel 组件');
-      t.assert(
-        !hasState(panel),
-        'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上。请删掉 Panel 的 useState，只通过 props 接收 isActive',
-      );
-      let owner = panel.return;
-      while (owner && !(isComp(owner) && hasState(owner))) owner = owner.return;
-      t.assert(owner, '找不到保存 activeId 的组件。请在 App 里用 useState 声明 activeId，再通过 props 传给 Panel');
+      // 检查 state 放在哪里：渲染 <section> 的组件（Panel）不应再有自己的 state，它的上层组件（App）要有。
+      // 依赖 React 19.3.x 的 fiber 结构（经 t.internals：componentOf / hasStateHook）；结构不认识时跳过，
+      // 下面“再渲染一份 App，两份各管各的”的行为断言仍会发现把 state 放在组件外面的写法
+      const inter = t.internals;
+      const sectionFiber = inter.fiberOf(sec('p1'));
+      const panel = sectionFiber && inter.componentOf(sectionFiber);
+      if (sectionFiber && inter.hasStateHook(panel) !== null) {
+        t.assert(panel, '找不到渲染 <section> 的组件。请保留 Panel 组件');
+        t.assert(
+          !inter.hasStateHook(panel),
+          'Panel 里还有自己的 state。这样 Panel 和 App 各存一份“是否展开”，两份数据随时可能对不上。请删掉 Panel 的 useState，只通过 props 接收 isActive',
+        );
+        let owner = inter.componentOf(panel.return);
+        while (owner && !inter.hasStateHook(owner)) owner = inter.componentOf(owner.return);
+        t.assert(owner, '找不到保存 activeId 的组件。请在 App 里用 useState 声明 activeId，再通过 props 传给 Panel');
+      }
       // 再渲染一份 App：两份应各管各的。state 如果放在了组件外面（模块变量），两份会互相影响
       t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
       const box = document.createElement('div');
@@ -207,6 +203,223 @@ function App() {
       }
     },
   },
+  drills: [
+    {
+      title: '两个输入框同步',
+      task: '<ol class="task-steps"><li>现在两个输入框各存一份文字，互相不知道对方输入了什么。</li><li>把文字提升到 <code>App</code>，整个页面只存一份。</li><li><code>Field</code> 自己不再有 state，通过 props 接收文字和变化时的回调。</li><li>结果：在任意一个框里输入，另一个框同步显示同样的文字，下面的 <code>字数</code> 也跟着变。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function Field({ id, label }) {
+  const [text, setText] = useState('');
+  return (
+    <p>
+      <label>{label}：
+        <input id={id} value={text} onChange={e => setText(e.target.value)} />
+      </label>
+    </p>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Field id="a" label="输入框 A" />
+      <Field id="b" label="输入框 B" />
+      <p id="len">字数：0</p>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function Field({ id, label, text, onChange }) {
+  return (
+    <p>
+      <label>{label}：
+        <input id={id} value={text} onChange={e => onChange(e.target.value)} />
+      </label>
+    </p>
+  );
+}
+
+function App() {
+  const [text, setText] = useState('');
+  return (
+    <div>
+      <Field id="a" label="输入框 A" text={text} onChange={setText} />
+      <Field id="b" label="输入框 B" text={text} onChange={setText} />
+      <p id="len">字数：{text.length}</p>
+    </div>
+  );
+}`,
+      hint: '谁需要知道文字？两个 Field 和字数都要，所以 state 要放在它们最近的共同父组件里。Field 只负责显示收到的文字，输入变化时通知父组件。',
+      exports: ['App'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const val = id => (t.q('#' + id) ? t.q('#' + id).value : null);
+        const len = () => t.text('#len').replace(/\s/g, '');
+        t.assert(t.q('#a') && t.q('#b') && t.q('#len'), '请保留 id 为 a、b 的输入框和 id 为 len 的字数。');
+        await t.type('#a', '你好');
+        t.assert(
+          val('b') === '你好',
+          '在输入框 A 输入“你好”后，输入框 B 应同步显示“你好”，实际是“' + val('b') + '”。两个框各存一份文字时，互相看不到对方，请只存一份。',
+        );
+        t.assert(len() === '字数：2', '输入“你好”后字数应为 2，实际显示“' + t.text('#len') + '”。字数要由那一份文字算出来。');
+        await t.type('#b', 'hello');
+        t.assert(val('a') === 'hello', '在输入框 B 输入“hello”后，输入框 A 应同步显示“hello”，实际是“' + val('a') + '”。');
+        t.assert(len() === '字数：5', '输入“hello”后字数应为 5，实际显示“' + t.text('#len') + '”。');
+        await t.type('#a', '');
+        t.assert(val('b') === '' && len() === '字数：0', '清空输入框 A 后，B 和字数也应清空。');
+        await t.type('#a', 'abc');
+        // 谁拥有 state：渲染输入框的组件如果不是显示字数的那个组件，就不该有自己的 state
+        const I = t.internals;
+        const ownerOf = sel => I.componentOf(I.fiberOf(t.q(sel)));
+        const fieldComp = ownerOf('#a');
+        const lenComp = ownerOf('#len');
+        if (fieldComp && lenComp && fieldComp.type !== lenComp.type) {
+          t.assert(I.hasStateHook(fieldComp) !== true, '输入框所在的组件里还有自己的 state。文字应只存在它们共同的父组件里，输入框组件只通过 props 接收文字。');
+        }
+        // 再渲染一份 App：两份各管各的，文字不能存在组件外面
+        t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
+        const box = document.createElement('div');
+        const root = ReactDOM.createRoot(box);
+        try {
+          ReactDOM.flushSync(() => root.render(React.createElement(t.exports.App)));
+          const a2: any = box.querySelector('#a');
+          t.assert(
+            a2 && a2.value === '',
+            '再渲染一份 App，输入框一开始就有内容“' + (a2 && a2.value) + '”，应为空。文字被存在了组件外面，被所有 App 共用。请把它存成 App 的 state。',
+          );
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(a2, 'xyz');
+          a2.dispatchEvent(new Event('input', { bubbles: true }));
+          await t.wait(40);
+          t.assert((box.querySelector('#b') as any).value === 'xyz', '在新渲染的 App 里输入后，另一个框没有同步。');
+          t.assert(
+            val('a') === 'abc',
+            '在另一份 App 里输入后，页面上这一份被改掉了（现在是“' + val('a') + '”）。文字被存在了组件外面，请把它存成 App 的 state。',
+          );
+        } finally {
+          root.unmount();
+        }
+      },
+    },
+    {
+      title: '修复搜索框和列表不同步',
+      task: '<ol class="task-steps"><li>在搜索框输入“苹果”，下面的列表却没有变化，计数也不对。</li><li>找出原因：搜索词现在存了几份？列表读的是哪一份？</li><li>修复它，让搜索词只有一份。</li><li>结果：输入“苹果”后列表只剩 3 项，<code>共 3 项</code> 同步变化；清空后恢复全部 5 项。</li></ol>',
+      starter: `import { useState } from 'react';
+
+const FRUITS = ['苹果', '香蕉', '苹果派', '橙子', '青苹果'];
+
+function SearchBox() {
+  const [query, setQuery] = useState('');
+  return <input id="q" placeholder="搜索水果" value={query} onChange={e => setQuery(e.target.value)} />;
+}
+
+function FruitList() {
+  const [query] = useState('');
+  const shown = FRUITS.filter(f => f.includes(query));
+  return (
+    <div>
+      <p id="count">共 {shown.length} 项</p>
+      <ul id="list">
+        {shown.map(f => <li key={f}>{f}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <SearchBox />
+      <FruitList />
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+const FRUITS = ['苹果', '香蕉', '苹果派', '橙子', '青苹果'];
+
+function SearchBox({ query, onChange }) {
+  return <input id="q" placeholder="搜索水果" value={query} onChange={e => onChange(e.target.value)} />;
+}
+
+function FruitList({ query }) {
+  const shown = FRUITS.filter(f => f.includes(query));
+  return (
+    <div>
+      <p id="count">共 {shown.length} 项</p>
+      <ul id="list">
+        {shown.map(f => <li key={f}>{f}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function App() {
+  const [query, setQuery] = useState('');
+  return (
+    <div>
+      <SearchBox query={query} onChange={setQuery} />
+      <FruitList query={query} />
+    </div>
+  );
+}`,
+      hint: '搜索框和列表各有一个 query，列表读的是自己那份，永远是空字符串。谁需要知道搜索词？它们的共同父组件是 App，state 应该放在那里。',
+      exports: ['App'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const items = (scope = t.root) => [...scope.querySelectorAll('#list li')].map(li => li.textContent.trim());
+        const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+        const count = () => t.text('#count').replace(/\s/g, '');
+        t.assert(t.q('#q') && t.q('#list') && t.q('#count'), '请保留 id 为 q 的搜索框、id 为 list 的列表和 id 为 count 的计数。');
+        t.assert(items().length === 5, '一开始应显示全部 5 项，实际是 ' + items().length + ' 项。');
+        await t.type('#q', '苹果');
+        t.assert(
+          same(items(), ['苹果', '苹果派', '青苹果']),
+          '输入“苹果”后列表应只剩 3 项（苹果、苹果派、青苹果），实际是：' +
+            items().join('、') +
+            '。搜索词在搜索框和列表里各存了一份，列表读不到搜索框里输入的内容。',
+        );
+        t.assert(count() === '共3项', '输入“苹果”后计数应为“共 3 项”，实际是“' + t.text('#count') + '”。');
+        await t.type('#q', '橙');
+        t.assert(same(items(), ['橙子']), '输入“橙”后列表应只剩“橙子”，实际是：' + items().join('、') + '。过滤要用搜索框当前的内容，不能写死。');
+        await t.type('#q', '没有');
+        t.assert(items().length === 0 && count() === '共0项', '输入“没有”后列表应为空、计数为“共 0 项”。');
+        await t.type('#q', '');
+        t.assert(items().length === 5 && count() === '共5项', '清空搜索框后应恢复全部 5 项。');
+        await t.type('#q', '橙');
+        // 搜索词只能在一个共同祖先里：搜索框所在的组件和列表所在的组件，不能各自有 state
+        const I = t.internals;
+        const statefulTypes = sel => {
+          const out = [];
+          for (let f = I.componentOf(I.fiberOf(t.q(sel))); f; f = I.componentOf(f.return)) if (I.hasStateHook(f) === true) out.push(f.type);
+          return out;
+        };
+        const qChain = statefulTypes('#q');
+        const listChain = statefulTypes('#list');
+        t.assert(
+          qChain.every(x => listChain.includes(x)) && listChain.every(x => qChain.includes(x)),
+          '搜索框和列表不在同一个有 state 的组件里：搜索词被存了不止一份。应只在它们的共同父组件里存一份。',
+        );
+        // 再渲染一份：互不影响
+        t.assert(typeof t.exports.App === 'function', '请保留名为 App 的组件');
+        const box = document.createElement('div');
+        const root = ReactDOM.createRoot(box);
+        try {
+          ReactDOM.flushSync(() => root.render(React.createElement(t.exports.App)));
+          t.assert(items(box).length === 5, '再渲染一份 App，列表一开始应是全部 5 项。搜索词被存在了组件外面，被所有 App 共用，请把它存成 App 的 state。');
+          const q2: any = box.querySelector('#q');
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(q2, '香');
+          q2.dispatchEvent(new Event('input', { bubbles: true }));
+          await t.wait(40);
+          t.assert(same(items(box), ['香蕉']), '在新渲染的 App 里输入“香”后，列表应只剩“香蕉”。');
+          t.assert(same(items(), ['橙子']), '在另一份 App 里输入后，页面上这一份的列表被改掉了。搜索词被存在了组件外面，请把它存成 App 的 state。');
+        } finally {
+          root.unmount();
+        }
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `父组件渲染 <code>&lt;Child value={count} /&gt;</code>。count 从 0 变成 5 后，Child 显示几？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function Child({ value }) {

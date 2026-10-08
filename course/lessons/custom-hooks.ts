@@ -231,6 +231,250 @@ function App() {
       t.assert(t.text('#stock') === '10', `点“补满”后库存应恢复为 10，实际是 ${t.text('#stock')}`);
     },
   },
+  drills: [
+    {
+      title: '抽出 useLocalStorage：两个组件共用读写逻辑',
+      task: '<ol class="task-steps"><li><code>Nickname</code> 和 <code>Theme</code> 各写了一遍“从 localStorage 读初值，变化后写回去”。把它抽成自定义 Hook <code>useLocalStorage(key, initial)</code>。</li><li>它返回 <code>[value, setValue]</code>，用法和 <code>useState</code> 一样。第一次渲染时，如果 localStorage 里有这个 key，就用存的值（用 JSON 存取），否则用 initial。value 变化后要写回 localStorage。</li><li>改写 <code>Nickname</code> 和 <code>Theme</code>，让它们调用 <code>useLocalStorage</code>，不再自己读写 localStorage。key 仍是 <code>demo-nick</code> 和 <code>demo-dark</code>。</li></ol>',
+      starter: `import { useState, useEffect } from 'react';
+
+function useLocalStorage(key, initial) {
+  // 在这里实现：返回 [value, setValue]
+  return [initial, () => {}];
+}
+
+function Nickname() {
+  const [name, setName] = useState(() => {
+    const saved = localStorage.getItem('demo-nick');
+    return saved === null ? '访客' : JSON.parse(saved);
+  });
+  useEffect(() => {
+    localStorage.setItem('demo-nick', JSON.stringify(name));
+  }, [name]);
+  return <input id="nick" value={name} onChange={e => setName(e.target.value)} />;
+}
+
+function Theme() {
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('demo-dark');
+    return saved === null ? false : JSON.parse(saved);
+  });
+  useEffect(() => {
+    localStorage.setItem('demo-dark', JSON.stringify(dark));
+  }, [dark]);
+  return (
+    <label>
+      <input id="dark" type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)} /> 深色
+    </label>
+  );
+}
+
+function App() {
+  return <div><Nickname /><Theme /></div>;
+}`,
+      solution: `import { useState, useEffect } from 'react';
+
+function useLocalStorage(key, initial) {
+  const [value, setValue] = useState(() => {
+    const saved = localStorage.getItem(key);
+    return saved === null ? initial : JSON.parse(saved);
+  });
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue];
+}
+
+function Nickname() {
+  const [name, setName] = useLocalStorage('demo-nick', '访客');
+  return <input id="nick" value={name} onChange={e => setName(e.target.value)} />;
+}
+
+function Theme() {
+  const [dark, setDark] = useLocalStorage('demo-dark', false);
+  return (
+    <label>
+      <input id="dark" type="checkbox" checked={dark} onChange={e => setDark(e.target.checked)} /> 深色
+    </label>
+  );
+}
+
+function App() {
+  return <div><Nickname /><Theme /></div>;
+}`,
+      hint: '把 Nickname 里的 useState 初值函数和 useEffect 原样搬进 useLocalStorage，把写死的 key 和初值换成参数，最后返回 [value, setValue]。两个组件里就只剩一行调用。',
+      exports: ['useLocalStorage', 'App'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const h = React.createElement;
+        const useLocalStorage = t.exports.useLocalStorage;
+        t.assert(typeof useLocalStorage === 'function', '请保留名为 useLocalStorage 的函数');
+        const keys = ['drill-probe-a', 'drill-probe-b', 'demo-nick', 'demo-dark'];
+        const saved = keys.map(k => [k, localStorage.getItem(k)]);
+        const box = document.createElement('div');
+        const root = ReactDOM.createRoot(box);
+        try {
+          keys.forEach(k => localStorage.removeItem(k));
+          let a = null;
+          let b = null;
+          const Probe = () => {
+            a = useLocalStorage('drill-probe-a', 1);
+            b = useLocalStorage('drill-probe-b', 'x');
+            return null;
+          };
+          localStorage.setItem('drill-probe-a', JSON.stringify(42));
+          ReactDOM.flushSync(() => root.render(h(Probe)));
+          t.assert(Array.isArray(a) && typeof a[1] === 'function', 'useLocalStorage 应返回 [value, setValue]，第二项是函数');
+          t.assert(a[0] === 42, `localStorage 里已经存了 42，第一次渲染应读到它，实际是 ${JSON.stringify(a[0])}。初值应优先取存的值，没有才用 initial`);
+          t.assert(b[0] === 'x', `localStorage 里没有 drill-probe-b，应使用 initial 'x'，实际是 ${JSON.stringify(b[0])}`);
+          ReactDOM.flushSync(() => a[1](7));
+          t.assert(a[0] === 7, `调用 setValue(7) 后 value 应为 7，实际是 ${JSON.stringify(a[0])}`);
+          t.assert(
+            localStorage.getItem('drill-probe-a') === '7',
+            `value 变化后应写回 localStorage（JSON 格式），实际存的是 ${JSON.stringify(localStorage.getItem('drill-probe-a'))}`,
+          );
+          t.assert(b[0] === 'x', '两个 key 的状态应互相独立');
+          root.unmount();
+          // 新挂载一份 App：应读到之前存的值，并且组件通过 Hook 写回
+          localStorage.setItem('demo-nick', JSON.stringify('小明'));
+          localStorage.setItem('demo-dark', 'true');
+          const box2 = document.createElement('div');
+          const root2 = ReactDOM.createRoot(box2);
+          try {
+            ReactDOM.flushSync(() => root2.render(h(t.exports.App)));
+            t.assert(
+              (box2.querySelector('#nick') as HTMLInputElement).value === '小明',
+              `Nickname 应读到存的“小明”，实际是“${(box2.querySelector('#nick') as HTMLInputElement).value}”。key 要保持 demo-nick`,
+            );
+            t.assert((box2.querySelector('#dark') as HTMLInputElement).checked === true, 'Theme 应读到存的 true。key 要保持 demo-dark');
+            const input = box2.querySelector('#nick') as HTMLInputElement;
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            ReactDOM.flushSync(() => {
+              setter.call(input, '小红');
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            t.assert(
+              localStorage.getItem('demo-nick') === '"小红"',
+              `改了昵称后，localStorage 的 demo-nick 应为 "小红"，实际是 ${localStorage.getItem('demo-nick')}`,
+            );
+          } finally {
+            root2.unmount();
+          }
+          // 两个组件不再自己读写 localStorage 或直接用 useState
+          const bodyOf = name => {
+            const m = new RegExp('^[ \\t]*(?:export\\s+)?(?:function\\s+' + name + '\\b|(?:const|let|var)\\s+' + name + '\\s*=)', 'm').exec(t.source);
+            if (!m) return null;
+            const rest = t.source.slice(m.index + m[0].length);
+            const end = rest.search(/^(?:export\s+)?(?:function|const|let|var|class)\s/m);
+            return end < 0 ? rest : rest.slice(0, end);
+          };
+          for (const name of ['Nickname', 'Theme']) {
+            const body = bodyOf(name);
+            t.assert(body != null, `找不到组件 ${name}。请保留它的名字`);
+            t.assert(/\buseLocalStorage\s*\(/.test(body), `${name} 里没有调用 useLocalStorage`);
+            t.assert(
+              !/\blocalStorage\b/.test(body.replace(/useLocalStorage/g, '')) && !/\b(useState|useEffect)\s*\(/.test(body),
+              `${name} 里还在自己读写 localStorage 或直接用 useState/useEffect。这些逻辑应只写在 useLocalStorage 里一次`,
+            );
+          }
+        } finally {
+          try {
+            root.unmount();
+          } catch {}
+          for (const [k, v] of saved) {
+            if (v === null) localStorage.removeItem(k);
+            else localStorage.setItem(k, v);
+          }
+        }
+      },
+    },
+    {
+      title: '自己写 useDebounce：停止变化后才更新',
+      task: '<ol class="task-steps"><li>实现自定义 Hook <code>useDebounce(value, delay)</code>：它返回 value 的“延迟版本”。value 停止变化 <code>delay</code> 毫秒后，返回值才更新成最新的 value。</li><li>value 连续变化时要重新计时，中间的值不能出现在返回值里。</li><li>App 已经在用 <code>useDebounce(text, 300)</code>，不用改。</li></ol>',
+      starter: `import { useState, useEffect } from 'react';
+
+function useDebounce(value, delay) {
+  // 在这里实现：value 停止变化 delay 毫秒后，才返回最新的 value
+  return value;
+}
+
+function App() {
+  const [text, setText] = useState('');
+  const keyword = useDebounce(text, 300);
+  return (
+    <div>
+      <input id="q" value={text} onChange={e => setText(e.target.value)} />
+      <p>输入：<span id="typed">{text}</span></p>
+      <p>搜索词：<span id="keyword">{keyword}</span></p>
+    </div>
+  );
+}`,
+      solution: `import { useState, useEffect } from 'react';
+
+function useDebounce(value, delay) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
+
+function App() {
+  const [text, setText] = useState('');
+  const keyword = useDebounce(text, 300);
+  return (
+    <div>
+      <input id="q" value={text} onChange={e => setText(e.target.value)} />
+      <p>输入：<span id="typed">{text}</span></p>
+      <p>搜索词：<span id="keyword">{keyword}</span></p>
+    </div>
+  );
+}`,
+      hint: 'Hook 里用 useState 保存延迟版本。再用 useEffect：value 变化后启动一个 setTimeout，到时间才 set。想一想：value 又变了，上一个计时器该怎么处理？组件卸载呢？',
+      exports: ['useDebounce'],
+      test: async t => {
+        const { React, ReactDOM } = t;
+        const h = React.createElement;
+        const useDebounce = t.exports.useDebounce;
+        t.assert(typeof useDebounce === 'function', '请保留名为 useDebounce 的函数');
+        const D = 200;
+        await t.retry(async () => {
+          const box = document.createElement('div');
+          const root = ReactDOM.createRoot(box);
+          const seen: string[] = [];
+          let out: any;
+          const Probe = ({ v }) => {
+            out = useDebounce(v, D);
+            seen.push(out);
+            return null;
+          };
+          const set = v => ReactDOM.flushSync(() => root.render(h(Probe, { v })));
+          try {
+            set('a');
+            t.assert(out === 'a', `第一次渲染应直接返回初始值 'a'，实际是 ${JSON.stringify(out)}`);
+            set('ab');
+            t.assert(out === 'a', `value 刚变成 'ab' 时，返回值应还是 'a'（等 value 稳定一段时间后才更新），实际是 ${JSON.stringify(out)}`);
+            await t.wait(D / 2);
+            t.timing(out === 'a', `过了 ${D / 2} 毫秒还不到 delay（${D} 毫秒），返回值应仍是 'a'，实际是 ${JSON.stringify(out)}。是不是没有按 delay 等待？`);
+            set('abc');
+            await t.wait(D * 0.8);
+            t.assert(!seen.includes('ab'), "value 在 'ab' 之后又变成了 'abc'，'ab' 不该出现在返回值里。value 再次变化时，要先清掉上一个计时器");
+            for (let i = 0; i < 40 && out !== 'abc'; i++) await t.wait(20);
+            t.timing(
+              out === 'abc',
+              `'abc' 稳定超过 delay 之后，返回值应更新为 'abc'，实际是 ${JSON.stringify(out)}。delay 是不是被写死了，或者 effect 没有随 value 重新计时？`,
+            );
+          } finally {
+            root.unmount();
+          }
+        });
+        // 真实的 App：输入后搜索词不能立刻跟上
+        await t.type('#q', 'hi');
+        t.assert(t.text('#typed') === 'hi', '输入框下方应立刻显示输入的文字');
+        t.assert(t.text('#keyword') !== 'hi', '刚输入完，搜索词不该立刻等于输入。它应等输入停下来 300 毫秒后才更新');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `a 初始为 false。点击按钮后，a 是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function useToggle(init) {

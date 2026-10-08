@@ -150,6 +150,242 @@ function App() {
       t.assert(r({ count: 1 }, { type: 'increment' }).count === 2, 'increment 应返回 count 加 1 的新对象');
     },
   },
+  drills: [
+    {
+      title: '两个 useState 改写成一个 reducer',
+      task: '<ol class="task-steps"><li>现在用两个 <code>useState</code> 管理 <code>count</code> 和 <code>step</code>。它们总是一起变化，适合合成一个对象 <code>{ count, step }</code>。</li><li>实现 <code>reducer</code>，处理四种 action：<code>increment</code>（count 加上 step）、<code>decrement</code>（count 减去 step）、<code>setStep</code>（带载荷，形如 <code>{ type: \'setStep\', step: 5 }</code>，只改 step）、<code>reset</code>（回到初始状态 <code>{ count: 0, step: 1 }</code>）。</li><li>每个分支返回新对象，没改的字段要保留。遇到不认识的 action，不要返回 <code>undefined</code>。</li><li>在 <code>App</code> 里用一个 <code>useReducer</code> 代替两个 <code>useState</code>，按钮改为派发对应的 action。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function reducer(state, action) {
+  // 在这里实现
+  return state;
+}
+
+function App() {
+  const [count, setCount] = useState(0);
+  const [step, setStep] = useState(1);
+
+  return (
+    <div>
+      <p>计数：<b id="count">{count}</b>，步长：<b id="step">{step}</b></p>
+      <button onClick={() => setCount(count + step)}>加</button>
+      <button onClick={() => setCount(count - step)}>减</button>
+      <button onClick={() => setStep(1)}>步长 1</button>
+      <button onClick={() => setStep(5)}>步长 5</button>
+      <button onClick={() => { setCount(0); setStep(1); }}>重置</button>
+    </div>
+  );
+}`,
+      solution: `import { useReducer } from 'react';
+
+const initialState = { count: 0, step: 1 };
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'increment': return { ...state, count: state.count + state.step };
+    case 'decrement': return { ...state, count: state.count - state.step };
+    case 'setStep': return { ...state, step: action.step };
+    case 'reset': return initialState;
+    default: throw new Error('未知的 action: ' + action.type);
+  }
+}
+
+function App() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  return (
+    <div>
+      <p>计数：<b id="count">{state.count}</b>，步长：<b id="step">{state.step}</b></p>
+      <button onClick={() => dispatch({ type: 'increment' })}>加</button>
+      <button onClick={() => dispatch({ type: 'decrement' })}>减</button>
+      <button onClick={() => dispatch({ type: 'setStep', step: 1 })}>步长 1</button>
+      <button onClick={() => dispatch({ type: 'setStep', step: 5 })}>步长 5</button>
+      <button onClick={() => dispatch({ type: 'reset' })}>重置</button>
+    </div>
+  );
+}`,
+      hint: '用展开语法保留没改的字段：<code>{ ...state, count: state.count + state.step }</code>。<code>setStep</code> 的新步长在 <code>action.step</code> 里。<code>reset</code> 要同时把两个字段放回初始值。',
+      exports: ['reducer'],
+      test: async t => {
+        const r = t.exports.reducer;
+        t.assert(typeof r === 'function', '没有找到 reducer');
+        const run = (s, a) => {
+          const snap = JSON.stringify(s);
+          const out = r(s, a);
+          t.assert(JSON.stringify(s) === snap, 'reducer 修改了原来的 state（' + a.type + '）。请返回新对象，不要改参数里的 state。');
+          return out;
+        };
+        const is = (out, c, s) => out && out.count === c && out.step === s;
+        const show = o => JSON.stringify(o);
+        let o = run({ count: 5, step: 2 }, { type: 'increment' });
+        t.assert(is(o, 7, 2), 'increment 应让 count 加上 step：{ count: 5, step: 2 } 应得到 { count: 7, step: 2 }，实际是 ' + show(o) + '。');
+        o = run({ count: 5, step: 2 }, { type: 'decrement' });
+        t.assert(is(o, 3, 2), 'decrement 应让 count 减去 step：{ count: 5, step: 2 } 应得到 { count: 3, step: 2 }，实际是 ' + show(o) + '。');
+        o = run({ count: 5, step: 2 }, { type: 'setStep', step: 3 });
+        t.assert(
+          is(o, 5, 3),
+          "setStep 只改 step，count 要保留：{ count: 5, step: 2 } 加 { type: 'setStep', step: 3 } 应得到 { count: 5, step: 3 }，实际是 " + show(o) + '。',
+        );
+        o = run({ count: 9, step: 5 }, { type: 'reset' });
+        t.assert(is(o, 0, 1), 'reset 应回到初始状态 { count: 0, step: 1 }（两个字段都要回去），实际是 ' + show(o) + '。');
+        const s0 = { count: 1, step: 1 };
+        for (const type of ['increment', 'decrement', 'setStep', 'reset']) {
+          t.assert(r(s0, { type, step: 2 }) !== s0, type + ' 应返回新对象，不要返回原来的 state。');
+        }
+        let unknown: any;
+        try {
+          unknown = r(s0, { type: '__unknown__' });
+        } catch {
+          unknown = s0; // 抛出错误也可以
+        }
+        t.assert(unknown !== undefined, '遇到不认识的 action 时返回了 undefined，state 会变成 undefined。请加 default 分支：返回原 state，或抛出错误。');
+        // 界面：count、step 同时受控
+        const c = () => t.text('#count');
+        const s = () => t.text('#step');
+        const btn = name => t.byText('button', name);
+        t.assert(btn('加') && btn('减') && btn('步长 1') && btn('步长 5') && btn('重置'), '请保留“加”“减”“步长 1”“步长 5”“重置”五个按钮。');
+        t.assert(c() === '0' && s() === '1', '初始应是计数 0、步长 1，实际是 ' + c() + '、' + s() + '。');
+        await t.click(btn('加'));
+        t.assert(c() === '1', '步长 1 时点一次“加”，计数应为 1，实际是 ' + c() + '。');
+        await t.click(btn('步长 5'));
+        await t.click(btn('加'));
+        t.assert(c() === '6' && s() === '5', '步长改为 5 后点“加”，计数应从 1 变成 6，实际是 ' + c() + '（步长 ' + s() + '）。');
+        await t.click(btn('减'));
+        t.assert(c() === '1', '点“减”应减去步长 5，计数应回到 1，实际是 ' + c() + '。');
+        await t.click(btn('重置'));
+        t.assert(c() === '0' && s() === '1', '点“重置”后计数应为 0、步长应为 1，实际是 ' + c() + '、' + s() + '。');
+        t.assert(/useReducer\(\s*reducer\b/.test(t.source), 'App 里请用 useReducer(reducer, …) 代替两个 useState，让界面真的由 reducer 驱动。');
+      },
+    },
+    {
+      title: '修复购物车 reducer 的三处问题',
+      task: '<ol class="task-steps"><li>这是一个购物车的 reducer，列表用 <code>[{ id, name, qty }]</code> 表示。点页面上的按钮，列表不更新，或者出现重复的行。</li><li>需求：<code>added</code>（带 <code>id</code>、<code>name</code>）在购物车里没有这件商品时追加一行 <code>qty: 1</code>，已有时把它的 qty 加 1；<code>removed</code>（带 <code>id</code>）删掉那一行；<code>changedQty</code>（带 <code>id</code>、<code>qty</code>）把数量改成 qty，qty 小于等于 0 时删掉那一行。</li><li>找出 reducer 里的问题并修复：不能修改原来的数组和里面的对象，要覆盖全部需求，遇到不认识的 action 不要返回 <code>undefined</code>。</li><li>按钮和列表已经写好，只改 <code>reducer</code>。</li></ol>',
+      starter: `import { useReducer } from 'react';
+
+function reducer(items, action) {
+  switch (action.type) {
+    case 'added':
+      items.push({ id: action.id, name: action.name, qty: 1 });
+      return items;
+    case 'removed':
+      return items.filter(i => i.id !== action.id);
+    case 'changedQty': {
+      const item = items.find(i => i.id === action.id);
+      item.qty = action.qty;
+      return items;
+    }
+  }
+}
+
+function App() {
+  const [items, dispatch] = useReducer(reducer, []);
+  return (
+    <div>
+      <button onClick={() => dispatch({ type: 'added', id: 'apple', name: '苹果' })}>加苹果</button>
+      <button onClick={() => dispatch({ type: 'added', id: 'pear', name: '梨' })}>加梨</button>
+      <ul id="cart">
+        {items.map(i => (
+          <li key={i.id}>
+            {i.name} × <span className="qty">{i.qty}</span>
+            <button onClick={() => dispatch({ type: 'changedQty', id: i.id, qty: i.qty - 1 })}>减一个</button>
+            <button onClick={() => dispatch({ type: 'removed', id: i.id })}>删除</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      solution: `import { useReducer } from 'react';
+
+function reducer(items, action) {
+  switch (action.type) {
+    case 'added':
+      if (items.some(i => i.id === action.id)) {
+        return items.map(i => (i.id === action.id ? { ...i, qty: i.qty + 1 } : i));
+      }
+      return [...items, { id: action.id, name: action.name, qty: 1 }];
+    case 'removed':
+      return items.filter(i => i.id !== action.id);
+    case 'changedQty':
+      if (action.qty <= 0) return items.filter(i => i.id !== action.id);
+      return items.map(i => (i.id === action.id ? { ...i, qty: action.qty } : i));
+    default:
+      throw new Error('未知的 action: ' + action.type);
+  }
+}
+
+function App() {
+  const [items, dispatch] = useReducer(reducer, []);
+  return (
+    <div>
+      <button onClick={() => dispatch({ type: 'added', id: 'apple', name: '苹果' })}>加苹果</button>
+      <button onClick={() => dispatch({ type: 'added', id: 'pear', name: '梨' })}>加梨</button>
+      <ul id="cart">
+        {items.map(i => (
+          <li key={i.id}>
+            {i.name} × <span className="qty">{i.qty}</span>
+            <button onClick={() => dispatch({ type: 'changedQty', id: i.id, qty: i.qty - 1 })}>减一个</button>
+            <button onClick={() => dispatch({ type: 'removed', id: i.id })}>删除</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      hint: '三处：一是 <code>push</code> 和给 <code>item.qty</code> 赋值都改了原来的数据，要换成 <code>[...items, 新项]</code> 和 <code>map</code> 加展开语法，改哪一项就为那一项创建新对象。二是 <code>added</code> 没先看有没有这件商品。三是 switch 没有 <code>default</code>。',
+      exports: ['reducer'],
+      test: async t => {
+        const r = t.exports.reducer;
+        t.assert(typeof r === 'function', '没有找到 reducer');
+        const clone = x => JSON.parse(JSON.stringify(x));
+        const run = (s, a) => {
+          const snap = JSON.stringify(s);
+          const itemRefs = Array.isArray(s) ? s.slice() : [];
+          const out = r(s, a);
+          t.assert(
+            JSON.stringify(s) === snap && itemRefs.every((x, i) => s[i] === x),
+            'reducer 修改了原来的购物车（' + a.type + '）。数组和里面的对象都不能直接改：追加用 [...items, 新项]，改某一项要为那一项创建新对象。',
+          );
+          return out;
+        };
+        const names = o => (Array.isArray(o) ? o.map(i => i.id + ':' + i.qty).join(',') : String(o));
+        const base = [
+          { id: 'apple', name: '苹果', qty: 1 },
+          { id: 'pear', name: '梨', qty: 2 },
+        ];
+        let o = run(clone(base), { type: 'added', id: 'fig', name: '无花果' });
+        t.assert(names(o) === 'apple:1,pear:2,fig:1', 'added 一件新商品应追加到末尾，qty 为 1：期望 apple:1,pear:2,fig:1，实际是 ' + names(o) + '。');
+        o = run(clone(base), { type: 'added', id: 'pear', name: '梨' });
+        t.assert(names(o) === 'apple:1,pear:3', 'added 已有的商品应把它的 qty 加 1，不要多出一行：期望 apple:1,pear:3，实际是 ' + names(o) + '。');
+        o = run(clone(base), { type: 'removed', id: 'apple' });
+        t.assert(names(o) === 'pear:2', 'removed 应删掉那一行：期望 pear:2，实际是 ' + names(o) + '。');
+        o = run(clone(base), { type: 'changedQty', id: 'pear', qty: 5 });
+        t.assert(names(o) === 'apple:1,pear:5', 'changedQty 应把那一项的数量改成 5：期望 apple:1,pear:5，实际是 ' + names(o) + '。');
+        o = run(clone(base), { type: 'changedQty', id: 'apple', qty: 0 });
+        t.assert(names(o) === 'pear:2', 'changedQty 把数量改成 0 时应删掉那一行：期望 pear:2，实际是 ' + names(o) + '。');
+        const s0 = clone(base);
+        let unknown: any;
+        try {
+          unknown = r(s0, { type: '__unknown__' });
+        } catch {
+          unknown = s0; // 抛出错误也可以
+        }
+        t.assert(unknown !== undefined, '遇到不认识的 action 时返回了 undefined，购物车会变成 undefined。请加 default 分支：返回原 state，或抛出错误。');
+        // 界面
+        const rows = () => t.qa('#cart li').map(li => li.firstChild.textContent.trim() + li.querySelector('.qty').textContent);
+        const btn = name => t.byText('button', name);
+        await t.click(btn('加苹果'));
+        await t.click(btn('加苹果'));
+        t.assert(rows().join() === '苹果2', '点两次“加苹果”应只有一行“苹果 × 2”，实际是：' + rows().join('、') + '。');
+        await t.click(btn('加梨'));
+        t.assert(rows().length === 2, '再点“加梨”应有两行，实际有 ' + rows().length + ' 行。');
+        const minus = t.qa('#cart li')[0].querySelectorAll('button')[0];
+        await t.click(minus);
+        await t.click(t.qa('#cart li')[0].querySelectorAll('button')[0]);
+        t.assert(rows().join() === '梨1', '苹果点两次“减一个”后应被删掉，只剩“梨 × 1”，实际是：' + rows().join('、') + '。');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `点击按钮执行 <code>dispatch({ type: 'add', item: 'b' })</code>。列表会怎样？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">function reducer(state, action) {

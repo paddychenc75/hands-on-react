@@ -31,13 +31,15 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | **`npm run check`** | typecheck + lint + check:content + test:unit。**每次提交前跑** | 约 2 秒 |
 | `npm run test:e2e` | 浏览器测试（Playwright），读 `doc_build/`，**先 `npm run build`**；需要联网 | 全部约 2.5 分钟 |
 | `npm run test:e2e -- lessons state use-effect` | 只测指定课（逐课测试） | 每课几秒 |
+| `npm run test:variants [-- 课id]` | 回归 `tests/variants/` 里记录的练习/变式练习变体（参考答案通过、起始代码被拒、常见错误被拒、不同写法通过）。不需要 build，较慢，不在 `npm test` 里 | 约 1–5 分钟 |
+| `node tests/e2e/try.mjs <课id> <ex \| drill:N> <变体文件>` | 写或改练习检查时的快速试验台：不需要 build，几秒出结果；`--throttle 4` 降 CPU，`--reps 3` 重复 | 几秒 |
 | `npm run test:e2e -- mechanics smoke` | 只跑学习机制 / 冒烟测试 | 各约 1 分钟 |
 | **`npm test`** | check + build + test:e2e，**完整验收**。改引擎、主题组件、样式后必跑 | 约 3 分钟 |
 | `npm run new-lesson -- <课id> --stage <0-5> --after <已有课id> --title "标题"` | 加一课 | 即时 |
 | `npm run gen` | 重新生成 `course/lessons.generated.ts`（dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router 和 tanstack-query 两课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），可以写多个；不写就五个都跑。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect 的参考答案仍通过），可以写多个；不写就七个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 49 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -83,6 +85,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `playground.ts` | 实验台，含“先预测再运行” |
 | `tester.ts` | 练习检查工具 `t.*`（`makeTester`） |
 | `exercise.ts` | 练习：任务、检查答案、提示阶梯 |
+| `drills.ts` | 变式练习：每道独立的实验台和检查答案，进度记在 `LessonProgress.dr`，不影响本课完成 |
 | `question.ts` / `quiz.ts` / `warmup.ts` / `review.ts` / `stageCheck.ts` | 题目共用组件 / 课内测验 / 课前热身 / 复习页 / 阶段测验 |
 | `cards.ts` | 间隔复习卡片的读写（`__srs`），卡片键对应回题目 |
 | `completion.ts` | 一课的完成判定和“掌握标准”条 |
@@ -92,6 +95,9 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `logic/srs.ts` | SRS 间隔推进、到期判断、热身选题 |
 | `logic/ladder.ts` | 提示阶梯解锁、“代码是否真的改了”、半成品示例 |
 | `logic/selfExplain.ts` | 自我解释有效字数 |
+| `logic/drills.ts` | 变式练习的两级提示规则、完成数统计 |
+| `logic/timing.ts` | 计时类检查的基线换算：相对阈值、设备忙的判断、失败信息 |
+| `logic/internals.ts` | `t.internals`：安全读 React 内部结构，字段不在返回 null |
 | `logic/stageCheck.ts` | 阶段测验抽题、及格、冷却、复测、交卷记录 |
 | `logic/runtime.ts` / `warnings.ts` | 运行时版本号常量 `REACT_VERSION` 和资源路径 / 识别 React 19 的警告 |
 | `logic/random.ts` / `text.ts` / `errors.ts` | 洗牌和种子随机 / 转义和选项格式 / 错误信息中文解释 |
@@ -190,12 +196,13 @@ const a = 1;
 
 <Quiz />
 <Exercise />
+<Drills />   {/* 可选：数据里有 drills 时 */}
 <SelfExplain />
 <LessonFooter />
 ```
 
-- MDX 全局组件（不用 import）：`Playground`（由 `play` 代码块生成）、`Quiz`、`Exercise`、`Warmup`、`SelfExplain`、`CallBox`、`Raw`、`LessonHeader`、`LessonGoals`、`LessonProse`、`LessonFooter`；页面级的 `HomePage`、`ReviewPage`、`GlossaryPage`、`StageCheck` 只用在首页、复习页、术语表和阶段测验页。
-- `<Quiz />`、`<Exercise />` 只在数据里有 `quiz`、`exercise` 时写（`check:content` 会检查两边对得上）。
+- MDX 全局组件（不用 import）：`Playground`（由 `play` 代码块生成）、`Quiz`、`Exercise`、`Drills`、`Warmup`、`SelfExplain`、`CallBox`、`Raw`、`LessonHeader`、`LessonGoals`、`LessonProse`、`LessonFooter`；页面级的 `HomePage`、`ReviewPage`、`GlossaryPage`、`StageCheck` 只用在首页、复习页、术语表和阶段测验页。
+- `<Quiz />`、`<Exercise />`、`<Drills />` 只在数据里有 `quiz`、`exercise`、`drills` 时写（`check:content` 会检查两边对得上）。
 - `play` 代码块：`title="…"` 是示例标题，也是数据文件 `plays` 的键；标题重名或没有标题时用 `key="#序号"`（序号从 1 起，按本课示例出现顺序）。代码作为字符串传入，不用转义 `{`、`<`。同一课里键必须唯一。
 - `<Raw html="…" tag className />`：只给带自定义结构的 HTML 用（`fig` 示意图、公式、路线图等）。能用 Markdown 写的一律用 Markdown。
 - 站内链接：`[文字](/lessons/<id>)`、`/review`、`/glossary`、`/check/<0-5>`。构建会检查 MDX 里的死链接；`check:content` 另外检查数据文件和 `<Raw html>` 里的链接。
@@ -208,23 +215,42 @@ const a = 1;
 import type { Lesson } from '../types.ts';
 export default {
   id: 'scheduler', stage: 5, title: '…', mins: 40, summary: '…',
-  goals: [...], keyPoints: [...], quiz: [...], exercise: {...}, checkOnly: [...], plays: {...},
+  goals: [...], keyPoints: [...], quiz: [...], exercise: {...}, drills: [...], localMins: 120, checkOnly: [...], plays: {...},
 } satisfies Lesson;
 ```
 
 **字段、含义和类型以 `course/types.ts` 为准**（不在这里重复抄字段表）。写法要点：
 
-- 预测题：写在 `plays[标题].predict`，`pkey` 是预测键（`课id|标题`，进度里 `__pred` 用它，别改）。**被预测的代码、按钮文字、日志里不能剧透答案**，解释放进 `note`（预测后才显示）。
+- `localMins`（可选，正整数分钟）：这一课的本机任务或本机项目的预计时间，只算要在自己电脑上做、站内没有自动检查的部分（课文里写了“本机项目另需约 2–3 小时”就填 150）。首页把“站内学习（各课 `mins` 之和，不含毕业设计）”“本机任务与本机项目（各课 `localMins` 之和）”“毕业设计（portfolio 的 `mins` + `localMins`）”分三段显示；缺省按 0。`mins` 不含它。
+- 预测题：写在 `plays[标题].predict`，`pkey` 是预测键（`课id|标题`，进度里 `__pred` 用它，别改）。示例从别的课搬来时 `pkey` 保持原样（例如 concurrent 里仍是 `rendering|三种隐藏方式`）：`check:content` 允许已经在快照里的 `pkey` 不以本课 id 开头。**被预测的代码、按钮文字、日志里不能剧透答案**，解释放进 `note`（预测后才显示）。
 - `options` 是纯文本，不能写 HTML（会被转义）。`q`、`explain`、`task`、`hint` 按 HTML 渲染，写 JSX 或泛型时把 `<` 写成 `&lt;`。
 - 步骤写成 Markdown 有序列表（课文）或 `<ol class="task-steps">`（`task` 里），不要用 `<br>1.` 手工编号。
 - `goals` 3–4 条，可观察的动词开头；`keyPoints` 4–5 条，自我解释后展示对照。
 - 检查函数用到的辅助函数写在数据文件顶部（模块作用域），需要引擎里的 `prepare`、`compile`、`stripComments` 就 `import … from '../engine/exec.ts'`。
 - 字段写错会被 `npm run typecheck` 拦住；选项数、`answer` 下标、`explain` 非空等由 `npm run check:content` 检查。
 
+### 变式练习（`drills`）
+
+每课除了一道正式练习（`exercise`），可以有 2–3 道**小而快**的变式练习：同一个核心概念的不同情境（换数据形状、换交互、给一段有 bug 的代码让学习者修、把写法 A 改成写法 B），不是把正式练习换个名字。每道 3–8 分钟，任务比正式练习窄。
+
+- **数据**：`drills: Drill[]`（类型在 `course/types.ts`）。每道有 `title`（一句话定位，显示在标题上）、`task`、`starter`、`solution`、`hint`、`test`，可选 `exports`。没有 `faded`（不提供半成品）。有 `drills` 必须有 `exercise`，MDX 里在 `<Exercise />` 后面写 `<Drills />`（`check:content` 检查两边对得上，并检查字段完整、2–3 道、标题不重复、`solution` 不能和正式练习相同）。`mins` 不含变式练习（选做）。
+- **界面**：“动手练习”之后是“变式练习”区，每道是独立的实验台和“检查答案”，标题行显示“变式 x/y”，本课跳转条里有“变式练习 x/y”，课末的掌握标准条也显示进度。
+- **进度**：`LessonProgress.dr`（下标 → `DrillProgress`：`ok`、`code`、`fails`、`lastFail`、`sawSol`、`rewrite`、`exHelp`）。localStorage 的键 `hands-on-react-v1` 和已有字段都不变，旧数据没有 `dr` 时一切照常（`drillStat` 和 `drillRec` 都容错）。**变式练习不影响“本课完成”**：`maybeComplete` 仍然只看随堂测验全对和正式练习通过。
+- **提示规则（简化，正式练习的阶梯一行没改）**：失败 1 次给提示，失败 2 次可看参考答案；没有半成品，也没有时间门槛。“代码是否真的改了”、粘贴参考答案原文不能通过、看过答案后点“重置”自己重写，规则和正式练习相同（`logic/drills.ts` 复用 `logic/ladder.ts`）。
+- **写法**：行为检查为主，不查字面。每道都要用 `try.mjs` 实测五类：参考答案通过；起始代码被拒（信息指向概念）；两种常见错误被拒（信息指向概念）；一种合理的不同写法通过。把变体存成 `tests/variants/<课id>.drill-<序号>.mjs`（正式练习是 `<课id>.ex.mjs`），`npm run test:variants` 回归。逐课 e2e（`lessons.mjs`）对每道变式也填参考答案要求通过、填起始代码要求被拒。
+- `new-lesson` 的数据模板里带一个注释掉的示例。
+
 ### 练习检查（`exercise.test`）
 
 `test(t)` 拿到的工具（类型是 `course/types.ts` 的 `Tester`，实现在 `course/engine/tester.ts` 的 `makeTester`）：`t.q(sel)`、`t.qa(sel)`、`t.text(sel)`、`t.byText(tag, text)`、`t.click(x)`、`t.type(x, value)`、`t.wait(ms)`、`t.assert(cond, msg)`、`t.unpreventedSubmits()`、`t.source`（去注释的代码）、`t.rawSource`、`t.exports`（按 `exports` 字段导出的顶层名字）、`t.root`。
 
+- **计时类检查和读 React 内部结构的检查，必须用下面这几个辅助**（评审指出绝对毫秒阈值和内部字段在慢设备、后台标签页、升级 React 后会误判）：
+  - `await t.baseline()` 返回 `{ factor, lag, limit(ms) }`：检查开始时实测一次设备基线（固定计算量的耗时相对参考机慢几倍、事件循环的额外延迟）。**阈值写成 `bl.limit(10)`，不要写死 `10`**。`limit` 只加“额外开销”（`ms + 2·lag + 2·(factor−1)`），**不按倍数放大**：任务本身是按墙钟忙等的（例如每个单元忙等 1ms），设备慢不会让它变长，按倍数放大会让“一直占用主线程”的错误写法混过去。
+  - `t.timing(cond, msg)`：计时类断言。失败抛出可重测的失败（普通 `t.assert` 不重测）。
+  - `await t.retry(fn)`：运行一段含 `t.timing` 的检查；`t.timing` 失败就等 0.3 秒、重新测基线，再整体重跑一次，两次都失败才判失败。失败信息附一句区分：设备看起来忙（慢 3 倍以上或事件循环延迟 40ms 以上）写“可能不是代码的问题，再点一次检查”，否则写“更可能是代码的问题”。**`fn` 必须能重复执行**：段内自己创建 root、调度器、数据，不依赖上一次的残留。
+  - 标签页在后台（`document.hidden`）：`t.baseline()` 和 `t.retry()` 会抛 `EnvFail`，界面提示“请保持本页在前台，再点一次检查”，**这次不计入失败次数、不解锁提示**（正式练习和变式练习都一样）。
+  - `t.internals`：读 React 内部结构的唯一入口（`fiberOf`、`rootOf`、`componentOf`、`hooksOf`、`hasStateHook`、`refValues`、`inTransition`，实现和注释见 `logic/internals.ts`）。字段不存在或形状不对时返回 `null`，**检查要在 `null` 时退回纯行为断言并跳过结构断言**，这样升级 React 后不会抛异常或全盘误判。依赖的是 React 19.3.x 的 fiber 结构；位掩码（过渡车道）只在 `t.internals.known`（版本是 19.3.x）时才用。不要在 `exercise.test` 里直接写 `memoizedState`、`__reactFiber$`、`pendingLanes`。
+  - 新写计时类检查后，用 `node tests/e2e/try.mjs <课> ex <变体> --throttle 4 --reps 3` 和 `--throttle 6` 验证：参考答案仍通过，起始代码和典型错误仍被拒。`tests/e2e/throttle.mjs` 把“4 倍 CPU 节流下参考答案通过”固定为回归。
 - `t.unpreventedSubmits()`：本次运行里表单被提交、但学习者的处理函数没有调用 `preventDefault()` 的次数。实验台（`runner.ts`）在 mount 的父元素上挂了一个晚于 React 处理函数的 `submit` 兜底监听：没人调用 `preventDefault` 时它照样拦住页面刷新，同时在控制台警告并计数。所以界面上看不出漏写，要用这个计数断言（见 `project-todo`）。
 - **检查行为，不查字面**：点按钮看界面变化、计渲染次数、另开 root、卸载后看定时器是否停止。`t.source` 只用作最后的补充。
 - 每改一道检查，要实测：参考答案通过；起始代码被拒，失败信息指向概念；常见错误和投机写法被拒；至少一种合理的不同写法通过。
@@ -269,29 +295,31 @@ export default {
 - 加载失败：实验台显示“运行环境加载失败，请检查网络后刷新页面。”，页面其余部分正常；之后再进入有实验台的页面会重试（`tests/e2e/runtime.mjs` 用 route 拦截验证）。
 - 界面：实验台标题栏有一行不抢眼的灰字 `React 19.3.0`。
 
-### 第三方库（react-router、@tanstack/react-query）
+### 第三方库（react-router、@tanstack/react-query、zustand）
 
-实验台的示例里可以 `import` 两个真库，其余的包不行（`import` 别的包会被悄悄忽略）：
+实验台的示例里可以 `import` 三个真库，其余的包不行（`import` 别的包会被悄悄忽略）：
 
 | 库 | 版本 | 示例里的写法 | 说明 |
 |---|---|---|---|
 | react-router | 8.4.0 | `from 'react-router'`、`from 'react-router/dom'` | 路径 `react-router/dom` 里是 `RouterProvider`，和真实项目的写法一致 |
 | @tanstack/react-query | 5.104.1 | `from '@tanstack/react-query'` | |
+| zustand | 5.0.15 | `from 'zustand'`、`'zustand/middleware'`、`'zustand/react/shallow'`、`'zustand/shallow'`、`'zustand/vanilla'` | 暴露这五个子路径。`persist` 示例只写自己的键（`hoc-demo-zustand`），不碰 `hands-on-react-v1`；localStorage 不可用时用 `try/catch` 退回内存存储 |
 
-**两条约定**：
+**三条约定**：
 1. **路由用内存路由**：实验台不能改动页面的真实地址。示例用 `createMemoryRouter`（或 `MemoryRouter`），预览区里要显示当前的内存地址（`useLocation().pathname`），课文里写明“真实项目里用 `createBrowserRouter`，这里为了不改动页面地址用内存路由”。示例里不要用 `BrowserRouter`、`createBrowserRouter`、`createHashRouter`。
 2. **不发真实网络请求**：Query 和 `loader` 的数据来自返回 Promise 的模拟函数（`setTimeout` 加 `resolve`），并在代码注释里写明是模拟。示例里不要 `fetch` 外部接口。
+3. **存储只用自己的键**：zustand 的 `persist` 示例用独立的键（例如 `hoc-demo-zustand`），提供“清除”按钮（先 `setState` 重置，再 `persist.clearStorage()`）；不要读写 `hands-on-react-v1`。
 
 **怎么实现**：
-- 版本的唯一来源：`course/engine/logic/runtime.ts` 的 `LIBS`（包名、版本、打包文件名里的短名、可以 import 的路径）。`package.json` 的 `devDependencies` 里同名包写**精确版本**（不带 `^`），`tests/unit/runtime.test.ts` 和 `scripts/build-libs.mjs` 都会核对两处一致。`esbuild`（也是精确版本）只用来打包这两个库，不进站点。
-- `scripts/build-libs.mjs`（`predev`、`prebuild` 在 `build-react19.mjs` 之后自动跑）用 esbuild 把每个库的**开发版**（`development` 条件）打成一个自包含的 IIFE：`docs/public/runtime/<短名>-<版本>.dev.js`（不提交；react-router 约 470 KB，gzip 约 97 KB；react-query 约 155 KB，gzip 约 33 KB）。`react`、`react-dom`、`react-dom/client`、`react/jsx-runtime` 标成外部依赖，加载时解析到 `window.__hocReact19` 里实验台那一份 React（`React`、`ReactDOM`、`jsxRuntime`）：库**不自带第二份 React**，Hook 才不会报错。产物登记在 `window.__hocLibs[包名] = { version, modules }`，不写别的全局变量。库里的 `console.warn` / `console.error` 经 `window.__hocLibConsole` 显示在当前实验台的控制台里（前缀 `react-router 提示：` / `报告：`）。
-- 按需加载：`logic/runtime.ts` 的 `libsInSource(代码)` 按 `import` 语句判断需要哪些库（注释和字符串里的不算）。`theme/lib/useSlot.ts` 在创建实验台前先 `loadLibs`；`Playground` 传 `[code]`，`Exercise` 传起始代码和参考答案。没有 `import` 这两个库的课不请求任何库文件。学习者在编辑器里新加 `import` 时，`makePlayground` 的 `run` 会先加载再运行。
-- `prepare`（`exec.ts`）把这两个包名的 `import` 解析到加载好的模块对象：具名导入写成 `const { … } = __libs["包名"]`，`import * as X` 和默认导入得到整个模块；`import type` 被忽略；库还没加载就 `import` 会报“还没有加载”。`Runner` 把 `runtime.libs` 作为 `__libs` 传进沙箱。
+- 版本的唯一来源：`course/engine/logic/runtime.ts` 的 `LIBS`（包名、版本、打包文件名里的短名、可以 import 的路径）。`package.json` 的 `devDependencies` 里同名包写**精确版本**（不带 `^`），`tests/unit/runtime.test.ts` 和 `scripts/build-libs.mjs` 都会核对两处一致。`esbuild`（也是精确版本）只用来打包这三个库，不进站点。
+- `scripts/build-libs.mjs`（`predev`、`prebuild` 在 `build-react19.mjs` 之后自动跑）用 esbuild 把每个库的**开发版**（`development` 条件）打成一个自包含的 IIFE：`docs/public/runtime/<短名>-<版本>.dev.js`（不提交；react-router 约 470 KB，gzip 约 97 KB；react-query 约 155 KB，gzip 约 33 KB；zustand 约 24 KB，gzip 约 6 KB）。`react`、`react-dom`、`react-dom/client`、`react/jsx-runtime` 标成外部依赖，加载时解析到 `window.__hocReact19` 里实验台那一份 React（`React`、`ReactDOM`、`jsxRuntime`）：库**不自带第二份 React**，Hook 才不会报错。产物登记在 `window.__hocLibs[包名] = { version, modules }`，不写别的全局变量。库里的 `console.warn` / `console.error` 经 `window.__hocLibConsole` 显示在当前实验台的控制台里（前缀 `react-router 提示：` / `报告：`）。
+- 按需加载：`logic/runtime.ts` 的 `libsInSource(代码)` 按 `import` 语句判断需要哪些库（注释和字符串里的不算）；`zustand/middleware` 这类子路径也算 zustand。`theme/lib/useSlot.ts` 在创建实验台前先 `loadLibs`；`Playground` 传 `[code]`，`Exercise` 传起始代码和参考答案。没有 `import` 这些库的课不请求任何库文件，用到哪个库的课只请求哪个库的文件。学习者在编辑器里新加 `import` 时，`makePlayground` 的 `run` 会先加载再运行。
+- `prepare`（`exec.ts`）把这些包名和子路径的 `import` 解析到加载好的模块对象：具名导入写成 `const { … } = __libs["包名"]`，`import * as X` 和默认导入得到整个模块；`import type` 被忽略；库还没加载就 `import` 会报“还没有加载”。`Runner` 把 `runtime.libs` 作为 `__libs` 传进沙箱。
 - 加载失败：该实验台显示“运行环境加载失败（react-router），请检查网络后刷新页面。”，课文、测验、不用库的示例都正常；之后再进入有这个库的页面会重试。
-- 界面：实验台标题栏在 `React 19.3.0` 旁再显示一行同样风格的灰字 `react-router 8.4.0`（`.pg-lib`，没用到库就隐藏）。
-- 练习检查：`t.libs['react-router']`、`t.libs['@tanstack/react-query']` 是加载好的模块对象（练习的代码 `import` 了才有）。
+- 界面：实验台标题栏在 `React 19.3.0` 旁再显示一行同样风格的灰字，例如 `react-router 8.4.0`、`zustand 5.0.15`（`.pg-lib`，没用到库就隐藏；用到几个库就并列几个，用 `·` 隔开）。
+- 练习检查：`t.libs['react-router']`、`t.libs['@tanstack/react-query']`、`t.libs['zustand']` 是加载好的模块对象（练习的代码 `import` 了才有）。键是 `import` 的路径，所以子路径是 `t.libs['zustand/middleware']`、`t.libs['react-router/dom']`。
 
-**升级版本**：改 `package.json` 里的精确版本和 `LIBS` 里的 `version`（两处一致），`npm install`，重新跑 `npm run build` 和 `npm run test:e2e -- libs`，并重新实测两课所有示例、预测题的答案和课文里对库行为的描述（课文里写了版本号的地方一起改）。
+**升级版本**：改 `package.json` 里的精确版本和 `LIBS` 里的 `version`（两处一致），`npm install`，重新跑 `npm run build` 和 `npm run test:e2e -- libs`，并重新实测用到它的课（router、tanstack-query、state-architecture）所有示例、预测题的答案和课文里对库行为的描述（课文里写了版本号的地方一起改）。
 
 **再加一个库**（例如另一个状态库）：
 1. `npm install -D -E <包名>@<版本>`，在 `LIBS` 里加一项（包名、版本、短名、可以 import 的路径）。

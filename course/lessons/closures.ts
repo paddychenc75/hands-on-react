@@ -218,6 +218,170 @@ function App() {
       t.assert(srv.connects === 2, `从开始到现在共连接了 ${srv.connects} 次，应为 2 次（综合 1 次 + 旅行 1 次）。收到消息时不要重新连接`);
     },
   },
+  drills: [
+    {
+      title: '稍后保存，要存到点时的最新输入',
+      task: '<ol class="task-steps"><li>输入一些文字，点“稍后保存”。这时还不保存，只是登记一个“到点再做”的任务。</li><li>登记之后继续输入，再点“时间到”。现在 <code>#saved</code> 显示的是登记时那次渲染的文字，不是输入框里现在的文字。</li><li>修改代码，让“时间到”保存输入框里<strong>此刻</strong>的文字。</li><li>不要改模拟调度器，也不要在点“稍后保存”时立刻保存。</li></ol>',
+      starter: `import { useState } from 'react';
+
+// —— 模拟调度器（不用修改）：later 登记一个“到点再做”的任务，flush 表示时间到了 ——
+const scheduler = {
+  jobs: [],
+  later(fn) { this.jobs.push(fn); },
+  flush() {
+    const jobs = this.jobs;
+    this.jobs = [];
+    jobs.forEach(fn => fn());
+  },
+};
+
+function App() {
+  const [text, setText] = useState('');
+  const [saved, setSaved] = useState('（未保存）');
+
+  function saveLater() {
+    scheduler.later(() => setSaved(text));
+  }
+
+  return (
+    <div>
+      <input id="text" value={text} onChange={e => setText(e.target.value)} />
+      <button id="save" onClick={saveLater}>稍后保存</button>
+      <button id="flush" onClick={() => scheduler.flush()}>时间到</button>
+      <p id="saved">{saved}</p>
+    </div>
+  );
+}`,
+      solution: `import { useState, useRef, useEffect } from 'react';
+
+// —— 模拟调度器（不用修改）：later 登记一个“到点再做”的任务，flush 表示时间到了 ——
+const scheduler = {
+  jobs: [],
+  later(fn) { this.jobs.push(fn); },
+  flush() {
+    const jobs = this.jobs;
+    this.jobs = [];
+    jobs.forEach(fn => fn());
+  },
+};
+
+function App() {
+  const [text, setText] = useState('');
+  const [saved, setSaved] = useState('（未保存）');
+  const latest = useRef(text);
+  useEffect(() => {
+    latest.current = text;
+  });
+
+  function saveLater() {
+    scheduler.later(() => setSaved(latest.current));
+  }
+
+  return (
+    <div>
+      <input id="text" value={text} onChange={e => setText(e.target.value)} />
+      <button id="save" onClick={saveLater}>稍后保存</button>
+      <button id="flush" onClick={() => scheduler.flush()}>时间到</button>
+      <p id="saved">{saved}</p>
+    </div>
+  );
+}`,
+      hint: '登记的回调是点击那次渲染创建的，它记住的 <code>text</code> 不会再变。需要一个<strong>跨渲染都指向同一处</strong>的地方存最新输入，回调到点时再去读它。想想 <code>useRef</code>：什么时候把最新的 <code>text</code> 写进去？',
+      test: async t => {
+        const saved = () => t.text('#saved');
+        t.assert(t.q('#text') && t.q('#save') && t.q('#flush') && t.q('#saved'), '请保留输入框、两个按钮和 #saved，不要删掉它们');
+        await t.type('#text', 'a');
+        await t.click('#save');
+        await t.type('#text', 'abc');
+        t.assert(saved() === '（未保存）', '还没点“时间到”，#saved 就变了。保存要等到点才发生，不要在点“稍后保存”时立刻保存');
+        await t.click('#flush');
+        if (saved() === 'a') {
+          t.assert(false, '到点时保存的是“a”，这是点“稍后保存”那次渲染里的输入。回调只记得创建它那次渲染的 text。输入框此刻的文字是“abc”');
+        }
+        t.assert(saved() === 'abc', `到点时保存的是“${saved()}”，应是输入框此刻的“abc”。回调读到的值必须随每次输入更新`);
+        await t.type('#text', 'p');
+        await t.click('#save');
+        await t.type('#text', 'pq');
+        await t.click('#save');
+        await t.type('#text', 'pqr');
+        await t.click('#flush');
+        t.assert(saved() === 'pqr', `连续登记两次后到点，保存的是“${saved()}”，应是最新输入“pqr”`);
+        t.assert(t.q('#text').value === 'pqr', '输入框应仍然能正常输入：它里面现在应是“pqr”');
+      },
+    },
+    {
+      title: '一次点击里连续调用 set 函数',
+      task: '<ol class="task-steps"><li>计数从 2 开始。点“加 3”，应变成 5：一次点击里调用三次 set 函数，每次加 1。</li><li>点“加 1 再翻倍”，应先加 1，再翻倍：5 变成 12。</li><li>现在两个按钮的结果都不对。修改两个函数，让一次点击里的几次 set 函数调用接着前一次的结果算。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(2);
+
+  function plusThree() {
+    setCount(count + 1);
+    setCount(count + 1);
+    setCount(count + 1);
+  }
+
+  function plusOneThenDouble() {
+    setCount(count + 1);
+    setCount(count * 2);
+  }
+
+  return (
+    <div>
+      <p id="count">{count}</p>
+      <button id="plus3" onClick={plusThree}>加 3</button>
+      <button id="double" onClick={plusOneThenDouble}>加 1 再翻倍</button>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [count, setCount] = useState(2);
+
+  function plusThree() {
+    setCount(c => c + 1);
+    setCount(c => c + 1);
+    setCount(c => c + 1);
+  }
+
+  function plusOneThenDouble() {
+    setCount(c => c + 1);
+    setCount(c => c * 2);
+  }
+
+  return (
+    <div>
+      <p id="count">{count}</p>
+      <button id="plus3" onClick={plusThree}>加 3</button>
+      <button id="double" onClick={plusOneThenDouble}>加 1 再翻倍</button>
+    </div>
+  );
+}`,
+      hint: '事件处理函数里，<code>count</code> 在这次渲染中是一个固定的数。三次 <code>setCount(count + 1)</code> 都在算“同一个 count 加 1”。给 set 函数传一个函数（<code>c =&gt; …</code>），React 会把上一次排队的结果交给它。',
+      test: async t => {
+        const n = () => Number(t.text('#count'));
+        t.assert(t.q('#count') && t.q('#plus3') && t.q('#double'), '请保留 #count 和两个按钮');
+        t.assert(n() === 2, `初始计数应是 2，现在是 ${t.text('#count')}`);
+        const steps: [string, number, string][] = [
+          ['#plus3', 5, '加 3'],
+          ['#double', 12, '加 1 再翻倍'],
+          ['#plus3', 15, '加 3'],
+          ['#double', 32, '加 1 再翻倍'],
+        ];
+        for (const [sel, want, name] of steps) {
+          const before = n();
+          await t.click(sel);
+          t.assert(
+            n() === want,
+            `计数是 ${before} 时点“${name}”，应变成 ${want}，实际是 ${t.text('#count')}。同一次点击里，count 是这次渲染的固定值，后一次 set 函数调用没有接着前一次的结果算`,
+          );
+        }
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `在输入框里输入“hi”，然后按 Enter。控制台打印什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [text, setText] = useState('');

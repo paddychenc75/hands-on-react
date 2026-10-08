@@ -21,6 +21,12 @@ export interface LibInfo {
 export const LIBS: LibInfo[] = [
   { name: 'react-router', version: '8.4.0', slug: 'react-router', specifiers: ['react-router', 'react-router/dom'] },
   { name: '@tanstack/react-query', version: '5.104.1', slug: 'tanstack-query', specifiers: ['@tanstack/react-query'] },
+  {
+    name: 'zustand',
+    version: '5.0.15',
+    slug: 'zustand',
+    specifiers: ['zustand', 'zustand/middleware', 'zustand/react/shallow', 'zustand/shallow', 'zustand/vanilla'],
+  },
 ];
 
 /** 库打包文件的站内路径（相对站点 base） */

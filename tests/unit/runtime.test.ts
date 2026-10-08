@@ -77,6 +77,21 @@ describe('第三方库：从 import 语句判断要加载哪些库', () => {
     expect(names('import { useQuery } from "@tanstack/react-query";')).toEqual(['@tanstack/react-query']);
     expect(names("import { useQuery } from '@tanstack/react-query';\nimport { Link } from 'react-router';")).toEqual(['react-router', '@tanstack/react-query']);
   });
+  it('zustand 的五个路径都算 zustand 这一个库；zustand/traditional 等没暴露的路径不算', () => {
+    expect(names("import { create } from 'zustand';")).toEqual(['zustand']);
+    expect(names("import { persist, createJSONStorage } from 'zustand/middleware';")).toEqual(['zustand']);
+    expect(names("import { useShallow } from 'zustand/react/shallow';")).toEqual(['zustand']);
+    expect(names("import { shallow } from 'zustand/shallow';")).toEqual(['zustand']);
+    expect(names("import { createStore } from 'zustand/vanilla';")).toEqual(['zustand']);
+    expect(names("import { useStoreWithEqualityFn } from 'zustand/traditional';")).toEqual([]);
+  });
+  it('三个库一起 import，按 LIBS 的顺序返回', () => {
+    expect(names("import { create } from 'zustand';\nimport { useQuery } from '@tanstack/react-query';\nimport { Link } from 'react-router';")).toEqual([
+      'react-router',
+      '@tanstack/react-query',
+      'zustand',
+    ]);
+  });
   it('react-router/dom 也算 react-router；react-router-dom 和别的包不算', () => {
     expect(names("import { RouterProvider } from 'react-router/dom';")).toEqual(['react-router']);
     expect(names("import { Link } from 'react-router-dom';\nimport x from 'lodash';")).toEqual([]);
@@ -96,7 +111,14 @@ describe('prepare：第三方库的 import 解析到加载好的库对象', () =
   const rt = {
     React: { useState() {} },
     ReactDOM: { createRoot() {} },
-    libs: { 'react-router': router, 'react-router/dom': { RouterProvider() {} }, '@tanstack/react-query': { useQuery() {} } } as Record<string, unknown>,
+    libs: {
+      'react-router': router,
+      'react-router/dom': { RouterProvider() {} },
+      '@tanstack/react-query': { useQuery() {} },
+      zustand: { create() {} },
+      'zustand/middleware': { persist() {} },
+      'zustand/react/shallow': { useShallow() {} },
+    } as Record<string, unknown>,
   };
   const run = (src: string, r: any = rt) => {
     (globalThis as any).window = { Babel };
@@ -123,6 +145,14 @@ describe('prepare：第三方库的 import 解析到加载好的库对象', () =
     const out = run("import { RouterProvider } from 'react-router/dom';\nimport { useQuery } from '@tanstack/react-query';\nfunction App(){}");
     expect(out).toContain('const { RouterProvider } = __libs["react-router/dom"];');
     expect(out).toContain('const { useQuery } = __libs["@tanstack/react-query"];');
+  });
+  it('zustand 各路径各取各的模块', () => {
+    const out = run(
+      "import { create } from 'zustand';\nimport { persist } from 'zustand/middleware';\nimport { useShallow } from 'zustand/react/shallow';\nfunction App(){}",
+    );
+    expect(out).toContain('const { create } = __libs["zustand"];');
+    expect(out).toContain('const { persist } = __libs["zustand/middleware"];');
+    expect(out).toContain('const { useShallow } = __libs["zustand/react/shallow"];');
   });
   it('和 react 的 import 混用时，两边都解析', () => {
     const out = run("import { useState } from 'react';\nimport { Link } from 'react-router';\nfunction App(){}");

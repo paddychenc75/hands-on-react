@@ -131,6 +131,141 @@ function App() {
       );
     },
   },
+  drills: [
+    {
+      title: '对象 state：点了没反应',
+      task: '<ol class="task-steps"><li>点 <b>过生日</b>，年龄应加 1。现在点了没有任何反应，请修好。</li><li>补全 <code>rename</code>：点 <b>改名</b>，名字变成“小强”，年龄保持不变。</li><li>两个按钮可以反复点，结果要一直正确。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [user, setUser] = useState({ name: '小美', age: 20 });
+
+  function birthday() {
+    user.age = user.age + 1;
+    setUser(user);
+  }
+
+  function rename() {
+    // 把名字改成“小强”，年龄不变
+  }
+
+  return (
+    <div>
+      <p id="info">{user.name}，{user.age} 岁</p>
+      <button onClick={birthday}>过生日</button>
+      <button onClick={rename}>改名</button>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [user, setUser] = useState({ name: '小美', age: 20 });
+
+  function birthday() {
+    setUser({ ...user, age: user.age + 1 });
+  }
+
+  function rename() {
+    setUser({ ...user, name: '小强' });
+  }
+
+  return (
+    <div>
+      <p id="info">{user.name}，{user.age} 岁</p>
+      <button onClick={birthday}>过生日</button>
+      <button onClick={rename}>改名</button>
+    </div>
+  );
+}`,
+      hint: 'React 用 Object.is 比较新旧 state。把同一个对象传回 set 函数，React 认为 state 没变，不会重新渲染。要传一个新对象，没改的字段用展开语法 <code>...user</code> 复制过来。',
+      test: async t => {
+        const info = () => t.text('#info').replace(/\s/g, '');
+        t.assert(t.q('#info'), '找不到 id="info" 的元素');
+        t.assert(info() === '小美，20岁', `初始应显示“小美，20 岁”，实际是“${t.text('#info')}”`);
+        const birthday = t.byText('button', '过生日'),
+          rename = t.byText('button', '改名');
+        t.assert(birthday && rename, '需要文字为“过生日”和“改名”的两个按钮');
+        await t.click(birthday);
+        t.assert(
+          info() === '小美，21岁',
+          `点一次“过生日”后应显示“小美，21 岁”，实际是“${t.text('#info')}”。如果界面没变：传给 set 函数的还是同一个对象，React 认为 state 没变，就不会重新渲染`,
+        );
+        await t.click(birthday);
+        t.assert(info() === '小美，22岁', `再点一次应为 22 岁，实际是“${t.text('#info')}”。新年龄要由当前的 user 算出来，不能写死`);
+        await t.click(rename);
+        t.assert(info() === '小强，22岁', `点“改名”后应显示“小强，22 岁”，实际是“${t.text('#info')}”。传给 set 函数的新对象要带上没改的字段，否则它们会丢失`);
+        await t.click(birthday);
+        t.assert(info() === '小强，23岁', `改名后再过生日，应显示“小强，23 岁”，实际是“${t.text('#info')}”。名字和年龄要同时保留`);
+      },
+    },
+    {
+      title: '数组 state：同一次点击加两项',
+      task: '<ol class="task-steps"><li>点 <b>加两项</b>，在列表末尾依次加入“面包”和“鸡蛋”。</li><li>两项要在同一次点击里加入。点两次后，列表共 5 项。</li><li>不要用 <code>push</code> 这类会修改旧数组的方法。</li></ol>',
+      starter: `import { useState } from 'react';
+
+function App() {
+  const [items, setItems] = useState(['牛奶']);
+
+  function addTwo() {
+    setItems([...items, '面包']);
+    setItems([...items, '鸡蛋']);
+  }
+
+  return (
+    <div>
+      <button onClick={addTwo}>加两项</button>
+      <ul id="list">
+        {/* 列表只在末尾追加，这里先用下标当 key */}
+        {items.map((x, i) => (
+          <li key={i}>{x}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+function App() {
+  const [items, setItems] = useState(['牛奶']);
+
+  function addTwo() {
+    setItems(prev => [...prev, '面包']);
+    setItems(prev => [...prev, '鸡蛋']);
+  }
+
+  return (
+    <div>
+      <button onClick={addTwo}>加两项</button>
+      <ul id="list">
+        {/* 列表只在末尾追加，这里先用下标当 key */}
+        {items.map((x, i) => (
+          <li key={i}>{x}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      hint: '同一个事件里，两次 <code>setItems([...items, …])</code> 读到的 <code>items</code> 是同一份快照，后一次把前一次盖掉了。可以用函数式更新 <code>setItems(prev =&gt; …)</code>，也可以一次 set 加入两项。',
+      test: async t => {
+        const list = () => t.qa('#list li').map(x => x.textContent.trim());
+        t.assert(t.q('#list'), '找不到 id="list" 的元素');
+        t.assert(list().join('、') === '牛奶', `初始应只有“牛奶”，实际是：${list().join('、')}`);
+        const btn = t.byText('button', '加两项');
+        t.assert(btn, '找不到“加两项”按钮');
+        await t.click(btn);
+        t.assert(
+          list().join('、') === '牛奶、面包、鸡蛋',
+          `点一次后应是：牛奶、面包、鸡蛋，实际是：${list().join('、') || '（空）'}。同一个事件里，两次 set 函数读到的是同一份快照，后一次会盖掉前一次；直接修改旧数组也不会触发更新`,
+        );
+        await t.click(btn);
+        t.assert(
+          list().join('、') === '牛奶、面包、鸡蛋、面包、鸡蛋',
+          `再点一次应共 5 项（牛奶、面包、鸡蛋、面包、鸡蛋），实际是：${list().join('、')}。新列表要在当前列表的基础上追加，不能写死`,
+        );
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `n 为 0。点击一次按钮后，界面显示几？控制台打印几？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [n, setN] = useState(0);

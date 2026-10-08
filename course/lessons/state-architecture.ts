@@ -4,20 +4,21 @@ export default {
   id: 'state-architecture',
   stage: 3,
   title: '状态管理架构',
-  mins: 28,
-  summary: '区分服务端状态与客户端状态，理解外部 store 的原理并亲手实现一个。',
+  mins: 40,
+  localMins: 30,
+  summary: '区分服务端状态与客户端状态，理解外部 store 的原理，亲手实现一个，再用真的 Zustand 做持久化。',
   goals: [
     '能把一个 state 归类（局部、服务端、全局客户端、URL、表单），并选出合适的工具',
     '能用 useSyncExternalStore 把外部 store 接入组件',
-    '能写出支持 selector 的迷你 Zustand',
+    '能写出支持 selector 的迷你 Zustand，并用真的 Zustand 的 create、persist、useShallow 做同样的事',
     '能解释 selector 为什么能减少重新渲染',
   ],
   keyPoints: [
     '先给 state 分类。从 API 来的数据是服务端状态，交给 TanStack Query 这类库。搜索词、页码放进 URL。真正的全局客户端 state 通常很少。',
     '外部 store 要提供两样东西：<code>subscribe(callback)</code> 返回取消订阅的函数，<code>getSnapshot()</code> 返回当前值。<code>useSyncExternalStore</code> 用它们把 store 接入组件。',
     'selector 只选出组件需要的那一部分。React 用 <code>Object.is</code> 比较快照，选出的值没变，组件就不重新渲染。',
-    '更新 store 时要创建新对象，不要修改旧对象。',
-    '常见坑：selector 每次返回新对象，例如 <code>s =&gt; ({ a: s.a })</code>。快照永远“变了”，会无限渲染。',
+    '更新 store 时要创建新对象，不要修改旧对象。<code>persist</code> 中间件把 state 存进存储（默认 localStorage），创建 store 时再读回来。',
+    '常见坑：selector 每次返回新对象，例如 <code>s =&gt; ({ a: s.a })</code>。快照永远“变了”，会无限渲染。用 <code>useShallow</code> 包住选择器，或者拆成几个返回原始值的选择器。',
   ],
   quiz: [
     {
@@ -317,6 +318,33 @@ const store = {
       explain:
         '商品列表来自服务器，别人也可能改它，它是服务端状态：缓存、去重、失效和重新获取都该交给查询库。页码要能分享，应该放进 URL。弹窗开关是局部 UI 状态，一个组件的 useState 就够。主题是全局客户端状态，最有迷惑性：它确实要跨组件共享，但它不是从服务器取回的数据，查询库帮不上忙。',
     },
+    {
+      q: `store 用了 <code>persist</code>。<code>count</code> 加到 5 后，<code>localStorage['counter']</code> 里存的是什么？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const useCounter = create(
+  persist(
+    (set) =&gt; ({
+      count: 0,
+      inc: () =&gt; set((s) =&gt; ({ count: s.count + 1 })),
+    }),
+    { name: 'counter' },
+  ),
+);</code></pre></div>`,
+      options: ['{"count":5}', '不存：inc 是函数，不能序列化，整个 state 都存不了', '{"state":{"count":5},"version":0}', '{"count":5,"inc":null}'],
+      answer: 2,
+      explain:
+        'persist 存的是 <code>{ state, version }</code>。JSON 序列化会丢掉函数，所以只剩 count。不会因为有函数就整个存不了。第一项最有迷惑性：少了外面这一层 <code>state</code> 和 <code>version</code>。',
+    },
+    {
+      q: '组件只需要 a 和 b 两个字段。在 Zustand v5 里，哪种写法会无限渲染？',
+      options: [
+        'const a = useStore(s => s.a); const b = useStore(s => s.b);',
+        'const [a, b] = useStore(useShallow(s => [s.a, s.b]));',
+        'const { a, b } = useStore();',
+        'const [a, b] = useStore(s => [s.a, s.b]);',
+      ],
+      answer: 3,
+      explain:
+        '选择器每次返回新数组，快照永远“变了”，v5 会无限渲染。第一项每次返回原始值，没有问题。第二项用 useShallow 逐项比较，也没有问题。第三项不传选择器，返回的是整个 state。它能正常工作，但任何字段变化都会让组件重新渲染。',
+    },
   ],
   plays: {
     '亲手实现 Zustand': {
@@ -329,6 +357,49 @@ const store = {
           '每个组件只订阅 selector 选出的值。bears 没变，BearCounter 的快照不变，React 跳过它。如果把整个 state 放进一个 Context，所有消费者都会重新渲染。',
       },
       pkey: 'state-architecture|亲手实现 Zustand',
+    },
+    '真库：create、选择器与组件外读写': {
+      note: '<code>subscribe</code> 的 listener 在 <code>setState</code> 里同步调用，所以日志先出现；组件的重新渲染由 React 安排在随后。组件里的 <code>useBear</code> 订阅了同一个 store，所以在组件外调用 <code>setState</code>，组件照样更新。再点“加一只熊”：蜂蜜没变，<code>subscribe</code> 的 listener 仍然被调用，因为它不经过选择器；组件则只有 BearCounter 渲染。',
+      predict: {
+        q: '点击一次“组件外：蜂蜜 +5”。控制台新增哪些行，顺序是？',
+        options: [
+          'HoneyPot 渲染，然后 store 变了：蜂蜜 10 → 15',
+          '只有 store 变了：蜂蜜 10 → 15。在组件外改 store，组件不会更新',
+          'store 变了：蜂蜜 10 → 15，然后 HoneyPot 渲染',
+          'store 变了：蜂蜜 10 → 15，然后 BearCounter 渲染、HoneyPot 渲染',
+        ],
+        answer: 2,
+        explain:
+          'setState 先更新 state，同步调用 listener（日志先出现），然后 React 重新渲染订阅了 honey 的 HoneyPot。BearCounter 选的 bears 没变，不渲染。组件外的 setState 和组件里的 set 作用在同一个 store 上，组件都会更新。',
+      },
+      pkey: 'state-architecture|真库：create、选择器与组件外读写',
+    },
+    '真库：persist 持久化': {
+      note: '示例只用 localStorage 里的 <code>hoc-demo-zustand</code> 这一个键，存的内容是 <code>{"state":{"count":3},"version":0}</code>，函数 <code>inc</code> 不在里面。重新运行相当于刷新页面：代码重新执行，创建新的 store，<code>persist</code> 在创建时把存储里的值读回来。点“清除存储并重置”会删掉这个键。如果浏览器不允许使用 localStorage，示例退回内存存储，重新运行后计数是 0。',
+      predict: {
+        q: '点“+1”三次，再点实验台右上角的“▶ 运行”（重新执行代码，相当于刷新页面）。预览里的“计数”显示几？',
+        options: ['3', '0：重新执行代码会创建新的 store，数据重置', '1：只存了最近一次的增量', '报错：同一个键不能创建两次'],
+        answer: 0,
+        explain:
+          '三次更新都被写进了 localStorage。重新运行时创建新的 store，persist 先把存储里的值读回来，所以显示 3。第二项是没有 persist 时的结果。（localStorage 不可用时示例退回内存存储，才会显示 0。）',
+      },
+      pkey: 'state-architecture|真库：persist 持久化',
+    },
+    '真库：选择器返回新对象与 useShallow': {
+      note: 'Zustand v5 用 <code>useSyncExternalStore</code> 订阅，选择器每次返回新对象，快照就永远“变了”：React 警告 getSnapshot 的结果没有缓存，渲染到 50 次的上限后抛出 <code>Maximum update depth exceeded</code>，由 Box 接住显示。写法 B 里 <code>useShallow</code> 逐字段比较，a、b 没变就沿用上次的对象：点“改 c”不渲染 PairB，点“改 a”渲染一次。',
+      predict: {
+        q: '点“挂载写法 A”。会发生什么？',
+        options: [
+          '正常显示 A：a = 1，b = 2，只渲染一次',
+          '先多渲染几次，随后稳定下来，显示 A：a = 1，b = 2',
+          '显示 a = undefined，b = undefined',
+          'React 一直重新渲染，超过上限后抛出错误，由 Box 显示出来',
+        ],
+        answer: 3,
+        explain:
+          '选择器每次返回新对象，React 用 Object.is 比较前后两次快照，永远不相等，于是一直重新渲染，直到超过上限报错。在 Zustand v5 里就是这个结果，不是“多渲染几次”。用 useShallow 包住选择器就能解决（写法 B）。',
+      },
+      pkey: 'state-architecture|真库：选择器返回新对象与 useShallow',
     },
   },
 } satisfies Lesson;

@@ -53,6 +53,44 @@ export interface Tester {
   type: (target: string | Element, value: string) => Promise<void>;
   wait: (ms: number) => Promise<void>;
   assert: (cond: unknown, message: string) => void;
+  /** 测一次设备基线（固定计算量的耗时、事件循环延迟）。标签页在后台时抛出“请切回前台”的提示，且不计入失败次数 */
+  baseline: () => Promise<Baseline>;
+  /** 计时类断言：失败时可被 t.retry 自动重测一次。阈值用 (await t.baseline()).limit(ms) 算，不要写死毫秒数 */
+  timing: (cond: unknown, message: string) => void;
+  /** 运行一段含 t.timing 的检查；t.timing 失败就等 0.3 秒再整体重测一次，两次都失败才判失败，失败信息区分“设备忙”和“代码问题”。fn 必须能重复执行（自己创建 root 和数据）。普通的 t.assert 失败不会重测 */
+  retry: (fn: () => Promise<void> | void) => Promise<void>;
+  /** 读 React 内部结构。字段不存在返回 null，检查要退回到纯行为断言；依赖的是 React 19.3.x 的结构 */
+  internals: Internals;
+}
+
+/** 设备基线（t.baseline() 的结果） */
+export interface Baseline {
+  /** 设备比参考机慢几倍，≥1 */
+  factor: number;
+  /** 事件循环的额外延迟（毫秒） */
+  lag: number;
+  /** 把原来的绝对阈值（毫秒）放宽一点：只加额外开销，不按倍数放大 */
+  limit: (ms: number) => number;
+}
+
+/** t.internals：读 React 内部结构的安全入口，字段不在就返回 null（调用方退回到行为断言） */
+export interface Internals {
+  /** 这个 React 版本的内部结构已知（19.3.x） */
+  known: boolean;
+  /** DOM 节点对应的 fiber */
+  fiberOf: (node: any) => any | null;
+  /** 容器上的 FiberRoot（要有数字类型的 pendingLanes） */
+  rootOf: (container: any) => any | null;
+  /** 从 fiber 往上找最近的函数组件 */
+  componentOf: (fiber: any) => any | null;
+  /** 组件 fiber 上的 Hook 链表，按顺序 */
+  hooksOf: (fiber: any) => any[] | null;
+  /** 组件有没有 useState/useReducer：true/false，拿不到结构时 null */
+  hasStateHook: (fiber: any) => boolean | null;
+  /** 组件里 useRef 的 current 值 */
+  refValues: (fiber: any) => any[] | null;
+  /** 根上有没有排队中的过渡更新；版本不是 19.3.x 或结构不对时 null */
+  inTransition: (root: any) => boolean | null;
 }
 
 export interface Exercise {
@@ -64,6 +102,21 @@ export interface Exercise {
   hint: string;
   /** 人工挖空的半成品，用 `/* ✏️ 说明 *\/` 标记要补的行 */
   faded: string;
+  test: (t: Tester) => Promise<void> | void;
+  /** 需要从学习者代码里取出的顶层名字，出现在 t.exports 里 */
+  exports?: string[];
+}
+
+/** 变式练习：正式练习之外的小任务（3–8 分钟），练同一个概念的不同情境。不影响“本课完成”。提示规则比正式练习简单：失败 1 次给提示，失败 2 次可看参考答案 */
+export interface Drill {
+  /** 一句话定位，显示在这道变式的标题上，例如“换成对象状态” */
+  title: string;
+  /** HTML */
+  task: string;
+  starter: string;
+  solution: string;
+  /** HTML，失败 1 次后可看 */
+  hint?: string;
   test: (t: Tester) => Promise<void> | void;
   /** 需要从学习者代码里取出的顶层名字，出现在 t.exports 里 */
   exports?: string[];
@@ -83,6 +136,10 @@ export interface Lesson {
   keyPoints: string[];
   quiz: QuizItem[];
   exercise?: Exercise;
+  /** 变式练习：2–3 道小而快的练习，练同一个概念的不同情境。可选，不影响“本课完成”。MDX 里写 `<Drills />` */
+  drills?: Drill[];
+  /** 这课的本机任务或本机项目的预计分钟数（需要在自己电脑上做，站内没有自动检查）。可选，缺省按 0；首页单独统计，不计入 mins */
+  localMins?: number;
   /** 阶段测验专用的读代码题。下标是复习卡片键 `课id#cN` 的 N，只能在末尾追加 */
   checkOnly: QuizItem[];
   /** 键：示例标题，或 `#序号`（标题重名或没有标题时） */
@@ -162,6 +219,20 @@ export interface LessonProgress {
   sx?: boolean;
   /** 学习目标自查勾选 */
   can?: Record<string, boolean>;
+  /** 变式练习的状态：下标 → 记录。只新增这一个字段；旧数据里没有它，一切照常 */
+  dr?: Record<number, DrillProgress>;
+}
+
+/** 一道变式练习的状态。字段含义和正式练习一致（code、fails、lastFail、sawSol、rewrite），ok 对应 LessonProgress.ex */
+export interface DrillProgress {
+  ok: boolean;
+  code?: string;
+  fails?: number;
+  lastFail?: string;
+  sawSol?: boolean;
+  rewrite?: boolean;
+  /** 是否借助参考答案通过 */
+  exHelp?: 'rewrite' | 'solution' | false;
 }
 
 /** 进度存储的整体结构：课 id → 单课进度，另有三个以 __ 开头的特殊键 */

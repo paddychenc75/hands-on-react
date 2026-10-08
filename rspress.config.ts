@@ -35,6 +35,7 @@ export default defineConfig({
       'Playground',
       'Quiz',
       'Exercise',
+      'Drills',
       'Warmup',
       'SelfExplain',
       'CallBox',

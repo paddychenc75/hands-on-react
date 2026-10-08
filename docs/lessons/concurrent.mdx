@@ -222,6 +222,96 @@ React 18 中，`startTransition` 只能接收同步函数，`useDeferredValue` �
 
 </CallBox>
 
+## 隐藏界面，但保留 state：`<Activity>`
+
+前面讲的是“更新有轻重缓急”。隐藏一块界面时也有同样的问题：隐藏的内容该占多少优先级？
+
+先看需求。切换标签页或收起侧边栏时，你想“隐藏”一块界面，又不想丢掉用户已经输入的内容。组件的 state 跟着它在树里的位置走（见[渲染机制](/lessons/rendering)）。条件渲染把组件卸载了，state 随之丢失。React 19.2 起稳定的 `<Activity>` 能做到保留。它的 `mode` 属性只有两个值：`"visible"` 和 `"hidden"`。
+
+```jsx play title="三种隐藏方式"
+import { Activity, useState, useEffect } from 'react';
+
+function Draft({ name }) {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    console.log(name + '：effect 开始');
+    return () => console.log(name + '：effect 清理');
+  }, [name]);
+  return <input value={text} onChange={e => setText(e.target.value)} placeholder={name} />;
+}
+
+function App() {
+  const [show, setShow] = useState(true);
+  return (
+    <div>
+      <button onClick={() => setShow(!show)}>{show ? '隐藏' : '显示'}</button>
+      <div>{show && <Draft name="条件渲染" />}</div>
+      <div style={{ display: show ? 'block' : 'none' }}>
+        <Draft name="CSS 隐藏" />
+      </div>
+      <Activity mode={show ? 'visible' : 'hidden'}>
+        <Draft name="Activity" />
+      </Activity>
+    </div>
+  );
+}
+```
+
+`mode="hidden"` 时，React 做三件事：
+
+1. 用 `display: none` 隐藏子树的 DOM。DOM 和 state 都留着。
+2. 清理子树里的 effect，就像卸载一样。
+3. 子树仍会随新的 props 重新渲染，但优先级比可见的内容低。
+
+切回 `"visible"` 时，state 原样恢复，effect 重新运行。三种隐藏方式的对比：
+
+| 做法 | state | effect | 隐藏时的渲染 |
+|---|---|---|---|
+| 条件渲染 `{show && <Page />}` | 丢失 | 卸载时清理 | 不渲染 |
+| CSS `display: none` | 保留 | 一直在运行 | 照常重新渲染 |
+| `<Activity mode="hidden">` | 保留 | 被清理，显示时重新运行 | 低优先级重新渲染 |
+
+第 3 件事和本课的主题直接相连。隐藏的子树对用户不可见，所以它的更新不紧急。React 先渲染并提交可见的部分，再找空档渲染隐藏的部分。和过渡更新一样，这次后台渲染可以被打断：用户一操作，React 先去处理可见内容。所以隐藏的子树再大，也不会拖慢你正在看的界面。
+
+下面的示例把这个顺序打印了出来。隐藏区和可见区读同一个 `n`。
+
+```jsx play title="隐藏的子树晚一步渲染"
+import { Activity, useState, useEffect } from 'react';
+
+function Panel({ name, n }) {
+  console.log(name + ' 渲染，n = ' + n);
+  useEffect(() => {
+    console.log(name + ' 提交，n = ' + n);
+  });
+  return <p>{name}：{n}</p>;
+}
+
+function App() {
+  const [n, setN] = useState(0);
+  return (
+    <div>
+      <button onClick={() => setN(n + 1)}>n + 1</button>
+      <Panel name="可见区" n={n} />
+      <Activity mode="hidden">
+        <Panel name="隐藏区" n={n} />
+      </Activity>
+    </div>
+  );
+}
+```
+
+隐藏区的“提交”一行从不出现，因为 effect 在隐藏时被清理，不会运行。
+
+<CallBox kind="warn" label="常见坑">
+
+Activity 隐藏的是 DOM，不会替你停掉有副作用的 DOM。隐藏的 `<video>` 会继续播放。要在 effect 的清理函数里暂停它。
+
+另外，只渲染文字的组件没有 DOM 元素可以隐藏，所以 `hidden` 时什么也不渲染。保留 state 也有代价：隐藏的子树仍占着内存，还会重新渲染。只对来回切换的界面使用它。
+
+</CallBox>
+
+Activity 在 Suspense 边界里的表现，放到[Suspense](/lessons/suspense)一课再看。
+
 </LessonProse>
 
 <Quiz />

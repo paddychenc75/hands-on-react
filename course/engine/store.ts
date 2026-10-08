@@ -1,7 +1,7 @@
 /* ---------- 进度存储（仅保存在本浏览器） ----------
    数据结构见 course/types.ts 的 Progress；键名改为 hands-on-react-v1（用户还没有旧进度，不需要迁移）。
    只在浏览器里读写：静态生成（Node）时 progress 保持为空对象，也不会碰 localStorage。 */
-import type { LessonProgress, Progress } from '../types.ts';
+import type { DrillProgress, LessonProgress, Progress } from '../types.ts';
 
 export const STORE_KEY = 'hands-on-react-v1';
 export const progress: Progress = {};
@@ -18,6 +18,13 @@ export const save = () => {
   } catch {}
 };
 export const lp = (id: string): LessonProgress => (progress[id] = progress[id] || { quiz: {}, ex: false, done: false });
+/** 一道变式练习的记录（不存在就创建）。旧数据里没有 dr 字段，在这里补上 */
+export const drillRec = (id: string, i: number): DrillProgress => {
+  const p = lp(id);
+  p.dr = p.dr || {};
+  p.dr[i] = p.dr[i] || { ok: false };
+  return p.dr[i];
+};
 export const isDone = (id: string): boolean => !!(progress[id] && progress[id].done);
 /* 进度变化通知：旧版的 refreshChrome() 在这里变成一个事件，侧栏标记等组件监听它 */
 export const PROGRESS_EVENT = 'hoc-progress';

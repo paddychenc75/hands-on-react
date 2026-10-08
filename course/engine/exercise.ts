@@ -8,7 +8,7 @@ import { libsInSource } from './logic/runtime.ts';
 import { makePlayground } from './playground.ts';
 import { loadLibs } from './runtime.ts';
 import { lp, save } from './store.ts';
-import { TestFail, makeTester } from './tester.ts';
+import { EnvFail, TestFail, makeTester } from './tester.ts';
 import { el, highlight, sleep, smooth } from './util.ts';
 
 export function makeExercise(lesson: Lesson): HTMLDivElement {
@@ -96,6 +96,11 @@ export function makeExercise(lesson: Lesson): HTMLDivElement {
             : '🎉 全部通过！做得好。',
       );
     } catch (e) {
+      if (e instanceof EnvFail) {
+        // 环境原因（例如标签页在后台）：不是代码的错，不计入失败次数
+        show('hint', esc(e.message));
+        return;
+      }
       const counted = !p.ex && isAttempt(code, ex.starter, p.lastFail);
       if (counted) {
         p.fails = (p.fails || 0) + 1;

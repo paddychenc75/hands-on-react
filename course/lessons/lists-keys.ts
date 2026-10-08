@@ -104,12 +104,11 @@ export default {
       const li = lis.map(x => x.textContent.trim());
       t.assert(li.length === 2, `应渲染 2 个未完成事项，实际 ${li.length} 个。先用 filter 留下 done 为 false 的事项`);
       t.assert(li.includes('学习 State') && li.includes('学习列表'), `渲染的事项不对：${li.join('、')}。应只显示“学习 State”和“学习列表”`);
-      // 读 React 记录的 key。从 <li> 往上找，直到某一层也包含了别的列表项：
+      // 读 React 记录的 key（依赖 React 19.3.x 的 DOM 节点上的 __reactFiber$ 键，经 t.internals.fiberOf 读；
+      // fiber 的 tag 5 = 原生元素，key / sibling / child / return 是 fiber 的通用字段）。读不到时退回源码里有没有写 key 的粗查。
+      // 从 <li> 往上找，直到某一层也包含了别的列表项：
       // 这之前最高的那一层，就是 map 为这一项返回的元素（<li>、组件、<Fragment> 或 <>）
-      const fiberOf = node => {
-        const k = Object.keys(node).find(k => k.startsWith('__reactFiber$'));
-        return k && node[k];
-      };
+      const fiberOf = node => t.internals.fiberOf(node);
       const hosts = f => {
         const out = [];
         const walk = c => {
@@ -134,7 +133,9 @@ export default {
       };
       const ids = { '学习 State': '2', 学习列表: '3' };
       const seen = [];
-      lis.forEach(x => {
+      const structural = lis.every(x => !!fiberOf(x));
+      if (!structural) t.assert(/\bkey=\{/.test(t.source), 'map 返回的元素没有 key。请用每项的 id 作为 key，例如 key={t.id}');
+      (structural ? lis : []).forEach(x => {
         const { top, inner } = keyInfo(x);
         const title = x.textContent.trim();
         t.assert(
@@ -180,6 +181,221 @@ export default {
       }
     },
   },
+  drills: [
+    {
+      title: '嵌套列表：两层 map，两层 key',
+      task: '<ol class="task-steps"><li>每个分组渲染成一个 <code>&lt;section&gt;</code>，里面有 <code>&lt;h3&gt;</code> 显示组名。</li><li>每组的商品渲染成 <code>&lt;ul&gt;</code> 里的 <code>&lt;li&gt;</code>，内容是商品名。</li><li>给每个 section 和每个 li 写合适的 key。注意：商品的 id 只在组内唯一，“水果”和“蔬菜”里都有 <code>a</code> 和 <code>b</code>。</li></ol>',
+      starter: `function App() {
+  const groups = [
+    { id: 'fruit', name: '水果', items: [{ id: 'a', name: '苹果' }, { id: 'b', name: '香蕉' }] },
+    { id: 'veg', name: '蔬菜', items: [{ id: 'a', name: '白菜' }, { id: 'b', name: '土豆' }] },
+  ];
+  return (
+    <div>
+      {/* 在这里渲染两层列表 */}
+    </div>
+  );
+}`,
+      solution: `function App() {
+  const groups = [
+    { id: 'fruit', name: '水果', items: [{ id: 'a', name: '苹果' }, { id: 'b', name: '香蕉' }] },
+    { id: 'veg', name: '蔬菜', items: [{ id: 'a', name: '白菜' }, { id: 'b', name: '土豆' }] },
+  ];
+  return (
+    <div>
+      {groups.map(g => (
+        <section key={g.id}>
+          <h3>{g.name}</h3>
+          <ul>
+            {g.items.map(item => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+}`,
+      hint: '外层 map 为每个分组返回 section，key 用分组的 id。内层 map 为每个商品返回 li，key 用商品自己的 id。key 只要求在<b>同一个数组里</b>各不相同，所以两组里都有 <code>a</code> 不冲突。',
+      test: async t => {
+        const sections = t.qa('section');
+        t.assert(sections.length === 2, `应渲染 2 个 <section>，实际 ${sections.length} 个。每个分组一个 section`);
+        const expect = [
+          {
+            gid: 'fruit',
+            name: '水果',
+            items: [
+              ['a', '苹果'],
+              ['b', '香蕉'],
+            ],
+          },
+          {
+            gid: 'veg',
+            name: '蔬菜',
+            items: [
+              ['a', '白菜'],
+              ['b', '土豆'],
+            ],
+          },
+        ];
+        const fiberOf = node => t.internals.fiberOf(node);
+        // 从节点的 fiber 往上，找到边界（它的父 DOM 节点）之前最近的 key
+        const keyOf = (node, boundary) => {
+          for (let f = fiberOf(node); f && f.stateNode !== boundary; f = f.return) if (f.key != null) return String(f.key);
+          return null;
+        };
+        const hasToken = (key, id) => new RegExp('(^|[^a-z0-9])' + id + '([^a-z0-9]|$)', 'i').test(key);
+        const canReadKeys = fiberOf(sections[0]) != null;
+        sections.forEach((sec, si) => {
+          const exp = expect[si];
+          const h3 = sec.querySelector('h3');
+          t.assert(h3 && h3.textContent.trim() === exp.name, `第 ${si + 1} 个 section 里应有 <h3>${exp.name}</h3>`);
+          const ul = sec.querySelector('ul');
+          t.assert(ul, `“${exp.name}”这一组里要有一个 <ul>`);
+          const lis = Array.from(ul.querySelectorAll(':scope > li')) as any[];
+          const texts = lis.map(x => x.textContent.trim());
+          t.assert(
+            texts.join('、') === exp.items.map(x => x[1]).join('、'),
+            `“${exp.name}”应列出：${exp.items.map(x => x[1]).join('、')}，实际是：${texts.join('、') || '（空）'}`,
+          );
+          if (!canReadKeys) return;
+          const seen = [];
+          lis.forEach((li, i) => {
+            const [id, title] = exp.items[i];
+            const k = keyOf(li, ul);
+            t.assert(k != null, `“${title}”没有 key。key 要写在内层 map 直接返回的元素上，用商品自己的 id`);
+            t.assert(k !== String(i), `“${title}”的 key 是 ${k}，看起来是数组下标。插入、删除或重排时，下标会对应到别的数据。请用商品自带的 id`);
+            t.assert(hasToken(k, id), `“${title}”的 key 是“${k}”，里面没有它的 id（${id}）。key 要能区分每一项，而且一直不变`);
+            t.assert(!seen.includes(k), `“${exp.name}”里有两个列表项的 key 都是“${k}”。同一个数组里的 key 必须各不相同`);
+            seen.push(k);
+          });
+        });
+        if (canReadKeys) {
+          const gkeys = sections.map((sec, si) => {
+            const k = keyOf(sec, sec.parentElement);
+            t.assert(k != null, `“${expect[si].name}”这一组没有 key。外层 map 返回的元素也要有 key，用分组的 id`);
+            t.assert(k !== String(si), `“${expect[si].name}”这一组的 key 是 ${k}，看起来是数组下标。请用分组自带的 id`);
+            t.assert(hasToken(k, expect[si].gid), `“${expect[si].name}”这一组的 key 是“${k}”，里面没有它的 id（${expect[si].gid}）`);
+            return k;
+          });
+          t.assert(gkeys[0] !== gkeys[1], '两个分组的 key 相同。同一个数组里的 key 必须各不相同');
+        } else {
+          t.assert(/key=/.test(t.source), '没有找到 key。外层和内层的 map 返回的元素都要写 key');
+        }
+      },
+    },
+    {
+      title: '下标当 key：删除后输入框串位',
+      task: '<ol class="task-steps"><li>每一行有一个备注输入框（不受 state 控制，用户直接在里面打字）。</li><li>现在先在每行备注里写点字，再点“苹果”那一行的 <b>删除</b>：“香蕉”那一行会带着苹果的备注。找出原因，让备注一直留在原来的那一行。</li><li>点 <b>在顶部添加</b> 加一行新品后，原有各行的备注也要留在原处。</li></ol>',
+      starter: `import { useState } from 'react';
+
+let nextId = 4;
+
+function App() {
+  const [rows, setRows] = useState([
+    { id: 1, name: '苹果' },
+    { id: 2, name: '香蕉' },
+    { id: 3, name: '橙子' },
+  ]);
+
+  function addTop() {
+    setRows([{ id: nextId, name: '新品' + nextId }, ...rows]);
+    nextId += 1;
+  }
+
+  function remove(id) {
+    setRows(rows.filter(r => r.id !== id));
+  }
+
+  return (
+    <div>
+      <button onClick={addTop}>在顶部添加</button>
+      <ul>
+        {rows.map((r, i) => (
+          <li key={i}>
+            <span>{r.name}</span>
+            <input placeholder="备注" />
+            <button onClick={() => remove(r.id)}>删除</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+let nextId = 4;
+
+function App() {
+  const [rows, setRows] = useState([
+    { id: 1, name: '苹果' },
+    { id: 2, name: '香蕉' },
+    { id: 3, name: '橙子' },
+  ]);
+
+  function addTop() {
+    setRows([{ id: nextId, name: '新品' + nextId }, ...rows]);
+    nextId += 1;
+  }
+
+  function remove(id) {
+    setRows(rows.filter(r => r.id !== id));
+  }
+
+  return (
+    <div>
+      <button onClick={addTop}>在顶部添加</button>
+      <ul>
+        {rows.map(r => (
+          <li key={r.id}>
+            <span>{r.name}</span>
+            <input placeholder="备注" />
+            <button onClick={() => remove(r.id)}>删除</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}`,
+      hint: '输入框里的字存在 DOM 节点里。React 靠 key 判断“这个节点属于哪条数据”。用下标当 key 时，删掉第一行后，原来的第二行变成了下标 0，React 就把第一个节点（连同里面的字）给了它。key 要跟着数据走，而不是跟着位置走。',
+      test: async t => {
+        const row = name => t.qa('li').find(li => li.querySelector('span') && li.querySelector('span').textContent.trim() === name);
+        const note = name => {
+          const r = row(name);
+          return r ? r.querySelector('input').value : null;
+        };
+        t.assert(
+          ['苹果', '香蕉', '橙子'].every(n => row(n)),
+          '初始应有“苹果”“香蕉”“橙子”三行，每行有一个 <span> 显示名字',
+        );
+        await t.type(row('苹果').querySelector('input'), 'A');
+        await t.type(row('香蕉').querySelector('input'), 'B');
+        await t.type(row('橙子').querySelector('input'), 'C');
+        const mismatch = (what, name, want) => {
+          const got = note(name);
+          if (got === want) return;
+          t.assert(
+            false,
+            got === ''
+              ? `${what}，“${name}”那一行的备注没了，应该还是“${want}”。key 每次渲染都变时，React 认为是全新的元素，会卸载旧的再建新的`
+              : `${what}，“${name}”那一行的备注是“${got}”，应该还是“${want}”。React 靠 key 判断哪个 DOM 节点属于哪条数据，想想现在的 key 能不能认出“同一条数据”`,
+          );
+        };
+        await t.click(row('苹果').querySelector('button'));
+        t.assert(!row('苹果'), '点“苹果”那一行的删除后，这一行应消失');
+        mismatch('删除“苹果”后', '香蕉', 'B');
+        mismatch('删除“苹果”后', '橙子', 'C');
+        const add = t.byText('button', '在顶部添加');
+        t.assert(add, '找不到“在顶部添加”按钮');
+        await t.click(add);
+        const first = t.qa('li')[0];
+        t.assert(first && first.querySelector('span').textContent.trim() === '新品4', '点“在顶部添加”后，第一行应是“新品4”');
+        t.assert(first.querySelector('input').value === '', '新加的“新品4”备注应是空的，实际是“' + first.querySelector('input').value + '”');
+        mismatch('顶部添加一行后', '香蕉', 'B');
+        mismatch('顶部添加一行后', '橙子', 'C');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `每条待办要渲染两个 <code>&lt;li&gt;</code>。key 应该写在哪里？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">{todos.map(t =&gt; (

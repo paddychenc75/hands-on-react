@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { progress, PROGRESS_EVENT } from '../../course/engine/index.ts';
+import { drillStat } from '../../course/engine/logic/drills.ts';
 import { useLesson } from '../lib/useLesson';
 
 const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth') as ScrollBehavior;
@@ -9,6 +10,7 @@ const smooth = () => (matchMedia('(prefers-reduced-motion: reduce)').matches ? '
 export default function LessonGoals() {
   const lesson = useLesson();
   const [ok, setOk] = useState<Record<string, boolean>>({});
+  const [dr, setDr] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: 依赖是课 id：同一课里 lesson 不变，进度变化靠 PROGRESS_EVENT 触发
   useEffect(() => {
     if (!lesson) return;
@@ -18,7 +20,9 @@ export default function LessonGoals() {
         'sec-quiz': !!p.quiz && (lesson.quiz || []).every((q: any, i: number) => p.quiz[i] === q.answer),
         'sec-ex': !!p.ex,
         'sec-self': !!(p.note && p.note.trim()),
+        'sec-drills': !!lesson.drills && drillStat(p.dr, lesson.drills.length).done === lesson.drills.length,
       });
+      setDr(lesson.drills ? drillStat(p.dr, lesson.drills.length).done : 0);
     };
     calc();
     window.addEventListener(PROGRESS_EVENT, calc);
@@ -28,6 +32,7 @@ export default function LessonGoals() {
   const jumps: [string, string][] = [['sec-read', '正文']];
   if (lesson.quiz && lesson.quiz.length) jumps.push(['sec-quiz', '随堂测验']);
   if (lesson.exercise) jumps.push(['sec-ex', '动手练习']);
+  if (lesson.drills?.length) jumps.push(['sec-drills', `变式练习 ${dr}/${lesson.drills.length}`]);
   jumps.push(['sec-self', '用自己的话讲一遍']);
   return (
     <div className="hoc">

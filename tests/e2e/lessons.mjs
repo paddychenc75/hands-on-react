@@ -20,6 +20,7 @@ async function testLesson(id) {
   p.on('pageerror', e => logs.push('PAGEERR ' + e.message));
   await p.goto(lessonUrl(site, id));
   await p.waitForSelector('.selfx', { timeout: 60000 });
+  if (L.drills?.length) await p.waitForFunction(n => document.querySelectorAll('.drill .pg').length >= n, L.drills.length, { timeout: 60000 });
   if (L.exercise)
     await p.waitForFunction(() => [...document.querySelectorAll('.pg')].some(x => x._editor && x.querySelector('.pg-badge.ex')), null, { timeout: 60000 });
   await p.waitForTimeout(800);
@@ -38,7 +39,7 @@ async function testLesson(id) {
   });
   await p.waitForTimeout(1500);
   const r = await p.evaluate(
-    async ({ solution, hasEx }) => {
+    async ({ solution, hasEx, drills }) => {
       const out = [];
       document.querySelectorAll('.pv-err').forEach(e => out.push('PVERR ' + e.textContent.slice(0, 120)));
       document.querySelectorAll('.err').forEach(e => out.push('ERR ' + e.textContent.slice(0, 120)));
@@ -57,13 +58,39 @@ async function testLesson(id) {
           out.push(txt.includes('通过') && !txt.startsWith('✗') ? 'PASS' : 'FAIL ' + txt.slice(0, 200));
         }
       }
+      // 变式练习:每道填参考答案要通过,填起始代码要被拒
+      const checkDrill = async (box, code) => {
+        const pg = box.querySelector('.pg');
+        const btn = [...box.querySelectorAll('button')].find(x => x.textContent.trim() === '✓ 检查答案');
+        pg._editor.value = code;
+        await new Promise(r => setTimeout(r, 400));
+        btn.click();
+        for (let i = 0; i < 100 && btn.disabled; i++) await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 300));
+        return box.querySelector('.result').innerText;
+      };
+      const boxes = [...document.querySelectorAll('.drill')];
+      for (let i = 0; i < drills.length; i++) {
+        if (!boxes[i]) {
+          out.push(`DRILL${i + 1} NO BOX`);
+          continue;
+        }
+        const bad = await checkDrill(boxes[i], drills[i].starter);
+        out.push(bad.startsWith('✗') ? `DRILL${i + 1} starter-rejected` : `DRILL${i + 1} FAIL starter accepted: ${bad.slice(0, 120)}`);
+        const txt = await checkDrill(boxes[i], drills[i].solution);
+        out.push(txt.includes('通过') && !txt.startsWith('✗') ? `DRILL${i + 1} PASS` : `DRILL${i + 1} FAIL ${txt.slice(0, 200)}`);
+      }
       return out;
     },
-    { solution: L.exercise ? L.exercise.solution : '', hasEx: !!L.exercise },
+    {
+      solution: L.exercise ? L.exercise.solution : '',
+      hasEx: !!L.exercise,
+      drills: (L.drills || []).map(d => ({ starter: d.starter, solution: d.solution })),
+    },
   );
   await ctx.close();
   const all = [...logs, ...r];
-  const issue = r.some(x => !x.startsWith('PASS') && !EXPECTED.some(re => re.test(x)));
+  const issue = r.some(x => !/^(PASS|DRILL\d+ (PASS|starter-rejected))/.test(x) && !EXPECTED.some(re => re.test(x)));
   return { id, line: id + ' ' + all.join(' | '), issue };
 }
 
