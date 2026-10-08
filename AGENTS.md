@@ -36,6 +36,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run test:e2e -- mechanics smoke` | 只跑学习机制 / 冒烟测试 | 各约 1 分钟 |
 | **`npm test`** | check + build + test:e2e，**完整验收**。改引擎、主题组件、样式后必跑 | 约 3 分钟 |
 | `npm run new-lesson -- <课id> --stage <0-5> --after <已有课id> --title "标题"` | 加一课 | 即时 |
+| `npm run mins [-- --write] [课id …]` | 按公式重新计算每课 `mins`，输出“现值 / 公式值 / 偏差”；`--write` 只回写偏差超过 ±20% 的课（写完要 `npm run gen`） | 即时 |
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
@@ -63,7 +64,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `course/engine/*.ts` | 会碰 DOM / 存储的引擎模块，模块清单见下面「引擎模块」 | 业务规则（放进 `logic/` 并写测试） |
 | `plugins/remark-play.mjs` | 把 ```` ```jsx play ```` 代码块变成 `<Playground>` | — |
 | `theme/` | React 薄包装组件（`components/`，在 `rspress.config.ts` 的 `globalComponents` 里注册，MDX 里不用 import）、`lib/` 钩子、`index.tsx`（顶栏加总进度）、`style.css`（全部样式，浅色 `:root`、深色 `html.dark`） | 学习机制的逻辑 |
-| `scripts/` | `check-content.mjs`、`new-lesson.mjs`、`gen-registry.mjs`、`setup-hooks.mjs`，`lib/` 是它们共用的 | — |
+| `scripts/` | `check-content.mjs`、`new-lesson.mjs`、`gen-registry.mjs`、`lesson-mins.mjs`（`npm run mins`，时长公式）、`setup-hooks.mjs`，`lib/` 是它们共用的 | — |
 | `tests/unit/` | Vitest 单元测试（`*.test.ts`） | 需要浏览器的测试 |
 | `tests/e2e/` | Playwright 测试：`lessons.mjs`、`mechanics.mjs`、`smoke.mjs`、`split.mjs`（课数据拆分：网络请求、慢网、旧进度），`screenshots.mjs`，`run.mjs` 是入口，`_site.mjs` 是共用的静态服务器和浏览器启动 | — |
 | `tests/screenshots/` | 截图（人工看版面用） | — |
@@ -117,7 +118,10 @@ npm run new-lesson -- hooks-recap --stage 1 --after custom-hooks --title "Hook �
 
 1. 把所有“【待写】”换成真内容（`npm run check:content` 会提示哪些课还有占位）。写作规范见下。
 2. **课号是位置**：插在中间会让后面的课号 +1。脚本会列出写了“第 N 课”且 N ≥ 新课号的位置；`check:content` 也会报“第 N 课《标题》”和“第 N 课“词””对不上的引用。逐个核对。毕业设计（portfolio）的验收表引用了很多课号；`theme/components/HomePage.tsx` 里写了“第 19 课”（渲染机制）。另外，`engineering`（第 33 课，第 5 阶段第一课）和 `delivery`（第 34 课）和 `project-weather`（第 40 课，第 5 阶段最后一课）有本机操作的命令、配置和版本要求，写进去前要对照官方文档核对。
-3. 估算 `mins`：正文每 300 字约 1 分钟，可运行示例 +2，练习 +10~20，测验每题 +1。
+3. 估算 `mins`（公式在 `scripts/lesson-mins.mjs`，`npm run mins` 看全部课的“现值 / 公式值 / 偏差”）：
+   - 正文每 300 字约 1 分钟（字数不含代码块和标签），可运行示例每个 +2，测验每题 +1，一道正式练习 +15（原写“+10~20”，取中值）。
+   - **项目课**（有练习、没有可运行示例，整课就是一个分步完成的项目，现有 `project-todo`、`project-search`、`project-kanban`）的综合练习按 **30 分钟**计，代替上面的 +15。有可运行示例的项目课（`project-actions`、`project-weather`）按普通课算。
+   - `mins` 与公式值相差在 **±20% 以内**算合理，不用改；超出就改成公式值（`npm run mins -- --write`），`check:content` 也会拦。变式练习不计入 `mins`（见下 `drillMins`）。毕业设计 `portfolio` 的本机时间另记在 `localMins`。
 4. 新阶段要同时改 `course/stages.ts` 和新建 `docs/check/N.mdx`（阶段测验页，照抄现有的）；`new-lesson` 和 `check:content` 读 `STAGES.length`，不用改。
 5. `npm run check` → `npm run build` → `npm run test:e2e -- lessons <id>`（练习必须 `PASS`）。
 6. 提交时新卡片键已经在快照里（脚本更新过），确认 `course/card-keys.snapshot.json` 一起提交。

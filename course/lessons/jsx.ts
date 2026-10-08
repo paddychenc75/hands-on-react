@@ -5,7 +5,7 @@ export default {
   id: 'jsx',
   stage: 0,
   title: 'JSX：在 JS 里写界面',
-  mins: 22,
+  mins: 30,
   summary: '学会 JSX 的语法规则，以及如何用 {} 嵌入 JavaScript 表达式。',
   goals: [
     '能说出一段 JSX 编译后得到的是什么（一个描述界面的 JS 对象）',

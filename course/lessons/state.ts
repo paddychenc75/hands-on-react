@@ -4,7 +4,7 @@ export default {
   id: 'state',
   stage: 0,
   title: 'State：让组件“记住”东西',
-  mins: 25,
+  mins: 33,
   summary: '用 useState 保存会变化的数据，理解为什么普通变量不行。',
   goals: [
     '能用 useState 声明 state，并在事件处理函数里调用 set 函数更新它，并说出同一组件的两个实例各有自己的 state',

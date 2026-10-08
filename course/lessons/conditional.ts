@@ -4,7 +4,7 @@ export default {
   id: 'conditional',
   stage: 0,
   title: '条件渲染',
-  mins: 16,
+  mins: 24,
   summary: '根据条件显示不同的内容。',
   goals: [
     '能根据场景选择 if 提前返回、三元运算符或 &amp;&amp; 来写条件渲染',

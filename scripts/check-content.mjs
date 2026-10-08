@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { LESSON_DIR, ROOT, staleFiles } from './lib/registry-gen.mjs';
 import { parsePlayMeta } from '../plugins/remark-play.mjs';
+import { THRESHOLD, formula, proseChars } from './lesson-mins.mjs';
 
 const args = process.argv.slice(2);
 const UPDATE = args.includes('--update');
@@ -224,6 +225,17 @@ for (const [id, l] of Object.entries(lessons)) {
   for (const f of ['title', 'summary']) if (typeof l[f] !== 'string' || !l[f].trim()) fail(where, `${f} 是空的`);
   if ('runtime' in l) fail(where, '出现了 runtime 字段：它已移除（实验台只有 React 19），请删掉这一行');
   if (!Number.isInteger(l.mins) || l.mins <= 0) fail(where, `mins 是 ${JSON.stringify(l.mins)}，必须是正整数`);
+  else if (mdxFiles.includes(id + '.mdx') && !String(l.summary).includes('【待写】')) {
+    // 时长要和 AGENTS.md 的公式相符（偏差在 ±20% 以内算合理）。公式见 scripts/lesson-mins.mjs，npm run mins 看对照表
+    const meta = { id, nPlays: Object.keys(l.plays || {}).length, quizAnswers: l.quiz || [], hasExercise: !!l.exercise };
+    const f = formula(meta, proseChars(fs.readFileSync(path.join(DOCS, 'lessons', id + '.mdx'), 'utf8')));
+    if (Math.abs(l.mins - f) / f > THRESHOLD)
+      fail(
+        where,
+        `mins 是 ${l.mins}，按公式算是 ${f}（偏差 ${Math.round(((l.mins - f) / f) * 100)}%，超过 ±${THRESHOLD * 100}%）`,
+        '运行 npm run mins 看对照表；确实该这么多就改公式规则（AGENTS.md「估算 mins」），否则改 mins',
+      );
+  }
   for (const f of ['goals', 'keyPoints']) if (!Array.isArray(l[f]) || !l[f].length) fail(where, `${f} 是空的`);
   if (l.exercise) {
     const ex = l.exercise;

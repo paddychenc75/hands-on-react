@@ -10,6 +10,7 @@
     "build": "rspress build",
     "preview": "rspress preview",
     "gen": "node scripts/gen-registry.mjs",
+    "mins": "node --disable-warning=ExperimentalWarning scripts/lesson-mins.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",

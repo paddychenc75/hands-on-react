@@ -4,7 +4,7 @@ export default {
   id: 'context',
   stage: 1,
   title: 'Context：跨层级共享数据',
-  mins: 22,
+  mins: 29,
   summary: '不用层层传递 props，也能让深层组件读到数据。',
   goals: [
     '能用 createContext、<ThemeContext value> 和 useContext 三步，让深层组件读到数据',

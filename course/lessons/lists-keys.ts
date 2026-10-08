@@ -5,7 +5,7 @@ export default {
   id: 'lists-keys',
   stage: 0,
   title: '列表渲染与 key',
-  mins: 21,
+  mins: 27,
   summary: '用 map 渲染列表，理解 key 为什么重要。',
   goals: [
     '能用 map 把数组渲染成元素列表，并先用 filter 筛选',

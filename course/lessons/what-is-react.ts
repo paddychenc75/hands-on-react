@@ -4,7 +4,7 @@ export default {
   id: 'what-is-react',
   stage: 0,
   title: 'React 是什么',
-  mins: 14,
+  mins: 22,
   summary: '理解 React 解决的问题，以及“UI = f(state)”这个核心思想。',
   goals: [
     '能说出 React 要解决的问题：数据变了，界面要跟着变',

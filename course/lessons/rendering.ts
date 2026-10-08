@@ -4,7 +4,7 @@ export default {
   id: 'rendering',
   stage: 2,
   title: '渲染机制：React 到底做了什么',
-  mins: 26,
+  mins: 33,
   summary: '理解触发、渲染、提交三个阶段，以及虚拟 DOM 与协调算法。',
   goals: [
     '能解释渲染、提交和更新 DOM 的区别',

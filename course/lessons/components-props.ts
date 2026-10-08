@@ -4,7 +4,7 @@ export default {
   id: 'components-props',
   stage: 0,
   title: '组件与 Props',
-  mins: 24,
+  mins: 33,
   summary: '把界面拆成组件，用 props 给组件传数据。',
   goals: [
     '能写出一个函数组件，并在 App 里多次使用它',

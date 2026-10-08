@@ -4,7 +4,7 @@ export default {
   id: 'project-search',
   stage: 1,
   title: '实战二：异步搜索',
-  mins: 41,
+  mins: 34,
   summary: '处理真实世界的异步：加载、空结果、错误，以及最容易被忽略的竞态问题。',
   goals: [
     '能为异步界面设计一个 status 字段，覆盖空闲、加载中、成功、空结果、出错',

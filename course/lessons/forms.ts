@@ -4,7 +4,7 @@ export default {
   id: 'forms',
   stage: 0,
   title: '表单与受控组件',
-  mins: 23,
+  mins: 30,
   summary: '让 React state 成为表单数据的唯一数据源。',
   goals: [
     '能把输入框写成受控组件：value 来自 state，onChange 更新 state',

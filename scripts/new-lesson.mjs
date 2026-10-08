@@ -60,7 +60,7 @@ export default {
   id: ${q(id)},
   stage: ${stage},
   title: ${q(title)},
-  mins: 10,
+  mins: 10, // 写完内容后按 AGENTS.md「估算 mins」的公式算：npm run mins
   summary: ${q(TODO + '一句话说明这一课学什么。')},
   goals: [
     ${q(TODO + '能写出……')},

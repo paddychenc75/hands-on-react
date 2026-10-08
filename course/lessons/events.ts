@@ -4,7 +4,7 @@ export default {
   id: 'events',
   stage: 0,
   title: '事件处理',
-  mins: 18,
+  mins: 25,
   summary: '响应点击、输入、键盘等用户操作。',
   goals: [
     '能给元素绑定事件处理函数，包括需要传参的写法',
