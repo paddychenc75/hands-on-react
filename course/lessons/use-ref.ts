@@ -151,7 +151,9 @@ function App() {
       t.assert(go && halt, '需要“开始”和“停止”两个按钮');
       t.assert(n() === 0, '初始应为 0');
       await t.click(go);
-      await t.wait(450);
+      // 等到数字 ≥ 3 或超时（约 450ms 该到 4；设备忙时定时器会晚，所以轮询而不是固定等 450ms）
+      const tickBy = performance.now() + 450 * Math.max(1, (await t.baseline()).factor) + 300;
+      while (n() < 3 && performance.now() < tickBy) await t.wait(25);
       const a = n();
       t.assert(a >= 3, `点“开始”0.45 秒后应约为 4，实际是 ${a}。start 里要启动定时器：每 100 毫秒把 ticks 加 1`);
       await t.click(halt);
@@ -176,9 +178,7 @@ function App() {
       const refVals = app ? inter.refValues(app) : null;
       if (hooks && refVals) {
         const idInRef = refVals.some(v => v != null && v !== false && !(v instanceof Element));
-        const extraState = hooks
-          .filter(h => h.queue && typeof h.queue.dispatch === 'function')
-          .some(h => typeof h.memoizedState === 'number' && h.memoizedState !== n() && h.memoizedState !== n() - 1 && h.memoizedState !== n() + 1);
+        const extraState = (inter.stateValues(app) || []).some(v => typeof v === 'number' && v !== n() && v !== n() - 1 && v !== n() + 1);
         t.assert(
           idInRef,
           extraState

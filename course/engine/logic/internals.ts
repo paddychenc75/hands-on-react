@@ -9,6 +9,8 @@ export const TRANSITION_LANES = 0b0000000001111111111111111000000;
 const KNOWN = /^19\.3\./;
 /** 函数组件、forwardRef、memo 的 fiber.tag */
 const COMPONENT_TAGS = [0, 11, 15];
+/** Suspense 边界的 fiber.tag */
+const SUSPENSE_TAG = 13;
 
 export interface Internals {
   /** 这个 React 版本的内部结构已知（19.3.x） */
@@ -19,7 +21,11 @@ export interface Internals {
   hooksOf: (fiber: any) => any[] | null;
   hasStateHook: (fiber: any) => boolean | null;
   refValues: (fiber: any) => any[] | null;
+  /** 组件里 useState/useReducer 当前的值，按 Hook 顺序 */
+  stateValues: (fiber: any) => any[] | null;
   inTransition: (root: any) => boolean | null;
+  /** 容器里 Suspense 边界（fiber.tag 13）的个数；找不到根 fiber 时 null */
+  suspenseCount: (container: any) => number | null;
 }
 
 const keyed = (obj: any, prefix: string): any => {
@@ -61,6 +67,10 @@ export function makeInternals(reactVersion: string): Internals {
       const hs = hooksOf(fiber);
       return hs ? hs.some(isState) : null;
     },
+    stateValues: fiber => {
+      const hs = hooksOf(fiber);
+      return hs ? hs.filter(isState).map(h => h.memoizedState) : null;
+    },
     refValues: fiber => {
       const hs = hooksOf(fiber);
       if (!hs) return null;
@@ -74,6 +84,20 @@ export function makeInternals(reactVersion: string): Internals {
             Object.keys(h.memoizedState).join() === 'current',
         )
         .map(h => h.memoizedState.current);
+    },
+    suspenseCount: container => {
+      const top = keyed(container, '__reactContainer$');
+      if (!top || typeof top !== 'object' || !('child' in top)) return null;
+      let n = 0;
+      const stack = [top];
+      for (let guard = 0; stack.length && guard < 100000; guard++) {
+        const f = stack.pop();
+        if (!f) continue;
+        if (f.tag === SUSPENSE_TAG) n++;
+        if (f.sibling) stack.push(f.sibling);
+        if (f.child) stack.push(f.child);
+      }
+      return n;
     },
     inTransition: root => (known && root && typeof root.pendingLanes === 'number' ? (root.pendingLanes & TRANSITION_LANES) !== 0 : null),
   };

@@ -369,79 +369,98 @@ function App() {
         return delay(800, () => [1, 2, 3].map(n => nm(id) + ' 的第 ' + n + ' 篇文章'));
       };
       const reqs = (what, id) => log.filter(x => x.what === what && x.id === id);
-      const countSuspense = container => {
-        const ck = Object.keys(container).find(k => k.startsWith('__reactContainer$'));
-        let n = 0;
-        const stack = ck ? [container[ck]] : [];
-        while (stack.length) {
-          const f = stack.pop();
-          if (!f) continue;
-          if (f.tag === 13) n++;
-          if (f.sibling) stack.push(f.sibling);
-          if (f.child) stack.push(f.child);
-        }
-        return n;
+      // 内部结构只经 t.internals 读；拿不到（结构不认识）时返回 null，下面退回行为断言
+      const countSuspense = container => t.internals.suspenseCount(container);
+      // 固定的等待窗口改成“轮询到条件成立或超时”；超时随设备基线放宽（等待窗口不是断言，放宽不会放过错误写法）
+      let slow = 1;
+      const scale = ms => Math.ceil(ms * slow);
+      const until = async (cond, ms) => {
+        const end = performance.now() + scale(ms);
+        while (!cond() && performance.now() < end) await t.wait(20);
+        return !!cond();
       };
-      const box = document.createElement('div');
-      document.body.appendChild(box);
+      const mount = () => {
+        const el = document.createElement('div');
+        document.body.appendChild(el);
+        return el;
+      };
+      // 带计时断言的段落可能整段重测：每次用没有请求过的用户 id，免得读到上一次留在缓存里的 Promise
+      const freshIds = [7, 17, 27];
+      let attempt = 0;
+      const box = mount();
       let root = null;
       try {
-        // 1. 单独渲染一个新用户：缓存、并行、两个边界
-        const id = 7;
-        const t0 = performance.now();
-        root = ReactDOM.createRoot(box);
-        root.render(React.createElement(ProfilePage, { userId: id }));
-        let userAt = null,
-          postsAt = null;
-        while (performance.now() - t0 < 1600) {
-          await t.wait(20);
-          const now = performance.now() - t0;
-          if (userAt === null && box.querySelector('#user')) userAt = now;
-          if (postsAt === null && box.querySelectorAll('#posts li').length === 3) postsAt = now;
-          if (reqs('user', id).length > 3) break;
-        }
-        const nu = reqs('user', id).length,
-          np = reqs('posts', id).length;
-        t.assert(nu > 0, '渲染 ProfilePage 后，没有调用 api.fetchUser。请通过 api.fetchUser(id) 请求用户信息');
-        t.assert(
-          nu === 1,
-          '同一个用户的信息被请求了 ' + nu + ' 次。getPromise 要把 Promise 存进缓存：同一个 key 只请求一次，之后每次返回同一个 Promise（步骤 1）',
-        );
-        t.assert(
-          np === 1,
-          np === 0 ? '1.6 秒内没有请求文章。请通过 api.fetchPosts(id) 请求文章' : '同一个用户的文章被请求了 ' + np + ' 次。同一个 key 只能请求一次（步骤 1）',
-        );
-        const gap = Math.abs(reqs('posts', id)[0].at - reqs('user', id)[0].at);
-        t.assert(
-          gap < 50,
-          '文章请求比用户请求晚了约 ' +
-            Math.round(gap) +
-            'ms 才发出，这是请求瀑布。Posts 在 UserInfo 里面，要等用户信息到了才渲染。让两个请求同时发出（步骤 2）',
-        );
-        t.assert(userAt !== null && postsAt !== null, '1.6 秒内用户信息或文章没有显示出来。检查 #user 和 #posts li 是否还在');
-        t.assert(countSuspense(box) >= 2, '页面里只找到 ' + countSuspense(box) + ' 个 Suspense。用户信息和文章要各用一个 Suspense（步骤 3）');
-        t.assert(
-          postsAt - userAt > 150,
-          '用户信息要等文章一起才显示（用户 ' +
-            Math.round(userAt) +
-            'ms，文章 ' +
-            Math.round(postsAt) +
-            'ms）。用户信息和文章要放在两个独立的 Suspense 里（步骤 3）',
-        );
-        t.assert(postsAt < 1150, '文章约 ' + Math.round(postsAt) + 'ms 才显示，应在约 800ms 显示（步骤 2）');
+        // 1. 单独渲染一个新用户：缓存、并行、两个边界。含计时断言，整段可重测
+        await t.retry(async () => {
+          const bl = await t.baseline();
+          slow = Math.max(1, bl.factor);
+          const id = freshIds[Math.min(attempt++, freshIds.length - 1)];
+          const el = mount();
+          const r = ReactDOM.createRoot(el);
+          try {
+            const t0 = performance.now();
+            r.render(React.createElement(ProfilePage, { userId: id }));
+            let userAt = null,
+              postsAt = null;
+            const deadline = t0 + scale(2000) + 2 * bl.lag;
+            while (performance.now() < deadline) {
+              await t.wait(20);
+              const now = performance.now() - t0;
+              if (userAt === null && el.querySelector('#user')) userAt = now;
+              if (postsAt === null && el.querySelectorAll('#posts li').length === 3) postsAt = now;
+              if (reqs('user', id).length > 3 || (userAt !== null && postsAt !== null)) break;
+            }
+            // 两处都显示出来之后再多等一会儿，看有没有多余的请求
+            if (userAt !== null && postsAt !== null) await t.wait(150);
+            const nu = reqs('user', id).length,
+              np = reqs('posts', id).length;
+            t.assert(nu > 0, '渲染 ProfilePage 后，没有调用 api.fetchUser。请通过 api.fetchUser(id) 请求用户信息');
+            t.assert(
+              nu === 1,
+              '同一个用户的信息被请求了 ' + nu + ' 次。getPromise 要把 Promise 存进缓存：同一个 key 只请求一次，之后每次返回同一个 Promise（步骤 1）',
+            );
+            t.assert(
+              np === 1,
+              np === 0
+                ? '等了一段时间也没有请求文章。请通过 api.fetchPosts(id) 请求文章'
+                : '同一个用户的文章被请求了 ' + np + ' 次。同一个 key 只能请求一次（步骤 1）',
+            );
+            const gap = Math.abs(reqs('posts', id)[0].at - reqs('user', id)[0].at);
+            t.timing(
+              gap < bl.limit(50),
+              '文章请求比用户请求晚了约 ' +
+                Math.round(gap) +
+                'ms 才发出，这是请求瀑布。Posts 在 UserInfo 里面，要等用户信息到了才渲染。让两个请求同时发出（步骤 2）',
+            );
+            t.assert(userAt !== null && postsAt !== null, '等了足够久，用户信息或文章还是没有显示出来。检查 #user 和 #posts li 是否还在');
+            const nSus = countSuspense(el);
+            // 结构不认识（null）时跳过这一条：下面“用户信息先于文章显示”的行为断言同样能抓到共用一个边界
+            t.assert(nSus === null || nSus >= 2, '页面里只找到 ' + nSus + ' 个 Suspense。用户信息和文章要各用一个 Suspense（步骤 3）');
+            t.timing(
+              postsAt - userAt > 150,
+              '用户信息要等文章一起才显示（用户 ' +
+                Math.round(userAt) +
+                'ms，文章 ' +
+                Math.round(postsAt) +
+                'ms）。用户信息和文章要放在两个独立的 Suspense 里（步骤 3）',
+            );
+            t.timing(postsAt < bl.limit(1150), '文章约 ' + Math.round(postsAt) + 'ms 才显示，应在约 800ms 显示（步骤 2）');
+          } finally {
+            r.unmount();
+            el.remove();
+          }
+        });
 
-        // 2. 文章请求失败：只影响文章区，重试能恢复
+        // 2. 文章请求失败：只影响文章区，重试能恢复（只有行为断言，等待窗口随基线放宽）
         const bad = 9;
         failPosts.add(bad);
-        root.unmount();
         root = ReactDOM.createRoot(box);
         root.render(React.createElement(ProfilePage, { userId: bad }));
         // Suspense 会用 display: none 藏起旧内容，所以只看可见的元素
         const visible = sel => Array.from(box.querySelectorAll(sel)).filter(e => !e.closest('[style*="display: none"]'));
         const findRetry = () => visible('button').find(b => b.textContent.trim() === '重试');
         const userOk = () => visible('#user').some(e => e.textContent.includes(nm(bad)));
-        const t1 = performance.now();
-        while (performance.now() - t1 < 1500 && !(findRetry() && userOk())) await t.wait(20);
+        await until(() => findRetry() && userOk(), 2000);
         const retryBtn = findRetry();
         t.assert(
           retryBtn || reqs('posts', bad).length < 2,
@@ -450,8 +469,7 @@ function App() {
         t.assert(retryBtn, '文章请求失败后，找不到“重试”按钮。文章区要有自己的错误边界（步骤 5）');
         t.assert(userOk(), '文章请求失败时，用户信息也不见了。错误边界只包住文章区，用户信息才能照常显示（步骤 5）');
         retryBtn.click();
-        const t2 = performance.now();
-        while (performance.now() - t2 < 1500 && visible('#posts li').length !== 3) await t.wait(20);
+        await until(() => visible('#posts li').length === 3, 2000);
         const tries = reqs('posts', bad).length;
         t.assert(tries >= 2, '点“重试”后没有重新请求文章：缓存里还留着失败的 Promise，use 又抛出了同一个错误。onRetry 要先删掉这个缓存项（步骤 5）');
         t.assert(visible('#posts li').length === 3, '点“重试”后，文章没有显示出来（步骤 5）');
@@ -459,42 +477,47 @@ function App() {
         root.unmount();
         root = null;
 
-        // 3. 在预览中点“下一位用户”：保留旧内容，不闪 fallback
-        const t3 = performance.now();
-        while (performance.now() - t3 < 3000 && t.qa('#posts li').length !== 3) await t.wait(30);
-        t.assert(t.qa('#posts li').length === 3 && t.q('#user'), '预览中第一位用户的信息和文章没有显示出来。请先点“运行”');
-        const oldName = t.text('#user');
-        const nextBtn = t.byText('button', '下一位用户');
-        t.assert(nextBtn, '找不到“下一位用户”按钮');
-        const before = log.length;
-        nextBtn.click();
-        let sawFallback = false,
-          sawPending = false,
-          lostOld = false;
-        const t4 = performance.now();
-        while (performance.now() - t4 < 2000) {
-          await t.wait(15);
-          if (t.q('.fallback')) sawFallback = true;
-          if (t.q('#pending')) sawPending = true;
-          const u = t.q('#user');
-          if (!u) lostOld = true;
-          if (u && u.textContent.trim() !== oldName && t.qa('#posts li').length === 3) break;
-        }
-        const fresh = log.slice(before);
-        t.assert(fresh.length >= 2, '点“下一位用户”后，没有通过 api 请求下一位用户的数据');
-        const newId = fresh[0].id;
-        const fu = fresh.find(x => x.what === 'user'),
-          fp = fresh.find(x => x.what === 'posts');
-        t.assert(fu && fp && Math.abs(fu.at - fp.at) < 50, '切换用户时，两个请求没有同时发出（步骤 2）');
-        t.assert(
-          !sawFallback && !lostOld,
-          '切换用户时，旧内容被 fallback 替换了。把切换 userId 的 set 函数调用放进 startTransition，已经显示的内容就会保留到新数据到齐（步骤 4）',
-        );
-        t.assert(sawPending, '切换期间没有出现 #pending。用 useTransition 拿到 isPending，显示 <small id="pending">切换中…</small>（步骤 4）');
-        t.assert(t.text('#user') === nm(newId), '2 秒后仍没有显示下一位用户。应显示“' + nm(newId) + '”，实际是“' + t.text('#user') + '”');
-        t.assert(t.qa('#posts li').length === 3 && t.qa('#posts li')[0].textContent.includes(nm(newId)), '切换后，文章列表应是“' + nm(newId) + '”的文章');
-        await t.wait(50);
-        t.assert(!t.q('#pending'), '切换完成后，#pending 应该消失');
+        // 3. 在预览中点“下一位用户”：保留旧内容，不闪 fallback。含“两个请求同时发出”的计时断言，整段可重测（每次点一下，换到再下一位用户）
+        const previewReady = () => t.qa('#posts li').length === 3 && t.q('#user');
+        await until(previewReady, 4000);
+        t.assert(previewReady(), '预览中第一位用户的信息和文章没有显示出来。请先点“运行”');
+        await t.retry(async () => {
+          const bl = await t.baseline();
+          slow = Math.max(1, bl.factor);
+          await until(() => previewReady() && !t.q('#pending'), 4000);
+          const oldName = t.text('#user');
+          const nextBtn = t.byText('button', '下一位用户');
+          t.assert(nextBtn, '找不到“下一位用户”按钮');
+          const before = log.length;
+          nextBtn.click();
+          let sawFallback = false,
+            sawPending = false,
+            lostOld = false;
+          const deadline = performance.now() + scale(3000) + 2 * bl.lag;
+          while (performance.now() < deadline) {
+            await t.wait(15);
+            if (t.q('.fallback')) sawFallback = true;
+            if (t.q('#pending')) sawPending = true;
+            const u = t.q('#user');
+            if (!u) lostOld = true;
+            if (u && u.textContent.trim() !== oldName && t.qa('#posts li').length === 3) break;
+          }
+          const fresh = log.slice(before);
+          t.assert(fresh.length >= 2, '点“下一位用户”后，没有通过 api 请求下一位用户的数据');
+          const newId = fresh[0].id;
+          const fu = fresh.find(x => x.what === 'user'),
+            fp = fresh.find(x => x.what === 'posts');
+          t.timing(fu && fp && Math.abs(fu.at - fp.at) < bl.limit(50), '切换用户时，两个请求没有同时发出（步骤 2）');
+          t.assert(
+            !sawFallback && !lostOld,
+            '切换用户时，旧内容被 fallback 替换了。把切换 userId 的 set 函数调用放进 startTransition，已经显示的内容就会保留到新数据到齐（步骤 4）',
+          );
+          t.assert(sawPending, '切换期间没有出现 #pending。用 useTransition 拿到 isPending，显示 <small id="pending">切换中…</small>（步骤 4）');
+          t.assert(t.text('#user') === nm(newId), '等了足够久仍没有显示下一位用户。应显示“' + nm(newId) + '”，实际是“' + t.text('#user') + '”');
+          t.assert(t.qa('#posts li').length === 3 && t.qa('#posts li')[0].textContent.includes(nm(newId)), '切换后，文章列表应是“' + nm(newId) + '”的文章');
+          await until(() => !t.q('#pending'), 1000);
+          t.assert(!t.q('#pending'), '切换完成后，#pending 应该消失');
+        });
       } finally {
         if (root) root.unmount();
         box.remove();

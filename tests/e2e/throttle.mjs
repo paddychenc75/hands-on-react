@@ -4,7 +4,7 @@
 import { launch, openSite, lessonUrl, lessonData } from './_site.mjs';
 
 const RATE = 4;
-const IDS = ['scheduler', 'concurrent', 'use-effect'];
+const IDS = ['scheduler', 'concurrent', 'use-effect', 'suspense-data'];
 const only = process.argv.slice(2);
 const ids = IDS.filter(id => !only.length || only.includes(id));
 const { site, close } = await openSite();

@@ -89,8 +89,12 @@ export interface Internals {
   hasStateHook: (fiber: any) => boolean | null;
   /** 组件里 useRef 的 current 值 */
   refValues: (fiber: any) => any[] | null;
+  /** 组件里 useState/useReducer 当前的值，按 Hook 顺序 */
+  stateValues: (fiber: any) => any[] | null;
   /** 根上有没有排队中的过渡更新；版本不是 19.3.x 或结构不对时 null */
   inTransition: (root: any) => boolean | null;
+  /** 容器里 Suspense 边界的个数；找不到根 fiber 时 null */
+  suspenseCount: (container: any) => number | null;
 }
 
 export interface Exercise {

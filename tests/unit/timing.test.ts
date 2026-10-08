@@ -62,10 +62,25 @@ describe('t.internals：读 React 内部结构，字段不在就返回 null', ()
     expect(I.refValues(fiber)).toEqual([7, null]);
     expect(I.refValues(null)).toBeNull();
   });
+  it('stateValues：只取 useState/useReducer 的值', () => {
+    const fiber = { memoizedState: hook(3, true, hook({ current: 7 }, false, hook('a', true))) };
+    expect(I.stateValues(fiber)).toEqual([3, 'a']);
+    expect(I.stateValues(null)).toBeNull();
+  });
   it('rootOf：校验 pendingLanes 是数字，否则 null', () => {
     expect(I.rootOf({ __reactContainer$x: { stateNode: { pendingLanes: 0 } } })).toEqual({ pendingLanes: 0 });
     expect(I.rootOf({ __reactContainer$x: { stateNode: {} } })).toBeNull();
     expect(I.rootOf({})).toBeNull();
+  });
+  it('suspenseCount：数容器里 tag 为 13 的 fiber；找不到根返回 null', () => {
+    const leaf = { tag: 5, child: null, sibling: null };
+    const inner = { tag: 13, child: leaf, sibling: null };
+    const outer = { tag: 13, child: null, sibling: inner };
+    const top = { tag: 3, child: { tag: 0, child: outer, sibling: null }, sibling: null };
+    expect(I.suspenseCount({ __reactContainer$x: top })).toBe(2);
+    expect(I.suspenseCount({ __reactContainer$x: { tag: 3, child: null } })).toBe(0);
+    expect(I.suspenseCount({})).toBeNull();
+    expect(I.suspenseCount(null)).toBeNull();
   });
   it('inTransition：19.3.x 按位掩码判断；别的版本返回 null，让检查退回到行为断言', () => {
     expect(I.inTransition({ pendingLanes: 0b1000000 })).toBe(true);

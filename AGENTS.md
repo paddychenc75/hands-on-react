@@ -39,7 +39,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就八个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query 和 state-architecture 三课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），可以写多个；不写就八个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 49 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -250,8 +250,10 @@ export default {
   - `t.timing(cond, msg)`：计时类断言。失败抛出可重测的失败（普通 `t.assert` 不重测）。
   - `await t.retry(fn)`：运行一段含 `t.timing` 的检查；`t.timing` 失败就等 0.3 秒、重新测基线，再整体重跑一次，两次都失败才判失败。失败信息附一句区分：设备看起来忙（慢 3 倍以上或事件循环延迟 40ms 以上）写“可能不是代码的问题，再点一次检查”，否则写“更可能是代码的问题”。**`fn` 必须能重复执行**：段内自己创建 root、调度器、数据，不依赖上一次的残留。
   - 标签页在后台（`document.hidden`）：`t.baseline()` 和 `t.retry()` 会抛 `EnvFail`，界面提示“请保持本页在前台，再点一次检查”，**这次不计入失败次数、不解锁提示**（正式练习和变式练习都一样）。
-  - `t.internals`：读 React 内部结构的唯一入口（`fiberOf`、`rootOf`、`componentOf`、`hooksOf`、`hasStateHook`、`refValues`、`inTransition`，实现和注释见 `logic/internals.ts`）。字段不存在或形状不对时返回 `null`，**检查要在 `null` 时退回纯行为断言并跳过结构断言**，这样升级 React 后不会抛异常或全盘误判。依赖的是 React 19.3.x 的 fiber 结构；位掩码（过渡车道）只在 `t.internals.known`（版本是 19.3.x）时才用。不要在 `exercise.test` 里直接写 `memoizedState`、`__reactFiber$`、`pendingLanes`。
+  - `t.internals`：读 React 内部结构的唯一入口（`fiberOf`、`rootOf`、`componentOf`、`hooksOf`、`hasStateHook`、`refValues`、`stateValues`、`suspenseCount`、`inTransition`，实现和注释见 `logic/internals.ts`）。字段不存在或形状不对时返回 `null`，**检查要在 `null` 时退回纯行为断言并跳过结构断言**，这样升级 React 后不会抛异常或全盘误判。依赖的是 React 19.3.x 的 fiber 结构；位掩码（过渡车道）只在 `t.internals.known`（版本是 19.3.x）时才用。不要在 `exercise.test` 里直接写 `memoizedState`、`__reactFiber$`、`pendingLanes`。
   - 新写计时类检查后，用 `node tests/e2e/try.mjs <课> ex <变体> --throttle 4 --reps 3` 和 `--throttle 6` 验证：参考答案仍通过，起始代码和典型错误仍被拒。`tests/e2e/throttle.mjs` 把“4 倍 CPU 节流下参考答案通过”固定为回归。
+  - **固定等待窗口**：`t.wait(固定毫秒)` 后马上断言“应该已经出现”的写法，在设备忙时会误判。改成轮询：循环到条件成立或超时，超时用 `(await t.baseline()).factor` 放宽（`suspense-data` 的 `until`、`use-ref` 的计数等待）。“等一段时间后确认**没有**变化”（例如停止后数字不再变、竞态里等过期请求回来）需要固定窗口，保留；设备慢只会让它更宽松。
+  - 扫描有风险的写法时，下面几种不算：`performance.now()` / `Date.now()` 只用来设轮询截止时间、或是示例里模拟“很慢”的忙等；`streaming-ssr` 为了确定性而替换 `Date.now`；`lists-keys` 经 `t.internals.fiberOf` 拿到 fiber 后读通用字段 `tag`/`key`/`return`/`stateNode`（读不到时有退回）。
 - `t.unpreventedSubmits()`：本次运行里表单被提交、但学习者的处理函数没有调用 `preventDefault()` 的次数。实验台（`runner.ts`）在 mount 的父元素上挂了一个晚于 React 处理函数的 `submit` 兜底监听：没人调用 `preventDefault` 时它照样拦住页面刷新，同时在控制台警告并计数。所以界面上看不出漏写，要用这个计数断言（见 `project-todo`）。
 - **检查行为，不查字面**：点按钮看界面变化、计渲染次数、另开 root、卸载后看定时器是否停止。`t.source` 只用作最后的补充。
 - 每改一道检查，要实测：参考答案通过；起始代码被拒，失败信息指向概念；常见错误和投机写法被拒；至少一种合理的不同写法通过。
