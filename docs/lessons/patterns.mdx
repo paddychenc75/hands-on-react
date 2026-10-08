@@ -25,7 +25,7 @@ const TabsContext = createContext(null);
 
 function Tabs({ defaultValue, children }) {
   const [active, setActive] = useState(defaultValue);
-  return <TabsContext.Provider value={{ active, setActive }}>{children}</TabsContext.Provider>;
+  return <TabsContext value={{ active, setActive }}>{children}</TabsContext>;
 }
 
 function TabList({ children }) {
@@ -67,9 +67,17 @@ function App() {
 }
 ```
 
+上面的 `Tabs` 把 `TabsContext` 直接当 Provider 用：`<TabsContext value={…}>`。Context 的用法见 [Context：跨层级共享数据](/lessons/context)。
+
+<CallBox kind="tip" label="维护 React 18 项目时">
+
+React 18 要写 `<TabsContext.Provider value={…}>`。React 19 也还支持这种写法，旧代码不用急着改。
+
+</CallBox>
+
 <CallBox kind="warn" label="常见坑">
 
-如果项目用了服务端组件（第 29 课），要小心 `Tabs.List` 这种静态属性写法。`Tabs` 用了 `useState`，必须是客户端组件。在**服务端组件**里写 `<Tabs.List>` 会报错，因为服务端拿到的只是客户端模块的引用，不能再取它的属性。这时改成具名导出：`export { Tabs, TabList, Tab, TabPanel }`。Radix 的 `Tabs.Root`、`Tabs.List` 是整个模块的命名空间导入，不是组件上的静态属性，所以不受影响。
+如果项目用了服务端组件（见 [Server Components 与全栈 React](/lessons/server-components)），要小心 `Tabs.List` 这种静态属性写法。`Tabs` 用了 `useState`，必须是客户端组件。在**服务端组件**里写 `<Tabs.List>` 会报错，因为服务端拿到的只是客户端模块的引用，不能再取它的属性。这时改成具名导出：`export { Tabs, TabList, Tab, TabPanel }`。Radix 的 `Tabs.Root`、`Tabs.List` 是整个模块的命名空间导入，不是组件上的静态属性，所以不受影响。
 
 </CallBox>
 
@@ -169,6 +177,8 @@ function App() {
 
 HOC 有一个固有的毛病：被包的组件看不出 `pos` 是哪个 HOC 注入的。两个 HOC 注入同名 prop 时，只有一个能留下来，另一个悄悄丢失，没有任何警告。Render Props 没有这个问题，但嵌套多了就是一层套一层的回调。自定义 Hook 两个毛病都没有。
 
+HOC 还有一个小麻烦：`ref` 要不要传给被包的组件。React 19 里，函数组件的 `ref` 是普通 prop，HOC 里的 `{...props}` 会把它一起传下去。React 18 里 `ref` 不是 prop，HOC 要用 `forwardRef` 才能转发。
+
 <CallBox kind="tip" label="要点">
 
 Render Props 现在仍然有用。如果组件要让**使用者决定如何渲染内部数据**，就用它，例如虚拟列表的 `renderItem={(item) => ...}`。
@@ -178,7 +188,7 @@ Render Props 现在仍然有用。如果组件要让**使用者决定如何渲�
 ## 其他设计原则
 
 - **组合优于配置**：不要提供 `showIcon`、`iconPosition`、`iconColor` 这样一长串 props。让使用者传 children 或插槽。
-- **透传原生属性**：`function Button({ variant, ...rest }) { return <button {...rest} /> }`，让使用者能传 aria-\*、onClick、type 等。
+- **透传原生属性**：`function Button({ variant, ...rest }) { return <button {...rest} /> }`，让使用者能传 aria-\*、onClick、type 等。React 19 里 `ref` 也是普通 prop，所以 `...rest` 会把 `ref` 一起透传，不需要 `forwardRef`。
 - **无障碍**：用正确的语义标签和 ARIA 角色，支持键盘操作。
 
 </LessonProse>

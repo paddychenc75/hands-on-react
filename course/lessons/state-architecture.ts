@@ -2,6 +2,7 @@ import type { Lesson } from '../types.ts';
 // 非正文数据。课文在 docs/lessons/state-architecture.mdx；plays 的键是示例标题（重名或无标题时是 #序号），对应 MDX 里的 ```jsx play 代码块。
 export default {
   id: 'state-architecture',
+  runtime: 19,
   stage: 3,
   title: '状态管理架构',
   mins: 28,
@@ -297,9 +298,9 @@ const store = {
         'useSyncExternalStore 用 Object.is 比较前后两次 getSnapshot 的返回值。这里修改了原对象，返回的还是同一个引用，React 就跳过渲染。修复：每次更新创建新对象，例如 <code>state = { ...state, count: state.count + 1 }</code>（state 改用 let 声明）。',
     },
     {
-      q: `mousePos 每秒变化 60 次。很多组件只读 theme，却也跟着每秒重新渲染 60 次。最合适的改法是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;AppCtx.Provider value={{ user, theme, mousePos }}&gt;
+      q: `mousePos 每秒变化 60 次。很多组件只读 theme，却也跟着每秒重新渲染 60 次。最合适的改法是？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">&lt;AppCtx value={{ user, theme, mousePos }}&gt;
   &lt;Page /&gt;
-&lt;/AppCtx.Provider&gt;</code></pre></div>`,
+&lt;/AppCtx&gt;</code></pre></div>`,
       options: [
         '用 useMemo 包住 value 对象',
         '用 memo 包裹所有只读 theme 的组件',

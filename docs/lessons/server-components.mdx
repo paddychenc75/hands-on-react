@@ -14,7 +14,7 @@ title: "Server Components 与全栈 React"
 
 React 正在从“浏览器里的 UI 库”演进为**全栈架构**。理解这一课，你就能看懂 Next.js App Router 等现代框架的设计。
 
-<strong>本课的示例代码只能阅读。</strong>原因是：服务端组件和 Server Function 要在服务器上运行，还要由 Next.js 这类框架打包。本页的沙箱只是浏览器里的 React 18。课末的练习是纯 JavaScript，可以运行。想在真实项目里试，见“在本地动手试”。
+<strong>本课的示例代码只能阅读。</strong>原因是：服务端组件和 Server Function 要在服务器上运行，还要由 Next.js 这类框架打包。本页的实验台只是浏览器里的 React 19，没有服务器，也没有打包器。课末的练习是纯 JavaScript，可以运行。想在真实项目里试，见“在本地动手试”。
 
 先认识本课反复出现的两个词：
 
@@ -118,6 +118,8 @@ export async function addComment(formData) {
 </form>
 ```
 
+表单的 `action` 属性接收函数，在浏览器里怎么用、怎样配合 `useActionState` 显示 pending 和错误，见[Actions：异步提交、表单与乐观更新](/lessons/react-19)。上面的 Server Function 用在同一个位置，区别只是函数在服务器上执行。
+
 <CallBox kind="tip" label="要点">
 
 **"use server" 不标记服务端组件**。组件默认就是服务端组件，不需要标记。它标记**可以被客户端调用的服务器函数**。框架会为这个函数自动生成一个 API 接口。所以务必在其中做权限校验和输入验证。
@@ -166,7 +168,7 @@ export async function deletePost(postId) {
 <details className="optional">
 <summary><span className="opt-tag">选读</span>在本地动手试<small>可以先跳过，需要时再展开</small></summary>
 
-需要 Node.js 20.9 或更新的版本（Next.js 16 的要求，运行 `node -v` 查看）。按下面的步骤，亲眼看看代码在哪里运行：
+需要 Node.js 20.9 或更新的版本（Next.js 16 的要求，运行 `node -v` 查看）。按下面的步骤，亲眼看看代码在哪里运行（[Next.js App Router](/lessons/nextjs)一课有更完整的项目步骤）：
 
 1. 运行 `npx create-next-app@latest rsc-demo`，在提示“是否使用推荐的默认设置”时选第一项（Yes, use recommended defaults），再进入项目目录运行 `npm run dev`。
 2. 在 `app/page.tsx` 的组件里加一行 `console.log('在哪里打印？')`，刷新页面。这句话打印在运行 npm 的终端里：它在服务器上运行。开发模式下，浏览器控制台也会转发一份，前面带“Server”标记。
