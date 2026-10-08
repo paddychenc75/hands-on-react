@@ -136,6 +136,8 @@ function proseOf(text) {
 
 const playsByLesson = {};
 const pkeys = new Map();
+// 示例搬到别的课时，pkey 保持原样（学习者进度里 __pred 用它）：已经在快照里的 pkey 可以不以本课 id 开头
+const snapPreds = new Set(fs.existsSync(SNAPSHOT) ? JSON.parse(fs.readFileSync(SNAPSHOT, 'utf8')).predictions || [] : []);
 for (const id of mdxIds) {
   const where = `docs/lessons/${id}.mdx`;
   const l = lessons[id];
@@ -164,11 +166,11 @@ for (const id of mdxIds) {
       );
     else if (meta?.predict) {
       // pkey 是学习者进度里 __pred 的键，一旦发布就不能改，所以允许它和现在的标题不同（示例改过名），但必须有、以"课id|"开头、全站唯一
-      if (typeof meta.pkey !== 'string' || !meta.pkey.startsWith(`${id}|`))
+      if (typeof meta.pkey !== 'string' || !(meta.pkey.startsWith(`${id}|`) || snapPreds.has(meta.pkey)))
         fail(
           `course/lessons/${id}.ts`,
           `plays["${k}"] 有预测题，但 pkey 是 ${JSON.stringify(meta.pkey)}，应以 "${id}|" 开头`,
-          '写成 课id|示例标题；没有 pkey 的预测题记不住学习者的选择',
+          '写成 课id|示例标题；没有 pkey 的预测题记不住学习者的选择。示例从别的课搬来时，保留原 pkey（它已在快照里）才允许不以本课 id 开头',
         );
       else if (pkeys.has(meta.pkey)) fail(`course/lessons/${id}.ts`, `pkey "${meta.pkey}" 和 ${pkeys.get(meta.pkey)} 重复`);
       else pkeys.set(meta.pkey, `course/lessons/${id}.ts`);

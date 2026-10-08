@@ -4,23 +4,19 @@ export default {
   id: 'rendering',
   stage: 2,
   title: '渲染机制：React 到底做了什么',
-  mins: 32,
+  mins: 26,
   summary: '理解触发、渲染、提交三个阶段，以及虚拟 DOM 与协调算法。',
   goals: [
-    '能解释“渲染”和“更新 DOM”的区别',
-    '能判断一次更新会让哪些组件重新渲染',
+    '能解释渲染、提交和更新 DOM 的区别',
+    '能判断一次更新会让哪些组件重新渲染，并用“把 state 下移”减少不必要的渲染',
     '能根据位置、类型和 key 预测 state 是保留还是丢失',
-    '能用“把 state 下移”减少不必要的渲染',
-    '能用 <code>&lt;Activity&gt;</code> 隐藏一块界面并保留它的 state，并说出它和条件渲染、CSS 隐藏的区别',
     '能说出严格模式在开发环境多做了什么，以及为什么渲染必须是纯的',
   ],
   keyPoints: [
     '一次更新分三步：触发 → 渲染 → 提交。渲染只是调用组件函数并算出差异，提交才修改 DOM。',
     '组件的 state 变化时，它和它的全部后代都会重新渲染。props 没变的子组件也一样，除非用了 memo，或项目启用了 React Compiler。',
-    'React 按“树中的位置 + 元素类型”保存 state。位置和类型不变，state 保留；类型变了或 key 变了，state 被丢弃。',
-    '最常见的坑：在组件内部定义组件。每次渲染它都是新类型，state 和焦点都会丢失。',
+    'React 按“树中的位置 + 元素类型”保存 state。位置和类型不变，state 保留；类型变了或 key 变了，state 被丢弃。最常见的坑：在组件内部定义组件，每次渲染它都是新类型，state 和焦点都会丢失。',
     '先试结构性优化：把 state 下移到真正用它的小组件里，其他组件就不会跟着重新渲染。',
-    '想隐藏界面又保留 state，用 <code>&lt;Activity mode="hidden"&gt;</code>：state 和 DOM 都留着，effect 被清理，显示时重新运行。条件渲染会丢 state，CSS 隐藏不会清理 effect。',
     '严格模式只在开发环境生效：多调用一次组件函数、初始化函数和更新函数，并让 effect 多做一轮。它用来暴露渲染里的副作用。',
   ],
   quiz: [
@@ -52,16 +48,16 @@ export default {
         '自动批处理：同一个事件中的多次 set 函数调用合并为一次渲染，三个更新都生效。最后一项是 React 17 的行为。React 18 起，setTimeout 和 Promise 回调里也会批处理。',
     },
     {
-      q: '标签页 B 的内容放在 &lt;Activity mode={tab === "b" ? "visible" : "hidden"}&gt; 里，里面有一个输入框和一个订阅消息的 effect。用户在输入框里打了字，然后切到标签页 A。B 里的输入框和 effect 分别怎样？',
+      q: '&lt;Profile key={userId} /&gt; 里有一个输入框，用户在里面打了字。userId 从 1 变成 2，Profile 的位置和类型都没变。输入框里的字？',
       options: [
-        '输入框的文字保留，effect 被清理；切回 B 时 effect 重新运行',
-        '输入框的文字丢失，effect 被清理',
-        '输入框的文字保留，effect 继续运行，和 CSS 隐藏一样',
-        '输入框的文字丢失，effect 继续运行',
+        '保留，因为位置和类型没变',
+        '丢失：key 变了就是另一个组件',
+        '保留，但 Profile 的 props 更新为新的 userId',
+        '保留一部分：React 只重置依赖 userId 的 state',
       ],
-      answer: 0,
+      answer: 1,
       explain:
-        'Activity 隐藏时保留 state 和 DOM，所以文字还在，但会清理 effect，订阅就不会在后台继续占资源。切回 visible 时，effect 重新运行。最迷惑的是第三项：它描述的是 CSS 隐藏（display: none）。CSS 只改样式，React 不知道界面被隐藏，effect 一直在运行。',
+        'key 是组件身份的一部分。key 变了，React 认为这是另一个组件：旧的卸载，state 随之丢弃，新的从初始值开始。这是“切换对象时重置表单”的惯用做法。第一项是没加 key 时的行为：位置和类型不变，state 保留。',
     },
   ],
   exercise: {
@@ -154,6 +150,154 @@ function App() {
       );
     },
   },
+  drills: [
+    {
+      title: '换收件人，留言草稿要跟着清空',
+      task: '<ol class="task-steps"><li>下面的 <code>Draft</code> 有自己的 state（留言草稿）。在输入框里写几个字，再切换收件人：草稿还留着，写给小明的话出现在了给小红的留言框里。</li><li>让切换收件人后，草稿从空白开始。</li><li>不要在 effect 里重置：那样会先用新收件人和旧草稿渲染一次，再渲染第二次。检查会查渲染记录 <code>seen</code>，里面不能出现“新收件人 + 旧草稿”的组合。</li><li>在输入框里打字时，已输入的内容不能丢。</li></ol>',
+      starter: `import { useState } from 'react';
+
+const seen = [];
+
+function Draft({ user }) {
+  const [text, setText] = useState('');
+  seen.push(user + '|' + text);
+  return (
+    <div>
+      <p>给 <b id="to">{user}</b> 写留言：</p>
+      <input id="draft" value={text} onChange={e => setText(e.target.value)} />
+    </div>
+  );
+}
+
+function App() {
+  const [user, setUser] = useState('小明');
+  return (
+    <div>
+      <button id="u1" onClick={() => setUser('小明')}>小明</button>
+      <button id="u2" onClick={() => setUser('小红')}>小红</button>
+      <Draft user={user} />
+    </div>
+  );
+}`,
+      solution: `import { useState } from 'react';
+
+const seen = [];
+
+function Draft({ user }) {
+  const [text, setText] = useState('');
+  seen.push(user + '|' + text);
+  return (
+    <div>
+      <p>给 <b id="to">{user}</b> 写留言：</p>
+      <input id="draft" value={text} onChange={e => setText(e.target.value)} />
+    </div>
+  );
+}
+
+function App() {
+  const [user, setUser] = useState('小明');
+  return (
+    <div>
+      <button id="u1" onClick={() => setUser('小明')}>小明</button>
+      <button id="u2" onClick={() => setUser('小红')}>小红</button>
+      <Draft key={user} user={user} />
+    </div>
+  );
+}`,
+      hint: 'React 按“位置 + 类型”保存 state：两次渲染里 Draft 在同一个位置、是同一种组件，所以它的 state 被保留了。想让 React 把它当成另一个组件，可以改变什么？',
+      exports: ['seen'],
+      test: async t => {
+        const seen = t.exports.seen;
+        t.assert(Array.isArray(seen), '请保留名为 seen 的数组和 Draft 组件里的 seen.push(…) 记录');
+        await t.type('#draft', 'hello');
+        t.assert(t.q('#draft').value === 'hello', `在输入框里打字后，应显示 hello，实际是“${t.q('#draft').value}”。打字时草稿不能被清掉`);
+        const n0 = seen.length;
+        await t.click('#u2');
+        t.assert(t.text('#to') === '小红', '点“小红”后，应显示“给 小红 写留言”');
+        t.assert(
+          t.q('#draft').value === '',
+          `切换收件人后，草稿应从空白开始，实际还是“${t.q('#draft').value}”。Draft 在树里的位置和类型都没变，React 就保留了它的 state。请让 React 把它当成另一个组件`,
+        );
+        const stale = seen.slice(n0).filter(x => x === '小红|hello');
+        t.assert(
+          stale.length === 0,
+          '切换后出现过一次“小红 + 旧草稿 hello”的渲染：state 是渲染之后才在 effect 里清掉的。重置 state 不要用 effect，让 React 直接丢掉旧组件的 state',
+        );
+        await t.type('#draft', '你好');
+        await t.click('#u1');
+        t.assert(t.q('#draft').value === '', `再切回小明，草稿也应从空白开始，实际是“${t.q('#draft').value}”`);
+      },
+    },
+    {
+      title: '有 state 的外壳，不要带着 Heavy 一起渲染',
+      task: '<ol class="task-steps"><li><code>Panel</code> 自己有 state（展开/收起），里面包着很费时的 <code>Heavy</code>。点“展开”时，Heavy 的渲染次数也在增加。</li><li>这次 state 不能再下移：按钮和详情就在 Panel 里。改成让 Panel 接收 <code>children</code>，由 App 把 <code>&lt;Heavy /&gt;</code> 传进去。</li><li>Heavy 仍要显示在 Panel 的 <code>&lt;section&gt;</code> 里面。</li><li>不要使用 memo 或 useMemo，也不要把 state 搬到 App。</li></ol>',
+      starter: `import { useState } from 'react';
+
+let heavyRenders = 0;
+function Heavy() {
+  heavyRenders++;
+  return <p>Heavy 渲染次数：<span id="heavy">{heavyRenders}</span></p>;
+}
+
+function Panel() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section>
+      <button id="toggle" onClick={() => setOpen(!open)}>{open ? '收起' : '展开'}详情</button>
+      {open && <p id="detail">这里是详情</p>}
+      <Heavy />
+    </section>
+  );
+}
+
+function App() {
+  return <Panel />;
+}`,
+      solution: `import { useState } from 'react';
+
+let heavyRenders = 0;
+function Heavy() {
+  heavyRenders++;
+  return <p>Heavy 渲染次数：<span id="heavy">{heavyRenders}</span></p>;
+}
+
+function Panel({ children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section>
+      <button id="toggle" onClick={() => setOpen(!open)}>{open ? '收起' : '展开'}详情</button>
+      {open && <p id="detail">这里是详情</p>}
+      {children}
+    </section>
+  );
+}
+
+function App() {
+  return (
+    <Panel>
+      <Heavy />
+    </Panel>
+  );
+}`,
+      hint: '谁创建了 <code>&lt;Heavy /&gt;</code> 这个元素？现在是 Panel，所以 Panel 每次渲染都会创建一个新元素。如果元素由没有重新渲染的 App 创建，再从外面传进来，Panel 的 state 变化时，React 会看到同一个元素对象。',
+      exports: ['Panel'],
+      test: async t => {
+        t.assert(!/memo/i.test(t.source), '这道题请不要使用 memo 或 useMemo');
+        const before = t.text('#heavy');
+        await t.click('#toggle');
+        t.assert(t.q('#detail'), '点“展开详情”后，应显示详情');
+        await t.click('#toggle');
+        await t.click('#toggle');
+        t.assert(
+          t.text('#heavy') === before,
+          `展开、收起时 Heavy 仍在重新渲染（${before} → ${t.text('#heavy')}）。Panel 的 state 一变，它自己重新渲染，里面写死的 <Heavy /> 也每次重新创建。请让 Heavy 由 App 创建，再作为 children 传给 Panel`,
+        );
+        t.assert(t.q('section #heavy'), 'Heavy 应仍显示在 Panel 的 <section> 里面');
+        t.assert(t.q('section #toggle'), '按钮应仍在 Panel 的 <section> 里面');
+        t.assert(t.qa('#heavy').length === 1, '页面上应只有一个 Heavy');
+      },
+    },
+  ],
   checkOnly: [
     {
       q: `点击按钮后，组件会渲染几次（不算第一次挂载）？<div class="codeblock faded"><pre style="white-space:pre-wrap"><code style="background:none;color:inherit;padding:0;font-size:inherit">const [a, setA] = useState(0);
@@ -249,16 +393,6 @@ function Page() {
         explain: 'state 属于 Counter，更新只会让 Counter 和它的后代重新渲染。父组件和兄弟组件不受影响。',
       },
       pkey: 'rendering|谁被重新渲染了？',
-    },
-    三种隐藏方式: {
-      note: '条件渲染的输入框在隐藏时被卸载，文字丢失，effect 被清理，显示时重新开始。CSS 隐藏的输入框保留文字，但 effect 没有任何日志：React 不知道它被隐藏，effect 一直在运行。Activity 里的输入框保留文字，同时 effect 被清理，显示时又运行一次。',
-      predict: {
-        q: '在三个输入框里各打几个字，点“隐藏”，再点“显示”。哪些输入框里的字还在？',
-        options: ['三个都在', '只有条件渲染的丢了，另外两个还在', '只有 Activity 里的还在', '三个都丢了'],
-        answer: 1,
-        explain: '条件渲染把组件卸载了，state 随之丢失。CSS 隐藏只改样式，组件一直挂载着。Activity 隐藏时保留 state 和 DOM，只清理 effect。',
-      },
-      pkey: 'rendering|三种隐藏方式',
     },
     严格模式下的组件函数: {
       note: '控制台里“Demo 函数被调用”会成对出现：严格模式把组件函数多调用一次。去掉 &lt;StrictMode&gt; 再运行，每次只打印一行。生产环境没有这次额外调用。',
