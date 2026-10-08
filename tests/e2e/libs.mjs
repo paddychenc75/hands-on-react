@@ -97,7 +97,7 @@ const isLib = (u, slug) => new RegExp(`/runtime/${slug}-[\\d.]+\\.dev\\.js`).tes
     !text.includes('element provided to render during initial hydration') && !text.includes('Missing queryFn'),
     '站点主包里没有 react-router 和 @tanstack/react-query 的代码',
   );
-  ok(bytes < 1_000_000, '站点主包小于 1,000,000 字节（加库之前是 929,753，加库之后是 943,790）', String(bytes));
+  ok(bytes < 1_200_000, '站点主包小于 1,200,000 字节（加库之前是 929,753，加库之后是 943,790；课程数据在主包里，加课后涨到约 1.04 MB）', String(bytes));
   const rt = path.join(ROOT, 'doc_build/runtime');
   const libs = fs.readdirSync(rt).filter(f => /^(react-router|tanstack-query)-[\d.]+\.dev\.js$/.test(f));
   ok(libs.length === 2, 'doc_build/runtime 里有两个库文件', libs.join(','));
