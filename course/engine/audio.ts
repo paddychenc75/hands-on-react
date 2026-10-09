@@ -430,13 +430,13 @@ export interface Engine {
   /** 每帧调用：影片时间 f、是否在自动播放。拖进度条 / 换幕 / 暂停 / 恢复都在这里被发现并重新排程 */
   sync(f: number, playing: boolean): void;
   /** 淡出并停下（暂停、后台标签页） */
-  hush(): void;
+  hush(fade?: number): void;
   /** 音量档：小声时整体降到一半 */
   setQuiet(q: boolean): void;
   /** 当前输出电平（0..1 的 RMS），给测试看 */
   level(): number;
   /** 当前排程的起点（影片时间）和状态，给测试看 */
-  info(): { anchorF: number; mode: string };
+  info(): { anchorF: number; mode: string; sched: [number, number][] };
   dispose(): void;
 }
 export function createEngine(): Engine | null {
@@ -460,6 +460,8 @@ export function createEngine(): Engine | null {
   let anchorCtx = 0; // 影片时间 anchorF 对应的 ctx 时间
   let anchorF = 0;
   let scheduledTo = 0;
+  /** 排过程的（影片时间）区间，给测试看：跳转时不该有跨过中间幕的区间 */
+  const sched: [number, number][] = [];
   let mode: 'film' | 'pad' | 'off' = 'off';
   let timer = 0;
   const buf = new Float32Array(analyser.fftSize);
@@ -479,6 +481,7 @@ export function createEngine(): Engine | null {
       // 从当前影片时间淡入（不是从头）
       g.linearRampToValueAtTime(LEVEL.master, now + (f < 1 ? 1.6 : 0.5));
       masterFadeOut(f);
+      sched.push([f, f + 0.01]);
       scheduleScore(ctx, ep, f, f + 0.01, anchorCtx, { catchUp: true });
     } else {
       g.linearRampToValueAtTime(LEVEL.master, now + 0.6);
@@ -497,6 +500,7 @@ export function createEngine(): Engine | null {
     if (mode !== 'film' || !ep || ctx.state !== 'running') return;
     const target = anchorF + (ctx.currentTime + 0.3 - anchorCtx);
     if (target > scheduledTo) {
+      sched.push([scheduledTo, Math.min(target, TOTAL + 2)]);
       scheduleScore(ctx, ep, scheduledTo, Math.min(target, TOTAL + 2), anchorCtx + (scheduledTo - anchorF));
       scheduledTo = target;
     }
@@ -518,22 +522,25 @@ export function createEngine(): Engine | null {
     setQuiet(q: boolean) {
       vol.gain.setTargetAtTime(q ? 0.5 : 1, ctx.currentTime, 0.05);
     },
-    hush() {
+    hush(fade = 0.3) {
       if (mode === 'off') return;
       mode = 'off';
       const now = ctx.currentTime;
       const g = bus.master.gain;
       g.cancelScheduledValues(now);
       g.setValueAtTime(Math.max(0.0001, g.value), now);
-      g.linearRampToValueAtTime(0.0001, now + 0.3);
-      if (ep) ep.kill(ctx, now + 0.3);
+      g.linearRampToValueAtTime(0.0001, now + fade);
+      if (ep) ep.kill(ctx, now + fade);
       ep = null;
-      window.setTimeout(() => {
-        if (mode === 'off' && ctx.state === 'running') void ctx.suspend();
-      }, 380);
+      window.setTimeout(
+        () => {
+          if (mode === 'off' && ctx.state === 'running') void ctx.suspend();
+        },
+        fade * 1000 + 80,
+      );
     },
     info() {
-      return { anchorF, mode };
+      return { anchorF, mode, sched };
     },
     level() {
       analyser.getFloatTimeDomainData(buf);
