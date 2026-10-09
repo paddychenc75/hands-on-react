@@ -431,6 +431,8 @@ export interface Engine {
   sync(f: number, playing: boolean): void;
   /** 淡出并停下（暂停、后台标签页） */
   hush(): void;
+  /** 音量档：小声时整体降到一半 */
+  setQuiet(q: boolean): void;
   /** 当前输出电平（0..1 的 RMS），给测试看 */
   level(): number;
   /** 当前排程的起点（影片时间）和状态，给测试看 */
@@ -450,8 +452,9 @@ export function createEngine(): Engine | null {
   }
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 1024;
-  analyser.connect(ctx.destination);
-  const bus = createBus(ctx, analyser);
+  const vol = ctx.createGain(); // 音量档（正常 1 / 小声 0.5），在总线之后，不碰配乐本身
+  vol.connect(analyser).connect(ctx.destination);
+  const bus = createBus(ctx, vol);
   bus.master.gain.value = 0.0001;
   let ep: Epoch | null = null;
   let anchorCtx = 0; // 影片时间 anchorF 对应的 ctx 时间
@@ -511,6 +514,9 @@ export function createEngine(): Engine | null {
       if (ctx.state === 'suspended') void ctx.resume();
       const predicted = anchorF + (ctx.currentTime - anchorCtx);
       if (mode !== 'film' || Math.abs(predicted - f) > 0.25) newEpoch(f, 'film');
+    },
+    setQuiet(q: boolean) {
+      vol.gain.setTargetAtTime(q ? 0.5 : 1, ctx.currentTime, 0.05);
     },
     hush() {
       if (mode === 'off') return;

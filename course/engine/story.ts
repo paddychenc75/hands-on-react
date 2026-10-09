@@ -13,6 +13,7 @@ import { doneCount } from './counts.ts';
 const DYN = 'story-dyn';
 const PLAYED = 'hoc-story-played';
 const SOUND_PREF = 'hoc-story-sound'; // localStorage：用户开过声音（不是学习进度的键）
+const SOUND_VOL = 'hoc-story-vol'; // localStorage：音量档（quiet / normal）
 const SOUND_TIP = 'hoc-story-tip'; // localStorage：“开启配乐”的提示点过了
 const SCENE_NAMES = [
   '开场',
@@ -320,6 +321,7 @@ export function attach(root: HTMLElement): () => void {
   );
   let engine: Engine | null = null;
   let soundOn = false;
+  let quiet = false;
   let tipTimer = 0;
   const store = (k: string, v: string) => {
     try {
@@ -349,6 +351,7 @@ export function attach(root: HTMLElement): () => void {
         engine = m.createEngine();
       }
       if (!engine) throw new Error('no audio');
+      engine.setQuiet(quiet);
       await engine.ctx.resume();
       if (playing) engine.sync(curF, true);
     } catch {
@@ -546,6 +549,7 @@ export function attach(root: HTMLElement): () => void {
       <button type="button" class="next" aria-label="下一幕">${I.next}</button>
       <button type="button" class="replay" aria-label="重播">${I.replay}</button>
       <button type="button" class="snd" aria-pressed="false" aria-label="声音（配乐）">${I.spk}<span class="snd-t">声音</span></button>
+      <button type="button" class="vol" aria-pressed="false" aria-label="音量：正常。点一下改成小声" hidden>正常</button>
       <a class="skip" href="#scene-9"><span class="sk-long">跳过，</span>开始学习 →</a>`;
     const live = document.createElement('div');
     live.className = 'live-region';
@@ -593,6 +597,24 @@ export function attach(root: HTMLElement): () => void {
     );
     filmBtn?.addEventListener('click', () => play(true), sig);
     const sndBtn = q<HTMLButtonElement>('.snd');
+    const volBtn = q<HTMLButtonElement>('.vol');
+    const paintVol = () => {
+      volBtn.textContent = quiet ? '小声' : '正常';
+      volBtn.setAttribute('aria-pressed', String(quiet));
+      volBtn.setAttribute('aria-label', quiet ? '音量：小声。点一下改成正常' : '音量：正常。点一下改成小声');
+    };
+    quiet = readStore(SOUND_VOL) === 'quiet';
+    paintVol();
+    volBtn.addEventListener(
+      'click',
+      () => {
+        quiet = !quiet;
+        store(SOUND_VOL, quiet ? 'quiet' : 'normal');
+        paintVol();
+        engine?.setQuiet(quiet);
+      },
+      sig,
+    );
     if (!hasAudio) sndBtn.hidden = true;
     sndBtn.addEventListener('click', () => (soundOn ? disableSound() : void enableSound()), sig);
     tip.addEventListener('click', () => void enableSound(), sig);
@@ -676,9 +698,11 @@ export function attach(root: HTMLElement): () => void {
       sound(on: boolean) {
         sndBtn.setAttribute('aria-pressed', String(on));
         sndBtn.classList.toggle('on', on);
+        volBtn.hidden = !on;
       },
       hideSound() {
         sndBtn.hidden = true;
+        volBtn.hidden = true;
         tip.hidden = true;
       },
       showTip(on: boolean) {
