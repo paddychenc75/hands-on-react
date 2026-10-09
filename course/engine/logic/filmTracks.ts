@@ -1,7 +1,7 @@
 /* 首页短片的编排：每个元素一条“轨道”（一串关键帧，时间单位是秒），story.ts 把它们变成暂停的 Web Animations，按影片时间擦洗。
  * 纯函数、不碰 DOM，有单元测试。只动 transform、opacity 和 SVG 描边。
  * 元素用 data-w 标记（见 HomePage.tsx）；轨道名以 "css:" 开头的是 CSS 选择器。 */
-import { FRAMES, MARKS, NODES, SERVER_BLOCKS, STREAM_TARGETS, TOTAL, depthOf, nodeById, subtree } from './filmData.ts';
+import { BOLT_NODES, CUE, ERA_COLORS, FRAMES, MARKS, NODES, STREAM_TARGETS, TOTAL, depthOf, nodeById, subtree } from './filmData.ts';
 
 export interface KF {
   t: number;
@@ -359,19 +359,31 @@ export function buildTracks(mobile = false): Tracks {
     flash('cf-' + id, t, 0.12, 0.8);
   });
 
-  /* ===== 5 Hooks：class → function，state 以挂钩的形状挂在函数卡片上 ===== */
+  /* ===== 5 Hooks：镜头推近到一张卡片，class 翻成 function，钩子带着 useState 挂上去 ===== */
+  k('hc', 0, { opacity: 0, transform: 'scale(.8)' }, EASE.out);
+  k('hc', M[5] + 0.15, { opacity: 0, transform: 'scale(.8)' }, EASE.out);
+  k('hc', M[5] + 0.7, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
+  k('hc', M[6] - 0.5, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
+  k('hc', M[6] - 0.05, { opacity: 0, transform: 'scale(1.06)' });
+  k('hc-in', 0, { transform: 'rotateY(0deg)' }, EASE.inout);
+  k('hc-in', CUE.flip - 0.15, { transform: 'rotateY(0deg)' }, EASE.inout);
+  k('hc-in', CUE.flip + 0.1, { transform: 'rotateY(-12deg)' }, EASE.out); // 翻之前的预备：轻微回缩
+  k('hc-in', CUE.flip + 0.95, { transform: 'rotateY(-180deg)' }, EASE.back);
+  k('hc-in', CUE.flip + 1.1, { transform: 'rotateY(-180deg)' });
+  k('hkb', 0, { opacity: 0, transform: 'translate(140px, -90px) rotate(28deg) scale(.5)' }, EASE.out);
+  k('hkb', CUE.attach - 0.55, { opacity: 0, transform: 'translate(140px, -90px) rotate(28deg) scale(.5)' }, EASE.out);
+  k('hkb', CUE.attach - 0.3, { opacity: 1, transform: 'translate(90px, -50px) rotate(14deg) scale(.8)' }, EASE.back);
+  k('hkb', CUE.attach, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1.1)' }, EASE.out);
+  k('hkb', CUE.attach + 0.22, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1)' });
+  // 镜头推近：别的东西让一让
+  k('cam', M[5] + 0.1, { opacity: 1 }, EASE.inout);
+  k('cam', M[5] + 0.7, { opacity: 0.22 }, EASE.inout);
+  k('cam', M[6] - 0.5, { opacity: 0.22 }, EASE.inout);
+  k('cam', M[6] + 0.2, { opacity: 1 });
   for (const id of ['Header', 'TodoList', 'Item1']) {
-    k('cls-' + id, 0, { opacity: 0 }, EASE.out);
-    k('cls-' + id, M[5] + 0.2, { opacity: 0 }, EASE.out);
-    k('cls-' + id, M[5] + 0.7, { opacity: 1 }, EASE.inout);
-    k('cls-' + id, M[5] + 1.3, { opacity: 1 }, EASE.lin);
-    k('cls-' + id, M[5] + 1.31, { opacity: 0 });
-    k('c-' + id, M[5] + 0.6, { transform: 'scaleX(1)' }, EASE.inout);
-    k('c-' + id, M[5] + 1.3, { transform: 'scaleX(0)' }, EASE.inout);
-    k('c-' + id, M[5] + 1.9, { transform: 'scaleX(1)' });
     k('hk-' + id, 0, { opacity: 0, transform: 'translateX(-50%) translateY(-8px)' }, EASE.back);
-    k('hk-' + id, M[5] + 1.7, { opacity: 0, transform: 'translateX(-50%) translateY(-8px)' }, EASE.back);
-    k('hk-' + id, M[5] + 2.2, { opacity: 1, transform: 'translateX(-50%) translateY(0px)' });
+    k('hk-' + id, M[5] + 2.9, { opacity: 0, transform: 'translateX(-50%) translateY(-8px)' }, EASE.back);
+    k('hk-' + id, M[5] + 3.3, { opacity: 1, transform: 'translateX(-50%) translateY(0px)' });
   }
 
   /* ===== 6 并发：紧急的插队，被打断的丢弃后重来 ===== */
@@ -436,55 +448,73 @@ export function buildTracks(mobile = false): Tracks {
   k('rip2', M[6] + 6.6, { opacity: 0.8, transform: 'scale(.3)' }, EASE.out);
   k('rip2', M[7] + 0.5, { opacity: 0, transform: 'scale(1.7)' });
 
-  /* ===== 7 服务端：块从服务器流到浏览器，带闪电的才带 JavaScript ===== */
-  k('srv', 0, { opacity: 0 }, EASE.inout);
-  k('srv', M[7] + 0.4, { opacity: 0 }, EASE.inout);
-  k('srv', M[7] + 1.0, { opacity: 1 });
-  k('srv', M[8] + 0.1, { opacity: 1 }, EASE.inout);
-  k('srv', M[8] + 0.7, { opacity: 0 });
+  /* ===== 7 服务端：左边一个独立的服务器面板，渲染好的块成串飞向右边的浏览器，落进骨架占位；带闪电的两块落位时通电 ===== */
+  k('srvp', 0, { opacity: 0, transform: 'translateX(-40px)' }, EASE.out);
+  k('srvp', M[7] + 0.2, { opacity: 0, transform: 'translateX(-40px)' }, EASE.out);
+  k('srvp', M[7] + 0.9, { opacity: 1, transform: 'translateX(0px)' }, EASE.inout);
+  k('srvp', M[8] + 0.1, { opacity: 1, transform: 'translateX(0px)' }, EASE.inout);
+  k('srvp', M[8] + 0.7, { opacity: 0, transform: 'translateX(-40px)' });
   const targets = [...STREAM_TARGETS];
-  SERVER_BLOCKS.forEach((_b, i) => {
-    const t = M[7] + 1.3 + i * 1.2;
+  for (let i = 0; i < 3; i++) {
+    const L = CUE.launch(i);
+    const A = CUE.arrive(i);
     const target = targets[i];
-    flash('sbl-' + i, t, 0.5);
-    fade('css:.story .st-base', M[7] + 1.0, M[7] + 1.4, 0, 0.7);
-    k('css:.story .st-base', M[8] + 0.1, { opacity: 0.7 }, EASE.inout);
-    k('css:.story .st-base', M[8] + 0.7, { opacity: 0 });
+    // 面板上的块：先渲染出来（亮起），起飞时闪一下，然后变淡
+    k('sbk-' + i, 0, { opacity: 0, transform: 'scale(.6)' }, EASE.back);
+    k('sbk-' + i, L - 0.6, { opacity: 0, transform: 'scale(.6)' }, EASE.back);
+    k('sbk-' + i, L - 0.15, { opacity: 1, transform: 'scale(1)' }, EASE.out);
+    k('sbk-' + i, L + 0.3, { opacity: 1, transform: 'scale(1.12)' }, EASE.out);
+    k('sbk-' + i, L + 0.7, { opacity: 0.4, transform: 'scale(1)' });
+    k('sbk-' + i, M[8] + 0.1, { opacity: 0.4, transform: 'scale(1)' });
+    // 弧形光路：先淡淡地显出路，光点成串飞过去，带拖尾
+    k('arcb-' + i, 0, { opacity: 0 }, EASE.inout);
+    k('arcb-' + i, L - 0.4, { opacity: 0 }, EASE.inout);
+    k('arcb-' + i, L, { opacity: 0.55 }, EASE.inout);
+    k('arcb-' + i, M[8] + 0.1, { opacity: 0.55 }, EASE.inout);
+    k('arcb-' + i, M[8] + 0.7, { opacity: 0 });
     for (const [n, peak] of [
-      ['stw-', 0.35],
-      ['st-', 1],
+      ['arcw-', 0.4],
+      ['arc-', 1],
     ] as const) {
-      k(n + i, 0, { opacity: 0, strokeDashoffset: '0.45' }, EASE.lin);
-      k(n + i, t + 0.3, { opacity: 0, strokeDashoffset: '0.45' }, EASE.lin);
-      k(n + i, t + 0.36, { opacity: peak, strokeDashoffset: '0.4' }, EASE.lin);
-      k(n + i, t + 1.15, { opacity: peak, strokeDashoffset: '-0.95' }, EASE.lin);
-      k(n + i, t + 1.25, { opacity: 0, strokeDashoffset: '-1.1' }, EASE.lin);
+      k(n + i, 0, { opacity: 0, strokeDashoffset: '0.5' }, EASE.lin);
+      k(n + i, L, { opacity: 0, strokeDashoffset: '0.5' }, EASE.lin);
+      k(n + i, L + 0.06, { opacity: peak, strokeDashoffset: '0.45' }, EASE.lin);
+      k(n + i, A - 0.05, { opacity: peak, strokeDashoffset: '-0.9' }, EASE.lin);
+      k(n + i, A + 0.1, { opacity: 0, strokeDashoffset: '-1.1' }, EASE.lin);
     }
-    // 到达：骨架被“冲刷”成真实内容
+    // 落位：骨架被冲刷成实块
     k('bs-' + target, 0, { opacity: 0 });
     k('bs-' + target, M[7] + 0.5, { opacity: 0 }, EASE.out);
-    k('bs-' + target, M[7] + 1.1, { opacity: 1 }, EASE.inout);
-    k('bs-' + target, t + 1.2, { opacity: 1 }, EASE.out);
-    k('bs-' + target, t + 1.6, { opacity: 0 });
-    flash('bl-' + target, t + 1.2, 0.1, 0.9);
-  });
-  // 带闪电的两块：通电
-  for (const id of ['Item2', 'Box2']) {
-    pop('bz-' + id, M[7] + 5.1, 0.45);
+    k('bs-' + target, M[7] + 1.0, { opacity: 1 }, EASE.inout);
+    k('bs-' + target, A - 0.05, { opacity: 1 }, EASE.out);
+    k('bs-' + target, A + 0.45, { opacity: 0 });
+    flash('bl-' + target, A, 0.12, 0.95);
+    flash('cm-' + target, A, 0.4);
+  }
+  // 带闪电的两块（Item1、Item2）：落位时通电，出现“JS”小标；其余块没有
+  BOLT_NODES.forEach(id => {
+    const i = targets.indexOf(id);
+    const A = CUE.arrive(i);
+    pop('bz-' + id, A + 0.1, 0.45);
     k('bz-' + id, M[8] + 0.1, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
     k('bz-' + id, M[8] + 0.7, { opacity: 0, transform: 'scale(1)' });
-    flash('nl-' + id, M[7] + 5.25, 0.3, 0.9);
-  }
-  k('rip', M[7] + 5.25, { opacity: 0, transform: 'scale(.1)' }, EASE.out);
-  k('rip', M[7] + 5.35, { opacity: 0.9, transform: 'scale(.3)' }, EASE.out);
-  k('rip', M[7] + 6.1, { opacity: 0, transform: 'scale(1.5)' });
+    flash('nl-' + id, A + 0.1, 0.3, 0.95);
+    const r = i === 1 ? 'rip' : 'rip2';
+    k(r, A, { opacity: 0, transform: 'scale(.1)' }, EASE.out);
+    k(r, A + 0.1, { opacity: 0.9, transform: 'scale(.3)' }, EASE.out);
+    k(r, A + 0.9, { opacity: 0, transform: 'scale(1.5)' });
+  });
   // 表单提交是一个 Action：一道光从浏览器回到服务器
-  k('st-act', 0, { opacity: 0, strokeDashoffset: '0.45' }, EASE.lin);
-  k('st-act', M[7] + 5.5, { opacity: 0, strokeDashoffset: '0.45' }, EASE.lin);
-  k('st-act', M[7] + 5.56, { opacity: 1, strokeDashoffset: '0.4' }, EASE.lin);
-  k('st-act', M[7] + 6.4, { opacity: 1, strokeDashoffset: '-0.95' }, EASE.lin);
-  k('st-act', M[7] + 6.5, { opacity: 0, strokeDashoffset: '-1' });
-  callout(k, 'cl-f', M[7] + 1.6, M[8] - 0.2);
+  for (const [n, peak] of [
+    ['arcw-act', 0.4],
+    ['arc-act', 1],
+  ] as const) {
+    k(n, 0, { opacity: 0, strokeDashoffset: '0.5' }, EASE.lin);
+    k(n, CUE.action, { opacity: 0, strokeDashoffset: '0.5' }, EASE.lin);
+    k(n, CUE.action + 0.06, { opacity: peak, strokeDashoffset: '0.45' }, EASE.lin);
+    k(n, CUE.action + 1.0, { opacity: peak, strokeDashoffset: '-0.9' }, EASE.lin);
+    k(n, CUE.action + 1.15, { opacity: 0, strokeDashoffset: '-1.1' }, EASE.lin);
+  }
 
   /* ===== 8 编译器：扫描线扫过组件卡片，没变的子树被挡住 ===== */
   k('scan', 0, { opacity: 0, transform: 'translateX(-30px)' }, EASE.inout);
@@ -514,14 +544,36 @@ export function buildTracks(mobile = false): Tracks {
   }
   callout(k, 'cl-g', T8 + 0.9, M[9] - 0.2);
 
+  /* ===== 每个时代一个主色：背景光晕、年份下的色条 ===== */
+  for (let i = 0; i < ERA_COLORS.length; i++) {
+    const n = 'eg-' + i;
+    k(n, 0, { opacity: i === 0 ? 1 : 0 }, EASE.inout);
+    if (i > 0) {
+      k(n, M[i] + 0.1, { opacity: 0 }, EASE.inout);
+      k(n, M[i] + 1.0, { opacity: 1 }, EASE.inout);
+    }
+    if (i < ERA_COLORS.length - 1) {
+      k(n, M[i + 1] + 0.1, { opacity: 1 }, EASE.inout);
+      k(n, M[i + 1] + 1.0, { opacity: 0 });
+    }
+    if (i >= 2 && i <= 8) {
+      const y = 'yb-' + i;
+      k(y, 0, { opacity: 0, transform: 'scaleX(0)' }, EASE.out);
+      k(y, M[i] + 0.5, { opacity: 0, transform: 'scaleX(0)' }, EASE.out);
+      k(y, M[i] + 1.1, { opacity: 1, transform: 'scaleX(1)' }, EASE.inout);
+      k(y, M[i + 1] + 0.1, { opacity: 1, transform: 'scaleX(1)' }, EASE.inout);
+      k(y, M[i + 1] + 0.5, { opacity: 0, transform: 'scaleX(1)' });
+    }
+  }
+
   /* ===== 年份：大号数字滚动切换 ===== */
   const yrs = ['2013', '2013', '2017', '2019', '2022', '2024', '2025'];
   const scenesOfYear = [2, 3, 4, 5, 6, 7, 8];
   for (let d = 0; d < 4; d++) {
     const val = (y: string) => -Number(y[d]);
-    k('yd-' + d, 0, { transform: `translateY(0em)` }, EASE.inout);
-    k('yd-' + d, M[2] + 0.2, { transform: `translateY(0em)` }, EASE.inout);
-    let prev = '0000';
+    k('yd-' + d, 0, { transform: `translateY(${val('2012')}em)` }, EASE.inout);
+    k('yd-' + d, M[2] + 0.2, { transform: `translateY(${val('2012')}em)` }, EASE.inout);
+    let prev = '2012';
     yrs.forEach((y, i) => {
       const t = M[scenesOfYear[i]] + 0.3;
       if (y[d] !== prev[d]) {
@@ -550,7 +602,7 @@ export function buildTracks(mobile = false): Tracks {
   /* ===== 文字：标题从遮罩里擦入，说明依次升起，钩子在幕尾出现 ===== */
   k('cp-0', 0, { opacity: 1 }, EASE.inout);
   k('cp-0', M[1] - 0.8, { opacity: 1 }, EASE.inout);
-  k('cp-0', M[1] - 0.1, { opacity: 0 });
+  k('cp-0', M[1] - 0.05, { opacity: 0 });
   for (let i = 1; i <= 8; i++) {
     const c = `[data-w=cp-${i}]`;
     k('cp-' + i, 0, { opacity: 0 }, EASE.inout);
@@ -583,14 +635,28 @@ export function buildTracks(mobile = false): Tracks {
     k(name, M[9] + t, { opacity: 0, transform: from }, EASE.out);
     k(name, M[9] + t + d, { opacity: 1, transform: 'translateY(0%)' });
   };
-  s9('.mk-in', 0.6, 0.7, 'translateY(108%)');
-  s9('.s9-head .desc', 1.0, 0.5, 'translateY(10px)');
-  s9('.eras', 1.3, 0.6, 'translateY(16px)');
-  s9('.nums', 1.7, 0.5, 'translateY(12px)');
-  s9('.st-actions', 2.0, 0.5, 'translateY(12px)');
-  s9('.st-links', 2.2, 0.5, 'translateY(10px)');
-  s9('.foot', 2.4, 0.5, 'translateY(8px)');
-
+  s9('.fin-eyebrow', 0.45, 0.5, 'translateY(10px)');
+  s9('.mk-in', 0.55, 0.7, 'translateY(108%)');
+  s9('.fin-head .desc', 0.95, 0.5, 'translateY(10px)');
+  s9('.stats3', 2.0, 0.5, 'translateY(14px)');
+  s9('.fin-actions', 2.3, 0.5, 'translateY(14px)');
+  s9('.foot', 2.9, 0.5, 'translateY(8px)');
+  // 时间轴的曲线先从左到右画出来（桌面）；手机上是竖线从上到下
+  k('tl-draw', 0, { strokeDashoffset: '1' }, EASE.inout);
+  k('tl-draw', M[9] + 0.6, { strokeDashoffset: '1' }, EASE.inout);
+  k('tl-draw', CUE.fin - 0.05, { strokeDashoffset: '0' });
+  k('tl-line', 0, { opacity: 0, transform: 'scaleY(0)' }, EASE.inout);
+  k('tl-line', M[9] + 0.6, { opacity: 0, transform: 'scaleY(0)' }, EASE.inout);
+  k('tl-line', CUE.fin - 0.05, { opacity: 1, transform: 'scaleY(1)' });
+  // 三层空间彻底收掉，换成干净的深色底和时间轴后面一团柔光
+  k('finbg', 0, { opacity: 0 }, EASE.inout);
+  k('finbg', M[9] + 0.4, { opacity: 0 }, EASE.inout);
+  k('finbg', M[9] + 1.4, { opacity: 1 });
+  k('cam', M[9] + 0.9, { opacity: 1 }, EASE.inout);
+  k('cam', M[9] + 1.5, { opacity: 0 });
+  for (const n of ['pl1', 'pl2', 'pl3', 'pl4']) {
+    k(n, M[9] + 1.5, { opacity: 0 }, EASE.inout);
+  }
   return finalize(raw);
 }
 
@@ -623,4 +689,102 @@ export function finalize(raw: Tracks): Tracks {
     out[name] = dedup;
   }
   return out;
+}
+
+/* ===== 幕间的“过渡元素”和收束幕的时间轴卡片：起点终点要在布局稳定后量出来（story.ts 量，传进来），所以单独一个函数 ===== */
+export interface Pt {
+  x: number;
+  y: number;
+}
+export interface Measure {
+  /** 第 1 幕三条手工的线落在 DOM 层的三块（屏幕坐标，相对 .world） */
+  a: [Pt, Pt, Pt];
+  /** 第 2 幕根节点 */
+  aEnd: Pt;
+  /** 第 3 幕被标出差别的那一处（旗标） */
+  bStart: Pt;
+  /** 第 4 幕节拍线上的第一格 */
+  bEnd: Pt;
+  /** 收束：三层空间的中心 */
+  cStart: Pt;
+  /** 收束幕时间轴上 8 张卡片的中心 */
+  li: Pt[];
+}
+
+/** 从 p0 到 p1 的一条向上拱的弧线上取 n+1 个点 */
+export function arcPoints(p0: Pt, p1: Pt, lift = 0.3, n = 8): Pt[] {
+  const dx = p1.x - p0.x;
+  const dy = p1.y - p0.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const c = { x: (p0.x + p1.x) / 2 + (dy / d) * d * lift, y: (p0.y + p1.y) / 2 - (dx / d) * d * lift - d * 0.1 };
+  const out: Pt[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    out.push({ x: (1 - t) ** 2 * p0.x + 2 * (1 - t) * t * c.x + t ** 2 * p1.x, y: (1 - t) ** 2 * p0.y + 2 * (1 - t) * t * c.y + t ** 2 * p1.y });
+  }
+  return out;
+}
+
+export function flyerTracks(m: Measure): Tracks {
+  const raw: Tracks = {};
+  const k = (name: string, t: number, props: Omit<KF, 't'>, easing = EASE.lin) => {
+    if (!raw[name]) raw[name] = [];
+    raw[name].push({ t, easing, ...props });
+  };
+  const tf = (p: Pt, s = 1, r = 0) => `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) rotate(${r}deg) scale(${s})`;
+  /** 沿弧线飞：每个采样点一个关键帧 */
+  const fly = (name: string, from: Pt, to: Pt, t0: number, t1: number, s0: number, s1: number, lift = 0.3, rot = 0) => {
+    const pts = arcPoints(from, to, lift);
+    pts.forEach((p, i) => {
+      const u = i / (pts.length - 1);
+      const e = u < 0.5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2;
+      k(name, t0 + (t1 - t0) * u, { transform: tf(p, s0 + (s1 - s0) * e, rot * e) });
+    });
+  };
+
+  // (a) 第 1 幕：三条手工的线收拢，汇成第 2 幕从根流入的那一道 state
+  m.a.forEach((from, i) => {
+    const name = `fly-a-${i}`;
+    const t0 = MARKS[2] + 0.1 + i * 0.12;
+    const t1 = MARKS[2] + 2.05;
+    k(name, 0, { opacity: 0, transform: tf(from, 0.6) });
+    k(name, t0, { opacity: 0, transform: tf(from, 0.6) });
+    k(name, t0 + 0.2, { opacity: 1, transform: tf(from, 1) });
+    fly(name, from, m.aEnd, t0 + 0.2, t1, 1, 1.15, 0.35 - i * 0.3);
+    k(name, t1, { opacity: 1 });
+    k(name, t1 + 0.25, { opacity: 0, transform: tf(m.aEnd, 0.3) });
+  });
+  // (b) 第 3 幕剩下的那一处差别标记，飞到第 4 幕节拍线上的第一格，变成第一个工作单元
+  const bT0 = MARKS[3] + 4.5;
+  const bT1 = MARKS[4] + 0.95;
+  k('fly-b', 0, { opacity: 0, transform: tf(m.bStart, 1) });
+  k('fly-b', bT0, { opacity: 0, transform: tf(m.bStart, 1) });
+  k('fly-b', bT0 + 0.1, { opacity: 1, transform: tf(m.bStart, 1) });
+  fly('fly-b', m.bStart, m.bEnd, bT0 + 0.1, bT1, 1, 0.55, 0.28, 90);
+  k('fly-b', bT1 + 0.05, { opacity: 1 });
+  k('fly-b', bT1 + 0.3, { opacity: 0, transform: tf(m.bEnd, 0.5, 90) });
+  k('fly-b-ring', 0, { opacity: 0, transform: tf(m.bEnd, 0.3) });
+  k('fly-b-ring', bT1, { opacity: 0, transform: tf(m.bEnd, 0.3) }, EASE.out);
+  k('fly-b-ring', bT1 + 0.1, { opacity: 0.95, transform: tf(m.bEnd, 0.7) }, EASE.out);
+  k('fly-b-ring', bT1 + 0.8, { opacity: 0, transform: tf(m.bEnd, 2.4) });
+  // (c) 收束：三层空间整体缩小、旋转，落成时间轴上的最后一个点；其余各点依次从它“拉”出来
+  const last = m.li[m.li.length - 1];
+  const cT0 = MARKS[9] + 0.15;
+  const cT1 = CUE.fin;
+  k('fly-c', 0, { opacity: 0, transform: tf(m.cStart, 3, 0) });
+  k('fly-c', cT0, { opacity: 0, transform: tf(m.cStart, 3, 0) }, EASE.out);
+  k('fly-c', cT0 + 0.2, { opacity: 1, transform: tf(m.cStart, 3, 0) });
+  fly('fly-c', m.cStart, last, cT0 + 0.2, cT1, 3, 0.5, 0.15, 360);
+  k('fly-c', cT1 + 0.05, { opacity: 1 });
+  k('fly-c', cT1 + 0.35, { opacity: 0, transform: tf(last, 0.4, 360) });
+  m.li.forEach((p, j) => {
+    const name = `css:[data-w="cp-9"] .eras li:nth-child(${j + 1})`;
+    const from = { x: last.x - p.x, y: last.y - p.y };
+    const t = j === m.li.length - 1 ? cT1 - 0.05 : cT1 + 0.1 + (m.li.length - 2 - j) * 0.16;
+    const hid = `translate(${from.x.toFixed(1)}px, ${from.y.toFixed(1)}px) scale(.4)`;
+    k(name, 0, { opacity: 0, transform: hid }, EASE.out);
+    k(name, t, { opacity: 0, transform: hid }, EASE.out);
+    k(name, t + 0.6, { opacity: 1, transform: 'translate(0px, 0px) scale(1)' });
+  });
+  return finalize(raw);
 }

@@ -5,12 +5,15 @@
  * 所以手动滚动、拖进度条、自动播放用的是同一套画面逻辑——自动播放不过是“自己匀速滚动页面”，用户一动手（滚轮、触摸、键盘、拖滚动条）就让出控制权。
  * 另外这里做：播放控制条、幕进度指示、屏幕外的东西不工作（只更新这一刻有变化的轨道）、标签页在后台时暂停。
  * 不改滚动速度，不拦截滚轮/触摸/键盘（全部是被动监听，从不 preventDefault；键盘快捷键只在播放器获得焦点时生效）。 */
-import { DURATIONS, MARKS, TOTAL } from './logic/filmData.ts';
-import { type KF, type Tracks, buildTracks } from './logic/filmTracks.ts';
+import { CUE, DURATIONS, MARKS, STREAM_TARGETS, TOTAL } from './logic/filmData.ts';
+import { type KF, type Measure, type Pt, type Tracks, buildTracks, flyerTracks } from './logic/filmTracks.ts';
+import type { Engine } from './audio.ts';
 import { doneCount } from './counts.ts';
 
 const DYN = 'story-dyn';
 const PLAYED = 'hoc-story-played';
+const SOUND_PREF = 'hoc-story-sound'; // localStorage：用户开过声音（不是学习进度的键）
+const SOUND_TIP = 'hoc-story-tip'; // localStorage：“开启配乐”的提示点过了
 const SCENE_NAMES = [
   '开场',
   'React 之前：手动改 DOM',
@@ -91,6 +94,7 @@ export function attach(root: HTMLElement): () => void {
     tracks = [];
     builtFor = null;
   };
+  let dynTimer = 0;
   let buildToken = 0;
   /** 建全部动画：一共几百条轨道，分批建（每批约 6ms），免得挤成一个长任务；建完才打开画面（root 上出现 .ready） */
   const build = (): Promise<void> => {
@@ -125,6 +129,7 @@ export function attach(root: HTMLElement): () => void {
         if (i < entries.length) setTimeout(slice, 0);
         else {
           builtFor = mobile;
+          staticCount = tracks.length;
           last = -1;
           paint(curF, true);
           resolve();
@@ -132,6 +137,70 @@ export function attach(root: HTMLElement): () => void {
       };
       slice();
     });
+  };
+
+  /* ---------- 过渡元素、弧形光路、时间轴卡片：起点终点要量出来 ---------- */
+  let staticCount = 0;
+  const rectAt = (sel: string, f: number, nth = 0): DOMRect => {
+    paint(f, true);
+    const els = root.querySelectorAll(sel);
+    return (els[Math.min(nth, els.length - 1)] as Element).getBoundingClientRect();
+  };
+  const buildDynamic = () => {
+    if (!tracks.length) return;
+    // 去掉上一次建的
+    for (const t of tracks.splice(staticCount)) for (const a of t.anims) a.cancel();
+    const saved = curF;
+    const w = world.getBoundingClientRect();
+    const center = (sel: string, f: number, nth = 0): Pt => {
+      const r = rectAt(sel, f, nth);
+      return { x: r.left + r.width / 2 - w.left, y: r.top + r.height / 2 - w.top };
+    };
+    const M = MARKS;
+    const m: Measure = {
+      a: ['Header', 'Item1', 'Box2'].map(id => center(`[data-w="b-${id}"]`, M[1] + 3.5)) as Measure['a'],
+      aEnd: center('[data-w="n-App"]', M[2] + 2.95),
+      bStart: center('[data-w="fl-Box2"]', M[3] + 3.0),
+      bEnd: center('[data-w="fk-0"]', M[4] + 1.0),
+      cStart: { x: w.width / 2, y: w.height / 2 },
+      li: Array.from(root.querySelectorAll('[data-w="cp-9"] .eras li .dt'), (_e, j) => center('[data-w="cp-9"] .eras li .dt', TOTAL, j)),
+    };
+    // 弧形光路：从服务器面板上的块，飞到浏览器里三个骨架占位；Action 是从右回到左的反向光
+    const setArc = (names: string[], from: Pt, to: Pt, lift: number) => {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const c = { x: (from.x + to.x) / 2 + (dy / d) * d * lift, y: (from.y + to.y) / 2 - (dx / d) * d * lift - d * 0.12 };
+      const dAttr = `M${from.x.toFixed(1)} ${from.y.toFixed(1)} Q${c.x.toFixed(1)} ${c.y.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+      for (const n of names) for (const el of root.querySelectorAll(`[data-w="${n}"]`)) el.setAttribute('d', dAttr);
+    };
+    STREAM_TARGETS.forEach((id, i) => {
+      const sr = rectAt(`[data-w="sbk-${i}"]`, M[7] + 1.0);
+      const from = { x: sr.right - w.left, y: sr.top + sr.height / 2 - w.top };
+      const to = center(`[data-w="b-${id}"]`, CUE.arrive(i));
+      setArc([`arcb-${i}`, `arcw-${i}`, `arc-${i}`], from, to, 0.28);
+    });
+    const panel = rectAt('[data-w="srvp"]', M[7] + 1.2);
+    setArc(['arcw-act', 'arc-act'], center('[data-w="b-Item2"]', CUE.action), { x: panel.right - w.left, y: panel.bottom - w.top - 24 }, -0.25);
+    const data = flyerTracks(m);
+    for (const [name, kfs] of Object.entries(data)) {
+      const els = name.startsWith('css:')
+        ? [...root.querySelectorAll<HTMLElement>(name.slice(4))]
+        : [...root.querySelectorAll<HTMLElement>(`[data-w="${name}"]`)];
+      const frames: Keyframe[] = kfs.map(({ t, easing, ...props }) => ({
+        offset: Math.min(1, t / TOTAL),
+        easing,
+        ...(props as Record<string, string | number>),
+      }));
+      const anims = els.map(el => {
+        const a = el.animate(frames, { duration: TOTAL * 1000, fill: 'both', easing: 'linear' });
+        a.pause();
+        return a;
+      });
+      tracks.push({ anims, spans: changeSpans(kfs), key: '' });
+    }
+    last = -1;
+    paint(saved, true);
   };
 
   let curF = 0;
@@ -194,6 +263,22 @@ export function attach(root: HTMLElement): () => void {
       onScene(s);
     }
     ui.update(f);
+    counters(f);
+  };
+  /** 收束幕的三个统计数字：进入本幕后从 0 滚动到目标值（影片时间的函数，往回拖也会倒回去）；没有短片模式时直接是最终值 */
+  const counts = [...root.querySelectorAll<HTMLElement>('.stats3 dt[data-count]')];
+  const counted: number[] = [];
+  const counters = (f: number) => {
+    if (!isDyn()) return;
+    const k = clamp((f - (MARKS[9] + 2.0)) / 0.8, 0, 1);
+    const e = 1 - (1 - k) ** 3;
+    counts.forEach((el, i) => {
+      const v = Math.round(Number(el.dataset.count) * e);
+      if (counted[i] !== v) {
+        counted[i] = v;
+        el.textContent = String(v);
+      }
+    });
   };
   const setF = (f: number) => {
     curF = clamp(f, 0, TOTAL);
@@ -229,6 +314,61 @@ export function attach(root: HTMLElement): () => void {
   let prevTs = 0;
   let autoTimer = 0;
   let cleanups: (() => void)[] = [];
+  /* ---------- 声音：默认静音，用户点了才创建 AudioContext 并加载 audio.ts（自己的 chunk） ---------- */
+  const hasAudio = !!(
+    (window as unknown as { AudioContext?: unknown }).AudioContext || (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext
+  );
+  let engine: Engine | null = null;
+  let soundOn = false;
+  let tipTimer = 0;
+  const store = (k: string, v: string) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* 隐私模式：当作没记住 */
+    }
+  };
+  const readStore = (k: string) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  };
+  const enableSound = async () => {
+    if (soundOn || !hasAudio) return;
+    soundOn = true;
+    ui.sound(true);
+    store(SOUND_PREF, 'on');
+    store(SOUND_TIP, '1');
+    ui.showTip(false);
+    try {
+      if (!engine) {
+        const m = await import('./audio.ts');
+        if (!soundOn || ac.signal.aborted) return;
+        engine = m.createEngine();
+      }
+      if (!engine) throw new Error('no audio');
+      await engine.ctx.resume();
+      if (playing) engine.sync(curF, true);
+    } catch {
+      soundOn = false;
+      ui.sound(false);
+      ui.hideSound();
+    }
+  };
+  const disableSound = () => {
+    soundOn = false;
+    ui.sound(false);
+    store(SOUND_PREF, 'off');
+    engine?.hush();
+  };
+  const showTip = () => {
+    if (!hasAudio || soundOn || readStore(SOUND_TIP)) return;
+    ui.showTip(true);
+    window.clearTimeout(tipTimer);
+    tipTimer = window.setTimeout(() => ui.showTip(false), 6000);
+  };
   const ui = createUi();
 
   const loop = (ts: number) => {
@@ -242,13 +382,14 @@ export function attach(root: HTMLElement): () => void {
     scrollTo(scrollOfTime(nf, mY));
     paint(nf);
     status(nf);
+    if (soundOn && engine) engine.sync(nf, true);
     if (nf >= TOTAL) {
       finish();
       return;
     }
     tick = requestAnimationFrame(loop);
   };
-  function play() {
+  function play(gesture = false) {
     if (!isDyn() || playing) return;
     if (curF >= TOTAL - 0.05) curF = 0;
     playing = true;
@@ -261,6 +402,9 @@ export function attach(root: HTMLElement): () => void {
     root.classList.add('playing');
     prevTs = performance.now();
     ui.state(true);
+    if (gesture && !soundOn && readStore(SOUND_PREF) === 'on') void enableSound();
+    else if (!soundOn) showTip();
+    if (soundOn && engine) engine.sync(curF, true);
     tick = requestAnimationFrame(loop);
   }
   function pause(_why: string) {
@@ -271,12 +415,14 @@ export function attach(root: HTMLElement): () => void {
     if (tick) cancelAnimationFrame(tick);
     tick = 0;
     ui.state(false);
+    engine?.hush();
   }
   function finish() {
     playing = false;
     root.classList.remove('playing');
     root.classList.add('ended');
     ui.state(false, true);
+    window.setTimeout(() => engine?.hush(), 1500);
   }
   /** 跳到某个影片时间（用户点上一幕、下一幕、进度条）：短暂地滑过去，然后保持原来的播放状态 */
   const seek = (f: number, smooth = true) => {
@@ -339,7 +485,11 @@ export function attach(root: HTMLElement): () => void {
     'resize',
     () => {
       fitWorld();
-      if (builtFor !== null && builtFor !== narrowMQ.matches) void build();
+      if (builtFor !== null && builtFor !== narrowMQ.matches) void build().then(buildDynamic);
+      else {
+        window.clearTimeout(dynTimer);
+        dynTimer = window.setTimeout(buildDynamic, 250);
+      }
       schedule();
     },
     { passive: true, ...sig },
@@ -384,6 +534,7 @@ export function attach(root: HTMLElement): () => void {
       prev: icon('M6 6h2v12H6zM9.5 12 18 6v12z'),
       next: icon('M16 6h2v12h-2zM6 18V6l8.5 6z'),
       replay: icon('M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z'),
+      spk: icon('M3 9v6h4l5 4V5L7 9zM16 8.5a5 5 0 0 1 0 7l-1.4-1.4a3 3 0 0 0 0-4.2zM18.8 5.7a9 9 0 0 1 0 12.6l-1.4-1.4a7 7 0 0 0 0-9.8z'),
     };
     bar.innerHTML = `
       <button type="button" class="play" aria-pressed="false" aria-label="播放短片">${I.play}</button>
@@ -394,6 +545,7 @@ export function attach(root: HTMLElement): () => void {
       </div>
       <button type="button" class="next" aria-label="下一幕">${I.next}</button>
       <button type="button" class="replay" aria-label="重播">${I.replay}</button>
+      <button type="button" class="snd" aria-pressed="false" aria-label="声音（配乐）">${I.spk}<span class="snd-t">声音</span></button>
       <a class="skip" href="#scene-9"><span class="sk-long">跳过，</span>开始学习 →</a>`;
     const live = document.createElement('div');
     live.className = 'live-region';
@@ -401,11 +553,16 @@ export function attach(root: HTMLElement): () => void {
     const q = <T extends HTMLElement>(s: string) => bar.querySelector(s) as T;
     const playBtn = q<HTMLButtonElement>('.play');
     const scrub = q<HTMLElement>('.scrub');
-    const tip = q<HTMLElement>('.tip');
+    const scrubTip = q<HTMLElement>('.tip');
     const segs = [...bar.querySelectorAll<HTMLElement>('.seg i')];
     let resume = false;
-    let lastFill: number[] = [];
-    slot?.append(bar, live);
+    const lastFill: number[] = [];
+    const tip = document.createElement('button');
+    tip.type = 'button';
+    tip.className = 'snd-tip';
+    tip.hidden = true;
+    tip.textContent = '🔊 开启配乐';
+    slot?.append(bar, tip, live);
 
     const setBtn = (isPlaying: boolean, ended = false) => {
       playBtn.setAttribute('aria-pressed', String(isPlaying));
@@ -413,7 +570,7 @@ export function attach(root: HTMLElement): () => void {
       playBtn.setAttribute('aria-label', isPlaying ? '暂停短片' : ended ? '重播短片' : resume ? '继续播放短片' : '播放短片');
       if (filmBtn) filmBtn.hidden = !isDyn() || isPlaying;
     };
-    playBtn.addEventListener('click', () => (playing ? pause('button') : play()), sig);
+    playBtn.addEventListener('click', () => (playing ? pause('button') : play(true)), sig);
     q('.prev').addEventListener('click', () => toScene(Math.max(0, curF - MARKS[activeScene] > 1.2 ? activeScene : activeScene - 1)), sig);
     q('.next').addEventListener('click', () => toScene(activeScene + 1), sig);
     q('.replay').addEventListener(
@@ -421,7 +578,7 @@ export function attach(root: HTMLElement): () => void {
       () => {
         root.classList.remove('ended');
         seek(0, false);
-        play();
+        play(true);
       },
       sig,
     );
@@ -434,7 +591,11 @@ export function attach(root: HTMLElement): () => void {
       },
       sig,
     );
-    filmBtn?.addEventListener('click', () => play(), sig);
+    filmBtn?.addEventListener('click', () => play(true), sig);
+    const sndBtn = q<HTMLButtonElement>('.snd');
+    if (!hasAudio) sndBtn.hidden = true;
+    sndBtn.addEventListener('click', () => (soundOn ? disableSound() : void enableSound()), sig);
+    tip.addEventListener('click', () => void enableSound(), sig);
     // 进度条：点击、拖动都是 scrub，同时暂停自动播放
     const frac = (e: PointerEvent) => {
       const r = scrub.getBoundingClientRect();
@@ -458,9 +619,9 @@ export function attach(root: HTMLElement): () => void {
       e => {
         const f = frac(e) * TOTAL;
         const r = scrub.getBoundingClientRect();
-        tip.textContent = SCENE_NAMES[sceneOf(f)];
-        tip.style.opacity = '1';
-        tip.style.transform = `translateX(${clamp(e.clientX - r.left - 40, 0, Math.max(0, r.width - 160))}px)`;
+        scrubTip.textContent = SCENE_NAMES[sceneOf(f)];
+        scrubTip.style.opacity = '1';
+        scrubTip.style.transform = `translateX(${clamp(e.clientX - r.left - 40, 0, Math.max(0, r.width - 160))}px)`;
         if (dragging) {
           scrollTo(scrollOfTime(f, maxY()));
           setF(f);
@@ -475,16 +636,16 @@ export function attach(root: HTMLElement): () => void {
       },
       sig,
     );
-    scrub.addEventListener('pointerleave', () => (tip.style.opacity = '0'), sig);
+    scrub.addEventListener('pointerleave', () => (scrubTip.style.opacity = '0'), sig);
     scrub.addEventListener(
       'focus',
       () => {
-        tip.textContent = SCENE_NAMES[activeScene];
-        tip.style.opacity = '1';
+        scrubTip.textContent = SCENE_NAMES[activeScene];
+        scrubTip.style.opacity = '1';
       },
       sig,
     );
-    scrub.addEventListener('blur', () => (tip.style.opacity = '0'), sig);
+    scrub.addEventListener('blur', () => (scrubTip.style.opacity = '0'), sig);
     // 键盘：只在播放器获得焦点时。空格播放/暂停（按钮自己会处理空格），左右方向键切幕
     bar.addEventListener(
       'keydown',
@@ -512,6 +673,17 @@ export function attach(root: HTMLElement): () => void {
     );
     return {
       state: setBtn,
+      sound(on: boolean) {
+        sndBtn.setAttribute('aria-pressed', String(on));
+        sndBtn.classList.toggle('on', on);
+      },
+      hideSound() {
+        sndBtn.hidden = true;
+        tip.hidden = true;
+      },
+      showTip(on: boolean) {
+        tip.hidden = !on || !hasAudio;
+      },
       needResume() {
         resume = true;
         setBtn(false);
@@ -582,7 +754,10 @@ export function attach(root: HTMLElement): () => void {
   };
   if (isDyn()) {
     ui.show(true);
-    build().then(start);
+    build().then(() => {
+      buildDynamic();
+      start();
+    });
   } else {
     ui.show(false);
     start();
@@ -601,9 +776,26 @@ export function attach(root: HTMLElement): () => void {
     lastY = scrollY;
     setF(curF);
   }
+  // 测试钩子：只有测试页面设了 window.__storyTest 才会有。读音频状态、离线渲染整段配乐做检查
+  if ((window as unknown as { __storyTest?: boolean }).__storyTest) {
+    (window as unknown as { __storyHook?: unknown }).__storyHook = {
+      audio: () => ({ on: soundOn, created: !!engine, state: engine?.ctx.state ?? null, level: engine?.level() ?? 0, playing, info: engine?.info() ?? null }),
+      render: async () => {
+        const [a, an] = await Promise.all([import('./audio.ts'), import('./logic/scoreAnalysis.ts')]);
+        const r = await a.renderOffline();
+        return an.analyzeAndEncode(r.left, r.right, r.sampleRate);
+      },
+    };
+  }
+
   return () => {
     ac.abort();
     window.clearTimeout(autoTimer);
+    window.clearTimeout(dynTimer);
+    window.clearTimeout(tipTimer);
+    engine?.dispose();
+    engine = null;
+    delete (window as unknown as { __storyHook?: unknown }).__storyHook;
     if (tick) cancelAnimationFrame(tick);
     if (raf) cancelAnimationFrame(raf);
     playing = false;

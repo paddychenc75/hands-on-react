@@ -61,15 +61,10 @@ export const BLOCK_SIZE: Record<string, [number, number]> = {
   Box1: [220, 70],
   Box2: [220, 70],
 };
-/** 服务器一侧的三块（第 7 幕）：[x, y, 宽, 高] */
-export const SERVER_BLOCKS: [number, number, number, number][] = [
-  [140, -150, 220, 70],
-  [500, -150, 220, 70],
-  [760, -150, 220, 70],
-];
 /** 流到 DOM 层哪三块（节点 id） */
 export const STREAM_TARGETS = ['Header', 'Item1', 'Item2'] as const;
-export const BOLT_NODES = ['Item2', 'Box2'] as const;
+/** 带闪电（需要 JavaScript）的两块：Item1、Item2 这两块 */
+export const BOLT_NODES = ['Item1', 'Item2'] as const;
 
 /** 收束幕的时间轴：年份、一个词、课 id */
 export const STATIONS: { year: string; name: string; lessons: string[] }[] = [
@@ -96,3 +91,68 @@ export const YEARS: { year: string; tag: string }[] = [
   { year: '', tag: '' },
 ];
 export const FRAMES = 28;
+
+/** 每个时代一个主色：背景光晕、年份下的色条、年份说明里体现。0 开场、9 收束用站点强调色 */
+export const ERA_COLORS = ['#5cc6e4', '#f0aa4f', '#5cc6e4', '#b3a1f2', '#55c98e', '#ff8fb8', '#6fa8ff', '#3fd0c0', '#ffd36b', '#5cc6e4'];
+
+/** 音效和画面共用的关键时间点（秒）：filmTracks.ts 的关键帧和 audio.ts 的音效都从这里取，保证对得上 */
+const M = MARKS;
+export const STALL_HITS = [0, 1, 3, 4, 7, 8, 12, 13];
+export const CUE = {
+  /** 第 1 幕：漏改的那一块红色闪烁（峰值） */
+  miss: M[1] + 4.25,
+  /** 第 2 幕：光沿树逐层点亮，每层一个音（深度 0..3） */
+  lightStart: M[2] + 2.9,
+  lightGap: 0.62,
+  /** 第 3 幕：光束落到 DOM 层 */
+  land: M[3] + 3.45,
+  /** 第 4 幕：旧方式掉帧，节拍卡住；新方式切片后规整的十六分音符开始 */
+  stallStart: M[4] + 1.0,
+  smooth: M[4] + 4.0,
+  /** 第 5 幕：卡片翻转、钩子挂上去 */
+  flip: M[5] + 1.0,
+  attach: M[5] + 2.35,
+  /** 第 6 幕：紧急更新插队；被打断的从头重来 */
+  urgent: M[6] + 2.7,
+  redo: M[6] + 4.5,
+  /** 第 7 幕：三串光点依次从服务器飞向浏览器（起飞）、落位；Action 反向光 */
+  launch: (i: number) => M[7] + 1.2 + i * 1.15,
+  arrive: (i: number) => M[7] + 2.2 + i * 1.15,
+  action: M[7] + 5.2,
+  /** 第 8 幕：编译器扫描线 */
+  scan: M[8] + 0.7,
+  /** 年份数字滚动：从第 2 幕起，每个年份变化的幕 */
+  tick: (i: number) => M[i] + 0.3,
+  /** 换幕：前一幕文字退场的时间 */
+  whoosh: (i: number) => M[i] - 0.05,
+  /** 收束：三层空间缩成一个点落到时间轴上 */
+  fin: M[9] + 1.5,
+};
+
+/** 音效的时间点和它对应的画面轨道（轨道名见 filmTracks.ts）：单元测试检查每个时间点 ±50ms 内轨道上有关键帧，e2e 检查离线渲染的配乐在这些点上有能量突起 */
+export interface CueRef {
+  name: string;
+  t: number;
+  track: string;
+  /** 这个音效比较轻（whoosh 一类），能量突起的门槛放低 */
+  soft?: boolean;
+}
+export function cueList(): CueRef[] {
+  const out: CueRef[] = [{ name: 'miss', t: CUE.miss, track: 'bx-Box2' }];
+  for (const n of subtree('App')) out.push({ name: 'light-' + n, t: CUE.lightStart + depthOf(n) * CUE.lightGap, track: 'nl-' + n });
+  out.push({ name: 'land', t: CUE.land, track: 'cm-Item2' });
+  for (const i of STALL_HITS) out.push({ name: 'stall-' + i, t: CUE.stallStart + i * 0.1, track: 'fx-' + i });
+  out.push(
+    { name: 'flip', t: CUE.flip + 0.1, track: 'hc-in' },
+    { name: 'attach', t: CUE.attach, track: 'hkb' },
+    { name: 'urgent', t: CUE.urgent, track: 'ur-Search' },
+  );
+  for (let i = 0; i < 3; i++) {
+    out.push({ name: 'launch-' + i, t: CUE.launch(i), track: 'arc-' + i }, { name: 'arrive-' + i, t: CUE.arrive(i), track: 'bl-' + STREAM_TARGETS[i] });
+  }
+  out.push({ name: 'action', t: CUE.action, track: 'arc-act' }, { name: 'scan', t: CUE.scan, track: 'scan' });
+  for (const i of [2, 4, 5, 6, 7, 8]) out.push({ name: 'tick-' + i, t: CUE.tick(i), track: 'yd-3', soft: true });
+  for (let i = 1; i <= 9; i++) out.push({ name: 'whoosh-' + i, t: CUE.whoosh(i), track: 'cp-' + (i - 1), soft: true });
+  out.push({ name: 'fin', t: CUE.fin, track: 'fly-c' });
+  return out;
+}

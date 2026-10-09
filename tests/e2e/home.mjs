@@ -19,13 +19,12 @@ const { LESSONS } = await import(pathToFileURL(path.join(ROOT, 'course/registry.
 const { TOTAL, MARKS } = await import(pathToFileURL(path.join(ROOT, 'course/engine/logic/filmData.ts')).href);
 const errs = [];
 const CHUNK = /\/static\/js\/async\/lesson-([\w-]+)\.[0-9a-f]+\.js/;
-const SEEN = 'hoc-story-played';
 
 /** 打开首页。seen：把“本会话已播过”记下，免得自动播放；speed：测试倍速 */
-async function open({ w = 1280, h = 800, reduced = false, seed, js = true, seen = true, speed = 1, hash = '', cpu = 1, perf = false } = {}) {
+async function open({ w = 1280, h = 800, scheme = 'light', reduced = false, seed, js = true, seen = true, speed = 1, hash = '', cpu = 1, perf = false } = {}) {
   const ctx = await browser.newContext({
     viewport: { width: w, height: h },
-    colorScheme: 'light',
+    colorScheme: scheme,
     reducedMotion: reduced ? 'reduce' : 'no-preference',
     javaScriptEnabled: js,
   });
@@ -47,6 +46,17 @@ async function open({ w = 1280, h = 800, reduced = false, seed, js = true, seen 
         }
         if (sn) sessionStorage.setItem('hoc-story-played', '1');
         if (sp !== 1) window.__storySpeed = sp;
+        window.__storyTest = true;
+        window.__ctxs = [];
+        if (window.AudioContext) {
+          const AC = window.AudioContext;
+          window.AudioContext = class extends AC {
+            constructor(...a) {
+              super(...a);
+              window.__ctxs.push(this);
+            }
+          };
+        }
         window.__prevented = [];
         const add = EventTarget.prototype.addEventListener;
         EventTarget.prototype.addEventListener = function (t, f, o) {
@@ -182,14 +192,26 @@ const look = (p, sel) =>
 
 /* 3. 自动播放：首次进入约 1.2 秒后开始，整片 45–60 秒（真实速度），停在收束幕；播放期间开场按钮可点；帧间隔和长任务 */
 const perfRuns = [];
-for (const cpu of process.env.BROWSER ? [1] : [1, 4]) {
+// 开着声音自动播放，和不开声音对比：调度不能拖慢画面
+for (const [cpu, withSound] of process.env.BROWSER
+  ? [[1, false]]
+  : [
+      [1, false],
+      [4, false],
+      [1, true],
+      [4, true],
+    ]) {
   const p = await open({ seen: false, perf: true, cpu });
   const t0 = Date.now();
   await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
   const startAfter = Date.now() - t0;
-  if (cpu === 1) ok(startAfter >= 600 && startAfter <= 2300, `首次进入：约 1.2 秒后自动开始（实测 ${startAfter} ms）`);
+  if (cpu === 1 && !withSound) ok(startAfter >= 600 && startAfter <= 2300, `首次进入：约 1.2 秒后自动开始（实测 ${startAfter} ms）`);
+  if (withSound) {
+    await p.click('.snd');
+    await p.waitForTimeout(500);
+  }
   // 播放期间：开场按钮可点（点“查看课程地图”之外的链接不要离开页面：只检查它在最上层、可点击）
-  if (cpu === 1) {
+  if (cpu === 1 && !withSound) {
     const hit = await p.evaluate(() => {
       const a = document.querySelector('.s0 .st-actions a');
       const r = a.getBoundingClientRect();
@@ -217,6 +239,7 @@ for (const cpu of process.env.BROWSER ? [1] : [1, 4]) {
   const q = x => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * x))];
   perfRuns.push({
     cpu,
+    sound: withSound,
     seconds: +dur.toFixed(1),
     cls: +m.cls.toFixed(4),
     long: m.long,
@@ -229,12 +252,17 @@ for (const cpu of process.env.BROWSER ? [1] : [1, 4]) {
   });
   const end = await state(p);
   const maxY = await p.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-  if (cpu === 1) {
+  if (withSound)
+    ok(
+      (await p.evaluate(() => window.__storyHook.audio())).state === 'running',
+      `开着声音自动播放全程（${cpu === 1 ? '桌面' : '4 倍降速'}）：AudioContext 在运行`,
+    );
+  if (cpu === 1 && !withSound) {
     ok(dur >= 45 && dur <= 60, `整片真实速度放完用时 ${dur.toFixed(1)} 秒，在 45–60 秒内`, String(dur));
     ok(end.ended && !end.playing && end.active === 9 && Math.abs(end.y - maxY) < 3, '播放完：停在收束幕（页面底部），不循环', JSON.stringify(end));
     await p.waitForTimeout(1500);
     ok((await state(p)).y === end.y, '播放完：不循环，停住不动');
-    const ring = await p.evaluate(() => getComputedStyle(document.querySelector('.s9 .btn.primary'), '::after').animationName);
+    const ring = await p.evaluate(() => getComputedStyle(document.querySelector('.s9 .fin-actions .btn.big'), '::after').animationName);
     ok(ring !== 'none', '播放完：收束幕的主按钮有视觉强调（光环）', ring);
   }
   await p.ctx.close();
@@ -253,7 +281,7 @@ ok(
 ok(
   perfRuns.every(r => r.p95 <= 21),
   '自动播放帧间隔 p95 ≤ 20ms 左右（桌面、4 倍降速）',
-  JSON.stringify(perfRuns.map(r => [r.cpu, r.p50, r.p95, r.worst])),
+  JSON.stringify(perfRuns.map(r => [r.cpu, r.sound, r.p50, r.p95, r.worst])),
 );
 
 /* 4. 用户接管：滚轮、触摸、键盘、拖滚动条立刻暂停，不抢滚动，不 preventDefault */
@@ -268,9 +296,9 @@ for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) 
   else if (how === 'key-space') await p.keyboard.press('Space');
   else if (how === 'key-pagedown') await p.keyboard.press('PageDown');
   else await p.evaluate(y => window.scrollTo({ top: y, behavior: 'instant' }), before.y + 900); // 拖滚动条：滚动位置被别人改了
-  await p.waitForTimeout(150);
+  await p.waitForTimeout(how.startsWith('key') ? 900 : 150); // 键盘翻页是浏览器自己的平滑滚动，让它先走完
   const a = await state(p);
-  await p.waitForTimeout(1500);
+  await p.waitForTimeout(900);
   const b = await state(p);
   ok(!a.playing && !b.playing, `用户接管（${how}）：立刻暂停`, JSON.stringify([a, b]));
   // WebKit 自己的平滑滚动动画在暂停之后还会继续一小段（那是浏览器在响应用户的输入，不是自动播放），所以放宽
@@ -443,11 +471,21 @@ for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) 
         '有进度和到期卡片：“继续学习：下一课”和“今日复习 1 题”',
         JSON.stringify(r),
       );
-      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .st-actions a')].map(a => a.textContent.trim()));
-      ok(/^继续学习：/.test(last[0]), '有进度：收束幕的主按钮也是“继续学习”', JSON.stringify(last));
+      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
+      ok(
+        /^继续学习：/.test(last[0]) && last[1] === '查看课程地图' && /^今日复习 1 题/.test(last[2]),
+        '有进度和到期复习：收束幕是“继续学习：下一课”、“查看课程地图”、“今日复习 1 题”',
+        JSON.stringify(last),
+      );
     } else {
       const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => a.textContent.trim()));
       ok(r.length === 1 && /从第 1 课开始/.test(r[0]), `${name}：没有进度时开场只有“从第 1 课开始”，没有“今日复习”`, JSON.stringify(r));
+      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
+      ok(
+        last.length === 2 && /^开始学习/.test(last[0]) && last[1] === '查看课程地图',
+        `${name}：没有进度时收束幕是“开始学习”和“查看课程地图”，没有复习入口`,
+        JSON.stringify(last),
+      );
     }
     if (name === '同一会话已经播放过') {
       await p.click('.btn.film');
@@ -627,6 +665,296 @@ for (const [w, h] of [
   await p.ctx.close();
 }
 
+/* 10b. 收束幕的版式：八个节点、链接、年份、统计数字、减少动画下的静态版式 */
+{
+  const eras = [
+    ['之前', '手动改 DOM', 'what-is-react'],
+    ['2013', '声明式', 'state'],
+    ['2013', '协调', 'rendering'],
+    ['2017', 'Fiber', 'scheduler'],
+    ['2019', 'Hooks', 'custom-hooks'],
+    ['2022', '并发', 'concurrent'],
+    ['2024', '服务端', 'server-components'],
+    ['2025', '编译器', 'performance'],
+  ];
+  const playN = LESSONS.reduce((n, l) => n + l.nPlays, 0);
+  const exN = LESSONS.filter(l => l.hasExercise).length;
+  const quizN = LESSONS.reduce((n, l) => n + l.quizAnswers.length, 0);
+  for (const reduced of [false, true]) {
+    const p = await open({ seen: true, reduced });
+    if (!reduced) {
+      await atF(p, TOTAL);
+      await p.waitForTimeout(600);
+    }
+    const r = await p.evaluate(() => ({
+      items: [...document.querySelectorAll('.s9 .eras li')].map(li => ({
+        yr: li.querySelector('.yr').textContent,
+        name: li.querySelector('b').textContent,
+        href: li.querySelector('.era-main').getAttribute('href'),
+        label: li.querySelector('.era-main').getAttribute('aria-label'),
+        more: [...li.querySelectorAll('.era-more')].map(a => a.getAttribute('href')),
+        op: +getComputedStyle(li).opacity,
+        vis: li.querySelector('.era-main').checkVisibility({ checkOpacity: true }),
+      })),
+      counts: [...document.querySelectorAll('.s9 .stats3 dt')].map(d => +d.textContent),
+      ol: document.querySelector('.s9 ol.eras')?.tagName,
+      curve: !!document.querySelector('.s9 .tl-curve[aria-hidden="true"]'),
+      draw: +getComputedStyle(document.querySelector('.s9 .tl-draw')).strokeDashoffset.replace('px', ''),
+      sw: document.documentElement.scrollWidth <= innerWidth,
+    }));
+    const tag = reduced ? '减少动画' : '短片模式（拖到结尾）';
+    ok(
+      r.ol === 'OL' &&
+        r.items.length === 8 &&
+        r.items.every((it, i) => it.yr === eras[i][0] && it.name === eras[i][1] && it.href.endsWith('/lessons/' + eras[i][2])),
+      `收束幕（${tag}）：八个时代按顺序，年份、名称、课链接正确，用有序列表`,
+      JSON.stringify(r.items.map(i => [i.yr, i.name, i.href])),
+    );
+    ok(
+      r.items.every(it => /^(之前|\d{4}) .+：.+/.test(it.label)) && r.items[6].more.length === 1 && r.items[6].more[0].endsWith('/lessons/react-19'),
+      `收束幕（${tag}）：每个节点的可访问名称含年份、时代名和课名；服务端多一条 react-19`,
+      JSON.stringify(r.items.map(i => i.label)),
+    );
+    ok(
+      r.items.every(it => it.op === 1 && it.vis) && r.curve && r.sw,
+      `收束幕（${tag}）：八个节点都可见、曲线装饰对读屏隐藏、无横向滚动`,
+      JSON.stringify(r.items.map(i => i.op)),
+    );
+    ok(
+      JSON.stringify(r.counts) === JSON.stringify([playN, exN, quizN]),
+      `收束幕（${tag}）：三个统计数字和目录计算一致（${playN} / ${exN} / ${quizN}）`,
+      JSON.stringify(r.counts),
+    );
+    // 键盘 Tab 顺序：先是时代节点（从左到右），再是行动区
+    if (!reduced) {
+      await p.evaluate(() => document.querySelector('.s9 .era-main').focus());
+      const order = [];
+      for (let i = 0; i < 12; i++) {
+        order.push(await p.evaluate(() => document.activeElement?.getAttribute('href') || document.activeElement?.className));
+        await p.keyboard.press('Tab');
+      }
+      const lessonsSeq = order.filter(h => /\/lessons\//.test(h)).map(h => h.split('/lessons/')[1].replace('.html', ''));
+      ok(
+        lessonsSeq.slice(0, 9).join() ===
+          ['what-is-react', 'state', 'rendering', 'scheduler', 'custom-hooks', 'concurrent', 'server-components', 'react-19', 'performance'].join(),
+        '收束幕：Tab 顺序是时代节点从左到右（服务端的两条课挨在一起），然后才是行动区',
+        order.join(' | '),
+      );
+      // 悬停一个节点：它的一句话要点出现
+      await p.hover('.s9 .era:nth-child(4) .era-main');
+      await p.waitForTimeout(400);
+      const tip = await p.evaluate(() => +getComputedStyle(document.querySelector('.s9 .era:nth-child(4) .tip')).opacity);
+      ok(tip > 0.9, '收束幕：悬停一个节点，显示这一代的一句话要点', String(tip));
+    }
+    await p.ctx.close();
+  }
+  // 手机：纵向时间轴，无横向滚动，主按钮不被进度指示或控制条遮挡
+  for (const [w, h] of [
+    [390, 844],
+    [360, 640],
+  ]) {
+    const p = await open({ w, h });
+    await atF(p, TOTAL);
+    await p.waitForTimeout(700);
+    const r = await p.evaluate(() => {
+      const b = document.querySelector('.s9 .fin-actions .btn.big').getBoundingClientRect();
+      const pl = document.querySelector('.player').getBoundingClientRect();
+      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      const rail = document.querySelector('.rail').getBoundingClientRect();
+      return {
+        sw: document.documentElement.scrollWidth,
+        iw: innerWidth,
+        hit: !!top?.closest('.fin-actions'),
+        above: b.bottom <= pl.top + 1,
+        clearRail: b.right <= rail.left + 1 || b.bottom < rail.top || b.top > rail.bottom,
+      };
+    });
+    ok(r.sw <= r.iw && r.hit && r.above && r.clearRail, `${w}×${h}：收束幕无横向滚动，主按钮可点、在控制条之上、不被进度指示遮挡`, JSON.stringify(r));
+    await p.ctx.close();
+  }
+}
+
+/* 10c. 幕进度指示：所有圆点的圆心在一条线上（桌面竖线、手机同理），间距均匀，点击区域不小于 24×24；第一幕、中间一幕、最后一幕为当前时各量一次 */
+for (const [w, h] of [
+  [1280, 800],
+  [390, 844],
+]) {
+  const p = await open({ w, h });
+  for (const [label, f] of [
+    ['第一幕为当前', 1],
+    ['中间一幕为当前', MARKS[5] + 1],
+    ['最后一幕为当前', TOTAL],
+  ]) {
+    await atF(p, f);
+    await p.waitForTimeout(500);
+    await p.hover('.story .sc-copy', { force: true }).catch(() => {});
+    const r = await p.evaluate(() => {
+      const dots = [...document.querySelectorAll('.rail a')].map(a => ({ d: a.querySelector('.dot').getBoundingClientRect(), a: a.getBoundingClientRect() }));
+      const cx = dots.map(x => x.d.left + x.d.width / 2);
+      const cy = dots.map(x => x.d.top + x.d.height / 2);
+      const spread = v => Math.max(...v) - Math.min(...v);
+      const vertical = spread(cy) > spread(cx);
+      const main = vertical ? cy : cx;
+      const gaps = main.slice(1).map((v, i) => v - main[i]);
+      return {
+        n: dots.length,
+        crossSpread: vertical ? spread(cx) : spread(cy),
+        vertical,
+        gapSpread: spread(gaps),
+        minHit: Math.min(...dots.map(x => Math.min(x.a.width, x.a.height))),
+        cur: document.querySelector('.rail a[aria-current]')?.dataset.scene,
+      };
+    });
+    ok(
+      r.n === 10 && r.crossSpread <= 0.5 && r.gapSpread <= 0.5 && r.minHit >= 24,
+      `${w}×${h} 幕进度指示（${label}）：圆心在同一条${r.vertical ? '竖' : '横'}线上（偏差 ${r.crossSpread.toFixed(2)}px ≤ 0.5）、间距均匀（${r.gapSpread.toFixed(2)}px）、点击区域 ≥ 24px`,
+      JSON.stringify(r),
+    );
+  }
+  // 悬停、聚焦：也不动
+  await p.focus('.rail a[data-scene="3"]');
+  await p.hover('.rail a[data-scene="7"]');
+  await p.waitForTimeout(400);
+  const hv = await p.evaluate(() => {
+    const cx = [...document.querySelectorAll('.rail .dot')].map(d => d.getBoundingClientRect().left + d.getBoundingClientRect().width / 2);
+    const cy = [...document.querySelectorAll('.rail .dot')].map(d => d.getBoundingClientRect().top + d.getBoundingClientRect().height / 2);
+    const sp = v => Math.max(...v) - Math.min(...v);
+    return Math.min(sp(cx), sp(cy)) > 1 ? Math.max(Math.min(sp(cx), sp(cy)), 0) : Math.min(sp(cx), sp(cy));
+  });
+  ok(hv <= 0.5, `${w}×${h} 幕进度指示：悬停、聚焦时圆点也不动`, String(hv));
+  await p.ctx.close();
+}
+
+/* 10d. 配乐：默认静音、点开才创建 AudioContext 和加载音频 chunk；与影片同步；暂停静音；关掉、离开页面都清理；偏好记在单独的键里 */
+{
+  const dir = path.join(ROOT, 'doc_build/static/js/async');
+  const audioChunk = fs.readdirSync(dir).find(f => !/^lesson-/.test(f) && fs.readFileSync(path.join(dir, f), 'utf8').includes('createDynamicsCompressor'));
+  ok(!!audioChunk, '音频代码在自己的 chunk 里', String(audioChunk));
+  const p = await open({ seen: false });
+  await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
+  const hook = () => p.evaluate(() => window.__storyHook.audio());
+  const a0 = await p.evaluate(() => ({ ctxs: window.__ctxs.length, hook: window.__storyHook.audio() }));
+  ok(
+    a0.ctxs === 0 && !a0.hook.created && !p.reqs.some(u => u.includes(audioChunk)),
+    '默认静音：没有创建 AudioContext，也没有加载音频 chunk',
+    JSON.stringify(a0),
+  );
+  ok((await p.getAttribute('.snd', 'aria-pressed')) === 'false', '声音开关：aria-pressed=false');
+  ok(await p.locator('.snd-tip').isVisible(), '首次自动播放开始时，控制条上方出现“🔊 开启配乐”提示');
+  await p.waitForTimeout(6600);
+  ok(!(await p.locator('.snd-tip').isVisible()), '提示约 6 秒后消失');
+  await p.click('.snd');
+  await p.waitForTimeout(1800);
+  const a1 = await hook();
+  ok(
+    a1.on &&
+      a1.created &&
+      a1.state === 'running' &&
+      a1.level > 0.003 &&
+      (await p.getAttribute('.snd', 'aria-pressed')) === 'true' &&
+      p.reqs.some(u => u.includes(audioChunk)),
+    '点开声音：上下文 running、有电平、此时才加载音频 chunk',
+    JSON.stringify(a1),
+  );
+  const lsv = await p.evaluate(() => [
+    localStorage.getItem('hoc-story-sound'),
+    localStorage.getItem('hoc-story-tip'),
+    localStorage.getItem('hands-on-react-v1'),
+  ]);
+  ok(lsv[0] === 'on' && lsv[1] === '1' && !/story/.test(lsv[2] || ''), '偏好记在单独的 localStorage 键里，不写进学习进度的键', JSON.stringify(lsv));
+  // 音乐从当前影片时间开始（不是从头），换幕后重新排程
+  const f0 = a1.info.anchorF;
+  ok(f0 > 4, '音乐从当前的影片时间淡入（不是从头）', String(f0));
+  await p.click('.player .next');
+  await p.waitForTimeout(1500);
+  const a2 = await hook();
+  ok(a2.info.anchorF >= f0 + 2 && a2.playing, '拖到别的幕后，调度位置随之改变', JSON.stringify([f0, a2.info.anchorF]));
+  // 暂停：0.5 秒内静音，随后 suspend
+  await p.click('.player .play');
+  await p.waitForTimeout(550);
+  const a3 = await hook();
+  await p.waitForTimeout(500);
+  const a4 = await hook();
+  ok(a3.level < 0.0008 && a4.state === 'suspended', '暂停：0.5 秒内输出静音，随后 AudioContext 被 suspend', JSON.stringify([a3.level, a4.state]));
+  await p.click('.player .play');
+  await p.waitForTimeout(1800);
+  const a5 = await hook();
+  ok(a5.state === 'running' && a5.level > 0.003, '继续播放：声音淡入回来', JSON.stringify(a5));
+  // 关掉声音
+  await p.click('.snd');
+  await p.waitForTimeout(900);
+  const a6 = await hook();
+  ok(
+    !a6.on && a6.state === 'suspended' && (await p.getAttribute('.snd', 'aria-pressed')) === 'false',
+    '关掉声音：上下文被 suspend，aria-pressed=false',
+    JSON.stringify(a6),
+  );
+  // 重新打开，然后离开首页（客户端路由）：上下文全部关闭
+  await p.click('.snd');
+  await p.waitForTimeout(1200);
+  await p.evaluate(() => (window.__nr = 1));
+  await p.click('.rp-nav a[href*="glossary"], .rp-nav-menu a[href*="glossary"]').catch(() => p.goto(site + 'glossary.html'));
+  await p.waitForTimeout(1500);
+  const gone = await p.evaluate(() => ({ states: window.__ctxs?.map(c => c.state) ?? ['reloaded'], hook: !!window.__storyHook }));
+  ok(!gone.hook && gone.states.every(s => s === 'closed' || s === 'reloaded'), '离开首页：停止全部声源、关闭 AudioContext、清掉测试钩子', JSON.stringify(gone));
+  await p.ctx.close();
+  // 开过声音的偏好：下次点“▶ 播放短片”直接带声音
+  const q = await open({ seen: true });
+  await q.evaluate(() => localStorage.setItem('hoc-story-sound', 'on'));
+  await q.click('.btn.film');
+  await q.waitForTimeout(2200);
+  const b1 = await q.evaluate(() => window.__storyHook.audio());
+  ok(b1.on && b1.state === 'running' && b1.level > 0.003, '偏好开过声音：点“▶ 播放短片”直接带声音', JSON.stringify(b1));
+  await q.ctx.close();
+  // 没有偏好时点播放仍然静音，并给出提示
+  const r2 = await open({ seen: true });
+  await r2.click('.btn.film');
+  await r2.waitForTimeout(1200);
+  const b2 = await r2.evaluate(() => ({ h: window.__storyHook.audio(), tip: !document.querySelector('.snd-tip').hidden, ctxs: window.__ctxs.length }));
+  ok(!b2.h.on && b2.ctxs === 0 && b2.tip, '没有偏好：点播放仍然静音，并显示“开启配乐”提示', JSON.stringify(b2));
+  await r2.ctx.close();
+}
+
+/* 10e. 离线渲染整段配乐并检查（可测量的部分；好不好听要人来判断） */
+{
+  const p = await open({ seen: true });
+  const r = await p.evaluate(() => window.__storyHook.render());
+  const st = r.stats;
+  const outDir = process.env.SCORE_DIR;
+  if (outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, 'score.wav'), Buffer.from(r.wav, 'base64'));
+    fs.writeFileSync(path.join(outDir, 'stats.json'), JSON.stringify(st, null, 1));
+  }
+  console.log('配乐检查：' + JSON.stringify({ ...st, cues: undefined, perScene: undefined }));
+  console.log('每幕 RMS/峰值(dBFS)：' + st.perScene.map(x => `${x.scene}:${x.rmsDb}/${x.peakDb}`).join(' '));
+  ok(st.nan === 0 && st.clipped === 0, '配乐：没有 NaN，没有削波（≥0.999 的采样数为 0）', JSON.stringify([st.nan, st.clipped]));
+  ok(
+    st.peakDb <= -3 && st.rmsDb > -26 && st.rmsDb < -14,
+    `配乐：峰值 ${st.peakDb} dBFS ≤ -3，整体 RMS ${st.rmsDb} dBFS 适中`,
+    JSON.stringify([st.peakDb, st.rmsDb]),
+  );
+  ok(
+    st.perScene.every(x => x.peakDb <= -3 && x.rmsDb > -32),
+    '配乐：每一幕的峰值都 ≤ -3 dBFS、响度不低于 -32 dBFS',
+    JSON.stringify(st.perScene),
+  );
+  ok(st.longestQuiet <= 1.5, `配乐：没有超过 1.5 秒的意外静音（最长 ${st.longestQuiet} 秒）`, String(st.longestQuiet));
+  ok(st.stereoDiff > 0.02, `配乐：左右声道不同（立体声差异 ${st.stereoDiff}）`, String(st.stereoDiff));
+  ok(
+    st.bands['2k-5k'] + st.bands.gt5k < 0.2,
+    `配乐：频谱不集中在刺耳的 2–5 kHz（占比 ${(st.bands['2k-5k'] * 100).toFixed(1)}%，5 kHz 以上 ${(st.bands.gt5k * 100).toFixed(1)}%）`,
+    JSON.stringify(st.bands),
+  );
+  const bad = st.cues.filter(c => !c.ok);
+  ok(
+    bad.length === 0,
+    `配乐：每个音效在对应的画面时间点 ±50ms 内都有能量突起（${st.cues.length - bad.length}/${st.cues.length}）`,
+    bad.map(c => `${c.name}@${c.t.toFixed(2)}×${c.ratio}`).join(' '),
+  );
+  await p.ctx.close();
+}
+
 /* 11. 体积：首页自己的 chunk 和主包 */
 {
   const dir = path.join(ROOT, 'doc_build/static/js/async');
@@ -667,6 +995,27 @@ if (process.env.HOME_SHOTS) {
       await p.screenshot({ path: path.join(out, `home-story-${name}-${i}.png`) });
     }
     await p.ctx.close();
+  }
+  // 收束幕：自动播放（倍速）放完之后的静止画面，各种屏幕尺寸、深浅两种主题
+  for (const [w, h] of [
+    [1280, 800],
+    [1440, 900],
+    [1920, 1080],
+    [390, 844],
+    [360, 640],
+  ]) {
+    for (const scheme of ['dark', 'light']) {
+      const p = await open({ w, h, scheme, seen: false, speed: 10 });
+      await p.waitForFunction(() => document.querySelector('.story').classList.contains('ended'), null, { timeout: 30000 });
+      await p.waitForTimeout(1800);
+      await p.screenshot({ path: path.join(out, `home-story-final-${w}x${h}-${scheme}.png`) });
+      if (w === 1280 && scheme === 'dark') {
+        await p.hover('.s9 .era:nth-child(4) .era-main');
+        await p.waitForTimeout(500);
+        await p.screenshot({ path: path.join(out, 'home-story-final-hover.png') });
+      }
+      await p.ctx.close();
+    }
   }
   const p = await open({ reduced: true });
   await p.screenshot({ path: path.join(out, 'home-story-reduced-full.png'), fullPage: true });

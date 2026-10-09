@@ -1,21 +1,7 @@
 import { Link } from '@rspress/core/theme';
 import { useEffect, useRef } from 'react';
 import { attachStory, doneCount, dueCount, isDone } from '../../course/engine/index.ts';
-import {
-  BLOCK_SIZE,
-  DURATIONS,
-  FRAMES,
-  H,
-  MARKS,
-  NODES,
-  SECONDS_PER_SCREEN,
-  SERVER_BLOCKS,
-  STATIONS,
-  STREAM_TARGETS,
-  TOTAL,
-  W,
-  YEARS,
-} from '../../course/engine/logic/filmData.ts';
+import { BLOCK_SIZE, DURATIONS, ERA_COLORS, FRAMES, H, NODES, SECONDS_PER_SCREEN, STATIONS, TOTAL, W, YEARS } from '../../course/engine/logic/filmData.ts';
 import { LESSONS, lessonById } from '../../course/registry.ts';
 import { useProgress } from '../lib/useProgress';
 
@@ -101,6 +87,22 @@ const SCENES: { id: string; eyebrow: [string, string]; title: string; text: stri
   },
 ];
 
+/** 收束幕的时间轴：8 个节点在一条平缓上升的曲线上（x、y 是 1000×200 视窗里的坐标），曲线用 Catmull-Rom 过这 8 个点 */
+const XS = STATIONS.map((_s, i) => (i + 0.5) * 125);
+const YS = [120, 91, 110, 81, 100, 71, 90, 61];
+const CURVE = (() => {
+  const pts = [{ x: 0, y: 128 }, ...XS.map((x, i) => ({ x, y: YS[i] })), { x: 1000, y: 52 }];
+  let d = `M${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    d += ` C${(p1.x + (p2.x - p0.x) / 6).toFixed(1)} ${(p1.y + (p2.y - p0.y) / 6).toFixed(1)} ${(p2.x - (p3.x - p1.x) / 6).toFixed(1)} ${(p2.y - (p3.y - p1.y) / 6).toFixed(1)} ${p2.x} ${p2.y}`;
+  }
+  return d;
+})();
+
 export default function HomePage() {
   const mounted = useProgress();
   const root = useRef<HTMLDivElement>(null);
@@ -152,6 +154,11 @@ export default function HomePage() {
 
       {/* 三层空间：你的组件 / React 的树 / DOM 与屏幕。没有 JS 时它是一张静态的结论帧 */}
       <div className="world" aria-hidden="true">
+        <div className="eraglow">
+          {ERA_COLORS.map((c, i) => (
+            <i key={i} data-w={'eg-' + i} style={{ '--c': c } as React.CSSProperties} />
+          ))}
+        </div>
         <div className="w3d">
           <div className="cam" data-w="cam">
             <div className="u" style={{ width: px(W), height: px(H) }}>
@@ -188,32 +195,7 @@ export default function HomePage() {
                     </g>
                   ))}
                   <path className="ml-x" data-w="ml-x" d="M846 420 L894 470 M894 420 L846 470" />
-                  {SERVER_BLOCKS.map(([x, y, w, h], i) => {
-                    const t = NODES.find(n => n.id === STREAM_TARGETS[i]) as (typeof NODES)[number];
-                    const cx = t.x;
-                    const ty = t.y - BLOCK_SIZE[t.id][1] / 2 + 8;
-                    const sy = y + h;
-                    const d = `M${x + w / 2} ${sy} C${x + w / 2} ${sy + 90} ${cx} ${ty - 110} ${cx} ${ty}`;
-                    return (
-                      <g key={i}>
-                        <path className="st-base" d={d} />
-                        <path className="stw" data-w={'stw-' + i} d={d} pathLength={1} />
-                        <path className="st" data-w={'st-' + i} d={d} pathLength={1} />
-                      </g>
-                    );
-                  })}
-                  <path className="st act" data-w="st-act" d="M930 446 C 990 300 990 40 940 -80" pathLength={1} />
                 </svg>
-                <div className="srv" data-w="srv">
-                  <i className="plbl" style={at(-230, 100)}>
-                    服务器
-                  </i>
-                  {SERVER_BLOCKS.map(([x, y, w, h], i) => (
-                    <div key={i} className="sb" data-w={'sb-' + i} style={at(x, y, w, h)}>
-                      <i className="sbl" data-w={'sbl-' + i} />
-                    </div>
-                  ))}
-                </div>
                 <i className="beam orb-beam" data-w="bm-orb" />
               </div>
               {/* 第 2 层：React 的树（全片的主角）和正在构建的新树 */}
@@ -309,7 +291,62 @@ export default function HomePage() {
           </div>
         </div>
         {/* 画面角落：年份、帧节拍线、图例 */}
+        <div className="finbg" data-w="finbg" aria-hidden="true" />
         <div className="hud">
+          <div className="srvpanel" data-w="srvp">
+            <b className="srvt">服务器</b>
+            <div className="rack">
+              {[0, 1, 2].map(i => (
+                <span className="sbk" data-w={'sbk-' + i} key={i}>
+                  <u />
+                  <u />
+                </span>
+              ))}
+            </div>
+            <i className="led" />
+          </div>
+          <svg className="arcs" aria-hidden="true">
+            {[0, 1, 2].map(i => (
+              <g key={i}>
+                <path className="arcb" data-w={'arcb-' + i} pathLength={1} />
+                <path className="arcw" data-w={'arcw-' + i} pathLength={1} />
+                <path className="arc" data-w={'arc-' + i} pathLength={1} />
+              </g>
+            ))}
+            <path className="arcw act" data-w="arcw-act" pathLength={1} />
+            <path className="arc act" data-w="arc-act" pathLength={1} />
+          </svg>
+          <div className="hc" data-w="hc">
+            <div className="hc-in" data-w="hc-in">
+              <div className="hc-f hc-front">
+                <small>以前：class</small>
+                <code>class Counter extends Component</code>
+              </div>
+              <div className="hc-f hc-back">
+                <small>现在：function</small>
+                <code>function Counter()</code>
+              </div>
+            </div>
+            <u className="hkb" data-w="hkb">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <path d="M9 3v9a4 4 0 1 0 4 4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                <circle cx="9" cy="3.5" r="1.8" fill="currentColor" />
+              </svg>
+              useState
+            </u>
+          </div>
+          <i className="fly fa" data-w="fly-a-0" />
+          <i className="fly fa" data-w="fly-a-1" />
+          <i className="fly fa" data-w="fly-a-2" />
+          <i className="fly fb" data-w="fly-b">
+            ≠
+          </i>
+          <i className="fly fb-ring" data-w="fly-b-ring" />
+          <svg className="fly fc" data-w="fly-c" viewBox="-30 -30 60 60" aria-hidden="true">
+            <rect x="-22" y="6" width="44" height="14" rx="3" className="l3" />
+            <rect x="-22" y="-7" width="44" height="14" rx="3" className="l2" />
+            <rect x="-22" y="-20" width="44" height="14" rx="3" className="l1" />
+          </svg>
           <div className="year" data-w="year">
             <div className="digits">
               {[0, 1, 2, 3].map(d => (
@@ -320,6 +357,11 @@ export default function HomePage() {
                     ))}
                   </span>
                 </span>
+              ))}
+            </div>
+            <div className="ybars" aria-hidden="true">
+              {[2, 3, 4, 5, 6, 7, 8].map(i => (
+                <i key={i} data-w={'yb-' + i} style={{ background: ERA_COLORS[i] }} />
               ))}
             </div>
             <div className="ytags">
@@ -426,44 +468,94 @@ export default function HomePage() {
         </section>
       ))}
 
-      {/* 9 收束 */}
+      {/* 9 收束：发光的时间轴是视觉主体，上标题、下行动 */}
       <section className="sc s9" id="scene-9" style={{ '--d': DURATIONS[9] } as React.CSSProperties} aria-labelledby="h-9">
         <div className="sc-copy" data-w="cp-9">
-          <div className="s9-head">
-            <h2 id="h-9">
-              <span className="mk">
-                <span className="mk-in">{T('每一代，都在解决上一代留下的问题')}</span>
-              </span>
-            </h2>
-            <p className="desc">这门课按同样的顺序讲：先预测，再运行，再自己写。</p>
-          </div>
-          <ol className="eras">
-            {STATIONS.map(s => (
-              <li key={s.name + s.year}>
-                <span className="yr">{s.year}</span>
-                <b>{s.name}</b>
-                {s.lessons.map(id => (
-                  <Link key={id} href={'/lessons/' + id}>
-                    {short(id)}
-                  </Link>
+          <div className="fin">
+            <header className="fin-head">
+              <p className="fin-eyebrow">2013 → 2025</p>
+              <h2 id="h-9">
+                <span className="mk">
+                  <span className="mk-in">
+                    <span className="ph">每一代，</span>
+                    <span className="ph">
+                      都在解决<em>上一代留下的问题</em>
+                    </span>
+                  </span>
+                </span>
+              </h2>
+              <p className="desc">这门课按同样的顺序讲：先预测，再运行，再自己写。</p>
+            </header>
+            <div className="tl">
+              <svg className="tl-curve" viewBox="0 0 1000 200" preserveAspectRatio="none" aria-hidden="true">
+                <path className="tl-base" d={CURVE} />
+                <path className="tl-draw" data-w="tl-draw" d={CURVE} pathLength={1} />
+                <path className="tl-flow" d={CURVE} pathLength={1} />
+              </svg>
+              <i className="tl-line" data-w="tl-line" aria-hidden="true" />
+              <ol className="eras">
+                {STATIONS.map((st, i) => {
+                  const lessons = st.lessons;
+                  return (
+                    <li
+                      key={st.name + st.year}
+                      className={'era ' + (i % 2 ? 'up' : 'down')}
+                      style={{ '--c': ERA_COLORS[i + 1], '--x': `${XS[i] / 10}%`, '--y': `${(YS[i] / 200) * 100}%` } as React.CSSProperties}
+                    >
+                      <span className="dt" aria-hidden="true" />
+                      <div className="era-box">
+                        <Link className="era-main" href={'/lessons/' + lessons[0]} aria-label={`${st.year} ${st.name}：${short(lessons[0])}`}>
+                          <span className="yr">{st.year}</span>
+                          <b>{st.name}</b>
+                          <span className="ln">{short(lessons[0])}</span>
+                          <span className="tip" aria-hidden="true">
+                            {SCENES[i].title}
+                          </span>
+                        </Link>
+                        {lessons.slice(1).map(id => (
+                          <Link key={id} className="era-more" href={'/lessons/' + id}>
+                            {short(id)}
+                          </Link>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+            <div className="fin-act">
+              <dl className="stats3">
+                {[
+                  [playCount, '个先预测再运行的示例'],
+                  [exCount, '道自动判分练习'],
+                  [quizCount, '道测验题进入间隔复习'],
+                ].map(([n, label]) => (
+                  <div key={label as string}>
+                    <dt data-count={n}>{n}</dt>
+                    <dd>{label}</dd>
+                  </div>
                 ))}
-              </li>
-            ))}
-          </ol>
-          <ul className="nums">
-            <li>{playCount} 个先预测再运行的示例</li>
-            <li>{exCount} 道自动判分练习</li>
-            <li>{quizCount} 道测验题进入间隔复习</li>
-          </ul>
-          <Actions big />
-          <p className="st-links">
-            <Link href="/roadmap">查看课程地图</Link>
-          </p>
-          <p className="foot">
-            代码 <a href="https://github.com/paddychenc75/hands-on-react/blob/main/LICENSE">MIT</a> · 课文{' '}
-            <a href="https://github.com/paddychenc75/hands-on-react/blob/main/LICENSE-CONTENT">CC BY-NC-SA 4.0</a> ·{' '}
-            <a href="https://github.com/paddychenc75/hands-on-react">GitHub</a>
-          </p>
+              </dl>
+              <div className="fin-actions">
+                <Link className="btn primary big" href={'/lessons/' + next.id}>
+                  {done ? '继续学习：' + short(next.id) : '开始学习'} →
+                </Link>
+                <Link className="btn ghost" href="/roadmap">
+                  查看课程地图
+                </Link>
+                {due ? (
+                  <Link className="btn sun" href="/review">
+                    今日复习 {due} 题
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+            <p className="foot">
+              代码 <a href="https://github.com/paddychenc75/hands-on-react/blob/main/LICENSE">MIT</a> · 课文{' '}
+              <a href="https://github.com/paddychenc75/hands-on-react/blob/main/LICENSE-CONTENT">CC BY-NC-SA 4.0</a> ·{' '}
+              <a href="https://github.com/paddychenc75/hands-on-react">GitHub</a>
+            </p>
+          </div>
         </div>
       </section>
     </div>
