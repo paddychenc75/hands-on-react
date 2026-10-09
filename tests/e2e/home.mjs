@@ -989,7 +989,7 @@ for (const [w, h] of PHONES) {
     await atF(p, STOP[i]);
     await p.waitForTimeout(450);
     const r = await p.evaluate(
-      ([i, land]) => {
+      ([i]) => {
         const c = document.querySelector(`[data-w="cp-${i}"]`);
         const b = c.getBoundingClientRect();
         const pl = document.querySelector('.player').getBoundingClientRect();
@@ -1037,7 +1037,7 @@ for (const [w, h] of PHONES) {
         c.scrollTop = 0;
         return out;
       },
-      [i, land],
+      [i],
     );
     const inner = i === 9 ? 0 : 1;
     const overP = !land && i !== 9 && r.b > r.pt + 1;

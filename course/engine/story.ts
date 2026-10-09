@@ -40,7 +40,7 @@ export const sceneOf = (f: number): number => {
   return i;
 };
 /** 每一幕的“结论帧”：这一幕的文字和画面都到位、下一幕的转场还没开始（秒）。收束幕是片尾 */
-export const STOP: number[] = MARKS.map((m, i) => (i === MARKS.length - 1 ? TOTAL : MARKS[i + 1] - (i === 0 ? 1.0 : 0.85)));
+export const STOP: number[] = MARKS.map((_m, i) => (i === MARKS.length - 1 ? TOTAL : MARKS[i + 1] - (i === 0 ? 1.0 : 0.85)));
 /** 每一幕的“起始帧”：从这里往下播就是这一幕的动画（文字已出现，上一幕的东西已退场） */
 export const START: number[] = MARKS.map((m, i) => (i === 0 ? 0 : m + 0.6));
 /** 影片时间 → 它属于哪一幕的“停靠区间”：结论帧之前的最后一幕（f 在第 k-1 幕结论帧之后、第 k 幕结论帧之前，就算第 k 幕） */
@@ -478,13 +478,6 @@ export function attach(root: HTMLElement): () => void {
       });
     }, FADE_MS);
   }
-  /** 往后切一幕：先到当前幕的结论帧（立刻），再从这里播放到下一幕的结论帧 */
-  const run = (to: number) => {
-    const first = playing;
-    if (first) cancelMotion();
-    if (to >= TOTAL - 0.01) root.classList.remove('ended');
-    startMotion('run', to);
-  };
   function step(dir: 1 | -1) {
     if (!isDyn()) return;
     const cur = sceneAt(curF);
