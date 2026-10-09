@@ -446,7 +446,8 @@ export default function HomePage() {
             </button>
           </p>
           <p className="scroll-hint" aria-hidden="true">
-            向下滚动
+            <span className="sh-mouse">向下滚动，一次一幕</span>
+            <span className="sh-touch">向上滑动，一次一幕</span>
           </p>
         </div>
       </section>

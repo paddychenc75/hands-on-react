@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DURATIONS, MARKS, NODES, SECONDS_PER_SCREEN, TOTAL, depthOf, subtree } from '../../course/engine/logic/filmData.ts';
 import { buildTracks } from '../../course/engine/logic/filmTracks.ts';
-import { changeSpans, sceneOf, scrollOfTime, timeOfScroll } from '../../course/engine/story.ts';
+import { START, STOP, changeSpans, sceneAt, sceneOf } from '../../course/engine/story.ts';
 
 describe('首页短片的时间轴', () => {
   it('整片 45–60 秒，幕的起点是时长的累加', () => {
@@ -18,11 +18,25 @@ describe('首页短片的时间轴', () => {
     expect(TOTAL / SECONDS_PER_SCREEN).toBeGreaterThan(8.5);
     expect(TOTAL / SECONDS_PER_SCREEN).toBeLessThan(10.5);
   });
-  it('滚动位置和影片时间互为反函数，两端夹住', () => {
-    for (const f of [0, 3.3, 20, 41.7, TOTAL]) expect(timeOfScroll(scrollOfTime(f, 5000), 5000)).toBeCloseTo(f, 9);
-    expect(timeOfScroll(-10, 5000)).toBe(0);
-    expect(timeOfScroll(9999, 5000)).toBe(TOTAL);
-    expect(timeOfScroll(10, 0)).toBe(0);
+  it('每一幕的结论帧在下一幕转场开始之前、起始帧在本幕文字出现之后，递增', () => {
+    for (let i = 0; i < 10; i++) {
+      expect(START[i]).toBeLessThan(STOP[i]);
+      if (i > 0) expect(STOP[i]).toBeGreaterThan(STOP[i - 1]);
+      if (i < 9) expect(STOP[i]).toBeLessThan(MARKS[i + 1] - 0.5);
+      if (i > 0) expect(START[i]).toBeGreaterThan(MARKS[i] + 0.55);
+      expect(sceneOf(START[i])).toBe(i);
+      expect(sceneOf(STOP[i])).toBe(i);
+    }
+    expect(STOP[9]).toBe(TOTAL);
+    // 相邻两幕之间播放的时间 = 后一幕的时长，所以一次切换约 4.5–7 秒
+    for (let i = 1; i < 10; i++) expect(STOP[i] - STOP[i - 1]).toBeGreaterThan(DURATIONS[i] - 0.5);
+  });
+  it('sceneAt：f 属于“结论帧还没到的第一幕”', () => {
+    expect(sceneAt(0)).toBe(0);
+    expect(sceneAt(STOP[0])).toBe(0);
+    expect(sceneAt(STOP[0] + 0.1)).toBe(1);
+    expect(sceneAt(STOP[4] - 1)).toBe(4);
+    expect(sceneAt(TOTAL)).toBe(9);
   });
   it('sceneOf：按幕的起点分幕', () => {
     expect(sceneOf(0)).toBe(0);

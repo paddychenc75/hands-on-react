@@ -17,6 +17,7 @@ const browser = await launch();
 const DAY = 864e5;
 const { LESSONS } = await import(pathToFileURL(path.join(ROOT, 'course/registry.ts')).href);
 const { TOTAL, MARKS } = await import(pathToFileURL(path.join(ROOT, 'course/engine/logic/filmData.ts')).href);
+const { STOP } = await import(pathToFileURL(path.join(ROOT, 'course/engine/story.ts')).href);
 const errs = [];
 const CHUNK = /\/static\/js\/async\/lesson-([\w-]+)\.[0-9a-f]+\.js/;
 
@@ -44,7 +45,7 @@ async function open({ w = 1280, h = 800, scheme = 'light', reduced = false, seed
           localStorage.setItem(k, JSON.stringify(s));
           sessionStorage.setItem('seeded', '1');
         }
-        if (sn) sessionStorage.setItem('hoc-story-played', '1');
+        if (sn) window.__storyNoAuto = true;
         if (sp !== 1) window.__storySpeed = sp;
         window.__storyTest = true;
         window.__ctxs = [];
@@ -100,21 +101,18 @@ const titles = [
   '记忆化交给编译器',
   '每一代，都在解决上一代留下的问题',
 ];
-const y2f = p => p.evaluate(t => (scrollY / Math.max(1, document.documentElement.scrollHeight - innerHeight)) * t, TOTAL);
-/** 滚到影片时间 f 秒（手动滚动） */
-const atF = (p, f) =>
-  p.evaluate(
-    ([f, t]) => {
-      const max = document.documentElement.scrollHeight - innerHeight;
-      window.scrollTo({ top: (f / t) * max, behavior: 'instant' });
-    },
-    [f, TOTAL],
-  );
+/** 放到影片时间 f 秒（测试取景：直接把画面放到那一帧，不播放） */
+const atF = (p, f) => p.evaluate(f => window.__storyHook.at(f), f);
 const settle = p => p.waitForTimeout(250);
+const nav = p => p.evaluate(() => window.__storyHook.nav());
+/** 等切换结束（先让刚发出的输入被处理，再等模式回到 idle） */
+const waitIdle = async (p, t = 30000) => {
+  await p.waitForTimeout(150);
+  await p.waitForFunction(() => window.__storyHook.nav().mode === 'idle', null, { timeout: t });
+};
 const state = p =>
   p.evaluate(() => ({
     playing: document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true',
-    y: scrollY,
     active: +document.querySelector('.story').dataset.active,
     ended: document.querySelector('.story').classList.contains('ended'),
     now: document.querySelector('.scrub')?.getAttribute('aria-valuenow'),
@@ -251,7 +249,6 @@ for (const [cpu, withSound] of process.env.BROWSER
     frames: sorted.length,
   });
   const end = await state(p);
-  const maxY = await p.evaluate(() => document.documentElement.scrollHeight - innerHeight);
   if (withSound)
     ok(
       (await p.evaluate(() => window.__storyHook.audio())).state === 'running',
@@ -259,9 +256,9 @@ for (const [cpu, withSound] of process.env.BROWSER
     );
   if (cpu === 1 && !withSound) {
     ok(dur >= 45 && dur <= 60, `整片真实速度放完用时 ${dur.toFixed(1)} 秒，在 45–60 秒内`, String(dur));
-    ok(end.ended && !end.playing && end.active === 9 && Math.abs(end.y - maxY) < 3, '播放完：停在收束幕（页面底部），不循环', JSON.stringify(end));
+    ok(end.ended && !end.playing && end.active === 9, '播放完：停在收束幕的结论帧，不循环', JSON.stringify(end));
     await p.waitForTimeout(1500);
-    ok((await state(p)).y === end.y, '播放完：不循环，停住不动');
+    ok(Math.abs((await nav(p)).f - TOTAL) < 0.01, '播放完：不循环，停住不动');
     const ring = await p.evaluate(() => getComputedStyle(document.querySelector('.s9 .fin-actions .btn.big'), '::after').animationName);
     ok(ring !== 'none', '播放完：收束幕的主按钮有视觉强调（光环）', ring);
   }
@@ -287,47 +284,241 @@ ok(
   JSON.stringify(perfRuns.map(r => [r.cpu, r.sound, r.p50, r.p95, r.worst])),
 );
 
-/* 4. 用户接管：滚轮、触摸、键盘、拖滚动条立刻暂停，不抢滚动，不 preventDefault */
-for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) {
-  const p = await open({ seen: false });
-  await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
-  await p.waitForTimeout(2500);
-  const before = await state(p);
-  await p.mouse.move(500, 400);
-  if (how === 'wheel') await p.mouse.wheel(0, 240);
-  else if (how === 'touch') await p.evaluate(() => window.dispatchEvent(new Event('touchstart', { bubbles: true, cancelable: true })));
-  else if (how === 'key-space') await p.keyboard.press('Space');
-  else if (how === 'key-pagedown') await p.keyboard.press('PageDown');
-  else await p.evaluate(y => window.scrollTo({ top: y, behavior: 'instant' }), before.y + 900); // 拖滚动条：滚动位置被别人改了
-  await p.waitForTimeout(how.startsWith('key') ? 900 : 150); // 键盘翻页是浏览器自己的平滑滚动，让它先走完
-  const a = await state(p);
-  await p.waitForTimeout(900);
-  const b = await state(p);
-  ok(!a.playing && !b.playing, `用户接管（${how}）：立刻暂停`, JSON.stringify([a, b]));
-  // WebKit 自己的平滑滚动动画在暂停之后还会继续一小段（那是浏览器在响应用户的输入，不是自动播放），所以放宽
-  const tol = process.env.BROWSER === 'webkit' ? 80 : 4;
-  ok(how === 'touch' ? Math.abs(b.y - a.y) < 2 : Math.abs(b.y - a.y) < tol, `用户接管（${how}）：之后页面不再被自动播放抢着滚动`, JSON.stringify([a.y, b.y]));
-  if (how === 'wheel' && process.env.BROWSER !== 'webkit') ok(b.y >= before.y + 200, '用户接管（滚轮）：用户的滚动量保留', JSON.stringify([before.y, b.y]));
-  if (how === 'wheel') {
-    const pv = await p.evaluate(() => {
-      const out = [];
-      for (const type of ['wheel', 'touchmove']) {
-        const e = new Event(type, { cancelable: true, bubbles: true });
-        document.body.dispatchEvent(e);
-        out.push(e.defaultPrevented);
-      }
-      return { synthetic: out, recorded: window.__prevented };
+/* 3b. 手机视口（390×844）自动播放的性能：1 倍和 4 倍降速各一次，没有长任务，帧间隔 p95 */
+{
+  const mob = [];
+  for (const cpu of [1, 4]) {
+    const p = await open({ w: 390, h: 844, seen: false, perf: true, cpu });
+    await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true', null, { timeout: 8000 });
+    await p.evaluate(() => {
+      window.__m.long = [];
+      window.__fr = [];
+      let last = performance.now();
+      const f = now => {
+        window.__fr.push(now - last);
+        last = now;
+        requestAnimationFrame(f);
+      };
+      requestAnimationFrame(f);
     });
-    ok(!pv.synthetic.some(Boolean) && pv.recorded.length === 0, '不劫持滚动：wheel、touchmove、touchstart 没有被 preventDefault', JSON.stringify(pv));
-    // 暂停后手动擦洗：和自动播放用同一套画面
-    ok((await y2f(p)) > 0, '用户接管后：影片时间跟着滚动位置走');
+    await p.waitForFunction(() => document.querySelector('.story').classList.contains('ended'), null, { timeout: 90000 });
+    const m = await p.evaluate(() => ({ cls: window.__m.cls, long: window.__m.long, fr: window.__fr.slice(5) }));
+    const sorted = [...m.fr].sort((a, b) => a - b);
+    mob.push({
+      cpu,
+      cls: +m.cls.toFixed(4),
+      maxLong: Math.max(0, ...m.long),
+      p50: +sorted[Math.floor(sorted.length * 0.5)].toFixed(1),
+      p95: +sorted[Math.floor(sorted.length * 0.95)].toFixed(1),
+    });
+    await p.ctx.close();
   }
+  console.log('手机性能：' + JSON.stringify(mob));
+  ok(
+    mob.every(r => r.maxLong <= 50 && r.cls < 0.01),
+    '手机视口自动播放全程：没有超过 50ms 的长任务，CLS < 0.01',
+    JSON.stringify(mob),
+  );
+  ok(
+    mob.every(r => r.p95 <= (process.env.CI ? 55 : 21)),
+    `手机视口自动播放帧间隔 p95 ≤ ${process.env.CI ? 55 : 21}ms（1 倍、4 倍降速）`,
+    JSON.stringify(mob),
+  );
+}
+
+/* 4. 一次一幕：一格滚轮、一串快速滚轮、一整段触控板惯性、一次按键（含按住不放）、一次滑动，都只切一幕；
+ *    切换中再来一次输入不排队、不卡死（先到当前幕的结论帧再往下走）；自动播放被手势接管；最后一幕不困住；不 preventDefault；菜单打开时不响应 */
+const gestureOpen = (extra = {}) => open({ seen: true, speed: 8, ...extra });
+const swipeCDP = async (p, dir, { dist = 220, steps = 6, ms = 120 } = {}) => {
+  const cdp = await p.context().newCDPSession(p);
+  const vp = p.viewportSize();
+  const x = vp.width / 2;
+  const y0 = vp.height * (dir > 0 ? 0.65 : 0.35);
+  const y1 = y0 - dir * dist;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+  for (let i = 1; i <= steps; i++) {
+    await p.waitForTimeout(ms / steps);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 - (dir * dist * i) / steps }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+  void y1;
+};
+{
+  const p = await gestureOpen();
+  await p.mouse.move(640, 400);
+  // 一格滚轮
+  const n0 = await nav(p);
+  await p.mouse.wheel(0, 100);
+  await p.waitForTimeout(150);
+  const run1 = await nav(p);
+  ok(n0.scene === 0 && n0.mode === 'idle' && run1.mode === 'run', '一格滚轮：开始播放到下一幕（模式 run）', JSON.stringify([n0, run1]));
+  await waitIdle(p);
+  const n1 = await nav(p);
+  ok(n1.scene === 1 && Math.abs(n1.f - STOP[1]) < 0.02, `一格滚轮：只切一幕，停在第 1 幕的结论帧（f=${n1.f.toFixed(2)}）`, JSON.stringify(n1));
+  ok((await p.evaluate(() => [scrollY, document.documentElement.scrollHeight <= innerHeight + 1])).join() === '0,true', '页面本身不滚动：固定舞台');
+  // 一串快速的滚轮（每 40ms 一格，共 12 格）：还是一幕
+  for (let i = 0; i < 12; i++) {
+    await p.mouse.wheel(0, 60);
+    await p.waitForTimeout(40);
+  }
+  await waitIdle(p);
+  ok((await nav(p)).scene === 2, '连续快速的 12 格滚轮：只切一幕（第 1 → 2 幕）', JSON.stringify(await nav(p)));
+  // 触控板惯性：一次推动之后 delta 逐渐衰减，约 1.2 秒共 70 个事件：还是一幕
+  for (let i = 0; i < 70; i++) {
+    await p.mouse.wheel(0, Math.max(2, Math.round(160 * 0.94 ** i)));
+    await p.waitForTimeout(17);
+  }
+  await waitIdle(p);
+  ok((await nav(p)).scene === 3, '一整段触控板惯性（70 个衰减的滚轮事件）：只切一幕（第 2 → 3 幕）', JSON.stringify(await nav(p)));
+  // 往回：一格向上滚，直接显示上一幕的结论帧（淡出淡入，不倒放整幕）
+  await p.waitForTimeout(300);
+  await p.mouse.wheel(0, -100);
+  await p.waitForTimeout(120);
+  ok((await nav(p)).mode === 'fade', '一格向上滚：淡出到上一幕（模式 fade）', JSON.stringify(await nav(p)));
+  await waitIdle(p);
+  const nb = await nav(p);
+  ok(nb.scene === 2 && Math.abs(nb.f - STOP[2]) < 0.02, '一格向上滚：停在上一幕的结论帧', JSON.stringify(nb));
+  // 切换中再来一次（隔了安静期，是新的一次手势）：不排队、不卡死——先到当前幕的结论帧，再往下一幕走
+  await p.waitForTimeout(300);
+  await p.mouse.wheel(0, 100);
+  await p.waitForTimeout(260);
+  await p.mouse.wheel(0, 100);
+  await p.waitForTimeout(120);
+  const mid = await nav(p);
+  ok(mid.mode === 'run' && mid.f > STOP[3] && mid.f < STOP[4], '切换中再滚一次：立刻跳到当前幕的结论帧，再向下一幕播放', JSON.stringify(mid));
+  await waitIdle(p);
+  ok((await nav(p)).scene === 4, '切换中再滚一次：最终停在第 4 幕（跳过的是当前幕剩下的动画，不是排队）', JSON.stringify(await nav(p)));
+  const pv = await p.evaluate(() => window.__prevented);
+  ok(pv.length === 0, '滚轮和触摸监听都是被动的：没有 preventDefault', JSON.stringify(pv));
+  await p.ctx.close();
+}
+{
+  // 键盘：↓ / PageDown / 空格各切一幕；按住不放（auto-repeat）也只算一次；↑ / PageUp 往回；Home / End
+  const p = await gestureOpen();
+  await p.mouse.move(640, 400);
+  for (const [key, expect] of [
+    ['ArrowDown', 1],
+    ['PageDown', 2],
+    ['Space', 3],
+  ]) {
+    await p.keyboard.press(key);
+    await waitIdle(p);
+    ok((await nav(p)).scene === expect, `按 ${key}：切到下一幕（第 ${expect} 幕）`, JSON.stringify(await nav(p)));
+  }
+  await p.keyboard.down('ArrowDown');
+  for (let i = 0; i < 8; i++) {
+    await p.keyboard.down('ArrowDown'); // repeat
+    await p.waitForTimeout(30);
+  }
+  await p.keyboard.up('ArrowDown');
+  await waitIdle(p);
+  ok((await nav(p)).scene === 4, '按住 ↓ 不放（自动重复 8 次）：只切一幕', JSON.stringify(await nav(p)));
+  await p.keyboard.press('ArrowUp');
+  await waitIdle(p);
+  ok((await nav(p)).scene === 3, '按 ↑：回到上一幕', JSON.stringify(await nav(p)));
+  await p.keyboard.press('PageUp');
+  await waitIdle(p);
+  ok((await nav(p)).scene === 2, '按 PageUp：回到上一幕');
+  await p.keyboard.press('End');
+  await p.waitForTimeout(700);
+  const e = await nav(p);
+  ok(e.scene === 9 && e.ended && Math.abs(e.f - TOTAL) < 0.01, '按 End：直接到收束幕的结论帧', JSON.stringify(e));
+  await p.keyboard.press('Home');
+  await p.waitForTimeout(500);
+  ok((await nav(p)).scene === 0, '按 Home：回到开场', JSON.stringify(await nav(p)));
+  await waitIdle(p);
+  // 最后一幕不困住：再向下滚没有反应也没有错误；向上滚照常回到上一幕；页面没有滚动条可卡
+  await atF(p, TOTAL);
+  await p.waitForTimeout(300);
+  await p.mouse.move(640, 300);
+  await p.mouse.wheel(0, 200);
+  await p.waitForTimeout(500);
+  const last = await nav(p);
+  ok(last.scene === 9 && last.mode === 'idle' && last.ended, '最后一幕再向下滚：没有下一幕，保持不动，不报错', JSON.stringify(last));
+  await p.waitForTimeout(300);
+  await p.mouse.wheel(0, -200);
+  await p.waitForTimeout(150);
+  await waitIdle(p);
+  ok((await nav(p)).scene === 8, '最后一幕向上滚：回到第 8 幕');
+  // 焦点在按钮、链接、输入框上时，空格和方向键归它们自己
+  await p.focus('.player .snd');
+  const before = (await nav(p)).f;
+  await p.keyboard.press('ArrowDown');
+  await p.waitForTimeout(300);
+  ok(Math.abs((await nav(p)).f - before) < 0.01, '焦点在播放器的按钮上：方向键不切幕');
+  ok(errs.length === 0, '一次一幕的各种输入：没有控制台错误', errs.join(' | '));
+  await p.ctx.close();
+}
+if (!process.env.BROWSER) {
+  // 触摸滑动（Chromium 用 CDP 发真实的触摸序列）：一次 touchstart→touchend 只切一幕；太短的不算；横向的不算；两指不算；点按钮不算滑动
+  const p = await open({ w: 390, h: 844, seen: true, speed: 8 });
+  const m = await open({ w: 390, h: 844, seen: true, speed: 8 });
+  await m.ctx.close();
+  await p.ctx.close();
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const q = await c.newPage();
+  await q.addInitScript(() => {
+    window.__storyTest = true;
+    window.__storyNoAuto = true;
+    window.__storySpeed = 8;
+  });
+  await q.goto(site);
+  await q.waitForSelector('.story.ready');
+  await q.waitForTimeout(400);
+  await swipeCDP(q, 1);
+  await waitIdle(q);
+  ok((await nav(q)).scene === 1, '手机：向上滑一次，切到下一幕', JSON.stringify(await nav(q)));
+  await swipeCDP(q, 1, { dist: 500, steps: 12, ms: 90 }); // 用力的一次长滑
+  await waitIdle(q);
+  ok((await nav(q)).scene === 2, '手机：一次又长又快的滑动，仍然只切一幕', JSON.stringify(await nav(q)));
+  await swipeCDP(q, 1, { dist: 20, steps: 2, ms: 400 });
+  await q.waitForTimeout(300);
+  ok((await nav(q)).scene === 2 && (await nav(q)).mode === 'idle', '手机：很短很慢的一下（20px）不算滑动');
+  await swipeCDP(q, -1);
+  await waitIdle(q);
+  ok((await nav(q)).scene === 1, '手机：向下滑一次，回到上一幕', JSON.stringify(await nav(q)));
+  // 切换中再滑一次：不排队不卡死
+  await swipeCDP(q, 1);
+  await q.waitForTimeout(500);
+  await swipeCDP(q, 1);
+  await waitIdle(q);
+  ok((await nav(q)).scene === 3, '手机：播放中再滑一次，先到当前幕的结论帧再往下走', JSON.stringify(await nav(q)));
+  // 菜单打开时不响应
+  await q.tap('button[aria-label="mobile hamburger"]');
+  await q.waitForTimeout(500);
+  const open0 = await q.evaluate(() => !!document.querySelector('.rp-nav-screen'));
+  await swipeCDP(q, 1);
+  await q.waitForTimeout(500);
+  ok(open0 && (await nav(q)).scene === 3 && (await nav(q)).mode === 'idle', '顶栏菜单打开时：滑动不切幕', JSON.stringify([open0, await nav(q)]));
+  await c.close();
+}
+{
+  // 自动播放 + 手势：手势暂停自动播放并执行这次切换，之后停在那一幕等待
+  const p = await open({ seen: false, speed: 6 });
+  await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
+  await p.waitForFunction(() => window.__storyHook.nav().f > 12);
+  await p.mouse.move(640, 400);
+  await p.mouse.wheel(0, 100);
+  await p.waitForTimeout(150);
+  const g = await state(p);
+  ok(!g.playing, '自动播放中滚一下：自动播放暂停（交给这一次切换）', JSON.stringify(g));
+  await waitIdle(p);
+  const after = await nav(p);
+  await p.waitForTimeout(1500);
+  const still = await nav(p);
+  ok(Math.abs(after.f - still.f) < 0.01 && !(await state(p)).playing, '切换完成后停在那一幕等待，不再自动往下', JSON.stringify([after, still]));
+  // 点播放：从当前位置继续自动播放
+  await p.click('.player .play');
+  await p.waitForTimeout(900);
+  const c1 = await nav(p);
+  ok(c1.f > still.f && (await state(p)).playing, '点播放：从当前帧继续自动播放', JSON.stringify([still, c1]));
   await p.ctx.close();
 }
 
-/* 5. 控制条：播放、暂停、重播、上一幕、下一幕、拖动进度条、跳过；键盘只在播放器获得焦点时生效 */
+/* 5. 控制条：播放、暂停、重播、上一幕、下一幕、进度条（按幕分段，点哪段去哪幕，拖动只更新提示）、跳过；键盘只在播放器获得焦点时生效 */
 {
-  const p = await open({ seen: true });
+  const p = await open({ seen: true, speed: 8 });
   const label = () => p.getAttribute('.player .play', 'aria-label');
   ok(
     (await p.getAttribute('.player', 'role')) === 'group' &&
@@ -337,97 +528,88 @@ for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) 
   );
   ok((await state(p)).playing === false && /播放/.test(await label()), '控制条：不自动播放时是“播放短片”，aria-pressed=false');
   await p.click('.player .play');
-  await p.waitForTimeout(700);
+  await p.waitForTimeout(500);
   ok(
     (await state(p)).playing && (await p.getAttribute('.player .play', 'aria-pressed')) === 'true' && /暂停/.test(await label()),
     '控制条：点播放开始，aria-pressed=true',
   );
   await p.click('.player .play');
-  const s1 = await state(p);
-  await p.waitForTimeout(500);
-  ok(!s1.playing && (await state(p)).y === s1.y, '控制条：点暂停就停住');
+  const s1 = await nav(p);
+  await p.waitForTimeout(400);
+  ok(!(await state(p)).playing && Math.abs((await nav(p)).f - s1.f) < 0.01, '控制条：点暂停就停住');
   await p.click('.player .next');
-  await p.waitForTimeout(1000);
-  const sn = await state(p);
-  ok(sn.active === 1 && !sn.playing, '控制条：下一幕（暂停时只跳不播）', JSON.stringify(sn));
-  await p.click('.player .next');
-  await p.waitForTimeout(1000);
+  await waitIdle(p);
+  const sn = await nav(p);
+  ok(sn.scene === (s1.scene === 0 ? 1 : s1.scene + 1) && !(await state(p)).playing, '控制条：下一幕（播放到下一幕的结论帧后停住）', JSON.stringify([s1, sn]));
   await p.click('.player .prev');
-  await p.waitForTimeout(1000);
-  ok((await state(p)).active === 1, '控制条：上一幕', JSON.stringify(await state(p)));
-  // 进度条点击：跳到那个位置，暂停
-  const box = await p.locator('.scrub').boundingBox();
-  await p.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
-  await p.waitForTimeout(300);
-  const mid = await state(p);
-  ok(Math.abs(+mid.now - 50) <= 3 && !mid.playing, '控制条：点进度条的中间，影片跳到约 50%', JSON.stringify(mid));
-  await p.mouse.move(box.x + box.width * 0.82, box.y + box.height / 2);
-  ok(/2024|服务端/.test(await p.textContent('.scrub .tip')), '控制条：悬停显示幕名', await p.textContent('.scrub .tip'));
-  // 拖动
-  await p.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+  await waitIdle(p);
+  ok((await nav(p)).scene === sn.scene - 1, '控制条：上一幕', JSON.stringify(await nav(p)));
+  // 进度条：按幕分段，每段点击进入那一幕（不相邻的先淡出，再从那一幕的起始帧播放）
+  const segs = await p.$$eval('.scrub .seg', els => els.map(e => e.getBoundingClientRect().toJSON()));
+  ok(segs.length === 10 && segs.every(s => s.width >= 12), '进度条：10 段，按幕分段', JSON.stringify(segs.map(s => Math.round(s.width))));
+  const sb = await p.locator('.scrub').boundingBox();
+  await p.mouse.click(segs[6].x + segs[6].width / 2, sb.y + sb.height / 2);
+  await p.waitForTimeout(150);
+  ok((await nav(p)).mode === 'fade', '进度条：点第 6 段，先淡出（模式 fade）', JSON.stringify(await nav(p)));
+  await waitIdle(p);
+  ok((await nav(p)).scene === 6, '进度条：点第 6 段，播放第 6 幕后停在它的结论帧', JSON.stringify(await nav(p)));
+  await p.mouse.move(segs[7].x + 4, sb.y + sb.height / 2);
+  ok(/2024|服务端/.test(await p.textContent('.scrub .tip')), '进度条：悬停显示幕名', await p.textContent('.scrub .tip'));
+  // 拖动：过程中只更新提示，画面不动；松手才跳转
+  const f0 = (await nav(p)).f;
+  await p.mouse.move(segs[2].x + 6, sb.y + sb.height / 2);
   await p.mouse.down();
-  await p.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, { steps: 6 });
+  await p.mouse.move(segs[5].x + 6, sb.y + sb.height / 2, { steps: 8 });
+  const dragState = await nav(p);
+  const dragTip = await p.textContent('.scrub .tip');
+  ok(
+    Math.abs(dragState.f - f0) < 0.01 && dragState.mode === 'idle' && /2019|Hooks/.test(dragTip),
+    '拖动进度条：过程中画面不动，只更新幕名提示',
+    JSON.stringify([f0, dragState, dragTip]),
+  );
   await p.mouse.up();
-  await p.waitForTimeout(200);
-  const dr = await state(p);
-  ok(Math.abs(+dr.now - 70) <= 4, '控制条：拖动进度条', JSON.stringify(dr));
-  // 播放器上的键盘：空格切换播放（只在播放器获得焦点时），左右方向键切幕
+  await p.waitForTimeout(150);
+  ok((await nav(p)).mode === 'fade', '拖动进度条：松手后才跳转');
+  await waitIdle(p);
+  ok((await nav(p)).scene === 5, '拖动进度条：松手后进入落点所在的幕（第 5 幕）', JSON.stringify(await nav(p)));
+  // 播放器上的键盘：左右方向键切幕；空格切换播放（只在播放器获得焦点时）
   await p.focus('.scrub');
-  const a0 = (await state(p)).active;
+  const a0 = (await nav(p)).scene;
   await p.keyboard.press('ArrowRight');
-  await p.waitForTimeout(900);
-  const a1 = (await state(p)).active;
+  await waitIdle(p);
+  const a1 = (await nav(p)).scene;
   await p.keyboard.press('ArrowLeft');
-  await p.waitForTimeout(900);
-  ok(a1 === a0 + 1 && (await state(p)).active === a0, '控制条键盘：焦点在播放器时，方向键切幕', JSON.stringify([a0, a1]));
+  await waitIdle(p);
+  ok(a1 === a0 + 1 && (await nav(p)).scene === a0, '控制条键盘：焦点在播放器时，方向键切幕', JSON.stringify([a0, a1]));
   await p.keyboard.press('Space');
   await p.waitForTimeout(400);
   ok((await state(p)).playing, '控制条键盘：焦点在进度条时，空格播放');
   await p.keyboard.press('Space');
   ok(!(await state(p)).playing, '控制条键盘：再按空格暂停');
-  // 全局空格不被劫持：焦点在页面上时，空格不会切换播放，也不会被 preventDefault
-  await p.evaluate(() => {
-    document.activeElement?.blur();
-    window.__sp = null;
-    addEventListener('keydown', e => setTimeout(() => (window.__sp = e.defaultPrevented), 0));
-  });
-  const yBefore = (await state(p)).y;
-  await p.keyboard.press('Space');
-  await p.waitForTimeout(500);
-  const gl = await state(p);
-  ok(
-    !gl.playing && (await p.evaluate(() => window.__sp)) === false && gl.y > yBefore,
-    '不劫持键盘：焦点不在播放器时，空格照常翻页，没有被 preventDefault',
-    JSON.stringify([yBefore, gl.y]),
-  );
+  // 幕进度圆点（桌面）：与当前幕同步，点击进入那一幕
+  const dot = await p.evaluate(() => document.querySelector('.rail a[aria-current]')?.dataset.scene);
+  ok(+dot === (await nav(p)).scene, '幕进度圆点与当前幕同步', `${dot} vs ${(await nav(p)).scene}`);
+  await p.click('.rail a[data-scene="2"]');
+  await waitIdle(p);
+  ok((await nav(p)).scene === 2, '幕进度圆点：点击进入对应的幕');
+  const labels = await p.$$eval('.rail a', as => as.map(a => a.getAttribute('aria-label')));
+  ok(labels.length === 10 && labels.every(l => /^第 \d 幕：/.test(l)), '幕进度圆点：10 个都有 aria-label', JSON.stringify(labels));
   // 重播
   await p.click('.player .replay');
-  await p.waitForTimeout(800);
-  const rp = await state(p);
-  ok(rp.playing && rp.y < 400, '控制条：重播从头开始', JSON.stringify(rp));
+  await p.waitForTimeout(700);
+  const rp = await nav(p);
+  ok((await state(p)).playing && rp.f < 6 && rp.scene === 0, '控制条：重播从头开始并自动播放', JSON.stringify(rp));
   await p.click('.player .play');
-  // 跳过
+  // 跳过：到收束幕的结论帧
   await p.click('.player .skip');
-  await p.waitForTimeout(1200);
-  const sk = await state(p);
-  ok(sk.active === 9 && !sk.playing, '控制条：“跳过，开始学习”直接到收束幕', JSON.stringify(sk));
-  // 手动把页面滚到任意位置再点播放：从当前位置继续
-  await atF(p, 20);
-  await settle(p);
-  await p.click('.player .play');
-  await p.waitForTimeout(900);
-  const cont = await y2f(p);
-  ok(cont > 20 && cont < 22.5, '手动滚到 20 秒处再点播放：从当前位置继续', String(cont));
-  await p.click('.player .play');
-  // 幕进度圆点与控制条同步
-  const dot = await p.evaluate(() => document.querySelector('.rail a[aria-current]')?.dataset.scene);
-  ok(+dot === (await state(p)).active, '幕进度圆点与播放器的当前幕同步', `${dot} vs ${(await state(p)).active}`);
-  await p.click('.rail a[data-scene="6"]');
-  await p.waitForTimeout(1000);
-  ok((await state(p)).active === 6, '幕进度圆点：点击跳到对应的幕');
-  const labels = await p.$$eval('.rail a', as => as.map(a => a.getAttribute('aria-label')));
-  ok(labels.length === 10 && labels.every(l => /^第 \d 幕：/.test(l)), '幕进度圆点：10 个都有 aria-label', JSON.stringify(labels));
-  // 换幕时礼貌播报，不连续播报
+  await p.waitForTimeout(700);
+  const sk = await nav(p);
+  ok(
+    sk.scene === 9 && sk.ended && Math.abs(sk.f - TOTAL) < 0.01 && !(await state(p)).playing,
+    '控制条：“跳过，开始学习”直接到收束幕的结论帧',
+    JSON.stringify(sk),
+  );
+  // 换幕时礼貌播报
   const live = await p.evaluate(() => [
     document.querySelector('.live-region')?.getAttribute('aria-live'),
     document.querySelector('.scrub')?.getAttribute('aria-valuetext'),
@@ -439,7 +621,160 @@ for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) 
   await p.ctx.close();
 }
 
-/* 6. 什么时候不自动播放：有学习进度、同会话已播、带锚点、减少动画、后台标签页 */
+/* 5b. 跳转不经过中间的幕：跳过、点进度条的远处、点圆点、重播、Home / End：中间各幕的文字层从没有变成可见；声音开着时没有中间幕的音效被排程；
+ *     连点、来回切、淡出过程中再点：以最后一次为准，不闪不卡 */
+const sampler = `
+  window.__mx = {};
+  const names = [1,2,3,4,5,6,7,8];
+  window.__watch = new Set();
+  const tick = () => {
+    for (const i of window.__watch) {
+      const e = document.querySelector('[data-w="cp-' + i + '"]');
+      if (!e) continue;
+      const o = +getComputedStyle(e).opacity;
+      window.__mx[i] = Math.max(window.__mx[i] || 0, o);
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+`;
+async function jumpCase(name, opts, setup, act, watch, expectScene, extra) {
+  const p = await open({ seen: true, speed: 1, ...opts });
+  await p.evaluate(sampler);
+  await p.evaluate(async () => {
+    if (!window.__storyHook.audio().on) return;
+  });
+  await setup(p);
+  await p.waitForTimeout(300);
+  await p.evaluate(w => {
+    window.__mx = {};
+    window.__watch = new Set(w);
+  }, watch);
+  await act(p);
+  await p.waitForTimeout(650);
+  const mx = await p.evaluate(() => window.__mx);
+  const n = await nav(p);
+  ok(
+    watch.every(i => (mx[i] || 0) === 0) && (expectScene === undefined || n.scene === expectScene),
+    `${name}：中间各幕（${watch.join('、')}）的文字层从未变为可见；落在第 ${expectScene} 幕`,
+    JSON.stringify([mx, n]),
+  );
+  if (extra) await extra(p, n);
+  await p.ctx.close();
+}
+await jumpCase(
+  '点“跳过”（从第 3 幕）',
+  {},
+  p => atF(p, STOP[3]),
+  p => p.click('.player .skip'),
+  [4, 5, 6, 7, 8],
+  9,
+  async (p, n) => {
+    ok(n.ended && Math.abs(n.f - TOTAL) < 0.01, '跳过：600ms 内处于收束幕的结论帧', JSON.stringify(n));
+    const stats = await p.$$eval('.s9 .stats3 dt[data-count]', els => els.map(e => [e.textContent, e.dataset.count]));
+    ok(
+      stats.every(([a, b]) => a === b),
+      '跳过：三个统计数字直接是最终值，不再从 0 滚动',
+      JSON.stringify(stats),
+    );
+  },
+);
+await jumpCase(
+  '点进度条上较远的一段（第 1 幕 → 第 7 段）',
+  {},
+  p => atF(p, STOP[1]),
+  async p => {
+    const segs = await p.$$eval('.scrub .seg', els => els.map(e => e.getBoundingClientRect().toJSON()));
+    const sb = await p.locator('.scrub').boundingBox();
+    await p.mouse.click(segs[7].x + segs[7].width / 2, sb.y + sb.height / 2);
+  },
+  [2, 3, 4, 5, 6],
+  7,
+);
+await jumpCase(
+  '点幕进度圆点（第 1 幕 → 第 7 幕）',
+  {},
+  p => atF(p, STOP[1]),
+  p => p.click('.rail a[data-scene="7"]'),
+  [2, 3, 4, 5, 6],
+  7,
+);
+await jumpCase(
+  '重播（从收束幕回到开场）',
+  {},
+  p => atF(p, TOTAL),
+  p => p.click('.player .replay'),
+  [1, 2, 3, 4, 5, 6, 7, 8],
+  0,
+);
+await jumpCase(
+  '按 End（从开场）',
+  {},
+  async () => {},
+  async p => {
+    await p.mouse.move(640, 400);
+    await p.keyboard.press('End');
+  },
+  [1, 2, 3, 4, 5, 6, 7, 8],
+  9,
+);
+await jumpCase(
+  '带 hash 进入（#scene-6）',
+  { hash: 'scene-6' },
+  async () => {},
+  async () => {},
+  [1, 2, 3, 4, 5],
+  6,
+);
+{
+  // 声音开着：跳转时没有中间幕的音效被排程，旧的声音在约 150ms 内淡出
+  const p = await open({ seen: true, speed: 1 });
+  await p.click('.snd');
+  await p.waitForTimeout(800);
+  await p.click('.player .play');
+  await p.waitForTimeout(500);
+  await p.evaluate(f => window.__storyHook.at(f), 0);
+  await p.click('.player .play');
+  await p.click('.player .play');
+  await p.waitForTimeout(600);
+  const before = await p.evaluate(() => window.__storyHook.audio().info.sched.length);
+  await p.click('.player .skip');
+  await p.waitForTimeout(900);
+  const info = await p.evaluate(() => window.__storyHook.audio());
+  const after = info.info.sched.slice(before);
+  const bad = after.filter(([a, b]) => a < MARKS[9] - 0.5 && b > MARKS[2] + 0.6);
+  ok(bad.length === 0, '声音开着点“跳过”：没有任何中间幕的音效被排程（排程区间都不跨过中间的幕）', JSON.stringify([before, info.info.sched.slice(-4)]));
+  await p.waitForTimeout(500);
+  ok((await p.evaluate(() => window.__storyHook.audio().level)) < 0.02, '跳转后旧的声音淡出了（电平回落）');
+  await p.ctx.close();
+}
+{
+  // 连点“下一幕”五次、淡出过程中再点、来回拖：以最后一次的目标为准，不叠影不卡
+  const p = await open({ seen: true, speed: 8 });
+  for (let i = 0; i < 5; i++) {
+    await p.click('.player .next');
+    await p.waitForTimeout(60);
+  }
+  await waitIdle(p);
+  ok((await nav(p)).scene === 5 && !(await nav(p)).xf, '连点“下一幕”5 次：每次打断上一次，最终停在第 5 幕', JSON.stringify(await nav(p)));
+  const segs = await p.$$eval('.scrub .seg', els => els.map(e => e.getBoundingClientRect().toJSON()));
+  const sb = await p.locator('.scrub').boundingBox();
+  await p.click('.player .skip');
+  await p.waitForTimeout(80);
+  await p.mouse.click(segs[2].x + segs[2].width / 2, sb.y + sb.height / 2);
+  await waitIdle(p);
+  ok((await nav(p)).scene === 2 && !(await nav(p)).xf, '淡出过程中再点别处：取消上一次，以最后一次为准（落在第 2 幕）', JSON.stringify(await nav(p)));
+  for (let i = 0; i < 4; i++) {
+    await p.mouse.click(segs[i % 2 ? 8 : 1].x + 6, sb.y + sb.height / 2);
+    await p.waitForTimeout(70);
+  }
+  await waitIdle(p);
+  ok((await nav(p)).scene === 8 && !(await nav(p)).xf, '在进度条上来回快速点：最终落在最后一次的目标', JSON.stringify(await nav(p)));
+  ok(errs.length === 0, '连续跳转：没有控制台错误', errs.join(' | '));
+  await p.ctx.close();
+}
+
+/* 6. 自动播放的触发规则：每次打开或刷新首页都自动播（回访者也一样）；站内跳走再回来不重放；带 hash 进入、减少动画、后台标签页不自动播 */
 {
   const W = await lessonData('what-is-react');
   const seed = {
@@ -452,515 +787,102 @@ for (const how of ['wheel', 'touch', 'key-space', 'key-pagedown', 'scrollbar']) 
     },
     __srs: { 'what-is-react#0': { box: 1, n: 1, due: Date.now() - 1000, last: Date.now() - 2 * DAY } },
   };
-  const cases = [
-    ['有学习进度的回访者', { seen: false, seed }],
-    ['同一会话已经播放过', { seen: true }],
-    ['带 hash 锚点进入', { seen: false, hash: 'scene-3' }],
-  ];
-  for (const [name, opts] of cases) {
-    const p = await open(opts);
-    await p.waitForTimeout(2600);
-    const s = await state(p);
-    const film = await p.evaluate(() => {
-      const b = document.querySelector('.btn.film');
-      return b && b.checkVisibility();
-    });
-    ok(!s.playing && film, `${name}：不自动播放，显示“▶ 播放 N 秒短片”按钮`, JSON.stringify([s, film]));
-    if (opts.hash) ok(s.active === 3, '带 hash 进入：停在对应的幕', JSON.stringify(s));
-    if (opts.seed) {
-      const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => [a.textContent.trim(), a.getAttribute('href')]));
-      ok(
-        /^继续学习：/.test(r[0][0]) && r[0][1].includes('/lessons/' + LESSONS[1].id) && /今日复习 1 题/.test(r[1]?.[0]),
-        '有进度和到期卡片：“继续学习：下一课”和“今日复习 1 题”',
-        JSON.stringify(r),
-      );
-      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
-      ok(
-        /^继续学习：/.test(last[0]) && last[1] === '查看课程地图' && /^今日复习 1 题/.test(last[2]),
-        '有进度和到期复习：收束幕是“继续学习：下一课”、“查看课程地图”、“今日复习 1 题”',
-        JSON.stringify(last),
-      );
-    } else {
-      const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => a.textContent.trim()));
-      ok(r.length === 1 && /从第 1 课开始/.test(r[0]), `${name}：没有进度时开场只有“从第 1 课开始”，没有“今日复习”`, JSON.stringify(r));
-      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
-      ok(
-        last.length === 2 && /^开始学习/.test(last[0]) && last[1] === '查看课程地图',
-        `${name}：没有进度时收束幕是“开始学习”和“查看课程地图”，没有复习入口`,
-        JSON.stringify(last),
-      );
-    }
-    if (name === '同一会话已经播放过') {
-      await p.click('.btn.film');
-      await p.waitForTimeout(800);
-      ok((await state(p)).playing, '点“▶ 播放 N 秒短片”按钮：开始播放');
-      // 标签页转到后台：暂停，回来不自动续播，按钮是“继续播放”
-      await p.evaluate(() => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-      await p.waitForTimeout(400);
-      const hid = await state(p);
-      await p.evaluate(() => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-      await p.waitForTimeout(1200);
-      const back = await state(p);
-      ok(
-        !hid.playing && !back.playing && back.y === hid.y && /继续播放/.test(await p.getAttribute('.player .play', 'aria-label')),
-        '后台标签页：暂停；回到前台不自动续播，按钮是“继续播放”',
-        JSON.stringify([hid, back]),
-      );
-    }
-    await p.ctx.close();
-  }
-  const r = await open({ reduced: true, seen: false });
-  await r.waitForTimeout(2600);
-  const info = await r.evaluate(() => ({
-    player: !!document.querySelector('.player') && getComputedStyle(document.querySelector('.player')).display !== 'none',
-    film: document.querySelector('.btn.film')?.checkVisibility(),
-    y: scrollY,
-    anims: document.getAnimations().length,
-    stage: getComputedStyle(document.querySelector('.world')).position,
-    copy: [...document.querySelectorAll('.sc-copy')].every(c => +getComputedStyle(c).opacity === 1 && getComputedStyle(c).position !== 'fixed'),
-    dots: document.querySelectorAll('.rail a').length,
-    sw: document.documentElement.scrollWidth <= innerWidth,
-    h2: [...document.querySelectorAll('.sc h2')].every(h => h.checkVisibility({ checkOpacity: true })),
-  }));
-  ok(!info.player && !info.film && info.y === 0 && info.anims === 0, '减少动画：没有播放器、没有自动播放、没有任何动画在跑', JSON.stringify(info));
-  ok(
-    info.stage === 'relative' && info.copy && info.h2 && info.sw && info.dots === 10,
-    '减少动画：静态长文，每幕文字都是最终状态，幕进度指示保留',
-    JSON.stringify(info),
-  );
-  await r.ctx.close();
-}
-
-/* 7. 手动擦洗：往回滚倒放；自动播放暂停在某处与手动滚到同一位置，画面一致 */
-{
-  const p = await open({ seen: true });
-  const probe = ['[data-w="n-Item2"]', '[data-w="nl-TodoList"]', '[data-w="bo-Box2"]', '[data-w="cam"]', '[data-w="year"]'];
-  const snap = async pg => {
-    const out = [];
-    for (const s of probe) out.push(await look(pg, s));
-    return out;
-  };
-  await atF(p, 14);
-  await settle(p);
-  const v1 = await snap(p);
-  await atF(p, 19.5);
-  await settle(p);
-  const v2 = await snap(p);
-  await atF(p, 14);
-  await settle(p);
-  const v3 = await snap(p);
-  ok(
-    JSON.stringify(v1) !== JSON.stringify(v2) && JSON.stringify(v1) === JSON.stringify(v3),
-    '手动擦洗：画面随滚动变化，往回滚会倒放（两个时间点比较关键元素的 transform / opacity）',
-    JSON.stringify([v1, v2]),
-  );
-  ok((await look(p, '[data-w="cp-2"]')).o === 1 && (await look(p, '[data-w="cp-5"]')).o === 0, '手动擦洗：当前幕的文字不透明，别的幕的文字退场');
-  await p.ctx.close();
-  // 自动播放（倍速）在中途暂停，读下画面；再在另一页手动滚到同一位置，比较
-  const a = await open({ seen: false, speed: 6 });
-  await a.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
-  await a.waitForFunction(() => scrollY > 0.37 * (document.documentElement.scrollHeight - innerHeight));
-  await a.click('.player .play');
-  await a.waitForTimeout(300);
-  const yA = (await state(a)).y;
-  const snapA = await snap(a);
-  const b = await open({ seen: true });
-  await b.evaluate(y => window.scrollTo({ top: y, behavior: 'instant' }), yA);
-  await settle(b);
-  const snapB = await snap(b);
-  ok(JSON.stringify(snapA) === JSON.stringify(snapB), '自动播放与手动滚到同一位置：关键元素的 transform / opacity 一致', JSON.stringify([snapA, snapB]));
-  await a.ctx.close();
-  await b.ctx.close();
-}
-
-/* 8. 手机和横屏：无横向滚动，每幕的文字完整、不被播放器遮挡 */
-for (const [w, h] of [
-  [390, 844],
-  [360, 640],
-  [844, 390],
-]) {
-  const p = await open({ w, h });
-  const bad = [];
-  for (let i = 0; i < 10; i++) {
-    await atF(p, i === 0 ? 1.5 : i === 9 ? TOTAL : MARKS[i] + 2.5);
-    await p.waitForTimeout(500);
-    const r = await p.evaluate(i => {
-      const sc = document.querySelectorAll('.sc')[i];
-      const c = sc.querySelector('.sc-copy');
-      const b = c.getBoundingClientRect();
-      const pl = document.querySelector('.player').getBoundingClientRect();
-      const last = c.querySelector('.hook, .foot, .desc, .scroll-hint, .st-links:last-child') || c;
-      const lb = (i === 9 ? c.querySelector('.foot') : i === 0 ? c.querySelector('.st-links') : c.querySelector('.desc')).getBoundingClientRect();
-      const inner = c.scrollHeight > c.clientHeight + 1;
-      return {
-        sw: document.documentElement.scrollWidth,
-        iw: innerWidth,
-        left: b.left,
-        right: b.right,
-        descBottom: lb.bottom,
-        playerTop: pl.top,
-        op: +getComputedStyle(c).opacity,
-        i,
-        scrolls: inner,
-        last: !!last,
-      };
-    }, i);
-    if (r.sw > r.iw || r.left < -1 || r.right > r.iw + 1 || r.op < 0.99) bad.push(JSON.stringify(r));
-    else if (!(i === 9 && r.scrolls) && r.descBottom > r.playerTop + 1 && w < 500) bad.push('被播放器遮挡 ' + JSON.stringify(r));
-  }
-  ok(!bad.length, `${w}×${h}：每幕无横向滚动，文字在屏幕内，不被播放器遮挡`, bad.join(' ; '));
-  await p.ctx.close();
-}
-
-/* 9. 键盘：Tab 从头走，每个获得焦点的链接、按钮都看得见（不透明、在视口里） */
-{
-  const p = await open({ seen: true });
-  const seen = [];
-  const bad = [];
-  for (let n = 0; n < 30; n++) {
-    await p.keyboard.press(process.env.BROWSER === 'webkit' ? 'Alt+Tab' : 'Tab');
-    await p.waitForTimeout(80);
-    const f = await p.evaluate(() => {
-      const e = document.activeElement;
-      if (!e || e === document.body || !e.closest('.story')) return null;
-      let o = 1;
-      for (let x = e; x; x = x.parentElement) o *= +getComputedStyle(x).opacity;
-      const r = e.getBoundingClientRect();
-      return {
-        t: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 16),
-        o: +o.toFixed(2),
-        vis: e.checkVisibility({ checkVisibilityCSS: true }),
-        inView: r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth,
-      };
-    });
-    if (!f) continue;
-    seen.push(f.t);
-    if (f.o < 0.99 || !f.inView || !f.vis) bad.push(JSON.stringify(f));
-  }
-  ok(seen.length >= 14 && !bad.length, 'Tab 走完首页：每个获得焦点的链接、按钮都不透明、可见、在视口里', `${seen.length} 个；` + bad.join(' ; '));
-  await p.ctx.close();
-}
-
-/* 10. 离开页面（客户端路由）：停止自动播放，清理动画 */
-{
-  const p = await open({ seen: false });
-  await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
-  await p.waitForTimeout(1500);
-  await p.evaluate(() => {
-    window.__nr = 1;
-  });
-  await p.click('.rp-nav-menu a[href*="glossary"], .rp-nav a[href*="glossary"]').catch(() => p.goto(site + 'glossary.html'));
-  await p.waitForTimeout(1500);
-  const r = await p.evaluate(() => ({
-    anims: document.getAnimations().length,
-    dyn: document.documentElement.classList.contains('story-dyn'),
-    story: !!document.querySelector('.story'),
-  }));
-  const y1 = await p.evaluate(() => scrollY);
-  await p.waitForTimeout(800);
-  ok(!r.story && r.anims < 5 && (await p.evaluate(() => scrollY)) === y1, '离开首页：播放停止、动画和监听清理干净', JSON.stringify(r));
-  await p.ctx.close();
-}
-
-/* 10b. 收束幕的版式：八个节点、链接、年份、统计数字、减少动画下的静态版式 */
-{
-  const eras = [
-    ['之前', '手动改 DOM', 'what-is-react'],
-    ['2013', '声明式', 'state'],
-    ['2013', '协调', 'rendering'],
-    ['2017', 'Fiber', 'scheduler'],
-    ['2019', 'Hooks', 'custom-hooks'],
-    ['2022', '并发', 'concurrent'],
-    ['2024', '服务端', 'server-components'],
-    ['2025', '编译器', 'performance'],
-  ];
-  const playN = LESSONS.reduce((n, l) => n + l.nPlays, 0);
-  const exN = LESSONS.filter(l => l.hasExercise).length;
-  const quizN = LESSONS.reduce((n, l) => n + l.quizAnswers.length, 0);
-  for (const reduced of [false, true]) {
-    const p = await open({ seen: true, reduced });
-    if (!reduced) {
-      await atF(p, TOTAL);
-      await p.waitForTimeout(600);
-    }
-    const r = await p.evaluate(() => ({
-      items: [...document.querySelectorAll('.s9 .eras li')].map(li => ({
-        yr: li.querySelector('.yr').textContent,
-        name: li.querySelector('b').textContent,
-        href: li.querySelector('.era-main').getAttribute('href'),
-        label: li.querySelector('.era-main').getAttribute('aria-label'),
-        more: [...li.querySelectorAll('.era-more')].map(a => a.getAttribute('href')),
-        op: +getComputedStyle(li).opacity,
-        vis: li.querySelector('.era-main').checkVisibility({ checkOpacity: true }),
-      })),
-      counts: [...document.querySelectorAll('.s9 .stats3 dt')].map(d => +d.textContent),
-      ol: document.querySelector('.s9 ol.eras')?.tagName,
-      curve: !!document.querySelector('.s9 .tl-curve[aria-hidden="true"]'),
-      draw: +getComputedStyle(document.querySelector('.s9 .tl-draw')).strokeDashoffset.replace('px', ''),
-      sw: document.documentElement.scrollWidth <= innerWidth,
-    }));
-    const tag = reduced ? '减少动画' : '短片模式（拖到结尾）';
-    ok(
-      r.ol === 'OL' &&
-        r.items.length === 8 &&
-        r.items.every((it, i) => it.yr === eras[i][0] && it.name === eras[i][1] && it.href.endsWith('/lessons/' + eras[i][2])),
-      `收束幕（${tag}）：八个时代按顺序，年份、名称、课链接正确，用有序列表`,
-      JSON.stringify(r.items.map(i => [i.yr, i.name, i.href])),
-    );
-    ok(
-      r.items.every(it => /^(之前|\d{4}) .+：.+/.test(it.label)) && r.items[6].more.length === 1 && r.items[6].more[0].endsWith('/lessons/react-19'),
-      `收束幕（${tag}）：每个节点的可访问名称含年份、时代名和课名；服务端多一条 react-19`,
-      JSON.stringify(r.items.map(i => i.label)),
-    );
-    ok(
-      r.items.every(it => it.op === 1 && it.vis) && r.curve && r.sw,
-      `收束幕（${tag}）：八个节点都可见、曲线装饰对读屏隐藏、无横向滚动`,
-      JSON.stringify(r.items.map(i => i.op)),
-    );
-    ok(
-      JSON.stringify(r.counts) === JSON.stringify([playN, exN, quizN]),
-      `收束幕（${tag}）：三个统计数字和目录计算一致（${playN} / ${exN} / ${quizN}）`,
-      JSON.stringify(r.counts),
-    );
-    // 键盘 Tab 顺序：先是时代节点（从左到右），再是行动区
-    if (!reduced) {
-      await p.evaluate(() => document.querySelector('.s9 .era-main').focus());
-      const order = [];
-      for (let i = 0; i < 12; i++) {
-        order.push(await p.evaluate(() => document.activeElement?.getAttribute('href') || document.activeElement?.className));
-        await p.keyboard.press('Tab');
-      }
-      const lessonsSeq = order.filter(h => /\/lessons\//.test(h)).map(h => h.split('/lessons/')[1].replace('.html', ''));
-      ok(
-        lessonsSeq.slice(0, 9).join() ===
-          ['what-is-react', 'state', 'rendering', 'scheduler', 'custom-hooks', 'concurrent', 'server-components', 'react-19', 'performance'].join(),
-        '收束幕：Tab 顺序是时代节点从左到右（服务端的两条课挨在一起），然后才是行动区',
-        order.join(' | '),
-      );
-      // 悬停一个节点：它的一句话要点出现
-      await p.hover('.s9 .era:nth-child(4) .era-main');
-      await p.waitForTimeout(400);
-      const tip = await p.evaluate(() => +getComputedStyle(document.querySelector('.s9 .era:nth-child(4) .tip')).opacity);
-      ok(tip > 0.9, '收束幕：悬停一个节点，显示这一代的一句话要点', String(tip));
-    }
-    await p.ctx.close();
-  }
-  // 手机：纵向时间轴，无横向滚动，主按钮不被进度指示或控制条遮挡
-  for (const [w, h] of [
-    [390, 844],
-    [360, 640],
-  ]) {
-    const p = await open({ w, h });
-    await atF(p, TOTAL);
-    await p.waitForTimeout(700);
+  // 有学习进度的回访者：照样自动播放；开场的“继续学习”“今日复习”按钮在播放期间可点、看得见
+  {
+    const p = await open({ seen: false, seed });
+    await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
     const r = await p.evaluate(() => {
-      const b = document.querySelector('.s9 .fin-actions .btn.big').getBoundingClientRect();
-      const pl = document.querySelector('.player').getBoundingClientRect();
-      const top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-      const rail = document.querySelector('.rail').getBoundingClientRect();
-      return {
-        sw: document.documentElement.scrollWidth,
-        iw: innerWidth,
-        hit: !!top?.closest('.fin-actions'),
-        above: b.bottom <= pl.top + 1,
-        clearRail: b.right <= rail.left + 1 || b.bottom < rail.top || b.top > rail.bottom,
-      };
-    });
-    ok(r.sw <= r.iw && r.hit && r.above && r.clearRail, `${w}×${h}：收束幕无横向滚动，主按钮可点、在控制条之上、不被进度指示遮挡`, JSON.stringify(r));
-    await p.ctx.close();
-  }
-}
-
-/* 10b2. 四种尺寸下收束幕互不遮挡：标题、八个节点、统计说明、按钮都完整可见；没有内部滚动容器；中心点命中的不是固定浮层 */
-for (const [w, h] of [
-  [360, 640],
-  [390, 844],
-  [1280, 720],
-  [1280, 800],
-]) {
-  const p = await open({ w, h, seen: false, speed: 10 });
-  await p.waitForFunction(() => document.querySelector('.story').classList.contains('ended'), null, { timeout: 30000 });
-  await p.waitForTimeout(1800);
-  const r = await p.evaluate(() => {
-    const box = e => {
-      const b = e.getBoundingClientRect();
-      return { l: b.left, t: b.top, r: b.right, b: b.bottom };
-    };
-    const sel = ['.s9 h2', '.s9 .eras .era-main', '.s9 .eras .era-more', '.s9 .stats3 dd', '.s9 .fin-actions a', '.s9 .foot'];
-    const items = sel.flatMap(s => [...document.querySelectorAll(s)].map(e => ({ s, e })));
-    const boxes = items.map(i => ({ s: i.s, ...box(i.e) }));
-    let overlap = 0;
-    for (let i = 0; i < boxes.length; i++)
-      for (let j = i + 1; j < boxes.length; j++) {
-        const a = boxes[i],
-          c = boxes[j];
-        if (a.l < c.r - 1 && c.l < a.r - 1 && a.t < c.b - 1 && c.t < a.b - 1) overlap++;
-      }
-    const outside = boxes.filter(b => b.t < 0 || b.b > innerHeight + 1 || b.l < 0 || b.r > innerWidth + 1).length;
-    let blocked = 0;
-    for (const i of items) {
-      if (!/stats3|era|fin-actions/.test(i.s)) continue;
-      const b = box(i.e);
-      const hit = document.elementFromPoint((b.l + b.r) / 2, (b.t + b.b) / 2);
-      if (!hit || !(i.e === hit || i.e.contains(hit) || hit.contains(i.e))) blocked++;
-    }
-    const c = document.querySelector('.s9 .sc-copy');
-    const primary = box(document.querySelector('.s9 .btn.primary'));
-    return { overlap, outside, blocked, n: items.length, scroll: c.scrollHeight, client: c.clientHeight, primaryB: primary.b, ih: innerHeight };
-  });
-  ok(
-    r.n >= 16 && r.overlap === 0 && r.outside === 0 && r.blocked === 0 && r.scroll <= r.client + 1 && r.primaryB <= r.ih,
-    `${w}×${h}：收束幕各元素互不相交、都在视口内、无内部滚动、中心点未被浮层遮挡`,
-    JSON.stringify(r),
-  );
-  await p.ctx.close();
-}
-
-/* 10c. 幕进度指示：所有圆点的圆心在一条线上（桌面竖线、手机同理），间距均匀，点击区域不小于 24×24；第一幕、中间一幕、最后一幕为当前时各量一次 */
-for (const [w, h] of [
-  [1280, 800],
-  [390, 844],
-]) {
-  const p = await open({ w, h });
-  for (const [label, f] of [
-    ['第一幕为当前', 1],
-    ['中间一幕为当前', MARKS[5] + 1],
-    ['最后一幕为当前', TOTAL],
-  ]) {
-    await atF(p, f);
-    await p.waitForTimeout(500);
-    await p.hover('.story .sc-copy', { force: true }).catch(() => {});
-    const r = await p.evaluate(() => {
-      const dots = [...document.querySelectorAll('.rail a')].map(a => ({ d: a.querySelector('.dot').getBoundingClientRect(), a: a.getBoundingClientRect() }));
-      const cx = dots.map(x => x.d.left + x.d.width / 2);
-      const cy = dots.map(x => x.d.top + x.d.height / 2);
-      const spread = v => Math.max(...v) - Math.min(...v);
-      const vertical = spread(cy) > spread(cx);
-      const main = vertical ? cy : cx;
-      const gaps = main.slice(1).map((v, i) => v - main[i]);
-      return {
-        n: dots.length,
-        crossSpread: vertical ? spread(cx) : spread(cy),
-        vertical,
-        gapSpread: spread(gaps),
-        minHit: Math.min(...dots.map(x => Math.min(x.a.width, x.a.height))),
-        cur: document.querySelector('.rail a[aria-current]')?.dataset.scene,
-      };
+      const links = [...document.querySelectorAll('.s0 .st-actions a')];
+      return links.map(a => {
+        const b = a.getBoundingClientRect();
+        const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        return [a.textContent.trim(), a.getAttribute('href'), a.contains(hit), +getComputedStyle(a.closest('.sc-copy')).opacity];
+      });
     });
     ok(
-      r.n === 10 && r.crossSpread <= 0.5 && r.gapSpread <= 0.5 && r.minHit >= 24,
-      `${w}×${h} 幕进度指示（${label}）：圆心在同一条${r.vertical ? '竖' : '横'}线上（偏差 ${r.crossSpread.toFixed(2)}px ≤ 0.5）、间距均匀（${r.gapSpread.toFixed(2)}px）、点击区域 ≥ 24px`,
+      r.length === 2 &&
+        /^继续学习：/.test(r[0][0]) &&
+        r[0][1].includes('/lessons/' + LESSONS[1].id) &&
+        /今日复习 1 题/.test(r[1][0]) &&
+        r.every(x => x[2] && x[3] > 0.9),
+      '有学习进度的回访者：照样自动播放，开场的“继续学习”和“今日复习”在播放期间可点、看得见',
       JSON.stringify(r),
     );
+    const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
+    ok(
+      /^继续学习：/.test(last[0]) && last[1] === '查看课程地图' && /^今日复习 1 题/.test(last[2]),
+      '有进度和到期复习：收束幕是“继续学习：下一课”、“查看课程地图”、“今日复习 1 题”',
+      JSON.stringify(last),
+    );
+    // 播放中点“继续学习”：直接进入那一课
+    await p.click('.s0 .st-actions a');
+    await p.waitForURL(/\/lessons\//, { timeout: 8000 });
+    ok(p.url().includes('/lessons/' + LESSONS[1].id), '播放期间点开场的“继续学习”：进入下一课', p.url());
+    await p.ctx.close();
   }
-  // 悬停、聚焦：也不动
-  await atF(p, 20);
-  await settle(p);
-  await p.click('.player .play');
-  await p.waitForTimeout(900);
-  const cont = await y2f(p);
-  ok(cont > 20 && cont < 22.5, '手动滚到 20 秒处再点播放：从当前位置继续', String(cont));
-  await p.click('.player .play');
-  // 幕进度圆点与控制条同步
-  const dot = await p.evaluate(() => document.querySelector('.rail a[aria-current]')?.dataset.scene);
-  ok(+dot === (await state(p)).active, '幕进度圆点与播放器的当前幕同步', `${dot} vs ${(await state(p)).active}`);
-  await p.click('.rail a[data-scene="6"]');
-  await p.waitForTimeout(1000);
-  ok((await state(p)).active === 6, '幕进度圆点：点击跳到对应的幕');
-  const labels = await p.$$eval('.rail a', as => as.map(a => a.getAttribute('aria-label')));
-  ok(labels.length === 10 && labels.every(l => /^第 \d 幕：/.test(l)), '幕进度圆点：10 个都有 aria-label', JSON.stringify(labels));
-  // 换幕时礼貌播报，不连续播报
-  const live = await p.evaluate(() => [
-    document.querySelector('.live-region')?.getAttribute('aria-live'),
-    document.querySelector('.scrub')?.getAttribute('aria-valuetext'),
-  ]);
-  ok(live[0] === 'polite' && /^第 \d 幕/.test(live[1]), '无障碍：换幕只在 polite 区播报，进度条有 aria-valuetext', JSON.stringify(live));
-  ok(errs.length === 0, '首页没有控制台错误、警告和水合不一致', errs.join(' | '));
-  const chunks = [...new Set(p.reqs.map(u => CHUNK.exec(u)?.[1]).filter(Boolean))];
-  ok(chunks.length === 0, '首页不加载任何一课的数据 chunk', chunks.join(','));
-  await p.ctx.close();
-}
-
-/* 6. 什么时候不自动播放：有学习进度、同会话已播、带锚点、减少动画、后台标签页 */
-{
-  const W = await lessonData('what-is-react');
-  const seed = {
-    'what-is-react': {
-      quiz: Object.fromEntries(W.quiz.map((q, i) => [i, q.answer])),
-      tried: Object.fromEntries(W.quiz.map((_q, i) => [i, true])),
-      first: Object.fromEntries(W.quiz.map((_q, i) => [i, true])),
-      ex: !!W.exercise,
-      done: true,
-    },
-    __srs: { 'what-is-react#0': { box: 1, n: 1, due: Date.now() - 1000, last: Date.now() - 2 * DAY } },
-  };
-  const cases = [
-    ['有学习进度的回访者', { seen: false, seed }],
-    ['同一会话已经播放过', { seen: true }],
-    ['带 hash 锚点进入', { seen: false, hash: 'scene-3' }],
-  ];
-  for (const [name, opts] of cases) {
-    const p = await open(opts);
+  // 没有进度：开场只有“从第 1 课开始”，收束幕是“开始学习”和“查看课程地图”
+  {
+    const p = await open({ seen: true });
+    const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => a.textContent.trim()));
+    ok(r.length === 1 && /从第 1 课开始/.test(r[0]), '没有进度时开场只有“从第 1 课开始”，没有“今日复习”', JSON.stringify(r));
+    const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
+    ok(
+      last.length === 2 && /^开始学习/.test(last[0]) && last[1] === '查看课程地图',
+      '没有进度时收束幕是“开始学习”和“查看课程地图”，没有复习入口',
+      JSON.stringify(last),
+    );
+    await p.ctx.close();
+  }
+  // 带 hash 进入：不自动播放，直接显示对应的幕（结论帧）
+  {
+    const p = await open({ seen: false, hash: 'scene-3' });
     await p.waitForTimeout(2600);
     const s = await state(p);
-    const film = await p.evaluate(() => {
-      const b = document.querySelector('.btn.film');
-      return b && b.checkVisibility();
+    const n = await nav(p);
+    ok(
+      !s.playing && s.active === 3 && Math.abs(n.f - STOP[3]) < 0.01 && /播放/.test(await p.getAttribute('.player .play', 'aria-label')),
+      '带 hash 进入：不自动播放，直接显示第 3 幕的结论帧，控制条是“播放短片”',
+      JSON.stringify([s, n]),
+    );
+    await p.click('.player .play');
+    await p.waitForTimeout(800);
+    ok((await state(p)).playing, '点播放：开始播放');
+    // 标签页转到后台：暂停；回来不自动续播，按钮是“继续播放”
+    await p.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      document.dispatchEvent(new Event('visibilitychange'));
     });
-    ok(!s.playing && film, `${name}：不自动播放，显示“▶ 播放 N 秒短片”按钮`, JSON.stringify([s, film]));
-    if (opts.hash) ok(s.active === 3, '带 hash 进入：停在对应的幕', JSON.stringify(s));
-    if (opts.seed) {
-      const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => [a.textContent.trim(), a.getAttribute('href')]));
-      ok(
-        /^继续学习：/.test(r[0][0]) && r[0][1].includes('/lessons/' + LESSONS[1].id) && /今日复习 1 题/.test(r[1]?.[0]),
-        '有进度和到期卡片：“继续学习：下一课”和“今日复习 1 题”',
-        JSON.stringify(r),
-      );
-      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
-      ok(
-        /^继续学习：/.test(last[0]) && last[1] === '查看课程地图' && /^今日复习 1 题/.test(last[2]),
-        '有进度和到期复习：收束幕是“继续学习：下一课”、“查看课程地图”、“今日复习 1 题”',
-        JSON.stringify(last),
-      );
-    } else {
-      const r = await p.evaluate(() => [...document.querySelectorAll('.s0 .st-actions a')].map(a => a.textContent.trim()));
-      ok(r.length === 1 && /从第 1 课开始/.test(r[0]), `${name}：没有进度时开场只有“从第 1 课开始”，没有“今日复习”`, JSON.stringify(r));
-      const last = await p.evaluate(() => [...document.querySelectorAll('.s9 .fin-actions a')].map(a => a.textContent.trim()));
-      ok(
-        last.length === 2 && /^开始学习/.test(last[0]) && last[1] === '查看课程地图',
-        `${name}：没有进度时收束幕是“开始学习”和“查看课程地图”，没有复习入口`,
-        JSON.stringify(last),
-      );
-    }
-    if (name === '同一会话已经播放过') {
-      await p.click('.btn.film');
-      await p.waitForTimeout(800);
-      ok((await state(p)).playing, '点“▶ 播放 N 秒短片”按钮：开始播放');
-      // 标签页转到后台：暂停，回来不自动续播，按钮是“继续播放”
-      await p.evaluate(() => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-      await p.waitForTimeout(400);
-      const hid = await state(p);
-      await p.evaluate(() => {
-        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
-        document.dispatchEvent(new Event('visibilitychange'));
-      });
-      await p.waitForTimeout(1200);
-      const back = await state(p);
-      ok(
-        !hid.playing && !back.playing && back.y === hid.y && /继续播放/.test(await p.getAttribute('.player .play', 'aria-label')),
-        '后台标签页：暂停；回到前台不自动续播，按钮是“继续播放”',
-        JSON.stringify([hid, back]),
-      );
-    }
+    await p.waitForTimeout(400);
+    const hid = await nav(p);
+    await p.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await p.waitForTimeout(1200);
+    const back = await nav(p);
+    ok(
+      !(await state(p)).playing && back.f === hid.f && /继续播放/.test(await p.getAttribute('.player .play', 'aria-label')),
+      '后台标签页：暂停；回到前台不自动续播，按钮是“继续播放”',
+      JSON.stringify([hid, back]),
+    );
+    await p.ctx.close();
+  }
+  // 站内跳走再回来：同一次页面加载内已经播过，不重放；刷新则重新播
+  {
+    const p = await open({ seen: false });
+    await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
+    await p.click('.rp-nav a[href*="roadmap"], a[href*="roadmap"]');
+    await p.waitForURL(/roadmap/);
+    await p.waitForTimeout(300);
+    await p.goBack();
+    await p.waitForSelector('.story.ready');
+    await p.waitForTimeout(2800);
+    const back = await state(p);
+    ok(!back.playing, '站内跳走再回来（后退）：不重放', JSON.stringify(back));
+    await p.reload();
+    await p.waitForSelector('.story.ready');
+    await p.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true', null, { timeout: 5000 });
+    ok(true, '刷新页面：重新自动播放');
     await p.ctx.close();
   }
   const r = await open({ reduced: true, seen: false });
@@ -975,19 +897,22 @@ for (const [w, h] of [
     dots: document.querySelectorAll('.rail a').length,
     sw: document.documentElement.scrollWidth <= innerWidth,
     h2: [...document.querySelectorAll('.sc h2')].every(h => h.checkVisibility({ checkOpacity: true })),
+    scrollable: document.documentElement.scrollHeight > innerHeight * 3 && getComputedStyle(document.documentElement).overflowY !== 'hidden',
   }));
   ok(!info.player && !info.film && info.y === 0 && info.anims === 0, '减少动画：没有播放器、没有自动播放、没有任何动画在跑', JSON.stringify(info));
   ok(
-    info.stage === 'relative' && info.copy && info.h2 && info.sw && info.dots === 10,
-    '减少动画：静态长文，每幕文字都是最终状态，幕进度指示保留',
+    info.stage === 'relative' && info.copy && info.h2 && info.sw && info.dots === 10 && info.scrollable,
+    '减少动画：仍是可以滚动的静态长文，每幕文字都是最终状态，幕进度指示保留',
     JSON.stringify(info),
   );
+  await r.evaluate(() => window.scrollTo(0, 3000));
+  ok((await r.evaluate(() => scrollY)) > 1000, '减少动画：页面真的能滚动');
   await r.ctx.close();
 }
 
-/* 7. 手动擦洗：往回滚倒放；自动播放暂停在某处与手动滚到同一位置，画面一致 */
+/* 7. 画面是影片时间的函数：同一帧永远是同一个画面；播放到某一幕的结论帧，和直接放到那一帧，画面一致 */
 {
-  const p = await open({ seen: true });
+  const p = await open({ seen: true, speed: 10 });
   const probe = ['[data-w="n-Item2"]', '[data-w="nl-TodoList"]', '[data-w="bo-Box2"]', '[data-w="cam"]', '[data-w="year"]'];
   const snap = async pg => {
     const out = [];
@@ -1005,67 +930,138 @@ for (const [w, h] of [
   const v3 = await snap(p);
   ok(
     JSON.stringify(v1) !== JSON.stringify(v2) && JSON.stringify(v1) === JSON.stringify(v3),
-    '手动擦洗：画面随滚动变化，往回滚会倒放（两个时间点比较关键元素的 transform / opacity）',
+    '同一帧永远是同一个画面（关键元素的 transform / opacity），不同帧不同',
     JSON.stringify([v1, v2]),
   );
-  ok((await look(p, '[data-w="cp-2"]')).o === 1 && (await look(p, '[data-w="cp-5"]')).o === 0, '手动擦洗：当前幕的文字不透明，别的幕的文字退场');
-  await p.ctx.close();
-  // 自动播放（倍速）在中途暂停，读下画面；再在另一页手动滚到同一位置，比较
-  const a = await open({ seen: false, speed: 6 });
-  await a.waitForFunction(() => document.querySelector('.player .play')?.getAttribute('aria-pressed') === 'true');
-  await a.waitForFunction(() => scrollY > 0.37 * (document.documentElement.scrollHeight - innerHeight));
-  await a.click('.player .play');
-  await a.waitForTimeout(300);
-  const yA = (await state(a)).y;
-  const snapA = await snap(a);
-  const b = await open({ seen: true });
-  await b.evaluate(y => window.scrollTo({ top: y, behavior: 'instant' }), yA);
-  await settle(b);
-  const snapB = await snap(b);
-  ok(JSON.stringify(snapA) === JSON.stringify(snapB), '自动播放与手动滚到同一位置：关键元素的 transform / opacity 一致', JSON.stringify([snapA, snapB]));
-  await a.ctx.close();
-  await b.ctx.close();
-}
-
-/* 8. 手机和横屏：无横向滚动，每幕的文字完整、不被播放器遮挡 */
-for (const [w, h] of [
-  [390, 844],
-  [360, 640],
-  [844, 390],
-]) {
-  const p = await open({ w, h });
+  ok((await look(p, '[data-w="cp-2"]')).o === 1 && (await look(p, '[data-w="cp-5"]')).o === 0, '当前幕的文字不透明，别的幕的文字退场');
+  // 每一幕的结论帧：文字层完全不透明、文字都读得出来
   const bad = [];
   for (let i = 0; i < 10; i++) {
-    await atF(p, i === 0 ? 1.5 : i === 9 ? TOTAL : MARKS[i] + 2.5);
-    await p.waitForTimeout(500);
+    await atF(p, STOP[i]);
+    await settle(p);
     const r = await p.evaluate(i => {
-      const sc = document.querySelectorAll('.sc')[i];
-      const c = sc.querySelector('.sc-copy');
-      const b = c.getBoundingClientRect();
-      const pl = document.querySelector('.player').getBoundingClientRect();
-      const last = c.querySelector('.hook, .foot, .desc, .scroll-hint, .st-links:last-child') || c;
-      const lb = (i === 9 ? c.querySelector('.foot') : i === 0 ? c.querySelector('.st-links') : c.querySelector('.desc')).getBoundingClientRect();
-      const inner = c.scrollHeight > c.clientHeight + 1;
-      return {
-        sw: document.documentElement.scrollWidth,
-        iw: innerWidth,
-        left: b.left,
-        right: b.right,
-        descBottom: lb.bottom,
-        playerTop: pl.top,
-        op: +getComputedStyle(c).opacity,
-        i,
-        scrolls: inner,
-        last: !!last,
-      };
+      const c = document.querySelector(`[data-w="cp-${i}"]`);
+      const others = [...document.querySelectorAll('.sc-copy')].filter(e => e !== c).map(e => +getComputedStyle(e).opacity);
+      const h = c.querySelector('h1, h2').checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+      return { o: +getComputedStyle(c).opacity, others: Math.max(...others), h };
     }, i);
-    if (r.sw > r.iw || r.left < -1 || r.right > r.iw + 1 || r.op < 0.99) bad.push(JSON.stringify(r));
-    else if (!(i === 9 && r.scrolls) && r.descBottom > r.playerTop + 1 && w < 500) bad.push('被播放器遮挡 ' + JSON.stringify(r));
+    if (r.o < 0.99 || r.others > 0.01 || !r.h) bad.push(i + ':' + JSON.stringify(r));
   }
-  ok(!bad.length, `${w}×${h}：每幕无横向滚动，文字在屏幕内，不被播放器遮挡`, bad.join(' ; '));
+  ok(!bad.length, '10 幕的结论帧：本幕文字完全不透明、别的幕文字全部退场、标题可见', bad.join(' ; '));
+  // 播放到下一幕的结论帧后，画面和直接放到那一帧一致
+  await atF(p, STOP[2]);
+  await p.mouse.move(640, 400);
+  await p.keyboard.press('ArrowDown');
+  await waitIdle(p);
+  const played = await snap(p);
+  await atF(p, STOP[3]);
+  await settle(p);
+  const direct = await snap(p);
+  ok(JSON.stringify(played) === JSON.stringify(direct), '播放到第 3 幕的结论帧 = 直接放到那一帧：关键元素一致', JSON.stringify([played, direct]));
   await p.ctx.close();
 }
 
+/* 8. 手机各尺寸（含 390×664 地址栏占位后的真实可视区）和横屏：无横向滚动；每一幕的文字、画面、控制条互不遮挡；正文 ≥ 14px、次要文字 ≥ 12px；触摸区域 ≥ 44px；
+ *    开场、收束幕里每个可点的东西，中心点命中的就是它自己 */
+const PHONES = [
+  [360, 640],
+  [375, 667],
+  [390, 664],
+  [390, 844],
+  [412, 915],
+  [430, 932],
+  [844, 390],
+];
+for (const [w, h] of PHONES) {
+  const c = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+  const p = await c.newPage();
+  p.on('pageerror', e => errs.push(e.message));
+  await p.addInitScript(() => {
+    window.__storyTest = true;
+    window.__storyNoAuto = true;
+  });
+  await p.goto(site);
+  await p.waitForSelector('.story.ready');
+  await p.waitForTimeout(400);
+  const land = w > h;
+  const bad = [];
+  for (let i = 0; i < 10; i++) {
+    await atF(p, STOP[i]);
+    await p.waitForTimeout(450);
+    const r = await p.evaluate(
+      ([i, land]) => {
+        const c = document.querySelector(`[data-w="cp-${i}"]`);
+        const b = c.getBoundingClientRect();
+        const pl = document.querySelector('.player').getBoundingClientRect();
+        const nav = document.querySelector('.story').getBoundingClientRect().top;
+        const out = {
+          i,
+          sw: document.documentElement.scrollWidth,
+          iw: innerWidth,
+          ih: innerHeight,
+          l: b.left,
+          r: b.right,
+          t: b.top,
+          b: b.bottom,
+          pt: pl.top,
+          nav,
+          minFont: 99,
+          minDescFont: 99,
+          small: [],
+          hit: [],
+        };
+        // 字号：文字层里所有有文字的元素
+        for (const e of c.querySelectorAll('*')) {
+          if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+          if (!e.checkVisibility({ checkVisibilityCSS: true })) continue;
+          const fs = parseFloat(getComputedStyle(e).fontSize);
+          out.minFont = Math.min(out.minFont, fs);
+          if (e.matches('.desc, .lead')) out.minDescFont = Math.min(out.minDescFont, fs);
+          if (fs < 12) out.small.push(e.className + ':' + fs);
+        }
+        // 触摸区域：控制条里可见的按钮和链接
+        out.touch = [...document.querySelectorAll('.player button, .player a')]
+          .filter(e => e.checkVisibility({ checkVisibilityCSS: true }))
+          .map(e => {
+            const r = e.getBoundingClientRect();
+            return Math.round(Math.min(r.width, r.height));
+          });
+        // 可点的东西：中心点命中的就是它自己或后代
+        const clickable = [...c.querySelectorAll('a, button')].filter(e => e.checkVisibility({ checkVisibilityCSS: true }));
+        for (const e of clickable) {
+          e.scrollIntoView({ block: 'nearest' });
+          const r = e.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!(hit && (e === hit || e.contains(hit) || hit.contains(e)))) out.hit.push((e.textContent || '').trim().slice(0, 10));
+        }
+        c.scrollTop = 0;
+        return out;
+      },
+      [i, land],
+    );
+    const inner = i === 9 ? 0 : 1;
+    const overP = !land && i !== 9 && r.b > r.pt + 1;
+    if (
+      r.sw > r.iw ||
+      r.l < -1 ||
+      r.r > r.iw + 1 ||
+      r.t < r.nav - 1 ||
+      overP ||
+      r.minDescFont < 14 ||
+      r.small.length ||
+      r.hit.length ||
+      r.touch.some(t => t < 44) ||
+      inner < 0
+    )
+      bad.push(JSON.stringify(r));
+  }
+  ok(
+    !bad.length,
+    `${w}×${h}：每幕无横向滚动、文字在屏内且不被控制条遮挡、正文 ≥ 14px 且没有 < 12px 的字、触摸区域 ≥ 44px、可点的东西不被盖住`,
+    bad.slice(0, 2).join(' ; '),
+  );
+  await c.close();
+}
 /* 9. 键盘：Tab 从头走，每个获得焦点的链接、按钮都看得见（不透明、在视口里） */
 {
   const p = await open({ seen: true });
@@ -1228,7 +1224,11 @@ for (const [w, h] of [
 /* 10b2. 四种尺寸下收束幕互不遮挡：标题、八个节点、统计说明、按钮都完整可见；没有内部滚动容器；中心点命中的不是固定浮层 */
 for (const [w, h] of [
   [360, 640],
+  [375, 667],
+  [390, 664],
   [390, 844],
+  [412, 915],
+  [430, 932],
   [1280, 720],
   [1280, 800],
 ]) {
@@ -1271,10 +1271,7 @@ for (const [w, h] of [
 }
 
 /* 10c. 幕进度指示：所有圆点的圆心在一条线上（桌面竖线、手机同理），间距均匀，点击区域不小于 24×24；第一幕、中间一幕、最后一幕为当前时各量一次 */
-for (const [w, h] of [
-  [1280, 800],
-  [390, 844],
-]) {
+for (const [w, h] of [[1280, 800]]) {
   const p = await open({ w, h });
   for (const [label, f] of [
     ['第一幕为当前', 1],
@@ -1321,6 +1318,150 @@ for (const [w, h] of [
   });
   ok(hv <= 0.5, `${w}×${h} 幕进度指示：悬停、聚焦时圆点也不动`, String(hv));
   await p.ctx.close();
+}
+
+/* 10c2. 手机：幕进度指示合并进控制条上面的分段进度（圆点列表不显示）；每段都够大、够好点 */
+for (const [w, h] of [
+  [360, 640],
+  [390, 844],
+]) {
+  const p = await open({ w, h });
+  const r = await p.evaluate(() => ({
+    rail: getComputedStyle(document.querySelector('.rail')).display,
+    segs: [...document.querySelectorAll('.scrub .seg')].map(e => Math.round(e.getBoundingClientRect().width)),
+    scrubH: document.querySelector('.scrub').getBoundingClientRect().height,
+  }));
+  ok(
+    r.rail === 'none' && r.segs.length === 10 && Math.min(...r.segs) >= 24 && r.scrubH >= 24,
+    `${w}×${h}：手机上圆点列表不显示，控制条的 10 段进度每段 ≥ 24px 宽（${Math.min(...r.segs)}px）、高 ≥ 24px`,
+    JSON.stringify(r),
+  );
+  await p.ctx.close();
+}
+
+/* 10f. 真实触摸点击（Playwright 的 iPhone 13 WebKit、Pixel 7 Chromium 设备配置，hasTouch + isMobile，用 tap / touchscreen.tap，不是 click）：
+ *      自动播放结束后、直接放到收束幕（不是 ended 状态）、点“跳过”之后，收束幕里的主按钮、“查看课程地图”、控制条上的“开始学习”都真的能进入下一页；
+ *      以前手机上点“开始学习 →”没反应，是因为播放控制条里的“跳过”在已经到了收束幕时只把地址改成 #scene-9。 */
+{
+  const { chromium: cr, webkit: wk, devices } = await import('playwright');
+  const combos = [
+    ['iPhone 13', wk],
+    ['Pixel 7', cr],
+  ];
+  for (const [dn, eng] of combos) {
+    let b;
+    try {
+      b = await eng.launch();
+    } catch {
+      continue; // 本机没有这个引擎
+    }
+    const mk = async init => {
+      const c = await b.newContext({ ...devices[dn] });
+      const pg = await c.newPage();
+      pg.on('pageerror', e => errs.push(e.message));
+      await pg.addInitScript(() => {
+        window.__storyTest = true;
+        window.__storySpeed = 10;
+      });
+      await pg.goto(site);
+      await pg.waitForSelector('.story.ready');
+      await init(pg);
+      await pg.waitForTimeout(800);
+      return { c, pg };
+    };
+    const paths = {
+      自动播放到结束后: async pg => {
+        await pg.waitForFunction(() => document.querySelector('.story').classList.contains('ended'), null, { timeout: 40000 });
+      },
+      '直接放到收束幕（不是 ended 状态）': async pg => {
+        await pg.evaluate(f => window.__storyHook.at(f), TOTAL - 1);
+        await pg.evaluate(() => document.querySelector('.story').classList.remove('ended'));
+      },
+      '点“跳过”之后': async pg => {
+        await pg.tap('.player .skip');
+        await pg.waitForFunction(() => window.__storyHook.nav().scene === 9 && window.__storyHook.nav().mode === 'idle', null, { timeout: 10000 });
+      },
+    };
+    for (const [pathName, init] of Object.entries(paths)) {
+      for (const [sel, want] of [
+        ['.s9 .fin-actions .btn.primary', /\/lessons\//],
+        ['.s9 .fin-actions .btn.ghost', /\/roadmap/],
+      ]) {
+        const { c, pg } = await mk(init);
+        const hit = await pg.evaluate(s => {
+          const e = document.querySelector(s);
+          const r = e.getBoundingClientRect();
+          const h = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+          return !!h && (e === h || e.contains(h));
+        }, sel);
+        await pg.tap(sel, { timeout: 5000 });
+        await pg.waitForURL(want, { timeout: 8000 }).catch(() => {});
+        ok(hit && want.test(pg.url()), `${dn} 触摸点击（${pathName}）：${sel.includes('primary') ? '“开始学习”' : '“查看课程地图”'}能进入下一页`, pg.url());
+        await c.close();
+      }
+    }
+    // 控制条上的“开始学习 →”：不在收束幕时是跳过；已经在收束幕时（没有 ended 的情形）它就是进入学习的链接
+    {
+      const { c, pg } = await mk(paths['直接放到收束幕（不是 ended 状态）']);
+      const sk = await pg.evaluate(() => {
+        const e = document.querySelector('.player .skip');
+        return {
+          vis: e.checkVisibility({ checkVisibilityCSS: true }),
+          href: e.getAttribute('href'),
+          main: document.querySelector('.s9 .btn.primary').getAttribute('href'),
+        };
+      });
+      if (sk.vis) await pg.tap('.player .skip');
+      await pg.waitForURL(/\/lessons\//, { timeout: 8000 }).catch(() => {});
+      ok(
+        sk.href === sk.main && /\/lessons\//.test(pg.url()),
+        `${dn}：已经在收束幕时，控制条上的“开始学习 →”会真的进入学习（不再只改地址）`,
+        JSON.stringify([sk, pg.url()]),
+      );
+      await c.close();
+    }
+    {
+      const { c, pg } = await mk(paths['自动播放到结束后']);
+      const vis = await pg.evaluate(() => document.querySelector('.player .skip').checkVisibility({ checkVisibilityCSS: true }));
+      ok(!vis, `${dn}：收束幕播完后，控制条里不再有“跳过”这个无用的按钮`);
+      // 控制条里每个可见的按钮点一下都有效：重播、声音
+      await pg.tap('.player .snd');
+      await pg.waitForTimeout(400);
+      ok((await pg.getAttribute('.player .snd', 'aria-pressed')) === 'true', `${dn} 触摸：声音开关点一下有效`);
+      await pg.tap('.player .replay');
+      await pg.waitForTimeout(700);
+      ok((await pg.evaluate(() => window.__storyHook.nav())).scene <= 1, `${dn} 触摸：重播点一下有效`);
+      await c.close();
+    }
+    {
+      // 开场的两个按钮、进度条的每一段、播放键：触摸点击都有效
+      const { c, pg } = await mk(async p0 => {
+        await p0.evaluate(() => document.querySelector('.player .play').click()); // 先停掉自动播放
+        await p0.evaluate(f => window.__storyHook.at(f), 0);
+      });
+      const hits = await pg.evaluate(() =>
+        [...document.querySelectorAll('.s0 .sc-copy a, .s0 .sc-copy button, .player button, .player a')]
+          .filter(e => e.checkVisibility({ checkVisibilityCSS: true }))
+          .map(e => {
+            const r = e.getBoundingClientRect();
+            const h = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+            return [(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 8), !!h && (e === h || e.contains(h))];
+          }),
+      );
+      ok(hits.length >= 6 && hits.every(h => h[1]), `${dn}：开场的按钮和控制条里每个按钮的中心点命中的都是它自己`, JSON.stringify(hits));
+      await pg.tap('.player .play');
+      await pg.waitForTimeout(600);
+      ok((await pg.evaluate(() => window.__storyHook.nav())).mode === 'auto', `${dn} 触摸：播放键点一下开始自动播放`);
+      const segs = await pg.$$eval('.scrub .seg', els => els.map(e => e.getBoundingClientRect().toJSON()));
+      const sb = await pg.locator('.scrub').boundingBox();
+      await pg.touchscreen.tap(segs[4].x + segs[4].width / 2, sb.y + sb.height / 2);
+      await pg.waitForTimeout(1200);
+      const n = await pg.evaluate(() => window.__storyHook.nav());
+      ok(n.scene === 4 || n.mode === 'fade' || n.mode === 'run', `${dn} 触摸：点进度条第 4 段进入第 4 幕`, JSON.stringify(n));
+      await c.close();
+    }
+    await b.close();
+  }
 }
 
 /* 10d. 配乐：默认静音、点开才创建 AudioContext 和加载音频 chunk；与影片同步；暂停静音；关掉、离开页面都清理；偏好记在单独的键里 */
@@ -1388,11 +1529,15 @@ for (const [w, h] of [
   // 音乐从当前影片时间开始（不是从头），换幕后重新排程
   const f0 = a1.info.anchorF;
   ok(f0 > 4, '音乐从当前的影片时间淡入（不是从头）', String(f0));
+  await p.click('.player .play');
+  await p.waitForTimeout(300);
   await p.click('.player .next');
   await p.waitForTimeout(1500);
   const a2 = await hook();
-  ok(a2.info.anchorF >= f0 + 2 && a2.playing, '拖到别的幕后，调度位置随之改变', JSON.stringify([f0, a2.info.anchorF]));
+  ok(a2.info.anchorF >= f0 + 2 && a2.info.mode === 'film', '切到下一幕后，音乐从那一帧的位置继续（手动切幕时也有声音）', JSON.stringify([f0, a2.info.anchorF]));
   // 暂停：0.5 秒内静音，随后 suspend
+  await p.click('.player .play');
+  await p.waitForTimeout(800);
   await p.click('.player .play');
   await p.waitForTimeout(550);
   const a3 = await hook();
@@ -1506,10 +1651,11 @@ for (const [w, h] of [
 /* 截图（HOME_SHOTS=1） */
 if (process.env.HOME_SHOTS) {
   const out = path.join(ROOT, 'tests/screenshots');
-  const plan = [1.5, 8.5, 14.5, 19.4, 24.4, 30.3, 35.6, 43.4, 49.4, 53.5];
+  const plan = STOP; // 每一幕的结论帧
   for (const [name, opts] of [
-    ['desktop', {}],
+    ['desktop', { w: 1440, h: 900 }],
     ['mobile', { w: 390, h: 844 }],
+    ['mobile360', { w: 360, h: 640 }],
   ]) {
     const p = await open(opts);
     for (const [i, f] of plan.entries()) {
