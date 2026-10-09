@@ -13,6 +13,7 @@ export { makeSelfExplain } from './selfExplain.ts';
 export { markTerms } from './terms.ts';
 export { makeReview } from './review.ts';
 export { makeCheck } from './stageCheck.ts';
+export { attachStory } from './home.ts';
 export { attachHeroTree, HERO_H, HERO_NODES, HERO_W, accName } from './home.ts';
 export { offerResume, savePos } from './reading.ts';
 export { doneCount, stageCount, dueCount, drillCount, lessonDrillCount } from './counts.ts';

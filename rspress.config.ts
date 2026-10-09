@@ -31,6 +31,8 @@ export default defineConfig({
   description: '中文交互式 React 课程：先预测再运行，边做边学。',
   globalStyles: path.join(here, 'theme/style.css'),
   outDir: 'doc_build',
+  // 首页叙事的动态布局开关：浏览器支持 CSS 滚动驱动动画时，在首屏绘制前就打开，避免加载后版面跳动。没有 JS 时页面是静态长文。
+  head: ['<script>try{if(CSS.supports("animation-timeline","view()"))document.documentElement.classList.add("story-dyn")}catch(e){}</script>'],
   // 课文里的 <Playground>、<Quiz> 等组件，在 MDX 里不用逐个 import
   markdown: {
     remarkPlugins: [remarkPlay],

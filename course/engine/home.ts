@@ -15,3 +15,17 @@ export function attachHeroTree(root: HTMLElement): () => void {
     destroy = null;
   };
 }
+
+/** 首页叙事：按需加载 story.ts（不支持 CSS 滚动驱动动画时的回退驱动、幕进度指示、屏幕外暂停）。返回销毁函数。 */
+export function attachStory(root: HTMLElement): () => void {
+  let destroy: (() => void) | null = null;
+  let dead = false;
+  import('./story.ts').then(m => {
+    if (!dead) destroy = m.attach(root);
+  });
+  return () => {
+    dead = true;
+    destroy?.();
+    destroy = null;
+  };
+}

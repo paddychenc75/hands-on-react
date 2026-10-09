@@ -1,3 +1,4 @@
+@import "./story.css";
 /* 课程组件样式：从旧版 src/style.css 搬来（只保留组件用到的部分），再按 Rspress 做适配。
    - 颜色令牌（--ink、--panel 等）在 :root（浅色）和 html.dark（深色）各定义一份，组件只用令牌，两种模式下文字都可读。
    - 页面外壳（顶栏、侧栏、首页、路由）交给 Rspress，所以不搬。 */
