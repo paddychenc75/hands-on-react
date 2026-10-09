@@ -303,9 +303,14 @@ for (const id of LESSONS) {
 /* i. 首页：标题、六个阶段、继续学习入口；学完一课后数字更新 */
 {
   await page.goto(site);
-  await page.evaluate(() => localStorage.clear());
+  // 首页组件树进入视口后会自动演示一轮（本会话一次）：这里先记成“已演示”，免得它改动下面要点的计数
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.setItem('hoc-hero-demo', '1');
+  });
   await page.reload();
   await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.home .hero-tree[data-ready]');
   const r = await page.evaluate(() => ({
     h1: document.querySelector('.home h1')?.textContent,
     stages: document.querySelectorAll('.home .stage').length,
@@ -319,7 +324,7 @@ for (const id of LESSONS) {
     r.h1 === '从零开始，边做边学React' &&
       r.stages === 6 &&
       r.prereq &&
-      r.tree === 7 &&
+      r.tree === 9 &&
       /开始第一课/.test(r.cta) &&
       r.stats[0] === '50' &&
       r.names[5] === '深入专题与毕业设计',
@@ -328,9 +333,9 @@ for (const id of LESSONS) {
   );
   // 组件树：点 Header，它和后代（Logo、Search）重新渲染，兄弟 TodoList 不变
   await page.locator('.home .tnode', { hasText: 'Header' }).click();
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(1800);
   const rc = await page.evaluate(() =>
-    [...document.querySelectorAll('.home .tnode')].map(g => g.querySelector('text').textContent + g.querySelector('.rc').textContent),
+    [...document.querySelectorAll('.home .tnode')].map(g => g.querySelector('.nm').textContent + g.querySelector('.rc').textContent),
   );
   ok(
     rc.filter(x => /渲染 2 次/.test(x)).length === 3 && /TodoList.*渲染 1 次/.test(rc.join('|')),

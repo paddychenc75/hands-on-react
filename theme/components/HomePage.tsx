@@ -1,15 +1,14 @@
 import { Link } from '@rspress/core/theme';
-import { buildHeroTree, doneCount, drillCount, dueCount, progress, isDone } from '../../course/engine/index.ts';
+import { doneCount, drillCount, dueCount, progress, isDone } from '../../course/engine/index.ts';
 import { LESSONS } from '../../course/registry.ts';
 import { STAGES } from '../../course/stages.ts';
 import { useProgress } from '../lib/useProgress';
-import { useDomSlot } from '../lib/useDomSlot';
+import HeroTree from './HeroTree';
 
 /** 首页（旧版 renderHome）：hero、统计、学习方法、六阶段课程地图。
  *  依赖进度的部分（继续学习、完成数、到期数、各阶段进度）挂载后才显示真实数字。 */
 export default function HomePage() {
   const mounted = useProgress();
-  const treeRef = useDomSlot(() => buildHeroTree());
   const done = mounted ? doneCount() : 0;
   const due = mounted ? dueCount() : 0;
   const next = (mounted && LESSONS.find((l: any) => !isDone(l.id))) || LESSONS[0];
@@ -33,7 +32,7 @@ export default function HomePage() {
   return (
     <div className="hoc home">
       <section className="hero">
-        <div>
+        <div className="hero-copy">
           <div className="eyebrow">按学习科学设计的 React 课程 · 中文</div>
           <h1>
             从零开始，
@@ -41,29 +40,26 @@ export default function HomePage() {
             边做边学<em>React</em>
           </h1>
           <p>这里不只是读教程。你会先预测代码的结果再运行验证，每节课开头回忆旧知识，按遗忘规律复习，每个阶段通过测验才算掌握。</p>
-          <p className="prereq">
-            <b>开始前你需要会：</b>JavaScript 基础（变量、函数、箭头函数、数组的 map 和 filter、对象和数组的解构与展开、模块的 import/export、Promise 与
-            async/await），以及基本的 HTML 和 CSS。还不熟的话，先花一两周补 JavaScript，再回来学会轻松很多。
-          </p>
-          <div className="cta">
-            <Link className="btn primary" href={'/lessons/' + next.id}>
-              {done ? '继续学习：' + next.title : '开始第一课'} →
+        </div>
+        <p className="prereq">
+          <b>开始前你需要会：</b>JavaScript 基础（变量、函数、箭头函数、数组的 map 和 filter、对象和数组的解构与展开、模块的 import/export、Promise 与
+          async/await），以及基本的 HTML 和 CSS。还不熟的话，先花一两周补 JavaScript，再回来学会轻松很多。
+        </p>
+        <div className="cta">
+          <Link className="btn primary" href={'/lessons/' + next.id}>
+            {done ? '继续学习：' + next.title : '开始第一课'} →
+          </Link>
+          {due ? (
+            <Link className="btn sun" href="/review">
+              今日复习 {due} 题
             </Link>
-            {due ? (
-              <Link className="btn sun" href="/review">
-                今日复习 {due} 题
-              </Link>
-            ) : (
-              <Link className="btn" href="/lessons/rendering">
-                直接看渲染原理
-              </Link>
-            )}
-          </div>
+          ) : (
+            <Link className="btn" href="/lessons/rendering">
+              直接看渲染原理
+            </Link>
+          )}
         </div>
-        <div className="tree-card">
-          <div ref={treeRef} />
-          <p className="cap">点击任意组件，模拟它调用了 set 函数：它和它的所有后代都会重新渲染（闪黄），兄弟和祖先不受影响。这就是第 19 课要讲的内容。</p>
-        </div>
+        <HeroTree />
       </section>
 
       <div className="stats">

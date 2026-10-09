@@ -40,7 +40,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query、state-architecture、form-architecture 四课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data、animation 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），`animation`（动画与过渡一课：六个示例的行为、四道预测题的答案、没有 View Transition API 时更新照常、开启减少动画后 React 不会自动关动画；用 Chromium 的 View Transition API，共享元素用真实鼠标点击），可以写多个；不写就十个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query、state-architecture、form-architecture 四课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data、animation 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），`animation`（动画与过渡一课：六个示例的行为、四道预测题的答案、没有 View Transition API 时更新照常、开启减少动画后 React 不会自动关动画；用 Chromium 的 View Transition API，共享元素用真实鼠标点击），`hero`（首页入口与主视觉：顶栏站名、侧栏和手机菜单里的“课程首页”、面包屑阶段链接；组件树的自动演示只播一次、点击范围与计数、memo、连点、键盘、减少动画、手机宽度、离开再回来、切后台、长任务；`HERO_SHOTS=1 node tests/e2e/hero.mjs` 还会重拍 `tests/screenshots/hero-*.png`），可以写多个；不写就十一个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 50 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -93,7 +93,9 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `completion.ts` | 一课的完成判定和“掌握标准”条 |
 | `selfExplain.ts` | 自我解释 |
 | `terms.ts` | 术语标注 |
-| `home.ts` / `reading.ts` / `counts.ts` | 首页组件树 / 阅读位置 / 侧栏和顶栏的数字 |
+| `home.ts` / `reading.ts` / `counts.ts` | 首页组件树的按需加载入口 `attachHeroTree`（动态 import `heroTree.ts`）和静态数据的出口 / 阅读位置 / 侧栏和顶栏的数字 |
+| `heroTree.ts` | 首页组件树的动画和交互（光点沿连线、节点亮起回弹、计数滚动、memo、自动演示、切后台收尾、卸载清理）。只在首页自己的异步 chunk 里，**不能被主包静态 import** |
+| `logic/heroTree.ts` / `logic/heroTreeData.ts` | 组件树的纯逻辑：谁渲染、按什么顺序和延迟（`planPulse`）、计数、读屏播报和旁白 / 树的静态数据（节点、坐标，服务端渲染的静态版本只用它）。单元测试 `tests/unit/heroTree.test.ts` |
 | `logic/srs.ts` | SRS 间隔推进、到期判断、热身选题 |
 | `logic/ladder.ts` | 提示阶梯解锁、“代码是否真的改了”、半成品示例 |
 | `logic/selfExplain.ts` | 自我解释有效字数 |
@@ -117,7 +119,7 @@ npm run new-lesson -- hooks-recap --stage 1 --after custom-hooks --title "Hook �
 然后：
 
 1. 把所有“【待写】”换成真内容（`npm run check:content` 会提示哪些课还有占位）。写作规范见下。
-2. **课号是位置**：插在中间会让后面的课号 +1。脚本会列出写了“第 N 课”且 N ≥ 新课号的位置；`check:content` 也会报“第 N 课《标题》”和“第 N 课“词””对不上的引用。逐个核对。毕业设计（portfolio）的验收表引用了很多课号；`theme/components/HomePage.tsx` 里写了“第 19 课”（渲染机制）。另外，`engineering`（第 34 课，第 5 阶段第一课）和 `delivery`（第 35 课）和 `project-weather`（第 41 课，第 5 阶段最后一课）有本机操作的命令、配置和版本要求，写进去前要对照官方文档核对。
+2. **课号是位置**：插在中间会让后面的课号 +1。脚本会列出写了“第 N 课”且 N ≥ 新课号的位置；`check:content` 也会报“第 N 课《标题》”和“第 N 课“词””对不上的引用。逐个核对。毕业设计（portfolio）的验收表引用了很多课号；首页的组件树说明文字用课 id（`rendering`、`performance`）取课名做链接，不写课号。另外，`engineering`（第 34 课，第 5 阶段第一课）和 `delivery`（第 35 课）和 `project-weather`（第 41 课，第 5 阶段最后一课）有本机操作的命令、配置和版本要求，写进去前要对照官方文档核对。
 3. 估算 `mins`（公式在 `scripts/lesson-mins.mjs`，`npm run mins` 看全部课的“现值 / 公式值 / 偏差”）：
    - 正文每 300 字约 1 分钟（字数不含代码块和标签），可运行示例每个 +2，测验每题 +1，一道正式练习 +15（原写“+10~20”，取中值）。
    - **项目课**（有练习、没有可运行示例，整课就是一个分步完成的项目，现有 `project-todo`、`project-search`、`project-kanban`）的综合练习按 **30 分钟**计，代替上面的 +15。有可运行示例的项目课（`project-actions`、`project-weather`）按普通课算。
@@ -377,6 +379,7 @@ export default {
   - **新增或修改课的字段后**：生成的目录和映射由 `npm run gen` 更新（`dev`、`build` 启动时自动跑，`check:content` 检查是否最新）。dev 服务器运行期间改了某课的 `title`、`summary`、`goals`、`mins`、题数、有没有练习等目录里的字段，要手动 `npm run gen`（或重启 dev）页面才会变；改题干、练习、示例说明不用，那些在课自己的 chunk 里，热更新照常。
   - 体积由 `tests/e2e/libs.mjs` 守着：主包有上限，且主包里不能有任何课的测验题文字；`tests/e2e/split.mjs` 守着“只请求需要的课的 chunk”。
 - **课程注册表自动收集**：`course/lessons/*.ts` → `scripts/gen-registry.mjs` → `course/lessons.generated.ts`、`lessons.catalog.generated.ts`、`lessons.loaders.generated.ts`（提交进仓库）。选生成脚本而不是 `import.meta.webpackContext`：rspress dev/build、Vitest、node 脚本和 tsc 要读同一份课程表，没有一种目录收集写法四处都能用。`dev`/`build` 前自动重新生成，`check:content` 检查它是否最新。
+- **首页主视觉（组件树）**：`theme/components/HeroTree.tsx` 在服务端渲染静态版本（9 个节点按钮、SVG 连线、memo 开关都在 HTML 里，开关先是 disabled），挂载后 `attachHeroTree` 动态加载 `course/engine/heroTree.ts` 去“激活”（根元素上出现 `data-ready`）。激活后树里的内容由它直接改 DOM，所以 `HeroTree` 用 `memo` 包住，React 不会再重渲染它。动画只用 Web Animations API 动 `transform`、`opacity` 和 SVG 的 `stroke-dashoffset`，不引入动画库；减少动画、切后台、卸载的行为见 `heroTree.ts` 开头注释和 `tests/e2e/hero.mjs`。自动演示是否播过记在 `sessionStorage['hoc-hero-demo']`，用户点过节点记在 `localStorage['hoc-hero-touched']`（都不是学习进度的键）。**主包不能带这块的动画代码**：`libs.mjs` 的主包上限会盯着，改完看一眼 `static/js/index.*.js` 的大小。
 - **站内链接**：引擎拼出来的 `<a>` 带 base 和 `.html`（`course/site.ts` 的 `lessonHref` 等）；全局组件 `LinkRouter` 拦截点击，交给 Rspress 的客户端路由，页面不整页刷新。
 - **实验台版面**：`.hoc-slot` 是 CSS 容器，宽度不足 900px 时编辑器在上、预览在下，保证 60 字符的代码行不折行。
 - **预览区的站点默认样式必须是零优先级**（`theme/style.css` 里 `:where(.preview button)` 这种写法，不要写成 `.preview button`）。因为实验台没有 iframe，站点样式和学习者的 `<style>` 在同一页面，优先级更高的默认样式会盖住示例里的单类选择器。示例里不要出现 `.preview`，选择器按真实项目的自然写法来；冒烟测试 b2 项守着这一条。示例的类名也别用站点自己的 `.btn`。
