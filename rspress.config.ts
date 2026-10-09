@@ -11,6 +11,7 @@ const component = (name: string) => path.join(here, 'theme/components', name + '
 // 侧栏：全站一份（课程页、复习页、术语表、阶段测验页都显示同一个目录），按阶段分组。
 // 课的顺序来自 course/order.ts，阶段来自每课数据文件的 stage：加课不用改这里。
 const lessonSidebar = [
+  { text: '课程首页', link: '/' },
   { text: '今日复习', link: '/review' },
   { text: '术语表', link: '/glossary' },
   { text: '变式练习', link: '/drills' },

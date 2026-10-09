@@ -161,7 +161,7 @@ export default function HomePage() {
           const rec = st[si];
           const [dd, dn] = mounted ? drillCount(si) : [0, ls.reduce((n: number, l: any) => n + l.nDrills, 0)];
           return (
-            <section className="stage" key={si}>
+            <section className="stage" id={'stage-' + si} key={si}>
               <div className="stage-head">
                 <span className="stage-no">{s.no}</span>
                 <h3>{s.name}</h3>

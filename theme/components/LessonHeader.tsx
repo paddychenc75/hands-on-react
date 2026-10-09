@@ -1,3 +1,4 @@
+import { BASE } from '../../course/site.ts';
 import { STAGES } from '../../course/stages.ts';
 import { lessonNo, TOTAL_LESSONS } from '../../course/registry.ts';
 import { useLesson } from '../lib/useLesson';
@@ -10,9 +11,9 @@ export default function LessonHeader() {
   return (
     <div className="hoc">
       <div className="crumb">
-        <span className="tag">
+        <a className="tag" href={BASE + '#stage-' + lesson.stage} title="在首页的课程地图里查看这个阶段">
           {stage.no} · {stage.name}
-        </span>
+        </a>
         <span>
           第 {lessonNo(lesson.id)} / {TOTAL_LESSONS} 课
         </span>

@@ -388,3 +388,17 @@ html.dark .btn.sun, html.dark .rp-doc .btn.sun, html.dark a[data-hoc-due]::after
 .drill-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 8px; font-size: 16px; }
 .drill-no { font: 600 12px var(--f-mono); letter-spacing: .06em; color: var(--sun); border: 1px solid var(--sun); border-radius: 99px; padding: 1px 9px; white-space: nowrap; }
 .pg-head .pg-badge.dr { color: var(--violet); border-color: var(--violet); }
+
+/* 回首页的入口：顶栏站名（带原子图标）、手机菜单第一项、课页面包屑里的阶段名 */
+.hoc-site-title { display: inline-flex; align-items: center; gap: 8px; border-radius: 8px; padding: 4px 6px; margin-left: -6px; color: var(--ink); white-space: nowrap; flex: none; transition: color .15s, background-color .15s; }
+.hoc-site-title .hoc-atom { color: var(--accent); flex: none; transition: transform .5s cubic-bezier(.3, .7, .3, 1); }
+.hoc-site-title:hover { color: var(--accent); background: var(--accent-wash); }
+.hoc-site-title:hover .hoc-atom { transform: rotate(120deg); }
+.hoc-site-title:focus-visible, .rp-nav-screen-menu-item.hoc-nav-home:focus-visible, .crumb a.tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hoc-site-title[aria-current="page"] { color: var(--accent); }
+.rp-nav-menu--left:has(> .hoc-nav-home:only-child), .rp-nav-menu .hoc-nav-home { display: none; }
+.rp-nav-screen-menu-item.hoc-nav-home { text-decoration: none; }
+.rp-doc .crumb a.tag { text-decoration: none; transition: background-color .15s, color .15s; }
+.rp-doc .crumb a.tag:hover { background: var(--accent); color: var(--accent-ink); }
+.stage { scroll-margin-top: 16px; }
+@media (prefers-reduced-motion: reduce) { .hoc-site-title .hoc-atom { transition: none; } .hoc-site-title:hover .hoc-atom { transform: none; } }
