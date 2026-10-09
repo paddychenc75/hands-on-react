@@ -40,7 +40,7 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `npm run gen` | 重新生成 `course/lessons.*generated.ts`（Node 端课表、轻量目录、课 chunk 映射；dev、build 会自动跑；一般不用手动） | 即时 |
 | `npm run screenshots` | 重新生成 `tests/screenshots/` 里的截图，改版面后人工看一眼 | 约 1 分钟 |
 
-- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query、state-architecture、form-architecture 四课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data、animation 的参考答案仍通过），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），`animation`（动画与过渡一课：六个示例的行为、四道预测题的答案、没有 View Transition API 时更新照常、开启减少动画后 React 不会自动关动画；用 Chromium 的 View Transition API，共享元素用真实鼠标点击），`hero`（回首页和课程地图的入口：顶栏站名、侧栏和手机菜单里的“课程首页”、面包屑阶段链接指向 `/roadmap#stage-N`；rendering 一课里的组件树：自动演示只播一次、点击范围与计数、memo、连点、键盘、减少动画、手机宽度、离开再回来、切后台、长任务；`HERO_SHOTS=1 node tests/e2e/hero.mjs` 还会重拍 `tests/screenshots/hero-*.png`），`home`（首页短片：静态 HTML 里有全部幕的文案、没有 JS 时可读、首次进入约 1.2 秒后自动播放且整片真实速度放完用时 45–60 秒、用户接管不抢滚动、控制条各项功能、各种不自动播放的情形、自动与手动同一画面、390/360/横屏无横向滚动、Tab 走完、CLS/长任务/帧间隔、首页 chunk 与主包体积；约 3 分钟），可以写多个；不写就十二个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
+- `npm run test:e2e` 的用法：`-- <套件> [课id …]`，套件是 `lessons`（课 id 跟在后面）、`mechanics`、`smoke`、`runtime`（实验台运行时：版本固定为 19.3.0、全局没有 `window.React`、跳转后仍正常、警告显示、资源被拦截、react-19 一课的示例和练习）、`libs`（第三方库：按需加载、版本标记、router、tanstack-query、state-architecture、form-architecture 四课的真库示例与预测题答案、库文件被拦截、tanstack-query 的练习），`drillhub`（变式练习的入口与标记：侧栏“变式 x/y”随进度变化、`/drills` 总览页列出全部变式并跳转到位、首页统计与阶段变式数、课头的变式时间、打开总览页和首页不加载课数据 chunk、手机宽度无横向滚动；截图存 `tests/screenshots/drills-*.png`），`drills`（变式练习区的显示、简化提示规则、变式通过不影响本课完成、旧进度没有 `dr` 字段时一切正常、手机宽度无横向滚动）、`throttle`（4 倍 CPU 节流下 scheduler、concurrent、use-effect、suspense-data、animation 的参考答案仍通过），`sync`（跨设备同步：两个设备上下文、假 Gist 服务、各类错误、令牌不泄露、导出导入、多标签页；截图存 `tests/screenshots/sync-*.png`），`split`（课数据按课拆分：首页不加载课数据、一课只请求自己的 chunk、复习页和阶段测验页只请求需要的课、静态 HTML 里有课标题摘要目标、无水合警告、慢网和拦截 chunk 时的加载状态与重试、旧进度显示一致；截图存 `tests/screenshots/split-*.png`），`animation`（动画与过渡一课：六个示例的行为、四道预测题的答案、没有 View Transition API 时更新照常、开启减少动画后 React 不会自动关动画；用 Chromium 的 View Transition API，共享元素用真实鼠标点击），`hero`（回首页和课程地图的入口：顶栏站名、侧栏和手机菜单里的“课程首页”、面包屑阶段链接指向 `/roadmap#stage-N`；rendering 一课里的组件树：自动演示只播一次、点击范围与计数、memo、连点、键盘、减少动画、手机宽度、离开再回来、切后台、长任务；`HERO_SHOTS=1 node tests/e2e/hero.mjs` 还会重拍 `tests/screenshots/hero-*.png`），`home`（首页短片：静态 HTML 里有全部幕的文案、没有 JS 时可读、首次进入约 1.2 秒后自动播放且整片真实速度放完用时 45–60 秒、用户接管不抢滚动、控制条各项功能、各种不自动播放的情形、自动与手动同一画面、390/360/横屏无横向滚动、Tab 走完、CLS/长任务/帧间隔、首页 chunk 与主包体积；约 3 分钟），可以写多个；不写就十二个都跑。`lessons` 现在对每道变式练习也填参考答案要求通过、填起始代码要求被拒。
 - 浏览器测试需要网络：实验台从 cdn.jsdelivr.net 加载 Babel、Prism；React 19.3.0 的开发版是站内静态文件（`doc_build/runtime/`，构建时生成），不走 CDN。
 - 测试默认用内置静态服务器托管 `doc_build`（按 base 挂载）；也可以 `SITE_URL=http://localhost:4173/hands-on-react/ npm run test:e2e` 测已运行的站点。想用本机 Chrome：`CHROMIUM=/path/to/chrome npm run test:e2e`。
 - 期望结果：`lessons` 最后一行 `lessons 50 with issues 0`；`mechanics`（8 项）和 `smoke`（50 项）最后一行 `全部通过`。`PAGEERR` 行（boom、网络错误、天气服务超时、toUpperCase、测试用的渲染错误）是课程示例故意抛出的错误，不算问题。
@@ -78,7 +78,9 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 |---|---|
 | `index.ts` | 对外出口：`theme/` 只从这里 import |
 | `lessonData.ts` | 按课加载重数据：`loadLesson(id)`（同一课只请求一次，失败可重试）、`loadLessons(ids)`、`loadedLesson(id)`（同步取已加载的） |
-| `store.ts` | 进度存储（`localStorage['hands-on-react-v1']`）、`lp(id)`、进度变化事件 |
+| `store.ts` | 进度存储（`localStorage['hands-on-react-v1']`）、`lp(id)`、进度变化事件、保存时给改动的组盖时间戳（`logic/stamp.ts`）、保存后发 `hoc-saved` |
+| `syncState.ts` | 跨设备同步的本地状态（配置键、状态键、备份键）和 `bootSync()`：**主包里只放这个小文件**，本机开启了同步才动态加载 `syncEngine.ts` |
+| `syncEngine.ts` | 同步引擎（独立 chunk `sync-engine`，只有开启同步的人才加载）：请求、合并并写回、防抖推送、多标签页选主、备份与恢复、导入导出、错误处理。见「进度同步」 |
 | `util.ts` | DOM 小工具（`el`、`toast`、`highlight`…） |
 | `exec.ts` | 代码预处理和编译（`prepare`、`compile`、`stripComments`）。练习的检查函数也 import 它 |
 | `runtime.ts` | 按需加载 React 19.3.0 开发版（站内文件）+ Babel + Prism；`loadRuntime()` 返回 `Runtime`，`getRuntime()` 同步取已加载的 |
@@ -104,6 +106,9 @@ npx playwright install chromium    # 第一次（浏览器测试用）
 | `logic/timing.ts` | 计时类检查的基线换算：相对阈值、设备忙的判断、失败信息 |
 | `logic/internals.ts` | `t.internals`：安全读 React 内部结构，字段不在返回 null |
 | `logic/stageCheck.ts` | 阶段测验抽题、及格、冷却、复测、交卷记录 |
+| `logic/merge.ts` | 两份进度的合并（`mergeProgress`）。幂等、可交换、可结合，见「进度同步」 |
+| `logic/stamp.ts` | 保存时给改动的字段组盖时间戳（在主包里，所以不 import `merge.ts`） |
+| `logic/syncFormat.ts` / `syncPlan.ts` / `syncView.ts` | 同步文件格式与 schema 校验 / 防抖、退避、限速等待、地址白名单、响应分类 / 顶栏显示用的小函数（相对时间、令牌末四位，主包里用） |
 | `logic/runtime.ts` / `warnings.ts` | 运行时版本号常量 `REACT_VERSION` 和资源路径 / 识别 React 19 的警告 |
 | `logic/random.ts` / `text.ts` / `errors.ts` | 洗牌和种子随机 / 转义和选项格式 / 错误信息中文解释 |
 
@@ -296,6 +301,80 @@ export default {
 
 改引擎后跑 `npm run test:unit` 和 `npm run test:e2e -- mechanics`；后者覆盖提示阶梯、自我解释门槛、阶段测验 12 题、交卷前不显示答案、中途离开冷却，以及 390px 宽度下无横向滚动。
 
+## 进度同步（跨设备，可选）
+
+没有后端，也不引入任何第三方库或服务：学习者自己开启后，进度存进**他自己 GitHub 账号下的一个私密 Gist**（接口 `https://api.github.com`，CORS 已核对可直接从浏览器调用）。不开启就一个请求也不发，同步引擎也不加载。
+
+### 进度数据结构（`localStorage['hands-on-react-v1']`，类型见 `course/types.ts`）
+
+| 键 | 内容 | 谁写 | 时间 |
+|---|---|---|---|
+| `<课id>.quiz / tried / first` | 随堂测验：题号 → 选项下标 / 是否答过 / 首答是否正确 | `quiz.ts` | 没有（卡片 `last` 间接记录） |
+| `<课id>.ex`、`done`、`sx`、`can` | 练习通过 / 课完成 / 自我解释已展开 / 目标自查勾选 | `exercise.ts`、`completion.ts`、`selfExplain.ts` | 没有 |
+| `<课id>.code fails firstFail lastFail sawSol rewrite exHelp` | 练习的代码草稿、失败记录、提示阶梯状态（`firstFail` 是阶梯时间门槛的起点） | `exercise.ts`、`playground.ts` | **新增 `ts.lad`** |
+| `<课id>.note` | 自我解释的笔记 | `selfExplain.ts` | **新增 `ts.note`** |
+| `<课id>.noteAlts`（**新增**） | 同步时被覆盖的另一份笔记，界面叫“另一台设备的版本” | 合并函数 | — |
+| `<课id>.dr[i]` | 变式练习：`ok code fails lastFail sawSol rewrite exHelp` | `drills.ts` | **新增 `dr[i].t` ** |
+| `__srs[课id#N]` | 间隔复习卡片 `{box n due last}` | `cards.ts` | `last` 就是最近一次复习的时间 |
+| `__stage[阶段]` | 阶段测验记录 `{best last passed passedAt failedAt weak pending}` | `stageCheck.ts` | `passedAt / failedAt / pending.at`，**新增 `t`** |
+| `__pred[预测键]` | 预测题：选中的选项下标 | `playground.ts` | 没有 |
+
+不同步（单设备的界面状态，不是学习进度）：阅读位置 `hands-on-react-v1:pos`、首页短片的已看过 / 声音偏好、组件树演示标记。另有三个**同步自己的键**：`:sync`（令牌、Gist 编号、账号名、设备 id）、`:sync-status`（状态，不含令牌）、`:backup`（覆盖本机进度之前的备份，最多 2 份）。
+
+**时间戳怎么来**：`store.ts` 的 `save()` 在写入前调用 `logic/stamp.ts`：为每组字段算一个指纹，和上次保存时的指纹不同就盖上 `Date.now()`。所以十几处写进度的代码一行都不用改。加载旧数据不盖章，旧数据没有时间戳，合并时按“更旧”（时间 0）处理。同步引擎整体替换本机进度后调用 `resyncStamps()`，避免把别人的内容盖成本机刚改的。新增的 `ts`、`t`、`noteAlts` 都是可选字段，不改任何现有字段的含义和类型，到期判断、提示阶梯、完成判定都不读它们。
+
+文件格式（`logic/syncFormat.ts`）：`{ schema, app: 'hands-on-react', updatedAt, device, progress }`，文件名 `hands-on-react-progress.json`，Gist 描述固定。`schema`（`PROGRESS_SCHEMA`，现在是 1）读到比自己新的：只读合并，**不覆盖云端**，提示“另一台设备的站点版本更新，请刷新”。
+
+### 逐字段合并规则（`logic/merge.ts` 的 `mergeProgress(a, b, ctx)`）
+
+原则：两台设备各学各的，合并后谁的进度都不丢；同一条记录以更新的为准。每个字段都是“取并集 / 取或 / 取最大”，需要二选一的地方只用一个全序比大小（时间、进度、规范化文本），不看参数顺序。
+
+| 字段 | 规则 |
+|---|---|
+| `done`、`ex`、`sx`、变式 `ok`、`tried`、`can` | 取“或”（一边完成就算完成） |
+| `first`（首答是否正确） | 取“与”：一边首答错就算错（保守，答错的题会回来复习） |
+| `quiz[题号]` | 按题合并；两边答案不同时优先取**正确的**（用目录里的 `quizAnswers`，由 `ctx` 传入），都对或都错取较大的下标 |
+| 草稿与阶梯整组（`code fails firstFail lastFail sawSol rewrite exHelp`） | **整组**取更新的一边，不拼接：先比 `ts.lad`，没有时间戳比失败次数（进度更靠后），再比 `sawSol`，最后比规范化文本。没有任何这组字段的一边不参与竞争 |
+| `exHelp`（借助答案完成） | 跟着“完成发生的那一边”：只有一边完成取它的；**两边都完成取最轻的**（没借助 < 重写 < 看答案，因为两边都是各自通过的，有一边没借助就是真的没借助）；都没完成跟着胜出的一组 |
+| `note` / `noteAlts` | 正文取 `ts.note` 更新的（没有时间戳取更长的）；**另一份不丢**，进 `noteAlts`（所有出现过的文字减去正文，所以合并顺序不影响结果），自我解释区折叠显示，可“用这一版” |
+| 变式 `dr[i]` | 每道独立，规则同上（`ok` 取或；草稿组按 `dr[i].t` / 失败次数；`exHelp` 同上） |
+| `__srs[键]` | 按键并集；同一张卡**整条**取 `last` 更晚的（再比 `n`、规范化文本），不混拼字段 |
+| `__stage[阶段]` | 按阶段取最近一次作答（`max(t, failedAt, passedAt, pending.at)`）的整条记录，“以最近一次为准”的现有语义不变；`best` 是历史最高分，取最大 |
+| `__pred` | 键的并集（同一键两边不同取规范化文本较大者，只是为了确定） |
+| 不认识的字段（课里或顶层） | 原样保留；两边都有且不同时逐键递归，标量取规范化文本较大者（向前兼容） |
+
+性质由 `tests/unit/merge.test.ts` 用手写用例 + 随机生成的进度固定：幂等 `merge(a,a)=a`、可交换、可结合（试过 30000 组随机三元组）、合并结果包含两边（再和任何一边合并不变）、任何一边已完成的课 / 练习 / 变式 / 卡片 / 阶段都不会消失、旧数据合并不报错、未知字段保留、不改参数。
+
+**已知取舍**：因为完成取“或”，“标记为未完成”在开启同步后会被另一台设备（或云端）上的“已完成”带回来，这是“谁的进度都不丢”的代价。时间取“较新”依赖设备时钟：两台设备时钟差几分钟，只影响草稿 / 笔记 / 阶段测验这几类二选一的记录谁赢（输的那份笔记仍保留在 `noteAlts`，草稿在合并前的备份里），不影响完成状态、复习卡片的并集。
+
+### 同步时机与引擎（`syncEngine.ts`，按需加载）
+
+- **开启**：校验令牌（`GET /user`；经典令牌看 `x-oauth-scopes` 有没有 `gist`；细粒度令牌没有这个头，权限留到读写时才知道）→ 在账号里列出 gist（分页，`Link` 头）找同名文件，没有才创建（`public: false`）→ 保存配置 → 立即同步一次，显示“从云端合并了 N 课 / 已把本机进度上传”。个别令牌列不出私密 Gist 时，面板里可以手动填 Gist 链接或编号。
+- **一次同步** = 读云端（`If-None-Match` 条件请求，304 不计入限额）→ 和本机合并 → 合并结果写回本机和云端（内容有差别才写）。所以推送前总是先拉，不会覆盖另一台设备刚写的内容；两台设备写之间的极小空隙里 PATCH 可能覆盖对方，但对方的本机进度还在，下次拉取发现云端缺内容时会合并后再推，自愈。
+- **时机**：页面加载后拉取；本机进度变化（`save()` 发 `hoc-saved`）后防抖 6 秒、最长 10 秒推送；页面隐藏 / 关闭时有未推送的改动，用 `fetch(..., { keepalive: true })` 尽力推一次（请求体上限 64 KB，超过就放弃，下次打开页面再同步）；回到前台且距上次拉取超过 5 分钟再拉；`online` 事件触发重试。
+- **多标签页**：`navigator.locks`（Web Locks）选出一个标签页负责联网（没有这个 API 时每个标签页都联网，靠“先读后合并”保证正确）。其他标签页写进 localStorage 的进度，靠 `storage` 事件合并进负责的页面，内存与 localStorage 两边收敛（合并是幂等的，不会来回打架）；“立即同步”用 `BroadcastChannel` 转给负责的标签页。
+- **界面不被冲掉**：用合并结果更新内存时**就地**写（保持页面里组件拿着的对象身份），只发 `hoc-progress` 让侧栏、顶栏、地图页刷新；课文 / 复习 / 阶段测验页打开时画好的内容不重绘，只提示“进度已从另一台设备更新”并给“刷新页面”按钮。
+- **绝不丢本地数据**：用合并结果覆盖本机进度前先备份（`:backup`，最近 2 份；写不进去就不覆盖）；先写 localStorage，成功了才改内存；任何错误都不动本地进度。面板里可以“恢复同步前的本地进度”（恢复后下次同步仍会把云端的合并回来，想彻底回到那时先断开同步）。
+- **错误**（`syncEngine.ts` 的 `MSG`）：断网 / 5xx → 状态“有未同步的更改”，指数退避（5 秒起、翻倍、最多 5 分钟、抖动 ±20%、连续 8 次后暂停自动重试，回到前台或点“立即同步”再试）；401 → 停止同步，提示重新填写令牌；403 且 `x-ratelimit-remaining: 0` 或带 `retry-after`（每小时 5000 次）→ 等到 `x-ratelimit-reset` 再试；其他 403 → 令牌没有 Gist 写权限；404 → Gist 被删，可一键重新创建；文件被截断（`truncated`，走 `raw_url`）读不全 / 内容不是合法进度 → **不覆盖**，另存原文件的备份文件到 Gist，提示并可“用本机进度重建”；存储空间不足 → 不动本机进度并提示。
+- 测试用的时间调节：`window.__hocSyncTest = { debounce, maxWait, pullAfter, initialDelay, backoff }`（只在 e2e 里由 `addInitScript` 设置）。
+
+### 令牌与安全约定（硬性）
+
+- 令牌只存在本机 `localStorage['hands-on-react-v1:sync']`，只用于请求 `https://api.github.com`（`request()` 里用 `isAllowedUrl` 白名单校验：https、主机 `api.github.com`、无账号密码、无端口；读 Gist 原文的 `raw_url` 只允许 `gist.githubusercontent.com` / `gist.github.com`，且**不带令牌**）。`fetch` 一律 `referrerPolicy: 'no-referrer'`、`credentials: 'omit'`、`redirect: 'error'`、`cache: 'no-store'`。
+- 令牌不进 URL、不写日志、不出现在错误提示和状态里（提示都是固定的中文，不回显服务器内容；状态键不含令牌；界面只显示末四位）。输入框 `type="password"`、`autocomplete="off"`，开启后立即清空。
+- 界面上用平实的话写明：令牌存在这台设备的浏览器里；任何能在这个网站上运行脚本的东西都能读到它，所以**只给它 Gist 权限**；公用电脑上用完请断开。“断开同步”删除本机的令牌和 Gist 编号，云端 Gist 是否一并删除由用户选（默认保留）。
+- 令牌类型（2026-10 对照 docs.github.com 核对）：**细粒度令牌**现在支持 Gist（账户权限 `Gists`，只有 `write`），创建链接可预填名称、说明、权限、有效期：`https://github.com/settings/personal-access-tokens/new?name=…&description=…&gists=write&expires_in=90`，界面优先推荐它（没有仓库权限、会过期）。备选**经典令牌**只勾 `gist`：`https://github.com/settings/tokens/new?scopes=gist&description=…`（`scopes` 参数是长期可用的写法，但官方文档没有写它）。
+- 开发和测试里**不用任何真实令牌、不创建真实 Gist**：e2e 用 Playwright 的 `route` 拦截 `api.github.com`，接内存里的假 Gist 服务（`tests/e2e/_fakegithub.mjs`），令牌是带标记的假字符串，全程搜索它有没有出现在 DOM、控制台、请求地址、Referer、断开后的 localStorage。
+
+### 改进度结构时怎样保持合并兼容
+
+1. **加字段**：只加**可选**字段，不改旧字段的含义和类型，旧数据没有它时一切照常（学习机制代码不要读新增的时间戳字段）。不升 `PROGRESS_SCHEMA`。
+2. 在 `logic/merge.ts` 给它定规则：能“取或 / 取并集 / 取最大”就这样做；必须二选一的，选一个全序（时间戳 > 进度 > 规范化文本），整组取，不拼接。**不写规则也不会丢**：不认识的字段走 `mergeAny`（并集、递归、标量取规范化文本较大者），但要想清楚这个默认是不是你要的。
+3. 如果新字段属于一组“整体取更新的一边”的字段（例如练习草稿组），同时改 `merge.ts` 的 `LADDER_KEYS`（或 `DRILL_KEYS`）和 `logic/stamp.ts` 的 `STAMP_LADDER`（单元测试会核对两处一致）。需要时间戳的新分组：在 `stamp.ts` 的 `fingerprints` / `stamp` 里加一类指纹，在 `merge.ts` 里按它比较。
+4. 补测试：`tests/unit/merge.test.ts` 加该字段的规则用例，并把它加进随机生成器 `genProgress`（性质测试会自动检查幂等、可交换、可结合、不丢）；有用户可见的行为再在 `tests/e2e/sync.mjs` 加一条。
+5. **改了含义或类型**才升 `PROGRESS_SCHEMA`：旧版站点读到新 schema 只读合并、不覆盖云端；同时写迁移（读旧 schema 的数据）并补单元测试。
+6. 不要让 `stamp.ts` 或其他主包文件 import `merge.ts` / `syncPlan.ts`：它们会整个被拖进主包（`libs.mjs` 的主包上限会拦）。主包里只放 `syncState.ts`、`stamp.ts`、`syncView.ts` 和顶栏 / 面板外壳；引擎和面板内容各自是异步 chunk（`sync-engine`、`sync-panel`）。
+
 ## 实验台运行时（React 19.3.0）
 
 **只有一个运行时**：全站的实验台和练习都跑 React 19.3.0 开发版，没有按课选版本的开关（数据文件里写 `runtime` 字段会被 `check:content` 报错）。
@@ -371,7 +450,7 @@ export default {
 
 - **React 组件只是薄包装**：服务端渲染只输出占位元素；浏览器里 `useEffect` 调用引擎函数，把返回的 DOM 挂进去（`theme/lib/useSlot.ts`、`useDomSlot.ts`）。学习机制的逻辑都在引擎里，不在组件里。**不要把交互组件改写成纯 React**。
 - **实验台不用 iframe**：页面内按需加载 React 19.3.0 **开发版**，站点自己的 React 与它互不干扰，见下面「实验台运行时」。必须是开发版：引擎靠拦截 React 的警告向学习者显示它们。服务端才有意义的内容（服务端组件、Server Function）在实验台里跑不了，只能用只读 `code` 块展示，并在文字里说明。
-- **进度**只存在浏览器 `localStorage['hands-on-react-v1']`（键和结构不要改，结构见 `course/types.ts` 的 `Progress`）；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
+- **进度**默认只存在浏览器 `localStorage['hands-on-react-v1']`（键和已有字段不要改，结构见 `course/types.ts` 的 `Progress`）；可选的跨设备同步见「进度同步」；服务端渲染时为空。依赖进度的组件挂载后才显示真实数字（`theme/lib/useProgress.ts`），避免水合不一致。进度变化发 `hoc-progress` 事件。
 - **侧栏**由 `rspress.config.ts` 从 `course/order.ts`（顺序）和每课的 `stage` 生成，不用手写；动态标记由全局组件 `ProgressMarks` 写成属性（`data-hoc-done`、`data-hoc-due`、`data-hoc-cnt`、`data-hoc-dr`、`data-hoc-dr-done`），样式在 `theme/style.css`。
 - **课程数据按课拆分（主包只带轻量目录）**：浏览器主包（`static/js/index.*.js`）只含 `course/registry.ts` 的**轻量目录**（`LessonMeta`：id、stage、title、mins、localMins、summary、goals，以及生成脚本算好的计数：`quizAnswers`（测验正确答案下标，长度 = 题数）、`nCheck`、`hasExercise`、`nDrills`、`drillTitles`（每道变式的标题，总览页用）、`drillMins`、`nPlays`）。测验、练习、变式练习、示例说明、预测题、keyPoints 等重数据留在 `course/lessons/<id>.ts`，每课一个异步 chunk（`static/js/async/lesson-<id>.*.js`），打开那一课才加载。
   - **同步的只靠目录**：课头、学习目标、测验题数、跳转条、侧栏、首页统计、顶栏、翻页、课末“掌握标准”条（`completion.ts` 用 `quizAnswers` 判断是否全对）、复习到期数量、阶段进度。这些在静态 HTML 里照常输出，水合时不会不一致。**写这类组件时用 `useLesson()`（返回 `LessonMeta`），不要为了读一个字段去加载整课。**
@@ -402,5 +481,5 @@ export default {
 - 第一次要在仓库 **Settings → Pages → Source** 选 “GitHub Actions”。站点地址 `https://<用户>.github.io/hands-on-react/`；base 在 `course/site.ts`，换仓库名要同步改。
 - 依赖更新：Dependabot（`.github/dependabot.yml`，npm 和 GitHub Actions，每周一次，同类合并成一个 PR）。
 - `doc_build/` 是纯静态文件，也可以放到任何静态托管（注意保持 base 路径）。
-- 学习进度存在浏览器 localStorage，不同网址的进度不互通。
+- 学习进度存在浏览器 localStorage，不同网址的进度不互通（想跨设备要学习者自己开启「进度同步」，或用导出 / 导入文件）。
 - 仓库还没有 `LICENSE`：公开仓库之前由所有者自己选择许可证。

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'drillhub', 'throttle', 'split', 'animation', 'hero', 'home'];
+const SUITES = ['lessons', 'mechanics', 'smoke', 'runtime', 'libs', 'drills', 'drillhub', 'throttle', 'split', 'animation', 'hero', 'home', 'sync'];
 
 // 课 id 和套件重名时（animation）：跟在 lessons 后面的算课 id；要跑同名套件，把它写在 lessons 前面
 const LESSON_IDS = new Set(fs.readdirSync(path.join(here, '../../docs/lessons')).map(f => f.replace(/\.mdx$/, '')));
