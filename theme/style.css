@@ -547,3 +547,9 @@ label.btn { cursor: pointer; }
 .roadmap .sync-panel .sync-fine { font-size: 13.5px; color: var(--ink-3); }
 .roadmap .sync-hero { grid-column: 1 / -1; margin: 0 0 12px; font-size: 14px; color: var(--ink-2); }
 .roadmap .sync-hero a { color: var(--accent); }
+
+.roadmap .sync-panel .sync-phone { margin: 10px 0; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--accent-wash); border-radius: 8px; color: var(--ink); }
+.roadmap .sync-panel .sync-phone p { margin: 0 0 8px; }
+.roadmap .sync-panel .sync-phone p:last-child { margin: 0; }
+.roadmap .sync-panel .sync-phone .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; text-decoration: none; }
+.roadmap .sync-panel .sync-phone a.btn { color: var(--accent-ink); }

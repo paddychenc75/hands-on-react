@@ -14,6 +14,13 @@ const errText = (e: unknown): string => (e && typeof (e as Error).message === 's
 const fmtTime = (t: number) => new Date(t).toLocaleString('zh-CN', { hour12: false });
 
 export default function SyncPanelBody() {
+  // 手机或平板（窄屏，或者只有触摸没有悬停）：多半是第二台设备，手里没有电脑上那个令牌（GitHub 只在创建时显示一次），直接引导新建一个。挂载后才判断，避免水合不一致
+  const [onPhone, setOnPhone] = useState(false);
+  useEffect(() => {
+    try {
+      setOnPhone(matchMedia('(max-width: 767px), (pointer: coarse) and (hover: none)').matches);
+    } catch {}
+  }, []);
   const v = useSyncStatus();
   const [token, setToken] = useState('');
   const [gistId, setGistId] = useState('');
@@ -122,6 +129,19 @@ export default function SyncPanelBody() {
 
       {!v.enabled ? (
         <>
+          {onPhone ? (
+            <div className="sync-phone">
+              <p>
+                <b>在手机上，或者这是第二台设备？直接新建一个令牌。</b>电脑上那个令牌只在创建时显示一次，现在已经看不到了，不用去找。两个令牌只要来自同一个
+                GitHub 账号，用的就是同一份进度。
+              </p>
+              <p>
+                <a className="btn primary" href={TOKEN_URL} target="_blank" rel="noopener noreferrer">
+                  去 GitHub 新建令牌
+                </a>
+              </p>
+            </div>
+          ) : null}
           <ol className="sync-steps">
             <li>
               点这个链接：
@@ -131,7 +151,8 @@ export default function SyncPanelBody() {
               。它会在新标签页打开 GitHub 的创建页面。名称和权限已经填好，权限只勾了 gist。需要先登录 GitHub；页面是英文的，不用管别的。
             </li>
             <li>
-              在 GitHub 页面最下面点“Generate token”。复制以 <code>ghp_</code> 开头的那串字符（细粒度令牌是 <code>github_pat_</code> 开头）。它只显示一次。
+              在 GitHub 页面最下面点“Generate token”。复制以 <code>ghp_</code> 开头的那串字符（细粒度令牌是 <code>github_pat_</code>{' '}
+              开头）。它只显示一次，离开那一页就再也看不到了。想在别的设备上用同一个，现在就存进密码管理器。
             </li>
             <li>回到本站，把令牌粘贴进下面的输入框，点“开启同步”。站点会先检查令牌能不能用，再做第一次同步，并告诉你结果。</li>
           </ol>
@@ -146,7 +167,8 @@ export default function SyncPanelBody() {
               <b>改回未完成：</b>开启同步后，在一台设备上把一课改回“未完成”，可能被另一台设备上的“已完成”带回来。合并的原则是谁的进度都不丢。
             </li>
             <li>
-              <b>在另一台设备上：</b>打开本站，重复第 3 步。令牌用同一个，或者再建一个都行，但要用同一个 GitHub 账号。开启时，站点会在你的账号里找已有的同步文件{' '}
+              <b>在另一台设备上：</b>打开本站，把这三步再做一遍，新建一个令牌。旧令牌事后看不到，不用去找；存了旧令牌的话，直接重复第 3
+              步粘贴它也行。两个令牌只要来自同一个 GitHub 账号，用的就是同一份进度。开启时，站点会在你的账号里找已有的同步文件{' '}
               <code>hands-on-react-progress.json</code>
               。找到就接着用同一份，不会再建一个。个别令牌列不出私密 Gist，找不到时，展开下面的“手动填 Gist”，填第一台设备上显示的 Gist 链接或编号。
             </li>

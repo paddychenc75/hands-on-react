@@ -363,7 +363,7 @@ export default {
 - 令牌只存在本机 `localStorage['hands-on-react-v1:sync']`，只用于请求 `https://api.github.com`（`request()` 里用 `isAllowedUrl` 白名单校验：https、主机 `api.github.com`、无账号密码、无端口；读 Gist 原文的 `raw_url` 只允许 `gist.githubusercontent.com` / `gist.github.com`，且**不带令牌**）。`fetch` 一律 `referrerPolicy: 'no-referrer'`、`credentials: 'omit'`、`redirect: 'error'`、`cache: 'no-store'`。
 - 令牌不进 URL、不写日志、不出现在错误提示和状态里（提示都是固定的中文，不回显服务器内容；状态键不含令牌；界面只显示末四位）。输入框 `type="password"`、`autocomplete="off"`，开启后立即清空。
 - 界面上用平实的话写明：令牌存在这台设备的浏览器里；任何能在这个网站上运行脚本的东西都能读到它，所以**只给它 Gist 权限**；公用电脑上用完请断开。“断开同步”删除本机的令牌和 Gist 编号，云端 Gist 是否一并删除由用户选（默认保留）。
-- 令牌类型（2026-10 对照 docs.github.com 核对；与「动手学 Vue 3」一致）：界面**主推经典令牌**，只勾 `gist`，链接 `https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync`（`scopes` 预填参数官方文档没写，是长期可用的写法；默认有效期也没写，界面按“默认 30 天，以 GitHub 页面显示为准”说）。**细粒度令牌**列为备选：官方文档里它有账户权限 `Gists`（只有 `write`），创建链接可预填 `…/personal-access-tokens/new?name=…&description=…&gists=write&expires_in=90`；但没人用真实令牌验证过它能不能列出已有的私密 Gist，所以面板写明“用它时另一台设备大概率要手动填 Gist”。401 / 权限不足的提示旁带“重新创建令牌”链接。
+- 令牌类型（2026-10 对照 docs.github.com 核对；与「动手学 Vue 3」一致）：界面**主推经典令牌**，只勾 `gist`，链接 `https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync`（`scopes` 预填参数官方文档没写，预填是否生效没有核实；默认有效期也没写，界面按“默认 30 天，以 GitHub 页面显示为准”说。2026-10 有用户用真实令牌开通同步成功，令牌类型与是否用了预填链接未确认）。**细粒度令牌**列为备选：官方文档里它有账户权限 `Gists`（只有 `write`），创建链接可预填 `…/personal-access-tokens/new?name=…&description=…&gists=write&expires_in=90`；但没人用真实令牌验证过它能不能列出已有的私密 Gist，所以面板写明“用它时另一台设备大概率要手动填 Gist”。401 / 权限不足的提示旁带“重新创建令牌”链接。
 - 开发和测试里**不用任何真实令牌、不创建真实 Gist**：e2e 用 Playwright 的 `route` 拦截 `api.github.com`，接内存里的假 Gist 服务（`tests/e2e/_fakegithub.mjs`），令牌是带标记的假字符串，全程搜索它有没有出现在 DOM、控制台、请求地址、Referer、断开后的 localStorage。
 
 ### 入口与界面约定（与「动手学 Vue 3」对齐）
@@ -371,6 +371,7 @@ export default {
 - 面板 id 是 `#sync`（`SyncPanel.tsx`，课程地图页里，在“学习路线”之前）。收起时标题行是“跨设备同步 · 未开启 · 可选”（开启后“已开启 · 状态”）。
 - 入口只有两个：**侧栏固定入口“进度同步”**（`rspress.config.ts` 的 `lessonSidebar`，链接 `/roadmap#sync`，在最上面那一组的最后：首页、课程地图、今日复习、术语表、变式练习、进度同步；Vue 没有“变式练习”，所以“进度同步”都是这一组的最后一项）和**课程地图页头一行**“想在手机和电脑之间接着学？开启跨设备同步（可选）”。顶栏在没开启时什么也不显示；开启后是四种状态（已同步 / 同步中 / 有未同步的更改 / 同步出错）的云朵图标和弹层。**入口都只是普通链接**：没开启时点它们不加载同步引擎、不发任何请求，只加载面板自己的 chunk。
 - 点入口后：展开面板、滚动到它、焦点放到标题上。直接访问 `/roadmap#sync`、刷新、客户端路由跳转都一样；已经在这一页时点入口路由不会触发 `hashchange`，所以 `SyncPanel` 另外监听 `popstate` 和指向 `#sync` 的点击。
+- **手机引导**：未开启时，面板挂载后若 `matchMedia('(max-width: 767px), (pointer: coarse) and (hover: none)')` 命中，在三步指引上方显示提示块和 ≥44px 的“去 GitHub 新建令牌”按钮（GitHub 只在创建时显示令牌一次，第二台设备手里多半没有旧令牌）。提示块在面板 chunk 里，不进主包；开启后不显示。第 2 步和“在另一台设备上”的文案与 Vue 课一致。
 - 侧栏项旁的小标记：没开启是很淡的“未开启”，开启后是状态小圆点（`ProgressMarks.tsx` 写 `data-hoc-sync`，样式在 `style.css`）。
 
 ### 后台同步的可靠性（CI 上暴露过缺陷，改动时别退回去）

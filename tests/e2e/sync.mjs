@@ -36,8 +36,8 @@ const until = async (fn, ms = 30000, step = 100) => {
 const all = { texts: [], reqs: [], pages: [] };
 
 /** 新的"设备"：独立的浏览器上下文，记录请求、控制台、页面错误 */
-async function device(gh, { viewport = { width: 1280, height: 900 }, tune = TUNE, colorScheme = 'light' } = {}) {
-  const ctx = await b.newContext({ viewport, colorScheme, acceptDownloads: true });
+async function device(gh, { viewport = { width: 1280, height: 900 }, tune = TUNE, colorScheme = 'light', hasTouch = false } = {}) {
+  const ctx = await b.newContext({ viewport, colorScheme, acceptDownloads: true, hasTouch, isMobile: hasTouch });
   await ctx.addInitScript(t => {
     if (t) window.__hocSyncTest = t;
   }, tune);
@@ -208,6 +208,16 @@ const foreground = async p => {
   // 直接访问
   await d.page.goto(site + 'roadmap.html#sync');
   await panelOpenAndFocused(d, '直接访问 /roadmap#sync');
+  ok((await d.page.locator('.sync-phone').count()) === 0, '桌面宽度：不显示手机引导块');
+  const stepText = await d.page.textContent('.sync-steps');
+  ok(/它只显示一次，离开那一页就再也看不到了。想在别的设备上用同一个，现在就存进密码管理器。/.test(stepText), '第 2 步末尾：令牌只显示一次、存进密码管理器');
+  const notes = await d.page.textContent('.sync-notes');
+  ok(
+    /打开本站，把这三步再做一遍，新建一个令牌。旧令牌事后看不到，不用去找；存了旧令牌的话，直接重复第 3 步粘贴它也行。两个令牌只要来自同一个 GitHub 账号，用的就是同一份进度。/.test(
+      notes,
+    ) && /手动填 Gist/.test(notes),
+    '“在另一台设备上”以新建为主，找 Gist 的句子保留',
+  );
   await d.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-panel-open-light.png') });
   ok(gitReqs(d) === 0 && !engine(d), '直达、点链接之后：仍然没有 github 请求，没有加载同步引擎');
   ok(
@@ -222,12 +232,38 @@ const foreground = async p => {
   await d.ctx.close();
 
   // 手机宽度：从菜单（侧栏）进入、页头链接都可达
-  const m = await device(null, { viewport: { width: 390, height: 844 } });
+  const m = await device(null, { viewport: { width: 390, height: 844 }, hasTouch: true });
   await m.page.goto(site + 'roadmap.html');
   await m.page.waitForSelector('.sync-hero a');
   await m.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-hero-link-mobile-light.png') });
   await m.page.click('.sync-hero a');
   await panelOpenAndFocused(m, '手机：点页头链接');
+  const ph = m.page.locator('.sync-phone');
+  await ph.waitFor();
+  ok(
+    /在手机上，或者这是第二台设备？直接新建一个令牌。电脑上那个令牌只在创建时显示一次，现在已经看不到了，不用去找。两个令牌只要来自同一个 GitHub 账号，用的就是同一份进度。/.test(
+      (await ph.textContent()).trim(),
+    ),
+    '手机：三步上方显示提示块和文案',
+  );
+  ok(
+    await m.page.evaluate(
+      () => document.querySelector('.sync-phone').compareDocumentPosition(document.querySelector('.sync-steps')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+    '手机：提示块在三步指引上方',
+  );
+  const pb = m.page.locator('.sync-phone a.btn');
+  ok(
+    (await pb.textContent()).trim() === '去 GitHub 新建令牌' &&
+      (await pb.getAttribute('href')) === 'https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync' &&
+      (await pb.getAttribute('target')) === '_blank' &&
+      (await pb.getAttribute('rel')) === 'noopener noreferrer',
+    '手机：按钮文字、链接地址、target 和 rel',
+  );
+  ok((await pb.boundingBox()).height >= 44, '手机：按钮高度不小于 44px');
+  ok((await m.page.locator('.sync-steps a').first().getAttribute('href')) === (await pb.getAttribute('href')), '手机：按钮与第 1 步是同一个创建令牌链接');
+  await m.page.evaluate(() => document.querySelector('.sync-phone').scrollIntoView({ block: 'center' }));
+  await m.page.screenshot({ path: path.join(SHOTS, 'sync-panel-phone-guide-mobile-light.png') });
   await m.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-panel-open-mobile-light.png') });
   await m.page.goto(lessonUrl(site, ids[0]));
   await m.page.click('button:has-text("菜单")');
@@ -720,6 +756,7 @@ const B = await device(gh, { colorScheme: 'dark' });
   await M.page.evaluate(() => document.documentElement.classList.add('dark'));
   await learn(M.page, ids[0]);
   await enable(M.page);
+  ok((await M.page.locator('.sync-phone').count()) === 0, '已开启同步后不显示手机引导块');
   await M.page.screenshot({ path: path.join(SHOTS, 'sync-panel-on-mobile-dark.png') });
   const wide = await M.page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   ok(!wide, '手机宽度（390px）下面板没有横向滚动');
