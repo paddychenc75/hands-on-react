@@ -2,7 +2,8 @@
 //   回首页的入口（顶栏站名、侧栏“课程首页”、手机菜单、面包屑里的阶段名）
 //   组件树动画（自动演示只播一次、点击范围与计数、memo、连点、减少动画、键盘、手机宽度、离开再回来、性能）
 // 用法：npm run build && node tests/e2e/hero.mjs
-import { launch, openSite, lessonUrl, checker } from './_site.mjs';
+import path from 'node:path';
+import { launch, openSite, lessonUrl, checker, ROOT } from './_site.mjs';
 
 const { ok, done } = checker();
 const { site, close: closeSite } = await openSite();
@@ -488,6 +489,45 @@ const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
   ok(!perf.long.some(d => d > 50), '性能. 一次完整脉冲期间没有超过 50ms 的长任务', JSON.stringify(perf));
   console.log('     性能：长任务', JSON.stringify(perf.long), '最长一帧', perf.maxFrame, 'ms');
   await ctx.close();
+}
+
+/* 截图：HERO_SHOTS=1 node tests/e2e/hero.mjs 重拍 tests/screenshots/hero-*.png（脉冲进行中的几帧和 memo 挡住的画面，人工看版面用） */
+if (process.env.HERO_SHOTS) {
+  const out = path.join(ROOT, 'tests/screenshots');
+  const modes = [
+    ['light-desktop', { viewport: { width: 1280, height: 800 }, colorScheme: 'light' }],
+    ['dark-desktop', { viewport: { width: 1280, height: 800 }, colorScheme: 'dark' }],
+    ['light-mobile', { viewport: { width: 390, height: 844 }, colorScheme: 'light', deviceScaleFactor: 2 }],
+    ['dark-mobile', { viewport: { width: 390, height: 844 }, colorScheme: 'dark', deviceScaleFactor: 2 }],
+  ];
+  for (const [name, opts] of modes) {
+    const ctx = await browser.newContext(opts);
+    const page = await ctx.newPage();
+    await openHome(page);
+    await page.addStyleTag({ content: '.hero, .hero * { animation: none !important; }' });
+    await page.locator('.hero-tree').scrollIntoViewIfNeeded();
+    await page.evaluate(() => document.querySelector('.tree-card').scrollIntoView({ block: 'center' }));
+    const clip = async () => {
+      const b = await page.locator('.tree-card').boundingBox();
+      return { x: Math.max(0, b.x - 6), y: Math.max(0, b.y - 6), width: Math.min(b.width + 12, opts.viewport.width), height: b.height + 12 };
+    };
+    // 从 TodoList 出发：起点亮起 → 流到子层 → 子层亮起、流到孙层 → 全部亮起
+    const t0 = async () => page.evaluate(() => performance.now());
+    const start = await t0();
+    await node(page, 'TodoList').click();
+    for (const [i, at] of [60, 260, 480, 800].entries()) {
+      await page.waitForFunction(([s, a]) => performance.now() - s >= a, [start, at]);
+      await page.screenshot({ path: path.join(out, `hero-${name}-pulse-${i}.png`), clip: await clip() });
+    }
+    await page.waitForTimeout(2200);
+    // memo 挡住：打开 memo，点 TodoList，光点流到 Item 前弹回
+    await page.check('.ht-memo-input');
+    const s2 = await t0();
+    await node(page, 'TodoList').click();
+    await page.waitForFunction(s => performance.now() - s >= 520, s2);
+    await page.screenshot({ path: path.join(out, `hero-${name}-memo.png`), clip: await clip() });
+    await ctx.close();
+  }
 }
 
 ok(!pageErrors.length, '页面没有意外的 pageerror', pageErrors.join(' | '));

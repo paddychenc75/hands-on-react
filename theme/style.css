@@ -438,7 +438,7 @@ html.dark .btn.sun, html.dark .rp-doc .btn.sun, html.dark a[data-hoc-due]::after
 .tnode.blocked { border-style: dashed; border-color: var(--violet); background: var(--violet-wash); }
 .badge-memo, .badge-skip { display: none; position: absolute; font: 600 9px/14px var(--f-mono); border-radius: 99px; padding: 0 5px; white-space: nowrap; pointer-events: none; }
 .badge-memo { top: -9px; right: -6px; align-items: center; gap: 2px; background: var(--violet-wash); color: var(--violet); border: 1px solid var(--violet); }
-.badge-skip { bottom: -9px; left: 50%; transform: translateX(-50%); background: var(--violet-wash); color: var(--violet); border: 1px dashed var(--violet); }
+.badge-skip { bottom: -13px; z-index: 1; left: 50%; transform: translateX(-50%); background: var(--violet-wash); color: var(--violet); border: 1px dashed var(--violet); }
 .memo-on .tnode[data-memoizable] .badge-memo { display: inline-flex; }
 .tnode.blocked .badge-skip { display: inline-block; }
 .hero-tree.busy .tnode:not(.on) { opacity: .85; }
