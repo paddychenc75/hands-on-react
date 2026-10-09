@@ -6,12 +6,14 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const BASE = '/hands-on-react/';
 export const KEY = 'hands-on-react-v1';
-export const launch = () => chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+// BROWSER=webkit / firefox 可以在别的引擎里跑（目前只有 home.mjs 在三个引擎里都验证过）
+export const launch = () =>
+  (({ webkit, firefox })[process.env.BROWSER] || chromium).launch(process.env.CHROMIUM && !process.env.BROWSER ? { executablePath: process.env.CHROMIUM } : {});
 export const lessonData = async id => (await import(pathToFileURL(path.join(ROOT, 'course/lessons', id + '.ts')).href)).default;
 export const lessonOrder = async () => (await import(pathToFileURL(path.join(ROOT, 'course/registry.ts')).href)).LESSON_ORDER;
 
