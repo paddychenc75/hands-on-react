@@ -131,10 +131,10 @@ const locks = (p, i) =>
   await p.waitForSelector('.rp-doc', { timeout: 30000 });
   await p.waitForTimeout(600);
   ok(await p.evaluate(() => /复习|到期|今天/.test(document.body.innerText)), '旧数据:复习页正常打开');
-  await p.goto(site);
+  await p.goto(site + 'roadmap.html');
   await p.waitForSelector('.home', { timeout: 30000 });
   await p.waitForTimeout(500);
-  ok(await p.evaluate(() => document.querySelector('.stats').innerText.includes('小时本机任务与本机项目')), '首页显示三段时间');
+  ok(await p.evaluate(() => document.querySelector('.stats').innerText.includes('小时本机任务与本机项目')), '课程地图显示三段时间');
   await ctx.close();
 }
 

@@ -49,8 +49,13 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /* 1. 网络请求 */
 {
-  const p = await open(site, undefined, { waitFor: '.hero' });
+  const p = await open(site, undefined, { waitFor: 'h1' });
   ok(eq(chunksOf(p.reqs), []), '首页不请求任何课的数据 chunk', chunksOf(p.reqs).join(','));
+  await p.context().close();
+}
+{
+  const p = await open(site + 'roadmap.html', undefined, { waitFor: '.home .stage' });
+  ok(eq(chunksOf(p.reqs), []), '课程地图不请求任何课的数据 chunk', chunksOf(p.reqs).join(','));
   await p.context().close();
 }
 {
@@ -219,10 +224,10 @@ for (const si of [0, 3]) {
     __stage: { 0: { best: 92, last: 92, passed: true, passedAt: now - 3 * DAY }, 1: { best: 58, last: 58, failedAt: now - 5 * DAY, weak: ['state'] } },
     __pred: { 'state|x': 0 },
   };
-  const p = await open(site, seed, { waitFor: '.hero' });
+  const p = await open(site + 'roadmap.html', seed, { waitFor: '.home .stage' });
   const home = await p.evaluate(() => ({
     top: document.querySelector('.top-progress')?.innerText,
-    cta: document.querySelector('.hero .cta')?.innerText,
+    cta: document.querySelector('.home .cta')?.innerText,
     mastered: document.querySelectorAll('.stage .mastered').length,
     learned: [...document.querySelectorAll('.stats > div')].map(d => d.innerText.replace(/\s+/g, ' ')).filter(t => /道题在复习中|课已完成/.test(t)),
     checks: [...document.querySelectorAll('.check-link')].slice(0, 2).map(a => a.innerText),
@@ -235,7 +240,7 @@ for (const si of [0, 3]) {
   );
   ok(
     home.learned.some(t => t.includes('3 道题在复习中')) && home.learned.some(t => t.includes('2/50')),
-    '旧进度：首页“3 道题在复习中”“2/50 课已完成”',
+    '旧进度：课程地图“3 道题在复习中”“2/50 课已完成”',
     JSON.stringify(home.learned),
   );
   ok(home.cta.includes('继续学习'), '旧进度：首页显示“继续学习”');

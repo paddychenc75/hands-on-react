@@ -12,6 +12,7 @@ const component = (name: string) => path.join(here, 'theme/components', name + '
 // 课的顺序来自 course/order.ts，阶段来自每课数据文件的 stage：加课不用改这里。
 const lessonSidebar = [
   { text: '课程首页', link: '/' },
+  { text: '课程地图', link: '/roadmap' },
   { text: '今日复习', link: '/review' },
   { text: '术语表', link: '/glossary' },
   { text: '变式练习', link: '/drills' },
@@ -47,6 +48,7 @@ export default defineConfig({
       'LessonProse',
       'LessonFooter',
       'HomePage',
+      'RoadmapPage',
       'ReviewPage',
       'GlossaryPage',
       'DrillsPage',

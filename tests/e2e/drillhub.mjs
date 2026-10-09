@@ -188,13 +188,13 @@ const mark = (p, id) => sidebarLink(p, id).getAttribute('data-hoc-dr');
   await p.context().close();
 }
 
-/* 3. 首页 */
+/* 3. 课程地图页（原首页的统计和阶段进度） */
 {
-  const p = await open(site, { seed });
-  await p.waitForSelector('.hero', { timeout: 30000 });
+  const p = await open(site + 'roadmap.html', { seed });
+  await p.waitForSelector('.home .stats', { timeout: 30000 });
   await p.waitForTimeout(1000);
   const stats = await p.locator('.stats').innerText();
-  ok(new RegExp(`${totalDrills}\\s*道变式练习`).test(stats), `首页统计有“${totalDrills} 道变式练习”`, stats.replace(/\n/g, ' '));
+  ok(new RegExp(`${totalDrills}\\s*道变式练习`).test(stats), `课程地图统计有“${totalDrills} 道变式练习”`, stats.replace(/\n/g, ' '));
   const hours = Math.round((totalMins / 60) * 10) / 10;
   ok(stats.includes(`+ 变式练习约 ${hours} 小时`), `站内学习旁有“+ 变式练习约 ${hours} 小时”`);
   const meters = await p.locator('.stage .meter').allInnerTexts();
@@ -208,15 +208,15 @@ const mark = (p, id) => sidebarLink(p, id).getAttribute('data-hoc-dr');
     meters.join(' | '),
   );
   ok(meters.some(m => /变式 3\/\d+/.test(m)) || meters.some(m => /变式 1\/\d+/.test(m)), '阶段的变式完成数来自进度', meters.join(' | '));
-  ok(chunks(p).length === 0, '打开首页不请求任何一课的数据 chunk', chunks(p).join(','));
+  ok(chunks(p).length === 0, '打开课程地图不请求任何一课的数据 chunk', chunks(p).join(','));
   await p.screenshot({ path: path.join(SHOTS, 'drills-home-stats.png'), clip: { x: 0, y: 380, width: 1280, height: 520 } });
   await p.context().close();
 }
 {
-  const p = await open(site, { width: 390, height: 844 });
-  await p.waitForSelector('.hero', { timeout: 30000 });
+  const p = await open(site + 'roadmap.html', { width: 390, height: 844 });
+  await p.waitForSelector('.home .stats', { timeout: 30000 });
   await p.waitForTimeout(800);
-  ok(await noHScroll(p), '390px 宽度下首页无横向滚动');
+  ok(await noHScroll(p), '390px 宽度下课程地图无横向滚动');
   await p.context().close();
 }
 

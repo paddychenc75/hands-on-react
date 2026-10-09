@@ -71,7 +71,7 @@ const m = await b.newPage({ viewport: { width: 390, height: 844 } });
 m.on('pageerror', e => errs.push(e.message));
 const ids = await lessonOrder();
 const wide = [];
-const pages = ['', 'review.html', 'glossary.html', ...[0, 1, 2, 3, 4, 5].map(i => `check/${i}.html`), ...ids.map(id => `lessons/${id}.html`)];
+const pages = ['', 'roadmap.html', 'review.html', 'glossary.html', ...[0, 1, 2, 3, 4, 5].map(i => `check/${i}.html`), ...ids.map(id => `lessons/${id}.html`)];
 for (const pg of pages) {
   await m.goto(site + pg);
   await m.waitForSelector('.rp-doc, .home', { timeout: 30000 });

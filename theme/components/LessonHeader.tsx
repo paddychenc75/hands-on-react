@@ -11,7 +11,7 @@ export default function LessonHeader() {
   return (
     <div className="hoc">
       <div className="crumb">
-        <a className="tag" href={BASE + '#stage-' + lesson.stage} title="在首页的课程地图里查看这个阶段">
+        <a className="tag" href={BASE + 'roadmap.html#stage-' + lesson.stage} title="在课程地图里查看这个阶段">
           {stage.no} · {stage.name}
         </a>
         <span>

@@ -257,7 +257,7 @@ for (const id of LESSONS) {
 /* g. 390px 宽度下没有横向滚动：首页、复习页、术语表和全部 50 课（实验台都运行之后再量） */
 {
   const { lessonOrder } = await import('./_site.mjs');
-  const pages = ['', 'review.html', 'glossary.html', ...(await lessonOrder()).map(l => 'lessons/' + l + '.html')];
+  const pages = ['', 'roadmap.html', 'review.html', 'glossary.html', ...(await lessonOrder()).map(l => 'lessons/' + l + '.html')];
   const wide = [];
   let next = 0;
   await Promise.all(
@@ -300,19 +300,17 @@ for (const id of LESSONS) {
   ok(items.length > 0, 'h. 搜索“声明式”有结果', JSON.stringify(items));
 }
 
-/* i. 首页：标题、六个阶段、继续学习入口；学完一课后数字更新 */
+/* i. 课程地图（/roadmap，原来首页的内容）：标题、六个阶段、继续学习入口；学完一课后数字更新 */
 {
-  await page.goto(site);
-  // 首页组件树进入视口后会自动演示一轮（本会话一次）：这里先记成“已演示”，免得它改动下面要点的计数
-  await page.evaluate(() => {
-    localStorage.clear();
-    sessionStorage.setItem('hoc-hero-demo', '1');
-  });
+  await page.goto(site + 'roadmap.html');
+  await page.evaluate(() => localStorage.clear());
   await page.reload();
   await page.waitForSelector('.home .stage');
-  await page.waitForSelector('.home .hero-tree[data-ready]');
   const r = await page.evaluate(() => ({
-    h1: document.querySelector('.home h1')?.textContent,
+    h1: document
+      .querySelector('.rp-doc h1')
+      ?.textContent.replace(/[\u200b]/g, '')
+      .trim(),
     stages: document.querySelectorAll('.home .stage').length,
     prereq: !!document.querySelector('.home .prereq'),
     tree: document.querySelectorAll('.home .tnode').length,
@@ -321,32 +319,21 @@ for (const id of LESSONS) {
     names: [...document.querySelectorAll('.home .stage h3')].map(h => h.textContent),
   }));
   ok(
-    r.h1 === '从零开始，边做边学React' &&
+    /^课程地图/.test(r.h1) &&
       r.stages === 6 &&
       r.prereq &&
-      r.tree === 9 &&
+      r.tree === 0 &&
       /开始第一课/.test(r.cta) &&
       r.stats[0] === '50' &&
       r.names[5] === '深入专题与毕业设计',
-    'i. 首页：hero、前置知识、六个阶段（第 6 阶段叫“深入专题与毕业设计”）、组件树、开始第一课',
+    'i. 课程地图：标题、前置知识、六个阶段（第 6 阶段叫“深入专题与毕业设计”）、开始第一课、没有可交互的组件树',
     JSON.stringify(r),
-  );
-  // 组件树：点 Header，它和后代（Logo、Search）重新渲染，兄弟 TodoList 不变
-  await page.locator('.home .tnode', { hasText: 'Header' }).click();
-  await page.waitForTimeout(1800);
-  const rc = await page.evaluate(() =>
-    [...document.querySelectorAll('.home .tnode')].map(g => g.querySelector('.nm').textContent + g.querySelector('.rc').textContent),
-  );
-  ok(
-    rc.filter(x => /渲染 2 次/.test(x)).length === 3 && /TodoList.*渲染 1 次/.test(rc.join('|')),
-    'i. 点击组件树节点：它和后代渲染次数 +1，兄弟不变',
-    JSON.stringify(rc),
   );
   // 标记 what-is-react 为已完成（点“我已掌握，跳过”），回到首页
   await page.goto(url('what-is-react'));
   await page.waitForSelector('#finish .btn');
   await page.locator('#finish .btn').click();
-  await page.goto(site);
+  await page.goto(site + 'roadmap.html');
   await page.waitForSelector('.home .stage');
   await page.waitForTimeout(300);
   const r2 = await page.evaluate(() => ({
@@ -357,7 +344,7 @@ for (const id of LESSONS) {
   }));
   ok(
     /继续学习：/.test(r2.cta) && r2.done === 1 && r2.stat === '1/50' && /^1\/10( · 变式 0\/\d+)?$/.test(r2.meter),
-    'i. 学完一课后：首页出现“继续学习”，阶段进度 1/10，总数 1/50',
+    'i. 学完一课后：课程地图出现“继续学习”，阶段进度 1/10，总数 1/50',
     JSON.stringify(r2),
   );
 }
@@ -562,7 +549,7 @@ for (const scheme of ['light', 'dark']) {
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   };
   const low = [];
-  for (const pg of ['', 'lessons/state.html', 'review.html', 'glossary.html', 'check/0.html']) {
+  for (const pg of ['', 'roadmap.html', 'lessons/state.html', 'review.html', 'glossary.html', 'check/0.html']) {
     await dp.goto(site + pg);
     await dp.waitForSelector('.rp-doc, .home');
     await dp.waitForTimeout(800);

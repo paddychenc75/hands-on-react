@@ -31,8 +31,8 @@ async function run(name, w, h, scheme, steps, clipSel) {
   await ctx.close();
 }
 for (const scheme of ['light', 'dark']) {
-  await run('home', 1280, 1300, scheme, async p => {
-    await p.goto(site);
+  await run('roadmap', 1280, 1300, scheme, async p => {
+    await p.goto(site + 'roadmap.html');
     await p.waitForSelector('.home .stage');
     await p.waitForTimeout(800);
   });
@@ -110,8 +110,8 @@ const drillShot = async p => {
 };
 for (const scheme of ['light', 'dark']) await run('drills', 1280, 1000, scheme, drillShot);
 await run('drills-mobile', 390, 844, 'light', drillShot);
-await run('home-time', 1280, 700, 'light', async p => {
-  await p.goto(site);
+await run('roadmap-time', 1280, 700, 'light', async p => {
+  await p.goto(site + 'roadmap.html');
   await p.waitForSelector('.home .stats');
   await p.waitForTimeout(800);
 });
