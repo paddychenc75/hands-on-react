@@ -152,6 +152,7 @@ async function openHome(page, { demo = false, fresh = false } = {}) {
   );
   await page.reload();
   await page.waitForSelector('.hero-tree[data-ready]');
+  await page.locator('.ht-stage').scrollIntoViewIfNeeded(); // 树在课文中间：进入视口后才会自动演示
 }
 const counts = page =>
   page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.hero-tree .tnode')].map(b => [b.dataset.id, +b.querySelector('.n').textContent])));

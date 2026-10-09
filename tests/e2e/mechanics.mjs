@@ -74,7 +74,7 @@ const wide = [];
 const pages = ['', 'roadmap.html', 'review.html', 'glossary.html', ...[0, 1, 2, 3, 4, 5].map(i => `check/${i}.html`), ...ids.map(id => `lessons/${id}.html`)];
 for (const pg of pages) {
   await m.goto(site + pg);
-  await m.waitForSelector('.rp-doc, .home', { timeout: 30000 });
+  await m.waitForSelector('.rp-doc, .home, .story', { timeout: 30000 });
   await m.waitForTimeout(250);
   if (await m.evaluate(() => document.documentElement.scrollWidth > innerWidth)) wide.push(pg || '首页');
 }

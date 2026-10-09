@@ -266,7 +266,7 @@ for (const id of LESSONS) {
       while (next < pages.length) {
         const pg = pages[next++];
         await m.goto(site + pg);
-        await m.waitForSelector('.rp-doc, .home', { timeout: 30000 });
+        await m.waitForSelector('.rp-doc, .home, .story', { timeout: 30000 });
         await m.waitForTimeout(500);
         await m.evaluate(async () => {
           for (const x of document.querySelectorAll('.pg')) {
@@ -319,7 +319,7 @@ for (const id of LESSONS) {
     names: [...document.querySelectorAll('.home .stage h3')].map(h => h.textContent),
   }));
   ok(
-    /^课程地图/.test(r.h1) &&
+    /课程地图/.test(r.h1) &&
       r.stages === 6 &&
       r.prereq &&
       r.tree === 0 &&
@@ -525,7 +525,7 @@ for (const id of LESSONS) {
   const t = await page.evaluate(() => ({ show: !!document.querySelector('#toast.show'), text: document.querySelector('#toast')?.textContent || '' }));
   ok(t.show && /上次读到这一课的 \d+% 处/.test(t.text) && /从上次的位置继续/.test(t.text), 'o. 重新打开这一课提示“继续上次位置”', JSON.stringify(t));
   await page.goto(site);
-  await page.waitForSelector('.home');
+  await page.waitForSelector('.story');
   ok(await page.evaluate(() => document.querySelector('.read-bar').hidden), 'o. 非课文页不显示阅读进度条');
 }
 
@@ -551,7 +551,7 @@ for (const scheme of ['light', 'dark']) {
   const low = [];
   for (const pg of ['', 'roadmap.html', 'lessons/state.html', 'review.html', 'glossary.html', 'check/0.html']) {
     await dp.goto(site + pg);
-    await dp.waitForSelector('.rp-doc, .home');
+    await dp.waitForSelector('.rp-doc, .home, .story');
     await dp.waitForTimeout(800);
     if ((await dp.evaluate(() => document.documentElement.classList.contains('dark'))) !== (scheme === 'dark')) low.push(pg + ' 模式不对');
     const samples = await dp.evaluate(() => {
@@ -565,7 +565,7 @@ for (const scheme of ['light', 'dark']) {
         return 'rgb(0,0,0)';
       };
       for (const el of document.querySelectorAll(
-        '.rp-doc p, .rp-doc li, .rp-doc td, .rp-doc th, .rp-doc h1, .rp-doc h2, .home p, .home li a, .home b, .rp-doc .crumb, .rp-doc .lesson-sum, .rp-doc .opt, .rp-doc .q-text, .rp-doc .btn, .stage .desc, .rp-doc .call, .rp-doc code',
+        '.rp-doc p, .rp-doc li, .rp-doc td, .rp-doc th, .rp-doc h1, .rp-doc h2, .home p, .home li a, .home b, .story p, .story h1, .story h2, .story .eras a, .story .nums li, .rp-doc .crumb, .rp-doc .lesson-sum, .rp-doc .opt, .rp-doc .q-text, .rp-doc .btn, .stage .desc, .rp-doc .call, .rp-doc code',
       )) {
         if (!el.textContent.trim() || el.closest('.preview') || el.closest('.editor')) continue;
         const cs = getComputedStyle(el);
