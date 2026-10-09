@@ -1,6 +1,7 @@
 import { doneCount } from '../../course/engine/index.ts';
 import { TOTAL_LESSONS } from '../../course/registry.ts';
 import { useProgress } from '../lib/useProgress';
+import SyncBadge from './SyncBadge';
 
 /** 顶栏右侧的总进度：已完成 n/50（旧版 #prog-text / #prog-bar） */
 export default function TopProgress() {
@@ -14,6 +15,7 @@ export default function TopProgress() {
       <span id="prog-text">
         已完成 {n}/{TOTAL_LESSONS}
       </span>
+      <SyncBadge />
     </div>
   );
 }

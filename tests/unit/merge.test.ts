@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canon, changedLessons, mergeProgress, sameProgress } from '../../course/engine/logic/merge.ts';
-import { fingerprints, stamp } from '../../course/engine/logic/stamp.ts';
+import { LADDER_KEYS, canon, changedLessons, mergeProgress, sameProgress } from '../../course/engine/logic/merge.ts';
+import { STAMP_LADDER, fingerprints, stamp } from '../../course/engine/logic/stamp.ts';
 
 const m = mergeProgress;
 
@@ -327,5 +327,11 @@ describe('stamp：改动时间戳', () => {
     const { ts, ...rest } = p.a;
     expect(rest).toEqual(before.a);
     expect(ts).toEqual({ lad: 99, note: 99 });
+  });
+});
+
+describe('stamp 和 merge 的字段表', () => {
+  it('提示阶梯字段一致（stamp.ts 在主包里，不能直接 import merge.ts）', () => {
+    expect([...STAMP_LADDER]).toEqual([...LADDER_KEYS]);
   });
 });

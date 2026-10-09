@@ -1,3 +1,4 @@
+export { ago, lastFour } from './syncView.ts';
 /* 同步的时机与错误处理的纯逻辑：退避、防抖、限速等待、地址白名单、响应分类、令牌显示。不读时间（now 由调用方传入）。 */
 
 /** 推送前的防抖：最后一次改动后等 6 秒，但从第一次改动算起最多等 10 秒 */
@@ -65,19 +66,6 @@ export function nextPage(link: string | null | undefined): number | null {
     return null;
   }
 }
-
-/** "3 分钟前"这样的相对时间 */
-export function ago(at: number | undefined, now: number): string {
-  if (!at) return '还没有同步过';
-  const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 45) return '刚刚';
-  if (s < 3600) return Math.round(s / 60) + ' 分钟前';
-  if (s < 86400) return Math.round(s / 3600) + ' 小时前';
-  return Math.round(s / 86400) + ' 天前';
-}
-
-/** 界面上只显示令牌的末四位 */
-export const lastFour = (token: string): string => (token.length >= 8 ? '…' + token.slice(-4) : '…');
 
 /** 令牌的基本格式（只查字符和长度，不代表有效）：ghp_ / github_pat_ 开头或旧式 40 位十六进制 */
 export const looksLikeToken = (t: string): boolean => /^[A-Za-z0-9_]{20,255}$/.test(t);

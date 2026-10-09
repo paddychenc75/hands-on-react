@@ -64,5 +64,22 @@ export function makeSelfExplain(lesson: Lesson): HTMLDivElement {
     reveal.hidden = true;
   } else sync();
   box.append(ta, reveal, count, list);
+  // 跨设备同步时，另一台设备写的、被覆盖的笔记保留在 noteAlts：折叠显示，可以一键换成那一版。是旧版本前缀的（只是少写了几句）不显示
+  const alts = ((p as { noteAlts?: string[] }).noteAlts || []).filter(a => a && a !== p.note && !(p.note || '').startsWith(a)).slice(0, 3);
+  if (alts.length) {
+    const d = el('details', { class: 'sx-alts' }, '<summary>另一台设备的版本（' + alts.length + '）</summary>');
+    alts.forEach(a => {
+      const row = el('div', { class: 'sx-alt' });
+      row.append(el('p', {}, ''), el('button', { class: 'btn small', type: 'button' }, '用这一版'));
+      row.firstElementChild.textContent = a;
+      row.lastElementChild.addEventListener('click', () => {
+        ta.value = a;
+        ta.dispatchEvent(new Event('input'));
+        d.remove();
+      });
+      d.appendChild(row);
+    });
+    box.appendChild(d);
+  }
   return box;
 }

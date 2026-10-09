@@ -3,6 +3,7 @@ import { doneCount, drillCount, dueCount, progress, isDone } from '../../course/
 import { LESSONS } from '../../course/registry.ts';
 import { STAGES } from '../../course/stages.ts';
 import { useProgress } from '../lib/useProgress';
+import SyncPanel from './SyncPanel';
 
 /** 课程地图页（/roadmap，原来的首页内容）：统计、学习方法、六阶段课程地图。
  *  依赖进度的部分（继续学习、完成数、到期数、各阶段进度）挂载后才显示真实数字。 */
@@ -133,6 +134,8 @@ export default function RoadmapPage() {
       <p className="section-sub">
         <b>掌握学习：</b>一课测验全对、练习通过才算完成；一个阶段测验达到 80% 才算掌握。建议每天先清空“今日复习”，再学新课。
       </p>
+
+      <SyncPanel />
 
       <h2 className="section-title" style={{ marginTop: 34 }}>
         学习路线
