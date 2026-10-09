@@ -1,133 +1,619 @@
-/* 首页叙事的浏览器端（自己的异步 chunk，不进站点主包）。
+/* 首页短片的浏览器端（自己的异步 chunk，不进站点主包）。
  *
- * 动画本身是 CSS：theme/story.css 里每一幕有一个 --p（0..1，这一幕从刚进入视口到完全离开的滚动进度），
- * 画面上所有东西都是 --p 的函数，只动 transform、opacity 和 SVG 的描边。--p 有两种来源，结果一致：
- *   1. 浏览器支持 CSS 滚动驱动动画（animation-timeline: view()，Chrome / Edge 115+）：--p 由 CSS 动画直接驱动，这里什么都不用做；
- *   2. 不支持（Firefox、旧 Safari）：这里用一个被动的 scroll 监听 + requestAnimationFrame 给“屏幕上的幕”写 --p。公式和 CSS 的 view() 完全一样。
- * 除此之外这里只做三件小事：幕进度指示（哪一幕在中间）、屏幕外的幕不工作（只给在视口里的幕写 --p / 打开 .on）、点指示跳转。
- * 不改滚动速度、不拦截滚轮/触摸/键盘。 */
+ * 首页是一段 55 秒的短片：画面是“影片时间”的函数（编排在 logic/filmTracks.ts，每个元素一条关键帧轨道，用 Web Animations API 暂停后按时间擦洗，
+ * 只动 transform、opacity 和 SVG 描边）。影片时间由页面滚动位置换算：f = 滚动位置 / 最大滚动位置 × 总时长。
+ * 所以手动滚动、拖进度条、自动播放用的是同一套画面逻辑——自动播放不过是“自己匀速滚动页面”，用户一动手（滚轮、触摸、键盘、拖滚动条）就让出控制权。
+ * 另外这里做：播放控制条、幕进度指示、屏幕外的东西不工作（只更新这一刻有变化的轨道）、标签页在后台时暂停。
+ * 不改滚动速度，不拦截滚轮/触摸/键盘（全部是被动监听，从不 preventDefault；键盘快捷键只在播放器获得焦点时生效）。 */
+import { DURATIONS, MARKS, TOTAL } from './logic/filmData.ts';
+import { type KF, type Tracks, buildTracks } from './logic/filmTracks.ts';
+import { doneCount } from './counts.ts';
 
-const NAV = 64; // 顶栏高度（和 CSS 里 view(block 64px 0px) 的上内边距一致）
 const DYN = 'story-dyn';
+const PLAYED = 'hoc-story-played';
+const SCENE_NAMES = [
+  '开场',
+  'React 之前：手动改 DOM',
+  '2013 · 声明式',
+  '2013 · 协调',
+  '2017 · Fiber',
+  '2019 · Hooks',
+  '2022 · 并发',
+  '2024 · 服务端',
+  '2025 · 编译器',
+  '收束',
+];
+/** 测试用的倍速（页面里设 window.__storySpeed）；正常使用恒为 1 */
+const speed = (): number => (typeof window !== 'undefined' && (window as unknown as { __storySpeed?: number }).__storySpeed) || 1;
+const clamp = (x: number, a: number, b: number) => (x < a ? a : x > b ? b : x);
 
-/** 一幕的滚动进度：0 = 刚从底部进入视口，1 = 底边离开顶栏。和 CSS 的 view(block 64px 0px) 的 cover 范围逐点相同。 */
-export function sceneProgress(top: number, height: number, viewport: number): number {
-  const p = (viewport - top) / (height + viewport - NAV);
-  return p < 0 ? 0 : p > 1 ? 1 : p;
+/** 影片时间 → 第几幕 */
+export const sceneOf = (f: number): number => {
+  let i = 0;
+  while (i < MARKS.length - 1 && f >= MARKS[i + 1]) i++;
+  return i;
+};
+/** 滚动位置 → 影片时间（秒） */
+export const timeOfScroll = (y: number, maxY: number): number => (maxY <= 0 ? 0 : clamp(y / maxY, 0, 1) * TOTAL);
+export const scrollOfTime = (f: number, maxY: number): number => (clamp(f, 0, TOTAL) / TOTAL) * maxY;
+
+interface Track {
+  anims: Animation[];
+  /** 值在变化的时间段（秒） */
+  spans: [number, number][];
+  key: string;
+}
+
+/** 一条轨道里“值真的在变”的时间段：相邻两个关键帧的属性不同才算 */
+export function changeSpans(kfs: KF[]): [number, number][] {
+  const spans: [number, number][] = [];
+  for (let i = 0; i < kfs.length - 1; i++) {
+    const a = kfs[i];
+    const b = kfs[i + 1];
+    let diff = false;
+    for (const p of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      if (p === 't' || p === 'easing') continue;
+      if (a[p] !== b[p]) diff = true;
+    }
+    if (!diff) continue;
+    const last = spans[spans.length - 1];
+    if (last && Math.abs(last[1] - a.t) < 1e-6) last[1] = b.t;
+    else spans.push([a.t, b.t]);
+  }
+  return spans;
 }
 
 export function attach(root: HTMLElement): () => void {
+  const html = document.documentElement;
+  const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
+  const narrowMQ = matchMedia('(max-width: 899px)');
+  const world = root.querySelector<HTMLElement>('.world') as HTMLElement;
   const scenes = [...root.querySelectorAll<HTMLElement>('.sc')];
   const dots = [...root.querySelectorAll<HTMLAnchorElement>('.rail a')];
-  const native = typeof CSS !== 'undefined' && CSS.supports('animation-timeline', 'view()');
-  const reduceMQ = matchMedia('(prefers-reduced-motion: reduce)');
-  const html = document.documentElement;
+  const filmBtn = root.querySelector<HTMLButtonElement>('.btn.film');
+  const slot = root.querySelector<HTMLElement>('.player-slot');
   const ac = new AbortController();
-  const visible = new Set<HTMLElement>();
-  const last = new Map<HTMLElement, number>();
-  let raf = 0;
+  const sig = { signal: ac.signal };
+  const isDyn = () => !reduceMQ.matches;
+
   let addedDyn = false;
-
-  const mode = native ? 'css' : 'js';
-  root.dataset.mode = mode;
-
-  // 回退路径：给“屏幕上的幕”写 --p。减少动画时什么都不写（画面是每一幕的最终静态画面）。
-  const frame = () => {
-    raf = 0;
-    if (reduceMQ.matches) return;
-    const vh = innerHeight;
-    for (const sc of visible) {
-      const r = sc.getBoundingClientRect();
-      const p = sceneProgress(r.top, r.height, vh);
-      const prev = last.get(sc);
-      if (prev === undefined || Math.abs(prev - p) > 0.0004 || p === 0 || p === 1) {
-        last.set(sc, p);
-        sc.style.setProperty('--p', p.toFixed(4));
-      }
-    }
-  };
-  const schedule = () => {
-    if (!raf) raf = requestAnimationFrame(frame);
-  };
-
-  // 动态布局的开关：首次打开首页时，页面 <head> 里的一小段脚本已经（在浏览器支持 CSS 滚动驱动动画时）加好了；
-  // 从别的页面点进来、或者走 JS 回退路径时，在这里加。没有这个类（没有 JS、JS 加载失败）页面就是一篇静态长文。
   if (!html.classList.contains(DYN)) {
     html.classList.add(DYN);
     addedDyn = true;
   }
-  if (!native) {
-    addEventListener('scroll', schedule, { passive: true, signal: ac.signal });
-    addEventListener('resize', schedule, { passive: true, signal: ac.signal });
-    reduceMQ.addEventListener(
-      'change',
-      () => {
-        if (reduceMQ.matches) scenes.forEach(s => s.style.removeProperty('--p'));
+  root.dataset.mode = 'film';
+
+  /* ---------- 轨道 → Web Animations ---------- */
+  let tracks: Track[] = [];
+  let builtFor: boolean | null = null;
+  const destroyAnims = () => {
+    for (const t of tracks) for (const a of t.anims) a.cancel();
+    tracks = [];
+    builtFor = null;
+  };
+  let buildToken = 0;
+  /** 建全部动画：一共几百条轨道，分批建（每批约 6ms），免得挤成一个长任务；建完才打开画面（root 上出现 .ready） */
+  const build = (): Promise<void> => {
+    destroyAnims();
+    const token = ++buildToken;
+    const mobile = narrowMQ.matches;
+    const data: Tracks = buildTracks(mobile);
+    const entries = Object.entries(data);
+    let i = 0;
+    return new Promise(resolve => {
+      const slice = () => {
+        if (token !== buildToken) return resolve();
+        const t0 = performance.now();
+        while (i < entries.length && performance.now() - t0 < 6) {
+          const [name, kfs] = entries[i++];
+          const els = name.startsWith('css:')
+            ? [...root.querySelectorAll<HTMLElement>(name.slice(4))]
+            : [...root.querySelectorAll<HTMLElement>(`[data-w="${name}"]`)];
+          if (!els.length) continue;
+          const frames: Keyframe[] = kfs.map(({ t, easing, ...props }) => ({
+            offset: Math.min(1, t / TOTAL),
+            easing,
+            ...(props as Record<string, string | number>),
+          }));
+          const anims = els.map(el => {
+            const a = el.animate(frames, { duration: TOTAL * 1000, fill: 'both', easing: 'linear' });
+            a.pause();
+            return a;
+          });
+          tracks.push({ anims, spans: changeSpans(kfs), key: '' });
+        }
+        if (i < entries.length) setTimeout(slice, 0);
         else {
-          last.clear();
-          schedule();
+          builtFor = mobile;
+          last = -1;
+          paint(curF, true);
+          resolve();
+        }
+      };
+      slice();
+    });
+  };
+
+  let curF = 0;
+  let last = -1;
+  const paint = (f: number, force = false) => {
+    if (!tracks.length) return;
+    if (!force && Math.abs(f - last) < 1e-4) return;
+    last = f;
+    const ms = f * 1000;
+    for (const t of tracks) {
+      // 在某一段变化里：每帧都要更新；在两段之间（值不变）：只在进入这一段空隙时更新一次
+      let key = '';
+      for (let i = 0; i < t.spans.length; i++) {
+        const [a, b] = t.spans[i];
+        if (f >= a - 0.02 && f <= b + 0.02) {
+          key = 's' + i;
+          break;
+        }
+        if (f < a) {
+          key = 'g' + i;
+          break;
+        }
+        key = 'g' + (i + 1);
+      }
+      const inside = key.startsWith('s');
+      if (inside || key !== t.key || force) {
+        t.key = key;
+        for (const a of t.anims) a.currentTime = ms;
+      }
+    }
+  };
+
+  /* ---------- 画面尺寸 ---------- */
+  const fitWorld = () => {
+    const r = world.getBoundingClientRect();
+    const narrow = narrowMQ.matches;
+    // 三层空间旋转之后比平面大：留出余量
+    const ws = narrow ? Math.min(r.width / 1000, r.height / 520) * 0.98 : Math.min(r.width / 1340, r.height / 650);
+    world.style.setProperty('--ws', ws.toFixed(4));
+  };
+
+  /* ---------- 滚动 ↔ 影片时间 ---------- */
+  const maxY = () => Math.max(1, document.documentElement.scrollHeight - innerHeight);
+  const live = new Set<number>();
+  let activeScene = -1;
+  const status = (f: number) => {
+    const s = sceneOf(f);
+    for (let i = 0; i < scenes.length; i++) {
+      const on = f >= MARKS[i] - 0.3 && f <= MARKS[i] + DURATIONS[i] + 0.3;
+      if (on !== live.has(i)) {
+        if (on) live.add(i);
+        else live.delete(i);
+        scenes[i].classList.toggle('live', on);
+      }
+    }
+    if (s !== activeScene) {
+      activeScene = s;
+      dots.forEach((d, j) => (j === s ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
+      root.dataset.active = String(s);
+      onScene(s);
+    }
+    ui.update(f);
+  };
+  const setF = (f: number) => {
+    curF = clamp(f, 0, TOTAL);
+    paint(curF);
+    status(curF);
+  };
+
+  let lastY = 0;
+  const onScroll = () => {
+    if (!isDyn()) return;
+    const y = scrollY;
+    if (playing && Math.abs(y - lastY) > 3 && !tweening) pause('scrollbar');
+    lastY = y;
+    schedule();
+  };
+  let raf = 0;
+  const schedule = () => {
+    if (!raf)
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (isDyn() && !playing) setF(timeOfScroll(scrollY, maxY()));
+      });
+  };
+  const scrollTo = (y: number) => {
+    window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior });
+    lastY = scrollY;
+  };
+
+  /* ---------- 播放器 ---------- */
+  let playing = false;
+  let tweening = false;
+  let tick = 0;
+  let prevTs = 0;
+  let autoTimer = 0;
+  let cleanups: (() => void)[] = [];
+  const ui = createUi();
+
+  const loop = (ts: number) => {
+    tick = 0;
+    if (!playing) return;
+    const dt = Math.min(0.1 * speed(), ((ts - prevTs) / 1000) * speed());
+    prevTs = ts;
+    const mY = maxY();
+    const nf = clamp(curF + dt, 0, TOTAL);
+    curF = nf;
+    scrollTo(scrollOfTime(nf, mY));
+    paint(nf);
+    status(nf);
+    if (nf >= TOTAL) {
+      finish();
+      return;
+    }
+    tick = requestAnimationFrame(loop);
+  };
+  function play() {
+    if (!isDyn() || playing) return;
+    if (curF >= TOTAL - 0.05) curF = 0;
+    playing = true;
+    try {
+      sessionStorage.setItem(PLAYED, '1');
+    } catch {
+      /* 隐私模式：当作没记住 */
+    }
+    window.clearTimeout(autoTimer);
+    root.classList.add('playing');
+    prevTs = performance.now();
+    ui.state(true);
+    tick = requestAnimationFrame(loop);
+  }
+  function pause(_why: string) {
+    window.clearTimeout(autoTimer);
+    if (!playing) return;
+    playing = false;
+    root.classList.remove('playing');
+    if (tick) cancelAnimationFrame(tick);
+    tick = 0;
+    ui.state(false);
+  }
+  function finish() {
+    playing = false;
+    root.classList.remove('playing');
+    root.classList.add('ended');
+    ui.state(false, true);
+  }
+  /** 跳到某个影片时间（用户点上一幕、下一幕、进度条）：短暂地滑过去，然后保持原来的播放状态 */
+  const seek = (f: number, smooth = true) => {
+    const was = playing;
+    pause('seek');
+    root.classList.remove('ended');
+    const to = clamp(f, 0, TOTAL);
+    if (!smooth || reduceMQ.matches) {
+      scrollTo(scrollOfTime(to, maxY()));
+      setF(to);
+      if (was) play();
+      return;
+    }
+    tweening = true;
+    const from = curF;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const x = clamp((now - t0) / 650, 0, 1);
+      const e = x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
+      const v = from + (to - from) * e;
+      scrollTo(scrollOfTime(v, maxY()));
+      setF(v);
+      if (x < 1) tick = requestAnimationFrame(step);
+      else {
+        tick = 0;
+        tweening = false;
+        if (was) play();
+      }
+    };
+    tick = requestAnimationFrame(step);
+  };
+  const toScene = (i: number) => seek(MARKS[clamp(i, 0, MARKS.length - 1)] + (i === 0 ? 0 : 0.25));
+
+  // 用户接管：任何滚轮、触摸、键盘滚动、拖滚动条都立刻暂停（全部是被动监听，不阻止默认行为）
+  const takeOver = () => {
+    if (playing && !tweening) pause('user');
+    window.clearTimeout(autoTimer);
+  };
+  addEventListener('wheel', takeOver, { passive: true, ...sig });
+  addEventListener('touchstart', takeOver, { passive: true, ...sig });
+  addEventListener('touchmove', takeOver, { passive: true, ...sig });
+  addEventListener(
+    'keydown',
+    e => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('.player') || /^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName || '')) return;
+      if ([' ', 'Spacebar', 'PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) takeOver();
+    },
+    { passive: true, ...sig },
+  );
+  addEventListener(
+    'mousedown',
+    e => {
+      if (e.clientX >= document.documentElement.clientWidth) takeOver(); // 点在滚动条上
+    },
+    { passive: true, ...sig },
+  );
+  addEventListener('scroll', onScroll, { passive: true, ...sig });
+  addEventListener(
+    'resize',
+    () => {
+      fitWorld();
+      if (builtFor !== null && builtFor !== narrowMQ.matches) void build();
+      schedule();
+    },
+    { passive: true, ...sig },
+  );
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.hidden && playing) {
+        pause('hidden');
+        ui.needResume();
+      }
+    },
+    sig,
+  );
+  reduceMQ.addEventListener(
+    'change',
+    () => {
+      if (reduceMQ.matches) {
+        pause('reduced');
+        destroyAnims();
+      } else {
+        fitWorld();
+        void build();
+        setF(timeOfScroll(scrollY, maxY()));
+      }
+      ui.show(!reduceMQ.matches);
+    },
+    sig,
+  );
+
+  /* ---------- 播放控制条 ---------- */
+  function createUi() {
+    const bar = document.createElement('div');
+    bar.className = 'player';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', '短片播放控制');
+    const icon = (d: string) =>
+      `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="${d}" fill="currentColor"/></svg>`;
+    const I = {
+      play: icon('M8 5v14l11-7z'),
+      pause: icon('M6 5h4v14H6zM14 5h4v14h-4z'),
+      prev: icon('M6 6h2v12H6zM9.5 12 18 6v12z'),
+      next: icon('M16 6h2v12h-2zM6 18V6l8.5 6z'),
+      replay: icon('M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z'),
+    };
+    bar.innerHTML = `
+      <button type="button" class="play" aria-pressed="false" aria-label="播放短片">${I.play}</button>
+      <button type="button" class="prev" aria-label="上一幕">${I.prev}</button>
+      <div class="scrub" role="slider" tabindex="0" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="开场">
+        ${DURATIONS.map((d, i) => `<span class="seg" style="flex:${d}" data-i="${i}"><i></i></span>`).join('')}
+        <span class="tip" aria-hidden="true"></span>
+      </div>
+      <button type="button" class="next" aria-label="下一幕">${I.next}</button>
+      <button type="button" class="replay" aria-label="重播">${I.replay}</button>
+      <a class="skip" href="#scene-9"><span class="sk-long">跳过，</span>开始学习 →</a>`;
+    const live = document.createElement('div');
+    live.className = 'live-region';
+    live.setAttribute('aria-live', 'polite');
+    const q = <T extends HTMLElement>(s: string) => bar.querySelector(s) as T;
+    const playBtn = q<HTMLButtonElement>('.play');
+    const scrub = q<HTMLElement>('.scrub');
+    const tip = q<HTMLElement>('.tip');
+    const segs = [...bar.querySelectorAll<HTMLElement>('.seg i')];
+    let resume = false;
+    let lastFill: number[] = [];
+    slot?.append(bar, live);
+
+    const setBtn = (isPlaying: boolean, ended = false) => {
+      playBtn.setAttribute('aria-pressed', String(isPlaying));
+      playBtn.innerHTML = isPlaying ? I.pause : I.play;
+      playBtn.setAttribute('aria-label', isPlaying ? '暂停短片' : ended ? '重播短片' : resume ? '继续播放短片' : '播放短片');
+      if (filmBtn) filmBtn.hidden = !isDyn() || isPlaying;
+    };
+    playBtn.addEventListener('click', () => (playing ? pause('button') : play()), sig);
+    q('.prev').addEventListener('click', () => toScene(Math.max(0, curF - MARKS[activeScene] > 1.2 ? activeScene : activeScene - 1)), sig);
+    q('.next').addEventListener('click', () => toScene(activeScene + 1), sig);
+    q('.replay').addEventListener(
+      'click',
+      () => {
+        root.classList.remove('ended');
+        seek(0, false);
+        play();
+      },
+      sig,
+    );
+    q('.skip').addEventListener(
+      'click',
+      e => {
+        e.preventDefault();
+        pause('skip');
+        toScene(9);
+      },
+      sig,
+    );
+    filmBtn?.addEventListener('click', () => play(), sig);
+    // 进度条：点击、拖动都是 scrub，同时暂停自动播放
+    const frac = (e: PointerEvent) => {
+      const r = scrub.getBoundingClientRect();
+      return clamp((e.clientX - r.left) / r.width, 0, 1);
+    };
+    let dragging = false;
+    scrub.addEventListener(
+      'pointerdown',
+      e => {
+        dragging = true;
+        scrub.setPointerCapture(e.pointerId);
+        pause('scrub');
+        root.classList.remove('ended');
+        scrollTo(scrollOfTime(frac(e) * TOTAL, maxY()));
+        setF(frac(e) * TOTAL);
+      },
+      sig,
+    );
+    scrub.addEventListener(
+      'pointermove',
+      e => {
+        const f = frac(e) * TOTAL;
+        const r = scrub.getBoundingClientRect();
+        tip.textContent = SCENE_NAMES[sceneOf(f)];
+        tip.style.opacity = '1';
+        tip.style.transform = `translateX(${clamp(e.clientX - r.left - 40, 0, Math.max(0, r.width - 160))}px)`;
+        if (dragging) {
+          scrollTo(scrollOfTime(f, maxY()));
+          setF(f);
         }
       },
-      { signal: ac.signal },
+      sig,
     );
+    scrub.addEventListener(
+      'pointerup',
+      () => {
+        dragging = false;
+      },
+      sig,
+    );
+    scrub.addEventListener('pointerleave', () => (tip.style.opacity = '0'), sig);
+    scrub.addEventListener(
+      'focus',
+      () => {
+        tip.textContent = SCENE_NAMES[activeScene];
+        tip.style.opacity = '1';
+      },
+      sig,
+    );
+    scrub.addEventListener('blur', () => (tip.style.opacity = '0'), sig);
+    // 键盘：只在播放器获得焦点时。空格播放/暂停（按钮自己会处理空格），左右方向键切幕
+    bar.addEventListener(
+      'keydown',
+      e => {
+        const onButton = (e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).tagName === 'A';
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          toScene(activeScene + 1);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          toScene(activeScene - 1);
+        } else if ((e.key === ' ' || e.key === 'Spacebar') && !onButton) {
+          e.preventDefault();
+          if (playing) pause('key');
+          else play();
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          toScene(0);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          toScene(9);
+        }
+      },
+      sig,
+    );
+    return {
+      state: setBtn,
+      needResume() {
+        resume = true;
+        setBtn(false);
+        if (filmBtn) filmBtn.textContent = '▶ 继续播放';
+      },
+      show(on: boolean) {
+        bar.hidden = !on;
+        if (filmBtn) filmBtn.hidden = !on || playing;
+      },
+      update(f: number) {
+        const s = sceneOf(f);
+        segs.forEach((el, i) => {
+          const v = Math.round(clamp((f - MARKS[i]) / DURATIONS[i], 0, 1) * 1000) / 1000;
+          if (lastFill[i] !== v) {
+            lastFill[i] = v;
+            el.style.transform = `scaleX(${v})`;
+          }
+        });
+        const pct = Math.round((f / TOTAL) * 100);
+        if (scrub.getAttribute('aria-valuenow') !== String(pct)) {
+          scrub.setAttribute('aria-valuenow', String(pct));
+          scrub.setAttribute('aria-valuetext', `第 ${s} 幕：${SCENE_NAMES[s]}`);
+        }
+      },
+      announce(s: number) {
+        live.textContent = `第 ${s} 幕：${SCENE_NAMES[s]}`;
+      },
+    };
   }
-
-  // 屏幕外的幕不工作：只有进入视口（上下各留一屏的余量）的幕才在 visible 里并带 .on
-  const io = new IntersectionObserver(
-    es => {
-      for (const e of es) {
-        const sc = e.target as HTMLElement;
-        sc.classList.toggle('on', e.isIntersecting);
-        if (e.isIntersecting) visible.add(sc);
-        else visible.delete(sc);
-      }
-      if (!native) schedule();
-    },
-    { rootMargin: '50% 0px 50% 0px' },
-  );
-  scenes.forEach(s => io.observe(s));
-
-  // 幕进度指示：哪一幕压在视口中线上，哪个点就亮
-  const setActive = (i: number) => {
-    dots.forEach((d, j) => {
-      if (j === i) d.setAttribute('aria-current', 'step');
-      else d.removeAttribute('aria-current');
-    });
-    root.dataset.active = String(i);
+  const onScene = (s: number) => {
+    if (playing) ui.announce(s);
   };
-  const mid = new IntersectionObserver(
-    es => {
-      for (const e of es) if (e.isIntersecting) setActive(scenes.indexOf(e.target as HTMLElement));
-    },
-    { rootMargin: '-50% 0px -49.9% 0px' },
-  );
-  scenes.forEach(s => mid.observe(s));
-  setActive(0);
 
-  // 点指示：滚到那一幕的开头（用户自己点的，不是替他滚）；减少动画时不用平滑滚动
+  /* ---------- 幕进度指示（右侧圆点）和锚点 ---------- */
   dots.forEach((d, i) => {
     d.addEventListener(
       'click',
       e => {
-        const target = scenes[i];
-        if (!target) return;
+        if (!isDyn()) return;
         e.preventDefault();
-        target.scrollIntoView({ block: 'start', behavior: reduceMQ.matches ? 'auto' : 'smooth' });
+        seek(MARKS[i] + (i === 0 ? 0 : 0.25));
       },
-      { signal: ac.signal },
+      sig,
     );
   });
 
-  schedule();
+  function maybeAutoplay() {
+    // 自动开始：第一次进首页（本会话没放过、没有学习进度、不是带锚点进来、没有减少动画、页面在最上面）
+    let seen = false;
+    try {
+      seen = !!sessionStorage.getItem(PLAYED);
+    } catch {
+      seen = false;
+    }
+    const visitorHasProgress = doneCount() > 0;
+    if (isDyn() && !seen && !visitorHasProgress && !location.hash && scrollY < 80 && !document.hidden) {
+      autoTimer = window.setTimeout(() => {
+        if (scrollY < 80 && !playing && !document.hidden) play();
+      }, 1200);
+    }
+  }
+
+  /* ---------- 启动 ---------- */
+  fitWorld();
+  const start = () => {
+    root.classList.add('ready');
+    maybeAutoplay();
+  };
+  if (isDyn()) {
+    ui.show(true);
+    build().then(start);
+  } else {
+    ui.show(false);
+    start();
+  }
+  ui.state(false);
+  if (filmBtn) filmBtn.hidden = !isDyn();
+  const hashed = !!location.hash && /^#scene-\d$/.test(location.hash);
+  if (hashed && isDyn()) {
+    const i = Number(location.hash.slice(-1));
+    requestAnimationFrame(() => {
+      scrollTo(scrollOfTime(MARKS[i] + (i === 0 ? 0 : 0.25), maxY()));
+      setF(MARKS[i] + (i === 0 ? 0 : 0.25));
+    });
+  } else {
+    curF = timeOfScroll(scrollY, maxY());
+    lastY = scrollY;
+    setF(curF);
+  }
   return () => {
     ac.abort();
-    io.disconnect();
-    mid.disconnect();
+    window.clearTimeout(autoTimer);
+    if (tick) cancelAnimationFrame(tick);
     if (raf) cancelAnimationFrame(raf);
+    playing = false;
+    destroyAnims();
+    slot?.replaceChildren();
+    for (const c of cleanups) c();
+    cleanups = [];
     if (addedDyn) html.classList.remove(DYN);
-    scenes.forEach(s => {
-      s.style.removeProperty('--p');
-      s.classList.remove('on');
-    });
+    scenes.forEach(s => s.classList.remove('live'));
+    root.classList.remove('ready', 'playing', 'ended');
+    delete root.dataset.mode;
   };
 }

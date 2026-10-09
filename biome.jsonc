@@ -17,7 +17,8 @@
       "!package-lock.json",
       "!**/*.mdx",
       "!docs/public/downloads", // 给学习者下载的文件，按学习者项目（模板）的风格写，不按本仓库的风格
-      "!theme/style.css"
+      "!theme/style.css",
+      "!theme/story.css"
     ]
   },
   // 风格贴着现有代码：2 空格、单引号、分号、尾逗号；行宽放宽到 160，引擎里有很多一行写完的长语句，不拆开可以少改很多行。

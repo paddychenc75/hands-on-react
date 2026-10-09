@@ -208,6 +208,14 @@ const node = (page, id) => page.locator(`.hero-tree .tnode[data-id="${id}"]`);
     '动画. 点 Header：它和后代 +1，兄弟 TodoList 一支和祖先 App 不变',
     JSON.stringify(await counts(page)),
   );
+  const rc = await page.evaluate(() =>
+    [...document.querySelectorAll('.hero-tree .tnode')].map(g => g.querySelector('.nm').textContent + g.querySelector('.rc').textContent),
+  );
+  ok(
+    rc.filter(x => /渲染 2 次/.test(x)).length === 3 && /TodoList.*渲染 1 次/.test(rc.join('|')),
+    '动画. 点击组件树节点后，它和后代的“渲染 N 次”变成 2，兄弟和祖先仍是 1（课文里的 RenderTree）',
+    JSON.stringify(rc),
+  );
   await node(page, 'Logo').click();
   await idle(page);
   ok((await counts(page)).Logo === 3 && (await counts(page)).Header === 2, '动画. 点叶子节点只加它自己');
