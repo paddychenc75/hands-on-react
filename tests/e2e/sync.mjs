@@ -16,9 +16,13 @@ const SHOTS = path.join(ROOT, 'tests/screenshots');
 const ids = await lessonOrder();
 const TOKEN = 'ghp_ZZTESTMARKERTOKEN0123456789abcdef';
 const TOKEN_B = 'github_pat_ZZTESTMARKERTOKENB0123456789';
-const TUNE = { debounce: 250, maxWait: 500, pullAfter: 0, initialDelay: 100, backoff: 150 };
+// 测试里把防抖、退避、心跳缩短；真实时长另有一组断言（见"真实时长"一节）。
+// SYNC_THROTTLE=4 node tests/e2e/sync.mjs 用 CDP 给每个页面降 CPU（模拟 GitHub 的 2 核 runner）；等待条件一律轮询到成立或超时（超时按降速倍数放大）
+const TUNE = { debounce: 250, maxWait: 500, pullAfter: 0, initialDelay: 100, backoff: 150, heartbeat: 500, periodic: 3000, leaseTtl: 3000 };
+const K = Math.max(1, Number(process.env.SYNC_THROTTLE) || 1);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const until = async (fn, ms = 8000, step = 100) => {
+const until = async (fn, ms = 30000, step = 100) => {
+  ms = Math.max(ms, 30000) * Math.max(1, K / 2);
   const t = Date.now();
   while (Date.now() - t < ms) {
     try {
@@ -44,6 +48,11 @@ async function device(gh, { viewport = { width: 1280, height: 900 }, tune = TUNE
     p.on('console', m => d.logs.push(m.text()));
     p.on('pageerror', e => d.errs.push(e.message));
     p.on('request', r => d.reqs.push({ url: r.url(), headers: r.headers() }));
+    if (K > 1)
+      ctx
+        .newCDPSession(p)
+        .then(c => c.send('Emulation.setCPUThrottlingRate', { rate: K }))
+        .catch(() => {});
   });
   d.page = await ctx.newPage();
   return d;
@@ -126,11 +135,127 @@ const foreground = async p => {
   ok(live, '结果区 aria-live=polite');
   const html = await d.page.content();
   ok(
+    (await d.page.locator('.sync-steps a').first().getAttribute('href')) ===
+      'https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync',
+    '第一步的链接是预填 scopes=gist 的经典令牌创建页',
+  );
+  ok(
+    /改回“未完成”.*带回来/.test(await d.page.textContent('.sync-notes')) && /备选：细粒度令牌/.test(await d.page.textContent('.sync-fine')),
+    '面板说明里有“改回未完成会被带回来”，细粒度令牌是备选',
+  );
+  ok(
     /细粒度|personal-access-tokens\/new\?name=/.test(html) && /gists=write/.test(html) && /tokens\/new\?scopes=gist/.test(html),
     '面板里有预填好的令牌创建链接（细粒度 gists=write；经典 scopes=gist）',
   );
   await d.page.screenshot({ path: path.join(SHOTS, 'sync-panel-off-light.png'), fullPage: false });
   await d.ctx.close();
+}
+
+/* =============== 0b. 入口（与「动手学 Vue 3」一致）：侧栏“进度同步”、课程地图页头一行链接、直达地址；全程不加载同步引擎、不发 github 请求 =============== */
+{
+  const gitReqs = d => d.reqs.filter(r => /github\.com|githubusercontent\.com/.test(r.url)).length;
+  const engine = d => d.reqs.some(r => /sync-engine/.test(r.url));
+  const panelOpenAndFocused = async (d, label) => {
+    ok(
+      await until(() => d.page.evaluate(() => document.querySelector('#sync')?.open && !!document.querySelector('#sync-token'))),
+      `${label}：落到展开的同步面板`,
+    );
+    ok(
+      await until(() => d.page.evaluate(() => document.activeElement?.tagName === 'SUMMARY' && document.activeElement.parentElement.id === 'sync')),
+      `${label}：焦点在面板标题上`,
+    );
+    ok(await until(async () => (await d.page.evaluate(() => document.querySelector('#sync').getBoundingClientRect().top)) < 400), `${label}：已滚动到面板`);
+  };
+  const d = await device(null);
+  await d.page.goto(lessonUrl(site, ids[0]));
+  const SIDE = '.rp-doc-layout__sidebar a[href$="#sync"]';
+  await d.page.waitForSelector(SIDE, { state: 'attached' });
+  const side = d.page.locator(SIDE);
+  ok((await side.count()) === 1 && /进度同步/.test(await side.textContent()), '侧栏固定入口里有"进度同步"');
+  ok(await until(async () => (await side.getAttribute('data-hoc-sync')) === 'off'), '未开启时侧栏项旁标记"未开启"');
+  const order = await d.page.evaluate(() => [...document.querySelectorAll('.rp-doc-layout__sidebar a[href]')].slice(0, 6).map(a => a.textContent.trim()));
+  ok(
+    order.join('|').startsWith('课程首页|课程地图|今日复习|术语表|变式练习|进度同步'),
+    '顺序：首页、课程地图、今日复习、术语表、变式练习，最后是进度同步',
+    order.join('|'),
+  );
+  ok((await d.page.locator('a.sync-off, .sync-badge').count()) === 0, '未开启时顶栏什么也不显示（与 Vue 一致）');
+  await d.page.screenshot({ path: path.join(SHOTS, 'sync-sidebar-entry-light.png'), clip: { x: 0, y: 0, width: 1280, height: 330 } });
+  await d.page.evaluate(() => (window.__spa = 1));
+  await side.click();
+  await panelOpenAndFocused(d, '点侧栏');
+  ok(await d.page.evaluate(() => window.__spa === 1 && /roadmap/.test(location.pathname)), '点侧栏走客户端路由（不整页刷新）并到了课程地图');
+  ok(gitReqs(d) === 0 && !engine(d), '点侧栏前后：没有 github 请求，没有加载同步引擎');
+  // 已经在课程地图页、面板被收起时再点，也要重新展开
+  await d.page.click('#sync > summary');
+  await d.page.waitForFunction(() => !document.querySelector('#sync').open);
+  await side.click();
+  await panelOpenAndFocused(d, '已在课程地图页再点侧栏');
+  // 页头那一行
+  await d.page.goto(site + 'roadmap.html');
+  const hero = d.page.locator('.sync-hero');
+  await hero.waitFor();
+  ok(
+    /想在手机和电脑之间接着学？开启跨设备同步（可选）/.test((await hero.textContent()).trim()),
+    '课程地图页头有一行"想在手机和电脑之间接着学？开启跨设备同步（可选）"',
+  );
+  ok(await d.page.evaluate(() => document.querySelector('.sync-hero').getBoundingClientRect().top < 500), '页头那一行在页面上方');
+  await d.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-hero-link-light.png') });
+  await d.page.evaluate(() => (window.__spa = 1));
+  await d.page.click('.sync-hero a');
+  await panelOpenAndFocused(d, '点页头链接');
+  ok(await d.page.evaluate(() => window.__spa === 1), '点页头链接走客户端路由');
+  // 直接访问
+  await d.page.goto(site + 'roadmap.html#sync');
+  await panelOpenAndFocused(d, '直接访问 /roadmap#sync');
+  await d.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-panel-open-light.png') });
+  ok(gitReqs(d) === 0 && !engine(d), '直达、点链接之后：仍然没有 github 请求，没有加载同步引擎');
+  ok(
+    d.reqs.some(r => /sync-panel/.test(r.url)),
+    '只加载了面板本身的 chunk',
+  );
+  await d.page.goto(site + 'roadmap.html');
+  await d.page.waitForSelector('#sync');
+  const summary = await d.page.textContent('#sync > summary');
+  ok(/跨设备同步/.test(summary) && /未开启/.test(summary) && /可选/.test(summary), '收起的标题行：跨设备同步 · 未开启 · 可选', summary);
+  ok(gitReqs(d) === 0 && !engine(d), '浏览课程地图页（面板收起）：没有 github 请求，没有同步引擎');
+  await d.ctx.close();
+
+  // 手机宽度：从菜单（侧栏）进入、页头链接都可达
+  const m = await device(null, { viewport: { width: 390, height: 844 } });
+  await m.page.goto(site + 'roadmap.html');
+  await m.page.waitForSelector('.sync-hero a');
+  await m.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-hero-link-mobile-light.png') });
+  await m.page.click('.sync-hero a');
+  await panelOpenAndFocused(m, '手机：点页头链接');
+  await m.page.screenshot({ path: path.join(SHOTS, 'sync-roadmap-panel-open-mobile-light.png') });
+  await m.page.goto(lessonUrl(site, ids[0]));
+  await m.page.click('button:has-text("菜单")');
+  const ms = m.page.locator(`${SIDE}:visible`);
+  await ms.waitFor();
+  await m.page.screenshot({ path: path.join(SHOTS, 'sync-sidebar-entry-mobile-light.png') });
+  await ms.click();
+  await panelOpenAndFocused(m, '手机：从菜单点"进度同步"');
+  ok(gitReqs(m) === 0 && !engine(m), '手机：入口点击前后没有 github 请求，没有同步引擎');
+  ok(!(await m.page.evaluate(() => document.documentElement.scrollWidth > innerWidth)), '手机：入口和面板没有横向滚动');
+  await m.ctx.close();
+
+  // 开启后侧栏项显示状态
+  const ghn = fakeGitHub();
+  ghn.st.valid.add(TOKEN);
+  const n = await device(ghn);
+  await enable(n.page);
+  await n.page.goto(site + 'review.html');
+  await n.page.waitForSelector('.hoc-slot');
+  const sideState = await until(() =>
+    n.page
+      .locator(SIDE)
+      .getAttribute('data-hoc-sync')
+      .then(v => v && v !== 'off' && v),
+  );
+  ok(['synced', 'syncing', 'pending'].includes(sideState), '已开启时侧栏项显示状态（小圆点）', String(sideState));
+  await n.page.screenshot({ path: path.join(SHOTS, 'sync-sidebar-entry-on-light.png'), clip: { x: 0, y: 0, width: 1280, height: 330 } });
+  await n.ctx.close();
 }
 
 /* =============== 1~2. 两台设备 A、B =============== */
@@ -212,13 +337,22 @@ const B = await device(gh, { colorScheme: 'dark' });
   const burst = gh.writes().length - writesBefore;
   ok(burst >= 1 && burst <= 3, '多次改动被防抖合并，没有逐次推送', String(burst));
   await A.page.goto(site + 'roadmap.html');
-  await foreground(A.page);
-  ok(await until(async () => (await doneIds(A.page)).join() === [ids[0], ids[1]].sort().join()), 'A 回到前台后拉取并合并，两课都完成');
+  ok(
+    await until(async () => {
+      await foreground(A.page);
+      return (await doneIds(A.page)).join() === [ids[0], ids[1]].sort().join();
+    }),
+    'A 回到前台后拉取并合并，两课都完成',
+  );
   ok(gh.st.n304 >= 0, 'ETag 条件请求已使用');
   const n304 = gh.st.n304;
-  await foreground(A.page);
-  await sleep(800);
-  ok(gh.st.n304 > n304, '远端没变时用 If-None-Match 得到 304，不重复下载');
+  ok(
+    await until(async () => {
+      await foreground(A.page);
+      return gh.st.n304 > n304;
+    }),
+    '远端没变时用 If-None-Match 得到 304，不重复下载',
+  );
   ok(
     gh.st.log.some(r => r.ifNoneMatch),
     '请求带 If-None-Match',
@@ -277,8 +411,7 @@ const B = await device(gh, { colorScheme: 'dark' });
     },
     [KEY, key, now],
   );
-  await sleep(1500);
-  const st = await X.page.evaluate(() => localStorage.getItem('hands-on-react-v1:sync-status'));
+  const st = await until(() => X.page.evaluate(() => localStorage.getItem('hands-on-react-v1:sync-status')).then(v => /pending/.test(v || '') && v));
   ok(/pending/.test(st || ''), '离线时状态是"有未同步的更改"');
   // 刷新让内存读到手改的卡片，再学一课触发保存
   await X.page.reload();
@@ -288,13 +421,12 @@ const B = await device(gh, { colorScheme: 'dark' });
   await learn(X.page, ids[3]);
   await learn(Y.page, ids[4]);
   const want = [ids[0], ids[1], ids[2], ids[3], ids[4]].sort().join();
-  await sleep(1500);
-  await foreground(X.page);
-  await foreground(Y.page);
-  await sleep(1500);
-  await foreground(X.page);
   ok(
-    await until(async () => (await doneIds(X.page)).join() === want && (await doneIds(Y.page)).join() === want, 20000),
+    await until(async () => {
+      await foreground(X.page);
+      await foreground(Y.page);
+      return (await doneIds(X.page)).join() === want && (await doneIds(Y.page)).join() === want;
+    }, 45000),
     '离线各学后上线，最终两边都包含所有课',
     `${await doneIds(X.page)} | ${await doneIds(Y.page)}`,
   );
@@ -303,7 +435,7 @@ const B = await device(gh, { colorScheme: 'dark' });
   ok(canon(cx) === canon(cy), '两边的复习卡片完全一致（并集）');
   ok(Object.keys(cx).length >= xc && cx[ids[2] + '#0'] && cx[ids[1] + '#0'] && cx[ids[4] + '#0'], '复习卡片是并集：每台设备各自的卡都在');
   ok(cx[key].box === 4 && cx[key].n === 5, '同一张卡两边都复习过时保留较新的那条（整条取，不混拼）', JSON.stringify(cx[key]));
-  ok(await until(() => canon(gh2.remote()?.progress.__srs) === canon(cx)), '云端也是合并后的结果');
+  ok(await until(async () => canon(gh2.remote()?.progress.__srs) === canon(await cards(X.page))), '云端也是合并后的结果');
   await X.ctx.close();
   await Y.ctx.close();
 }
@@ -510,6 +642,73 @@ const B = await device(gh, { colorScheme: 'dark' });
   }
   ok(!leaks.length, '控制台、页面错误、请求地址、Referer 和发往别处的请求头里都没有令牌', leaks.join(' | '));
   ok(!A.errs.concat(B.errs).some(e => !/boom|网络错误|天气服务超时|toUpperCase/.test(e)), '同步过程没有页面错误', A.errs.concat(B.errs).join(' | '));
+}
+
+/* =============== 7b. 后台同步不能只靠一个事件源（CI 上暴露的缺陷：引擎还没启动、锁被后台页面占着、定时器丢了） =============== */
+{
+  const ghs = fakeGitHub();
+  ghs.st.valid.add(TOKEN);
+  const remoteHas = (g, id) => g.remote()?.progress[id]?.done === true;
+
+  // (1) 引擎还没加载好（慢设备）时就保存了进度：不能漏掉，引擎启动后要推上去
+  const S = await device(ghs, { tune: { ...TUNE, bootDelay: 6000 } });
+  await enable(S.page);
+  await learn(S.page, ids[0]); // 整页跳转后引擎要 6 秒才启动，这期间已经保存
+  ok(await until(() => remoteHas(ghs, ids[0]), 45000), '引擎启动前保存的进度，启动后也会推送到云端（不依赖启动前的事件）');
+  await S.ctx.close();
+
+  // (2) 持租约的页面被冻结（后台页面被浏览器冻结 / 丢弃）：另一个可见页面几秒内接管并推送
+  const ghf = fakeGitHub();
+  ghf.st.valid.add(TOKEN);
+  const F = await device(ghf);
+  await enable(F.page);
+  await F.page.goto(site + 'roadmap.html');
+  await F.page.waitForSelector('.sync-badge');
+  const holder = async p => p.evaluate(() => JSON.parse(localStorage.getItem('hands-on-react-v1:sync-lease') || 'null')?.id);
+  const first = await until(() => holder(F.page));
+  ok(!!first, '有一个页面持有联网租约');
+  const F2 = await F.ctx.newPage();
+  F2.on('pageerror', e => F.errs.push(e.message));
+  await F2.goto(site + 'roadmap.html');
+  await F2.waitForSelector('.sync-badge');
+  await F2.bringToFront();
+  const cdp = await F.ctx.newCDPSession(F.page);
+  await cdp.send('Page.enable');
+  await cdp.send('Page.setWebLifecycleState', { state: 'frozen' }).catch(() => {});
+  await sleep(300);
+  await learn(F2, ids[1]);
+  ok(await until(() => remoteHas(ghf, ids[1]), 45000), '持租约的页面被冻结后，另一个页面接管并把进度推送到云端');
+  const second = await holder(F2);
+  ok(second && second !== first, '租约换成了另一个页面', `${first} -> ${second}`);
+  await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
+  await F.ctx.close();
+
+  // (3) 兜底：防抖定时器很久才到点（或事件丢了）时，低频检查也会把没推送的更改推出去
+  const ghp = fakeGitHub();
+  ghp.st.valid.add(TOKEN);
+  const P = await device(ghp, { tune: { ...TUNE, debounce: 3_600_000, maxWait: 3_600_000, periodic: 2000 } });
+  await enable(P.page);
+  await learn(P.page, ids[0]);
+  ok(await until(() => remoteHas(ghp, ids[0]), 45000), '防抖定时器没到点时，低频兜底检查也会推送没推送的更改');
+  await P.ctx.close();
+
+  // (4) 真实时长（不缩短防抖、心跳、轮询间隔）：学完一课后 6~10 秒防抖，最多半分钟内推送到云端
+  const ghr = fakeGitHub();
+  ghr.st.valid.add(TOKEN);
+  const R = await device(ghr, { tune: null });
+  await enable(R.page);
+  await learn(R.page, ids[0]);
+  ok(await until(() => remoteHas(ghr, ids[0]), 60000), '真实时长：学完一课后自动推送到云端');
+  // 引擎已经在运行：再改一处（自我解释的笔记），推送要等防抖（6 秒，最长 10 秒）。
+  // 不拿"学完一课"计时：慢设备上引擎启动晚于保存，启动后会立刻推送，那是对的
+  await R.page.fill('.selfx textarea', '我的笔记：用来测试同步的防抖时长');
+  const t0 = Date.now();
+  const w0 = ghr.writes().length;
+  ok(await until(() => ghr.remote()?.progress[ids[0]]?.note?.includes('防抖时长'), 60000), '真实时长：改动后自动推送');
+  const dt = Date.now() - t0;
+  ok(dt >= 4500 && dt <= 30000 * K, '真实时长：推送等了防抖（约 6 秒，不是每次改动立刻推送）', String(dt));
+  ok(ghr.writes().length - w0 <= 2, '真实时长：多次输入合并成一次推送', String(ghr.writes().length - w0));
+  await R.ctx.close();
 }
 
 /* =============== 8. 手机宽度与深色：面板和图标 =============== */

@@ -10,7 +10,7 @@
    - 令牌：只存在本机 localStorage 的 SYNC_KEY，只发往 https://api.github.com（见 request 里的白名单检查），不进 URL、不写日志、不放进提示文字。 */
 import { lessonById } from '../registry.ts';
 import { type Envelope, PROGRESS_SCHEMA, SYNC_DESC, SYNC_FILE, makeEnvelope, parseEnvelope } from './logic/syncFormat.ts';
-import { changedLessons, mergeProgress, sameProgress } from './logic/merge.ts';
+import { canon, changedLessons, mergeProgress, sameProgress } from './logic/merge.ts';
 import {
   MAX_ATTEMPTS,
   backoffDelay,
@@ -186,6 +186,19 @@ let attempts = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let lastRemote: Obj | undefined;
 let bc: BroadcastChannel | undefined;
+let nextAt = 0; // 已安排的下一次同步的时间（0 表示没有安排）
+const tabId = Math.random().toString(36).slice(2, 10);
+const LEASE_KEY = STORE_KEY + ':sync-lease';
+const LEASE_TTL = 15_000;
+
+/** 本机进度的指纹：和上次同步成功时的指纹不同，就说明有没推送出去的改动。不依赖任何事件，所以引擎还没启动时、页面被冻结时、事件丢了时发生的改动都不会漏 */
+const progressHash = (): string => {
+  const s = canon(progress);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return s.length + ':' + (h >>> 0).toString(36);
+};
+const unsynced = (): boolean => dirty || progressHash() !== readStatus().syncedHash;
 
 const randomId = (): string => {
   const a = new Uint8Array(4);
@@ -230,7 +243,11 @@ function markDirty(): void {
 }
 function schedule(ms: number): void {
   clearTimeout(timer);
-  timer = setTimeout(() => void cycle('timer'), ms);
+  nextAt = Date.now() + ms;
+  timer = setTimeout(() => {
+    nextAt = 0;
+    void cycle('timer');
+  }, ms);
 }
 
 function remoteChangedNotice(n: number): void {
@@ -380,7 +397,15 @@ async function cycle(reason: string, manual = false): Promise<{ ok: true; res: C
     stopped = false;
     const more = changeSeq !== seq;
     if (!more) dirty = false;
-    setStatus({ state: more ? 'pending' : 'synced', at: Date.now(), dirty: more || undefined, msg: undefined, code: undefined, retryAt: undefined });
+    setStatus({
+      state: more ? 'pending' : 'synced',
+      syncedHash: more ? undefined : progressHash(),
+      at: Date.now(),
+      dirty: more || undefined,
+      msg: undefined,
+      code: undefined,
+      retryAt: undefined,
+    });
     if (more && isLeader) schedule(pushDelay(firstDirty, lastChange, Date.now(), tune().debounce, tune().maxWait));
     return { ok: true, res };
   } catch (e) {
@@ -410,7 +435,7 @@ export function start(): void {
   cfg = readConfig();
   if (!cfg || started) return;
   started = true;
-  dirty = !!readStatus().dirty;
+  dirty = !!readStatus().dirty || progressHash() !== readStatus().syncedHash;
   firstDirty = lastChange = Date.now();
   setStatus({ remoteChanged: undefined });
   window.addEventListener(SAVED_EVENT, markDirty);
@@ -431,8 +456,12 @@ export function start(): void {
       void cycle('online');
     }
   });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') return flushKeepalive();
+  const onVisible = () => {
+    if (document.visibilityState === 'hidden') {
+      tryLead(); // 把"我现在不可见"写进租约，可见的标签页可以接管
+      return flushKeepalive();
+    }
+    tryLead();
     if (!isLeader || !cfg) return;
     const st = readStatus();
     if (stopped && st.state !== 'pending') return;
@@ -441,24 +470,69 @@ export function start(): void {
       attempts = 0;
       void cycle('foreground');
     }
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  window.addEventListener('pageshow', onVisible);
+  window.addEventListener('focus', onVisible);
+  window.addEventListener('pagehide', () => {
+    flushKeepalive();
+    releaseLease();
   });
-  window.addEventListener('pagehide', flushKeepalive);
+  // 兜底：不依赖任何事件的低频检查。租约心跳每 5 秒一次（持有者被冻结 / 关闭后，可见的标签页最多 15 秒内接管）；
+  // 每 60 秒看一次有没有没推送的更改，没有已安排的同步就立刻做；因网络问题暂停了自动重试的，也在这里恢复
+  setInterval(tryLead, tune().heartbeat ?? 5000);
+  setInterval(() => {
+    if (!cfg || !isLeader || running) return;
+    const st = readStatus();
+    if (stopped && st.state === 'pending') {
+      stopped = false;
+      attempts = 0;
+    }
+    if (stopped) return;
+    if (nextAt > Date.now() - 1000 && nextAt < Date.now() + 15_000) return; // 已有马上要到点的同步
+    if (unsynced() || st.state === 'pending') void cycle('periodic');
+  }, tune().periodic ?? 60_000);
   try {
     bc = new BroadcastChannel('hoc-sync');
     bc.onmessage = e => {
       if (e.data === 'sync-now' && isLeader) void cycle('manual', true);
     };
   } catch {}
-  const lead = () => {
-    isLeader = true;
-    setTimeout(() => void cycle('load'), tune().initialDelay ?? 300);
-  };
-  if (navigator.locks?.request) {
-    navigator.locks.request('hoc-sync-leader', () => {
-      lead();
-      return new Promise<void>(() => {});
-    });
-  } else lead();
+  tryLead();
+}
+
+/** 谁负责联网：租约（localStorage 里的 `:sync-lease`，持有者每 5 秒续约，超过 15 秒没续约就算失效）。
+ *  不用 Web Locks：后台标签页被冻结或丢弃时锁可能一直被占着，前台页面就没有人推送了。
+ *  可见的标签页可以接管不可见标签页的租约，所以任何时候，只要有可见页面，就有人在推送。两个页面偶尔同时联网是安全的（先读后合并，合并幂等） */
+function tryLead(): void {
+  if (!cfg) return;
+  const now = Date.now();
+  const vis = document.visibilityState !== 'hidden';
+  let l: { id: string; at: number; vis: boolean } | null = null;
+  try {
+    l = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null');
+  } catch {}
+  const free = !l || l.id === tabId || now - l.at > (tune().leaseTtl ?? LEASE_TTL) || (vis && !l.vis);
+  const was = isLeader;
+  isLeader = free;
+  if (free) {
+    try {
+      localStorage.setItem(LEASE_KEY, JSON.stringify({ id: tabId, at: now, vis }));
+    } catch {}
+    if (!was) {
+      clearTimeout(timer);
+      timer = setTimeout(() => void cycle('lead'), first ? (tune().initialDelay ?? 300) : 0);
+      first = false;
+    }
+  } else if (was) clearTimeout(timer);
+}
+let first = true;
+function releaseLease(): void {
+  if (!isLeader) return;
+  try {
+    const l = JSON.parse(localStorage.getItem(LEASE_KEY) || 'null');
+    if (l?.id === tabId) localStorage.removeItem(LEASE_KEY);
+  } catch {}
 }
 
 /* ---------- 给界面用的操作 ---------- */

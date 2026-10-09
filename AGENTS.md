@@ -363,8 +363,22 @@ export default {
 - 令牌只存在本机 `localStorage['hands-on-react-v1:sync']`，只用于请求 `https://api.github.com`（`request()` 里用 `isAllowedUrl` 白名单校验：https、主机 `api.github.com`、无账号密码、无端口；读 Gist 原文的 `raw_url` 只允许 `gist.githubusercontent.com` / `gist.github.com`，且**不带令牌**）。`fetch` 一律 `referrerPolicy: 'no-referrer'`、`credentials: 'omit'`、`redirect: 'error'`、`cache: 'no-store'`。
 - 令牌不进 URL、不写日志、不出现在错误提示和状态里（提示都是固定的中文，不回显服务器内容；状态键不含令牌；界面只显示末四位）。输入框 `type="password"`、`autocomplete="off"`，开启后立即清空。
 - 界面上用平实的话写明：令牌存在这台设备的浏览器里；任何能在这个网站上运行脚本的东西都能读到它，所以**只给它 Gist 权限**；公用电脑上用完请断开。“断开同步”删除本机的令牌和 Gist 编号，云端 Gist 是否一并删除由用户选（默认保留）。
-- 令牌类型（2026-10 对照 docs.github.com 核对）：**细粒度令牌**现在支持 Gist（账户权限 `Gists`，只有 `write`），创建链接可预填名称、说明、权限、有效期：`https://github.com/settings/personal-access-tokens/new?name=…&description=…&gists=write&expires_in=90`，界面优先推荐它（没有仓库权限、会过期）。备选**经典令牌**只勾 `gist`：`https://github.com/settings/tokens/new?scopes=gist&description=…`（`scopes` 参数是长期可用的写法，但官方文档没有写它）。
+- 令牌类型（2026-10 对照 docs.github.com 核对；与「动手学 Vue 3」一致）：界面**主推经典令牌**，只勾 `gist`，链接 `https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync`（`scopes` 预填参数官方文档没写，是长期可用的写法；默认有效期也没写，界面按“默认 30 天，以 GitHub 页面显示为准”说）。**细粒度令牌**列为备选：官方文档里它有账户权限 `Gists`（只有 `write`），创建链接可预填 `…/personal-access-tokens/new?name=…&description=…&gists=write&expires_in=90`；但没人用真实令牌验证过它能不能列出已有的私密 Gist，所以面板写明“用它时另一台设备大概率要手动填 Gist”。401 / 权限不足的提示旁带“重新创建令牌”链接。
 - 开发和测试里**不用任何真实令牌、不创建真实 Gist**：e2e 用 Playwright 的 `route` 拦截 `api.github.com`，接内存里的假 Gist 服务（`tests/e2e/_fakegithub.mjs`），令牌是带标记的假字符串，全程搜索它有没有出现在 DOM、控制台、请求地址、Referer、断开后的 localStorage。
+
+### 入口与界面约定（与「动手学 Vue 3」对齐）
+
+- 面板 id 是 `#sync`（`SyncPanel.tsx`，课程地图页里，在“学习路线”之前）。收起时标题行是“跨设备同步 · 未开启 · 可选”（开启后“已开启 · 状态”）。
+- 入口只有两个：**侧栏固定入口“进度同步”**（`rspress.config.ts` 的 `lessonSidebar`，链接 `/roadmap#sync`，在最上面那一组的最后：首页、课程地图、今日复习、术语表、变式练习、进度同步；Vue 没有“变式练习”，所以“进度同步”都是这一组的最后一项）和**课程地图页头一行**“想在手机和电脑之间接着学？开启跨设备同步（可选）”。顶栏在没开启时什么也不显示；开启后是四种状态（已同步 / 同步中 / 有未同步的更改 / 同步出错）的云朵图标和弹层。**入口都只是普通链接**：没开启时点它们不加载同步引擎、不发任何请求，只加载面板自己的 chunk。
+- 点入口后：展开面板、滚动到它、焦点放到标题上。直接访问 `/roadmap#sync`、刷新、客户端路由跳转都一样；已经在这一页时点入口路由不会触发 `hashchange`，所以 `SyncPanel` 另外监听 `popstate` 和指向 `#sync` 的点击。
+- 侧栏项旁的小标记：没开启是很淡的“未开启”，开启后是状态小圆点（`ProgressMarks.tsx` 写 `data-hoc-sync`，样式在 `style.css`）。
+
+### 后台同步的可靠性（CI 上暴露过缺陷，改动时别退回去）
+
+- **改动检测不能只靠事件**：`save()` 发的 `hoc-saved` 只有引擎启动后才有人听。慢设备上用户在引擎（动态 chunk）加载完之前就保存了进度，事件就丢了，之后永远不会推送。现在每次同步成功把本机进度的指纹存进 `status.syncedHash`，引擎启动时和每 60 秒用指纹对一次（`unsynced()`），不同就当作有未推送的改动；`bootSync()` 在引擎启动前也监听 `hoc-saved` 先记一个 `dirty`。
+- **谁负责联网用租约，不用 Web Locks**：锁会被被冻结 / 丢弃的后台页面一直占着。现在是 `localStorage[':sync-lease']`（`{id, at, vis}`），持有者每 5 秒续约，15 秒没续约算失效；可见页面可以接管不可见页面的租约；页面关闭时释放。任何时候只要有可见页面，就有人在推送。两个页面偶尔同时联网是安全的（先读后合并，合并幂等）。
+- **兜底定时器**：除了 `visibilitychange`、`pageshow`、`focus`、`online`，还有每 60 秒的检查：有没推送的更改、状态是等待重试、或因网络问题暂停了自动重试，都会重新同步。恢复联网不只靠 `online` 事件（退避定时器到点会自己重试）。
+- **测试**：`tests/e2e/sync.mjs` 里所有“后台自动发生”的断言都轮询到条件成立（超时至少 30 秒，按 `SYNC_THROTTLE` 放大），不用固定等待；时长通过 `window.__hocSyncTest`（`debounce maxWait pullAfter initialDelay backoff heartbeat periodic leaseTtl bootDelay`）缩短，另有一组用真实时长的断言。`SYNC_THROTTLE=4 node tests/e2e/sync.mjs` 用 CDP 给页面降 CPU，复现 2 核 runner。
 
 ### 改进度结构时怎样保持合并兼容
 

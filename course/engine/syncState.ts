@@ -4,7 +4,7 @@
    - hands-on-react-v1:sync         配置 { token, gist, login, device }
    - hands-on-react-v1:sync-status  状态（不含令牌）：最近一次结果、是否有未推送的改动、错误说明
    - hands-on-react-v1:backup       覆盖本机进度之前的备份，最多 2 份 */
-import { STORE_KEY } from './store.ts';
+import { SAVED_EVENT, STORE_KEY } from './store.ts';
 
 export const SYNC_KEY = STORE_KEY + ':sync';
 export const STATUS_KEY = STORE_KEY + ':sync-status';
@@ -34,6 +34,8 @@ export interface SyncStatus {
   remoteChanged?: number;
   /** 上次从云端读到的 ETag，用来做条件请求 */
   etag?: string;
+  /** 上次同步成功时本机进度的指纹；和现在的指纹不同就说明有没推送的改动 */
+  syncedHash?: string;
   /** 上次从云端拉取的时间 */
   pulledAt?: number;
 }
@@ -80,5 +82,18 @@ export function bootSync(): void {
   window.addEventListener('storage', e => {
     if (e.key === SYNC_KEY) go();
   });
-  if (readConfig()) setTimeout(go, 600);
+  if (readConfig()) {
+    // 引擎还没加载好（慢设备上要等一会儿）时用户就保存了进度：先记一笔"有没推送的改动"，引擎启动后会去推送
+    let marked = false;
+    window.addEventListener(SAVED_EVENT, () => {
+      if (marked || booted) return;
+      marked = true;
+      try {
+        localStorage.setItem(STATUS_KEY, JSON.stringify({ ...readStatus(), dirty: true, state: 'pending' }));
+        window.dispatchEvent(new Event(STATUS_EVENT));
+      } catch {}
+    });
+    const t = (window as { __hocSyncTest?: { bootDelay?: number } }).__hocSyncTest;
+    setTimeout(go, t?.bootDelay ?? 600);
+  }
 }

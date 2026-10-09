@@ -10,5 +10,8 @@ export function ago(at: number | undefined, now: number): string {
   return Math.round(s / 86400) + ' 天前';
 }
 
+/** 经典令牌（推荐）：scopes=gist 预填 Gist 权限；这个参数官方文档没写，但长期可用 */
+export const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=hands-on-react-sync';
+
 /** 界面上只显示令牌的末四位 */
 export const lastFour = (token: string): string => (token.length >= 8 ? '…' + token.slice(-4) : '…');

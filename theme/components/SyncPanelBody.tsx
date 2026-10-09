@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseEnvelope, summarize } from '../../course/engine/logic/syncFormat.ts';
-import { ago } from '../../course/engine/logic/syncView.ts';
+import { TOKEN_URL, ago } from '../../course/engine/logic/syncView.ts';
 import { loadSyncEngine } from '../../course/engine/syncState.ts';
 import { STATE_LABEL, useSyncStatus } from '../lib/useSyncStatus';
 
 const NAME = '动手学 React 学习进度同步';
 const enc = encodeURIComponent;
-/** 细粒度令牌：官方文档支持用地址参数预填名称、说明、权限和有效期（gists=write 是账号权限里的 Gist 读写，别的权限一个都不给） */
+/** 细粒度令牌（备选）：官方文档支持用地址参数预填名称、说明、权限和有效期（gists=write 是账号权限里的 Gist 读写，别的权限一个都不给） */
 const FINE_URL = `https://github.com/settings/personal-access-tokens/new?name=${enc(NAME)}&description=${enc('只用于把“动手学 React”的学习进度存进我自己的一个私密 Gist')}&gists=write&expires_in=90`;
-/** 经典令牌（备选）：scopes=gist 是长期可用的预填参数，但官方文档没有写它 */
-const CLASSIC_URL = `https://github.com/settings/tokens/new?scopes=gist&description=${enc(NAME)}`;
 
 type Msg = { kind: 'ok' | 'err'; text: string } | null;
 const errText = (e: unknown): string => (e && typeof (e as Error).message === 'string' ? (e as Error).message : '出了意外的错误。');
@@ -126,25 +124,41 @@ export default function SyncPanelBody() {
         <>
           <ol className="sync-steps">
             <li>
-              打开预填好的页面创建令牌：
-              <a href={FINE_URL} target="_blank" rel="noopener noreferrer">
-                创建令牌（推荐：细粒度，只有 Gist 权限）
+              点这个链接：
+              <a href={TOKEN_URL} target="_blank" rel="noopener noreferrer">
+                创建令牌
               </a>
-              。页面里名称和权限已经填好，有效期默认 90 天；其他权限一个也不要加。点“Generate token”，复制令牌。
-              <br />
-              <small>
-                如果细粒度令牌用不了，改用
-                <a href={CLASSIC_URL} target="_blank" rel="noopener noreferrer">
-                  经典令牌
-                </a>
-                （只勾 gist）。
-              </small>
+              。它会在新标签页打开 GitHub 的创建页面。名称和权限已经填好，权限只勾了 gist。需要先登录 GitHub；页面是英文的，不用管别的。
             </li>
-            <li>把令牌粘贴到下面，点“开启同步”。会先检查令牌能不能用，再做第一次同步。</li>
             <li>
-              在另一台设备上打开本站，用<b>同一个 GitHub 账号</b>重复第 1、2 步。两台设备的进度会自动合并。
+              在 GitHub 页面最下面点“Generate token”。复制以 <code>ghp_</code> 开头的那串字符（细粒度令牌是 <code>github_pat_</code> 开头）。它只显示一次。
             </li>
+            <li>回到本站，把令牌粘贴进下面的输入框，点“开启同步”。站点会先检查令牌能不能用，再做第一次同步，并告诉你结果。</li>
           </ol>
+          <ul className="sync-notes">
+            <li>
+              <b>只勾 gist 权限，别的都不要勾。</b>即使令牌泄露，对方也只能动你的 Gist，碰不到你的代码仓库。
+            </li>
+            <li>
+              <b>过期时间：</b>GitHub 默认 30 天（以 GitHub 页面显示为准）。过期后同步会停，本站会提示你重新创建令牌。你可以选更长，或者选不过期。
+            </li>
+            <li>
+              <b>改回未完成：</b>开启同步后，在一台设备上把一课改回“未完成”，可能被另一台设备上的“已完成”带回来。合并的原则是谁的进度都不丢。
+            </li>
+            <li>
+              <b>在另一台设备上：</b>打开本站，重复第 3 步。令牌用同一个，或者再建一个都行，但要用同一个 GitHub 账号。开启时，站点会在你的账号里找已有的同步文件{' '}
+              <code>hands-on-react-progress.json</code>
+              。找到就接着用同一份，不会再建一个。个别令牌列不出私密 Gist，找不到时，展开下面的“手动填 Gist”，填第一台设备上显示的 Gist 链接或编号。
+            </li>
+          </ul>
+          <p className="sync-fine">
+            备选：
+            <a href={FINE_URL} target="_blank" rel="noopener noreferrer">
+              细粒度令牌
+            </a>
+            。GitHub 官方文档的权限表里有账号权限 Gists，只有“写入”一档。本站没法用真实令牌验证它读私密 Gist
+            的行为，所以优先推荐经典令牌。用它时，另一台设备大概率要手动填 Gist。
+          </p>
           <form
             className="sync-form"
             onSubmit={e => {
@@ -166,11 +180,12 @@ export default function SyncPanelBody() {
               onChange={e => setToken(e.target.value)}
               placeholder="粘贴令牌（ghp_… 或 github_pat_…）"
             />
+            <small>找不到创建页面？在 GitHub 右上角头像 → Settings → Developer settings → Personal access tokens。</small>
             <details className="sync-adv">
               <summary>找不到云端已有的进度？手动填 Gist</summary>
               <label htmlFor="sync-gist">Gist 链接或编号（可选）</label>
               <input id="sync-gist" className="sync-input" type="text" autoComplete="off" value={gistId} onChange={e => setGistId(e.target.value)} />
-              <small>开启时会先在你的账号里找已有的同步文件。个别令牌列不出私密 Gist 时，到第一台设备的状态区复制 Gist 链接填在这里。</small>
+              <small>到第一台设备的同步状态区复制 Gist 链接，填在这里。</small>
             </details>
             <button type="submit" className="btn primary" disabled={busy || !token.trim()}>
               {busy ? '正在开启…' : '开启同步'}
@@ -248,9 +263,10 @@ export default function SyncPanelBody() {
             >
               <label htmlFor="sync-token2">换一个新令牌</label>
               <small>
-                <a href={FINE_URL} target="_blank" rel="noopener noreferrer">
-                  打开预填好的创建页面
+                <a href={TOKEN_URL} target="_blank" rel="noopener noreferrer">
+                  重新创建令牌
                 </a>
+                （名称和 gist 权限已预填）。在 GitHub 页面最下面点“Generate token”，复制后粘贴到这里。
               </small>
               <input
                 id="sync-token2"

@@ -16,6 +16,7 @@ const lessonSidebar = [
   { text: '今日复习', link: '/review' },
   { text: '术语表', link: '/glossary' },
   { text: '变式练习', link: '/drills' },
+  { text: '进度同步', link: '/roadmap#sync' },
   ...STAGES.flatMap((s, si) => [
     { sectionHeaderText: `${s.no} ${s.name}` },
     ...LESSONS.filter(l => l.stage === si).map(l => ({ text: `${lessonNo(l.id)}. ${l.title}`, link: '/lessons/' + l.id })),

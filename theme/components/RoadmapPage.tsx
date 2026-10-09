@@ -36,6 +36,9 @@ export default function RoadmapPage() {
         <b>开始前你需要会：</b>JavaScript 基础（变量、函数、箭头函数、数组的 map 和 filter、对象和数组的解构与展开、模块的 import/export、Promise 与
         async/await），以及基本的 HTML 和 CSS。还不熟的话，先花一两周补 JavaScript，再回来学会轻松很多。
       </p>
+      <p className="sync-hero">
+        想在手机和电脑之间接着学？<Link href="/roadmap#sync">开启跨设备同步</Link>（可选）
+      </p>
       <div className="cta">
         <Link className="btn primary" href={'/lessons/' + next.id}>
           {done ? '继续学习：' + next.title : '开始第一课'} →

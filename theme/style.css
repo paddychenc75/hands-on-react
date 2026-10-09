@@ -531,3 +531,19 @@ label.btn { cursor: pointer; }
 .roadmap .sync-panel div { background: none; border: 0; border-radius: 0; padding: 0; display: block; font-size: inherit; color: inherit; line-height: inherit; }
 .roadmap .sync-panel b { font: inherit; font-weight: 600; color: var(--ink); }
 .roadmap .sync-panel details { display: block; }
+
+/* ---------- 同步入口：侧栏、顶栏未开启图标、提示条、令牌页示意 ---------- */
+.rp-doc-layout__sidebar a[data-hoc-sync]::after { margin-left: auto; font: 500 11px var(--f-body); color: var(--ink-3); opacity: .85; }
+.rp-doc-layout__sidebar a[data-hoc-sync="off"]::after { content: "未开启"; }
+.rp-doc-layout__sidebar a[data-hoc-sync]:not([data-hoc-sync="off"])::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); opacity: 1; }
+.rp-doc-layout__sidebar a[data-hoc-sync="syncing"]::after { background: var(--accent); }
+.rp-doc-layout__sidebar a[data-hoc-sync="pending"]::after { background: var(--sun); }
+.rp-doc-layout__sidebar a[data-hoc-sync="error"]::after { background: var(--bad); }
+.roadmap .sync-panel { scroll-margin-top: 84px; }
+.roadmap .sync-panel > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+
+.roadmap .sync-panel .sync-notes { margin: 10px 0; padding: 10px 14px 10px 34px; list-style: disc outside; border-left: 3px solid var(--sun); background: var(--sun-wash); border-radius: 8px; color: var(--ink); }
+.roadmap .sync-panel .sync-steps li, .roadmap .sync-panel .sync-notes li { display: list-item; margin: 6px 0; }
+.roadmap .sync-panel .sync-fine { font-size: 13.5px; color: var(--ink-3); }
+.roadmap .sync-hero { grid-column: 1 / -1; margin: 0 0 12px; font-size: 14px; color: var(--ink-2); }
+.roadmap .sync-hero a { color: var(--accent); }

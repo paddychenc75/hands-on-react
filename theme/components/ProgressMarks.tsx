@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { isDone, progress, stageCount, dueCount, lessonDrillCount, PROGRESS_EVENT } from '../../course/engine/index.ts';
+import { STATUS_EVENT, readConfig, readStatus } from '../../course/engine/syncState.ts';
 import { lessonById } from '../../course/registry.ts';
 import { STAGES } from '../../course/stages.ts';
 
@@ -36,6 +37,7 @@ export default function ProgressMarks() {
           if (label) setAttr(label, 'data-hoc-dr', drMark);
           setAttr(a, 'data-hoc-dr-done', dn && dd === dn ? '1' : null);
         } else if (/\/check\/\d$/.test(path)) setAttr(a, 'data-hoc-done', st[id] && st[id].passed ? '1' : null);
+        else if (/\/roadmap(\.html)?#sync$/.test(path)) setAttr(a, 'data-hoc-sync', readConfig() ? readStatus().state : 'off');
         else if (/\/review$/.test(path)) {
           const n = dueCount();
           setAttr(a, 'data-hoc-due', n ? String(n) : null);
@@ -57,10 +59,12 @@ export default function ProgressMarks() {
     });
     mo.observe(document.body, { childList: true, subtree: true });
     window.addEventListener(PROGRESS_EVENT, mark);
+    window.addEventListener(STATUS_EVENT, mark);
     return () => {
       cancelAnimationFrame(raf);
       mo.disconnect();
       window.removeEventListener(PROGRESS_EVENT, mark);
+      window.removeEventListener(STATUS_EVENT, mark);
     };
   }, []);
   return null;
