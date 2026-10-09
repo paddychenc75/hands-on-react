@@ -1,6 +1,6 @@
-/* 首页主视觉：状态沿着组件树流下去（动画和交互）。
- * 静态的树（节点按钮、连线、开关）由 theme/components/HeroTree.tsx 渲染进 HTML；
- * 这个模块在首页自己的异步 chunk 里，挂载后“激活”它：点击、光点、计数、memo、自动演示。
+/* 课文里的组件树示意图：状态沿着组件树流下去（动画和交互）。
+ * 静态的树（节点按钮、连线、开关）由 theme/components/RenderTree.tsx 渲染进 HTML；
+ * 这个模块在自己的异步 chunk 里，挂载后“激活”它：点击、光点、计数、memo、自动演示。
  * 哪些节点渲染、按什么顺序和延迟由 logic/heroTree.ts 的纯函数算，这里只负责演出。
  * 只动 transform、opacity 和 SVG 的 stroke-dashoffset（Web Animations API），不触发布局。 */
 import {
@@ -18,7 +18,7 @@ import {
 } from './logic/heroTree.ts';
 import { accName } from './logic/heroTreeData.ts';
 
-const DEMO_KEY = 'hoc-hero-demo'; // sessionStorage：本次会话里自动演示播过了
+const DEMO_KEY = 'hoc-hero-demo'; // sessionStorage：本次会话里自动演示播过了（根元素的 data-demo-key 可以换成别的键，memo 默认打开的那张图用自己的键）
 const TOUCHED_KEY = 'hoc-hero-touched'; // localStorage：用户点过节点，不再出现“可点”提示（不是学习进度的键）
 const DEMO_ORIGIN = 'TodoList';
 const HINT_NODE = 'Header';
@@ -58,11 +58,12 @@ export function attach(root: HTMLElement): () => void {
   const memoIds = HERO_NODES.filter(n => n.memoizable).map(n => n.id);
 
   let counts: Counts = initialCounts(HERO_NODES);
-  let memo = new Set<string>();
+  let memo = new Set<string>(memoInput?.checked ? memoIds : []); // 静态 HTML 里开关默认就是选中的（memo 默认打开的那张图）
   let active = 0; // 进行中的脉冲数
   let destroyed = false;
   let interacted = false;
-  let played = !!read('session', DEMO_KEY);
+  const demoKey = root.dataset.demoKey || DEMO_KEY;
+  let played = !!read('session', demoKey);
   let inView = false;
   let liveToggle = false;
   const involved = new Map<string, number>();
@@ -313,7 +314,7 @@ export function attach(root: HTMLElement): () => void {
     demoTimer = after(() => {
       if (destroyed || !inView || document.hidden || interacted || played) return;
       played = true;
-      write('session', DEMO_KEY);
+      write('session', demoKey);
       const plan = pulse(DEMO_ORIGIN);
       hintTimer = after(() => hint(1), plan.durationMs + SETTLE_MS + 1800);
     }, 600);
@@ -377,6 +378,7 @@ export function attach(root: HTMLElement): () => void {
 
   // 激活：开关和重置按钮可用
   if (memoInput) memoInput.disabled = false;
+  if (memo.size) refreshLabels();
   root.dataset.ready = '1';
   root.dataset.active = '0';
   updateReset();

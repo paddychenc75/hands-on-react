@@ -49,6 +49,7 @@ export default defineConfig({
       'LessonFooter',
       'HomePage',
       'RoadmapPage',
+      'RenderTree',
       'ReviewPage',
       'GlossaryPage',
       'DrillsPage',

@@ -3,7 +3,6 @@ import { doneCount, drillCount, dueCount, progress, isDone } from '../../course/
 import { LESSONS } from '../../course/registry.ts';
 import { STAGES } from '../../course/stages.ts';
 import { useProgress } from '../lib/useProgress';
-import HeroTree from './HeroTree';
 
 /** 首页（旧版 renderHome）：hero、统计、学习方法、六阶段课程地图。
  *  依赖进度的部分（继续学习、完成数、到期数、各阶段进度）挂载后才显示真实数字。 */
@@ -59,7 +58,6 @@ export default function HomePage() {
             </Link>
           )}
         </div>
-        <HeroTree />
       </section>
 
       <div className="stats">

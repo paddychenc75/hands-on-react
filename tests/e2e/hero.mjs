@@ -1,5 +1,5 @@
-// 首页入口与首页主视觉：
-//   回首页的入口（顶栏站名、侧栏“课程首页”、手机菜单、面包屑里的阶段名）
+// 回首页和课程地图的入口，以及课文里的组件树示意图（rendering 一课、performance 一课）：
+//   入口（顶栏站名、侧栏“课程首页”和“课程地图”、手机菜单、面包屑里的阶段名）
 //   组件树动画（自动演示只播一次、点击范围与计数、memo、连点、减少动画、键盘、手机宽度、离开再回来、性能）
 // 用法：npm run build && node tests/e2e/hero.mjs
 import path from 'node:path';
@@ -38,7 +38,7 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
     window.__noReload = 1;
   });
   await page.click('a.hoc-site-title');
-  await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.story');
   ok(isHome(page.url()) && (await page.evaluate(() => window.__noReload)) === 1, '入口. 点站名回首页，且没有整页刷新', page.url());
   ok((await page.getAttribute('a.hoc-site-title', 'aria-current')) === 'page', '入口. 在首页时站名带 aria-current="page"');
 
@@ -49,7 +49,7 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
   const outline = await page.evaluate(() => getComputedStyle(document.querySelector('a.hoc-site-title')).outlineStyle);
   ok(outline !== 'none', '入口. 站名获得键盘焦点时有可见的焦点框', outline);
   await page.keyboard.press('Enter');
-  await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.story');
   ok(isHome(page.url()), '入口. 站名能用 Enter 激活');
 
   // 侧栏第一项“课程首页”
@@ -60,15 +60,15 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
     return { text: as[0]?.textContent.trim(), second: as[1]?.textContent.trim(), href: as[0]?.getAttribute('href') };
   });
   ok(
-    first.text === '课程首页' && first.second === '今日复习' && /^\/hands-on-react\/(index\.html)?$/.test(first.href),
-    '入口. 侧栏第一项是“课程首页”，在“今日复习”之前',
+    first.text === '课程首页' && first.second === '课程地图' && /^\/hands-on-react\/(index\.html)?$/.test(first.href),
+    '入口. 侧栏最上面是“课程首页”、“课程地图”，在“今日复习”之前',
     JSON.stringify(first),
   );
   await page.evaluate(() => {
     window.__noReload = 1;
   });
   await page.locator('.rp-doc-layout__sidebar a', { hasText: '课程首页' }).click();
-  await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.story');
   ok(isHome(page.url()) && (await page.evaluate(() => window.__noReload)) === 1, '入口. 点侧栏“课程首页”回首页，没有整页刷新', page.url());
 
   // 面包屑里的阶段名：链到首页课程地图里对应的阶段
@@ -78,7 +78,11 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
     href: document.querySelector('.crumb a.tag').getAttribute('href'),
     text: document.querySelector('.crumb a.tag').textContent,
   }));
-  ok(crumb.href === '/hands-on-react/#stage-0' && /入门/.test(crumb.text), '入口. 面包屑里的阶段名是链接，指向首页对应阶段的锚点', JSON.stringify(crumb));
+  ok(
+    crumb.href === '/hands-on-react/roadmap.html#stage-0' && /入门/.test(crumb.text),
+    '入口. 面包屑里的阶段名是链接，指向课程地图对应阶段的锚点',
+    JSON.stringify(crumb),
+  );
   await page.evaluate(() => {
     window.__noReload = 1;
   });
@@ -86,7 +90,7 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
   await page.waitForSelector('.home #stage-0');
   await page.waitForTimeout(800);
   const top = await page.evaluate(() => ({ top: Math.round(document.getElementById('stage-0').getBoundingClientRect().top), keep: window.__noReload }));
-  ok(top.keep === 1 && top.top > 0 && top.top < 200, '入口. 点阶段名客户端跳到首页并滚到该阶段', JSON.stringify(top));
+  ok(top.keep === 1 && top.top > 0 && top.top < 200, '入口. 点阶段名客户端跳到课程地图并滚到该阶段', JSON.stringify(top));
   await ctx.close();
 }
 
@@ -105,7 +109,7 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
     window.__noReload = 1;
   });
   await page.click('.rp-nav-screen--open .hoc-nav-home');
-  await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.story');
   ok(isHome(page.url()) && (await page.evaluate(() => window.__noReload)) === 1, '入口. 点手机菜单的“课程首页”回首页，没有整页刷新', page.url());
 
   await page.goto(lessonUrl(site, 'state'));
@@ -119,13 +123,13 @@ const isHome = u => /\/hands-on-react(\/|\/index\.html)?(#.*)?$/.test(new URL(u)
   await page.goto(lessonUrl(site, 'state'));
   await page.waitForSelector('.rp-doc');
   await page.click('a.hoc-site-title');
-  await page.waitForSelector('.home .stage');
+  await page.waitForSelector('.story');
   const box = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   ok(isHome(page.url()) && box.sw <= box.cw, '入口. 手机上点顶栏站名回首页，页面无横向滚动', JSON.stringify(box));
   await ctx.close();
 }
 
-/* ===== 首页组件树动画 ===== */
+/* ===== 课文里的组件树动画（rendering 一课） ===== */
 const IDS = ['App', 'Header', 'TodoList', 'Logo', 'Search', 'Item1', 'Item2', 'Box1', 'Box2'];
 const base = Object.fromEntries(IDS.map(i => [i, 1]));
 const plus = (...ids) => {
@@ -135,9 +139,9 @@ const plus = (...ids) => {
 };
 const TODO_SUB = ['TodoList', 'Item1', 'Item2', 'Box1', 'Box2'];
 const newCtx = (opts = {}) => browser.newContext({ viewport: { width: 1280, height: 800 }, ...opts });
-/** 打开首页并等树激活。demo=false 时先记成“本会话已自动演示过”，免得它改动要断言的计数。 */
+/** 打开 rendering 一课并等树激活。demo=false 时先记成“本会话已自动演示过”，免得它改动要断言的计数。 */
 async function openHome(page, { demo = false, fresh = false } = {}) {
-  await page.goto(site);
+  await page.goto(lessonUrl(site, 'rendering'));
   await page.evaluate(
     ([d, f]) => {
       if (f) localStorage.clear();
@@ -150,9 +154,9 @@ async function openHome(page, { demo = false, fresh = false } = {}) {
   await page.waitForSelector('.hero-tree[data-ready]');
 }
 const counts = page =>
-  page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.home .tnode')].map(b => [b.dataset.id, +b.querySelector('.n').textContent])));
+  page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.hero-tree .tnode')].map(b => [b.dataset.id, +b.querySelector('.n').textContent])));
 const idle = page => page.waitForFunction(() => document.querySelector('.hero-tree').dataset.active === '0', null, { timeout: 5000 });
-const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
+const node = (page, id) => page.locator(`.hero-tree .tnode[data-id="${id}"]`);
 
 /* 3. 自动演示：进入页面后自动从 TodoList 触发一次，本会话只播一次 */
 {
@@ -177,14 +181,13 @@ const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
   const keys = await page.evaluate(() => Object.keys(localStorage));
   ok(!keys.some(k => /hero|hoc-/.test(k)), '动画. 自动演示不写学习进度的 localStorage 键', keys.join(','));
   // 离开再回来、刷新：不重播
-  await page.click('a.hoc-site-title');
   await page.goto(lessonUrl(site, 'state'));
   await page.waitForSelector('.rp-doc');
-  await page.click('a.hoc-site-title');
+  await page.locator('.rp-doc-layout__sidebar a', { hasText: '渲染机制' }).first().click();
   await page.waitForSelector('.hero-tree[data-ready]');
   await page.waitForTimeout(2200);
-  ok(JSON.stringify(await counts(page)) === JSON.stringify(base), '动画. 同一会话内再回首页不重播自动演示', JSON.stringify(await counts(page)));
-  await page.goto(site);
+  ok(JSON.stringify(await counts(page)) === JSON.stringify(base), '动画. 同一会话内再回到这一课不重播自动演示', JSON.stringify(await counts(page)));
+  await page.goto(lessonUrl(site, 'rendering'));
   await page.waitForSelector('.hero-tree[data-ready]');
   await page.waitForTimeout(2200);
   ok(JSON.stringify(await counts(page)) === JSON.stringify(base), '动画. 刷新后同一会话仍不重播');
@@ -297,12 +300,10 @@ const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
   ok(c.Item2 === 2 && c.Box2 === 2 && c.Item1 === 3, '动画. 关掉 memo 后，后代又会跟着渲染', JSON.stringify(c));
   const why = await page.getAttribute('.ht-why', 'href');
   ok(/\/lessons\/performance/.test(why), '动画. “为什么？”链到性能优化一课', why);
-  const caps = await page.evaluate(() => [...document.querySelectorAll('.tree-card .cap a')].map(a => a.getAttribute('href')));
-  ok(
-    caps.length === 2 && /lessons\/rendering/.test(caps[0]) && /lessons\/performance/.test(caps[1]),
-    '动画. 说明文字链到渲染机制和性能优化两课',
-    JSON.stringify(caps),
+  const para = await page.evaluate(
+    () => [...document.querySelectorAll('.rp-doc a')].filter(a => /\/lessons\/performance/.test(a.getAttribute('href')) && !a.closest('.hero-tree')).length,
   );
+  ok(para >= 1, '动画. 图后面的衔接文字链到性能优化一课', String(para));
   await ctx.close();
 }
 
@@ -312,13 +313,11 @@ const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
   const page = await ctx.newPage();
   track(page);
   await openHome(page);
-  await page.focus('.hero .cta .btn.primary');
-  let reached = false;
-  for (let i = 0; i < 4 && !reached; i++) {
-    await page.keyboard.press('Tab');
-    reached = await page.evaluate(() => document.activeElement?.classList.contains('tnode'));
-  }
-  ok(reached, '键盘. 从“开始学习”按钮 Tab 几下就到组件树节点');
+  await page.locator('.hero-tree').scrollIntoViewIfNeeded();
+  await node(page, 'App').focus();
+  await page.keyboard.press('Tab');
+  const reached = await page.evaluate(() => document.activeElement?.dataset.id);
+  ok(reached === 'Header', '键盘. 在组件树里按 Tab，焦点按从上到下、从左到右的顺序走到下一个节点', String(reached));
   const tag = await page.evaluate(() => document.activeElement.tagName + '|' + getComputedStyle(document.activeElement).outlineStyle);
   ok(/^BUTTON\|(solid|auto)/.test(tag), '键盘. 节点是 button，获得焦点时有可见的焦点框', tag);
   await node(page, 'Header').focus();
@@ -420,17 +419,16 @@ const node = (page, id) => page.locator(`.home .tnode[data-id="${id}"]`);
   await openHome(page);
   await node(page, 'App').click();
   await page.waitForTimeout(150);
-  await page.click('a.hoc-site-title'.replace('a.', 'a.')); // 站名链接在首页也可点；再用侧栏离开
   await page.goto(lessonUrl(site, 'state'));
   await page.waitForSelector('.rp-doc');
   await page.evaluate(() => {
     window.__nr = 1;
   });
-  await page.click('a.hoc-site-title');
+  await page.locator('.rp-doc-layout__sidebar a', { hasText: '渲染机制' }).first().click();
   await page.waitForSelector('.hero-tree[data-ready]');
   ok(
     JSON.stringify(await counts(page)) === JSON.stringify(base) && (await page.evaluate(() => window.__nr)) === 1,
-    '离开再回来. 回到首页（客户端路由）计数是初始的，树能正常激活',
+    '离开再回来. 回到这一课（客户端路由）计数是初始的，树能正常激活',
     JSON.stringify(await counts(page)),
   );
   await node(page, 'Header').click();
@@ -504,7 +502,7 @@ if (process.env.HERO_SHOTS) {
     const ctx = await browser.newContext(opts);
     const page = await ctx.newPage();
     await openHome(page);
-    await page.addStyleTag({ content: '.hero, .hero * { animation: none !important; }' });
+    await page.addStyleTag({ content: '.hero-tree, .hero-tree * { animation: none !important; }' });
     await page.locator('.hero-tree').scrollIntoViewIfNeeded();
     await page.evaluate(() => document.querySelector('.tree-card').scrollIntoView({ block: 'center' }));
     const clip = async () => {

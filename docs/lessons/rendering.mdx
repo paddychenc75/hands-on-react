@@ -91,6 +91,12 @@ function App() {
 }
 ```
 
+预测并运行之后，再看一个更大的例子。下面是一个待办应用的组件树。点任意组件，就等于让它调用了 set 函数：
+
+<RenderTree />
+
+规律和刚才一样：被点的组件和它的所有后代重新渲染，兄弟和祖先不动。打开开关给 `Item` 包上 memo，光点会在 `Item` 前被挡回去。memo 怎样判断“可以跳过”，见[性能优化](/lessons/performance)一课。
+
 ## 先改结构，再考虑 memo
 
 从刚才的演示出发：点 Counter 的按钮，只有 Counter 闪烁，因为 state 在 Counter 里，App 没有重新渲染。

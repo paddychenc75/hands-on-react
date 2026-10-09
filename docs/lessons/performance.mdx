@@ -28,6 +28,10 @@ const ExpensiveList = memo(function ExpensiveList({ items }) {
 
 memo 只看父组件传来的 props。组件自己的 state 变了，或它读取的 Context 变了，它照样重新渲染。
 
+下面的示意图里，两个 `Item` 已经包了 memo。点 `TodoList`，看光点在 `Item` 前被挡回去。关掉开关，再点一次，对比后代的渲染次数。没有 memo 时的完整规律，见[渲染机制](/lessons/rendering)一课。
+
+<RenderTree memo />
+
 ## 陷阱：每次渲染都会创建新的函数和对象
 
 在 JavaScript 中，`{} !== {}`，`(() => {}) !== (() => {})`。组件每次渲染时，函数体里定义的对象、数组、函数都是**全新的**。把它们作为 props 传给 memo 组件，浅比较会判断为“变了”，memo 就失效了。JSX 也是对象，所以把 `<p>…</p>` 作为 children 传给 memo 组件，每次也是新引用。

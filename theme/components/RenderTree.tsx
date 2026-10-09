@@ -1,10 +1,8 @@
 import { Link } from '@rspress/core/theme';
-import { memo, useEffect, useRef } from 'react';
+import { memo as reactMemo, useEffect, useRef } from 'react';
 import { HERO_H, HERO_NODES, HERO_W, accName, attachHeroTree } from '../../course/engine/index.ts';
-import { lessonById } from '../../course/registry.ts';
 
 const nodeById = (id: string) => HERO_NODES.find(n => n.id === id);
-const shortTitle = (id: string) => (lessonById(id)?.title || id).split('：')[0];
 
 /** 连线：从父节点底边的曲线流到子节点顶边 */
 const edgePath = (id: string) => {
@@ -22,17 +20,17 @@ function Shield() {
   );
 }
 
-/** 首页的组件树：服务端先渲染出静态版本（节点、连线、开关都在 HTML 里，不会布局跳动），
+/** 课文里的组件树示意图（MDX 里写 <RenderTree />，memo 默认打开的写 <RenderTree memo />）：服务端先渲染出静态版本（节点、连线、开关都在 HTML 里，不会布局跳动），
  *  挂载后再按需加载动画模块去“激活”它。激活后树里的内容由动画模块直接改 DOM，React 不再管，所以用 memo 保证不重渲染。 */
-function HeroTreeInner() {
+function RenderTreeInner({ memo = false }: { memo?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = ref.current;
     return root ? attachHeroTree(root) : undefined;
   }, []);
   return (
-    <div className="tree-card">
-      <div className="hero-tree" ref={ref}>
+    <div className="hoc tree-card">
+      <div className={memo ? 'hero-tree memo-on' : 'hero-tree'} ref={ref} data-demo-key={memo ? 'hoc-hero-demo-memo' : undefined}>
         <p className="ht-title">点一个组件，模拟它调用了 set 函数</p>
         {/* biome-ignore lint/a11y/useSemanticElements: 要保持 aspect-ratio 和绝对定位的布局，不用 fieldset */}
         <div className="ht-stage" role="group" aria-label="组件树示意：App 下面是 Header 和 TodoList，TodoList 下面是两个 Item，每个 Item 里有一个 Checkbox">
@@ -75,7 +73,7 @@ function HeroTreeInner() {
         <p className="ht-live" role="status" aria-live="polite" />
         <div className="ht-controls">
           <label className="ht-switch">
-            <input className="ht-memo-input" type="checkbox" disabled />
+            <input className="ht-memo-input" type="checkbox" disabled defaultChecked={memo} />
             <span className="ht-track" aria-hidden="true" />
             <span>
               给 <code>&lt;Item&gt;</code> 包上 memo
@@ -89,16 +87,9 @@ function HeroTreeInner() {
           </button>
         </div>
       </div>
-      <p className="cap">
-        重新渲染的范围就是这棵子树，这是《
-        <Link href="/lessons/rendering">{shortTitle('rendering')}</Link>
-        》要讲的；用 memo 挡住没变的子树，是《
-        <Link href="/lessons/performance">{shortTitle('performance')}</Link>
-        》要讲的。
-      </p>
     </div>
   );
 }
 
-const HeroTree = memo(HeroTreeInner);
-export default HeroTree;
+const RenderTree = reactMemo(RenderTreeInner);
+export default RenderTree;
