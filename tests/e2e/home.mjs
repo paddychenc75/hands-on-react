@@ -1100,15 +1100,31 @@ const layoutProbe = i => {
     .filter(e => eff(e) > 0.35 && e.checkVisibility())
     .map(e => ({ n: e.dataset.w || e.className, ...box(e) }))
     .filter(r => r.r > 0 && r.l < innerWidth && r.b > 0 && r.t < innerHeight);
-  // 手机上画面区域在文字区之下：被画面区域裁掉的部分不算
+  // 手机上画面区域在文字区之下（开场幕上沿还要让到提示之下，上沿淡出）：被画面区域裁掉的部分不算
+  const story = getComputedStyle(document.querySelector('.story'));
+  const ch = Number.parseFloat(story.getPropertyValue('--ch')) || 0;
+  const pt0 = Number.parseFloat(story.getPropertyValue('--pt0')) || 0;
+  const w3 = box(document.querySelector('.w3d'));
+  const lim = document.querySelector('.world').getBoundingClientRect().top + ch + pt0;
   if (!wide) {
-    const w3 = box(document.querySelector('.w3d'));
     for (const n of nodes) {
-      n.t = Math.max(n.t, w3.t);
+      n.t = Math.max(n.t, lim);
       n.b = Math.min(n.b, w3.b);
     }
+    for (let k = nodes.length - 1; k >= 0; k--) if (nodes[k].b <= nodes[k].t) nodes.splice(k, 1);
   }
   const v = [];
+  if (i === 0) {
+    // 开场：文字区（标题、副标题、按钮、链接、提示）与三层空间互不重叠——节点，以及桌面上三层平面本体的包围盒
+    for (const n of nodes) if (tb && hit(tb, n, wide ? 12 : 4)) v.push('开场：文字区×节点 ' + n.n);
+    if (wide) {
+      const pl = box(document.querySelector('.world .p4'));
+      if (tb && hit(tb, pl, 12)) v.push('开场：文字区×三层平面 ' + Math.round(tb.r) + ' vs ' + Math.round(pl.l));
+    } else {
+      const hint = box(document.querySelector('.s0 .scroll-hint'));
+      if (lim < hint.b + 4) v.push('开场：画面区上沿 ' + Math.round(lim) + ' 没有让到提示 ' + Math.round(hint.b) + ' 之下');
+    }
+  }
   if (i > 0 && i < 9) {
     for (const n of nodes) {
       if (tb && hit(tb, n, wide ? 12 : 0)) v.push('文字区×节点 ' + n.n);
@@ -1165,22 +1181,14 @@ for (const [w, h] of [
               const top = k === 'srvp' ? world.top : w3.top;
               if (r.left < world.left - 1 || r.right > world.right + 1 || r.top < top - 1 || r.bottom > bottom + 1) out.out.push(k);
             }
-            if (i !== 7)
-              for (const sp of document.querySelectorAll('.world .nd > span')) {
-                let o = 1;
-                for (let x = sp; x && x !== document.body; x = x.parentElement) o *= +getComputedStyle(x).opacity;
-                const r = sp.getBoundingClientRect();
-                if (
-                  o < 0.5 ||
-                  !sp.checkVisibility({ visibilityProperty: true }) ||
-                  r.right < 0 ||
-                  r.left > innerWidth ||
-                  r.top < w3.top ||
-                  r.bottom > w3.bottom
-                )
-                  continue;
-                out.fonts.push(Number.parseFloat(getComputedStyle(sp).fontSize) * (r.height / sp.offsetHeight));
-              }
+            for (const sp of document.querySelectorAll('.world .nd > span')) {
+              let o = 1;
+              for (let x = sp; x && x !== document.body; x = x.parentElement) o *= +getComputedStyle(x).opacity;
+              const r = sp.getBoundingClientRect();
+              if (o < 0.5 || !sp.checkVisibility({ visibilityProperty: true }) || r.right < 0 || r.left > innerWidth || r.top < w3.top || r.bottom > w3.bottom)
+                continue;
+              out.fonts.push(Number.parseFloat(getComputedStyle(sp).fontSize) * (r.height / sp.offsetHeight));
+            }
             return out;
           },
           [KEYS[i], i],

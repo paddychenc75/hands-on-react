@@ -23,7 +23,7 @@ const U = 'translateZ';
 type Pose = [number, number, number, number, number];
 const poseCss = (p: Pose) => `rotateX(${p[0]}deg) rotateZ(${p[1]}deg) translate3d(${p[2]}px, ${p[3]}px, 0px) scale(${p[4]})`;
 const POSES_DESKTOP: Pose[] = [
-  [58, -26, 200, 30, 0.8], // 0 开场
+  [58, -26, 0, 30, 0.6], // 0 开场（水平位置见 deskOpenCss：整体放在文字区右边）
   [58, -18, 200, 20, 0.86], // 1 手动改 DOM
   [50, -12, 200, 10, 0.92], // 2 声明式
   [54, -10, 200, 0, 0.92], // 3 协调
@@ -38,6 +38,11 @@ const POSES_DESKTOP: Pose[] = [
  *  平移写成 calc(var(--ws) * N px)：--ws 是舞台的缩放（story.ts 的 fitWorld 按画面区域算出），所以不管手机多宽，同一个设计坐标都取到同一块。
  *  focus(cx, cy, s)：把数据平面上的点 (cx, cy)（1000×620 设计坐标）移到画面中心，放大 s 倍。 */
 const focus = (cx: number, cy: number, s: number, rx = 46, rz = -12): Pose => [rx, rz, -(cx - 500) * s, -(cy - 310) * s, s];
+/** 桌面开场：三层空间整体放在文字区（左边约 730px）的右边，平面左缘落在文字区之外。
+ *  水平位置 = 730px - 舞台宽的一半 + 平面半宽（约 600 个设计单位 × --ws × 放大倍数），这样 1280、1440、1920 宽度下平面的左缘都在同一条线上 */
+const OPEN_LEFT = 730;
+const deskOpenCss = (rx: number, rz: number, dx: number, ty: number, s: number) =>
+  `rotateX(${rx}deg) rotateZ(${rz}deg) translate3d(calc(${OPEN_LEFT + dx}px - 50vw + var(--ws) * ${(600 * s).toFixed(1)}px), ${ty}px, 0px) scale(${s})`;
 const poseCssMobile = (p: Pose) =>
   `rotateX(${p[0]}deg) rotateZ(${p[1]}deg) translate3d(calc(var(--ws) * ${p[2].toFixed(1)}px), calc(var(--ws) * ${p[3].toFixed(1)}px), 0px) scale(${p[4]})`;
 const POSES_MOBILE: Pose[] = [
@@ -48,7 +53,7 @@ const POSES_MOBILE: Pose[] = [
   focus(620, 235, 2.1, 36), // 4 Fiber：树里正在被切片的工作单元
   focus(500, 310, 1.0, 40, -16), // 5 Hooks：画面在卡片上（HUD），三维层退到后面
   focus(440, 280, 2.1, 36), // 6 并发：被打断的节点和插队的 Search
-  focus(540, 300, 1.15, 36), // 7 服务端：服务器面板到三个节点的光路
+  focus(540, 250, 1.15, 36), // 7 服务端：纵向构图——上方服务器面板，下方三个被填充的节点，光路自上而下
   focus(730, 330, 2.1, 36), // 8 编译器：被扫描的卡片和被跳过的子树
   [60, -24, 0, -250, 0.34], // 9 收束
 ];
@@ -97,19 +102,19 @@ export function buildTracks(mobile = false): Tracks {
 
   /* ===== 相机 ===== */
   const poses = mobile ? POSES_MOBILE : POSES_DESKTOP;
-  const camCss = (p: Pose, i: number) => (mobile && i < 9 ? poseCssMobile(p) : poseCss(p));
+  const camCss = (p: Pose, i: number) => (mobile && i < 9 ? poseCssMobile(p) : !mobile && i === 0 ? deskOpenCss(p[0], p[1], p[2], p[3], p[4]) : poseCss(p));
   k(
     'cam',
     0,
     {
       transform: mobile
         ? camCss([poses[0][0] + 20, poses[0][1] - 20, poses[0][2], poses[0][3], poses[0][4] * 0.85], 0)
-        : poseCss([68, -40, poses[0][2] * 0.6, 60, poses[0][4] * 0.85]),
+        : deskOpenCss(68, -40, 0, 60, poses[0][4] * 0.85),
     },
     EASE.inout,
   );
   poses.forEach((p, i) => {
-    const arrive = i === 0 ? (mobile ? 2.4 : 4.6) : M[i] + 0.9;
+    const arrive = i === 0 ? (mobile ? 2.4 : 3.0) : M[i] + 0.9;
     k('cam', arrive, { transform: camCss(p, i) }, EASE.inout);
     // 到位后很慢地继续飘一点（镜头推拉），到下一幕之前再被下一个姿态接走
     const end = i === 9 ? TOTAL : M[i + 1] - 0.05;
