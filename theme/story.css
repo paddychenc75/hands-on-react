@@ -598,9 +598,6 @@
   html.story-dyn .story .hc2 code { font-size: 16px; }
   html.story-dyn .story .hc2 small { font-size: 12px; }
 }
-/* 服务端一幕在手机上要同时看到服务器面板和三个目标节点，放不大，节点上的字读不了，干脆不显示（光路和面板在讲这件事） */
-@media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
-  html.story-dyn .story[data-active="7"] .world :is(.nd > span, .gn > span, .card code::after) { visibility: hidden; }
 }
 /* 非苹方字体（安卓、Linux、CI）说明会多折几行：标题最多 2 行、说明最多 4 行，文字区的高度就是确定的，不会顶进画面和图例 */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
@@ -609,8 +606,23 @@
 }
 /* 手机：画面区的下沿留出图例、提示条和“每一帧”节拍条的位置（不同幕占的高度不同），画面在这条线上淡出，不和它们叠在一起 */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
-  html.story-dyn .story { --pb: 30px; }
+  html.story-dyn .story { --pb: 30px; --pt0: 0px; }
+  html.story-dyn .story[data-active="0"] { --pt0: var(--pt0s, 0px); }
   html.story-dyn .story:is([data-active="2"], [data-active="3"], [data-active="8"]) { --pb: 80px; }
   html.story-dyn .story:is([data-active="4"], [data-active="6"]) { --pb: 116px; }
-  html.story-dyn .story .w3d { -webkit-mask-image: linear-gradient(#000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); mask-image: linear-gradient(#000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); }
+  html.story-dyn .story .w3d { -webkit-mask-image: linear-gradient(transparent var(--pt0, 0px), #000 calc(var(--pt0, 0px) + 28px), #000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); mask-image: linear-gradient(transparent var(--pt0, 0px), #000 calc(var(--pt0, 0px) + 28px), #000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); }
+}
+
+/* 手机·服务端一幕：纵向构图。上方是服务器面板（三块横排，放大到字读得出），下方是浏览器里被填充的三个节点，光路自上而下；节点字号单独放大到渲染 ≥ 11px */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
+  html.story-dyn .story .srvpanel { left: 7%; right: 7%; width: auto; top: calc(var(--ch) + 8px); height: 92px; padding: 9px 12px; }
+  html.story-dyn .story .srvt { font-size: 13px; }
+  html.story-dyn .story .rack { display: flex; gap: 10px; margin-top: 8px; }
+  html.story-dyn .story .sbk { flex: 1; height: 40px; padding: 0 9px; }
+  html.story-dyn .story .sbk u { height: 8px; }
+  html.story-dyn .story[data-active="7"] .nd:is([data-w="n-Header"], [data-w="n-Item1"], [data-w="n-Item2"]) { font-size: 30px; height: 46px; margin-top: -6px; }
+}
+/* 服务端一幕（手机）：只有三个目标节点的字放大到能读，其余节点退成背景（字调淡） */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
+  html.story-dyn .story[data-active="7"] .nd:not([data-w="n-Header"], [data-w="n-Item1"], [data-w="n-Item2"]) > span { opacity: .3; }
 }

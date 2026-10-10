@@ -185,7 +185,9 @@ export function attach(root: HTMLElement): () => void {
     };
     STREAM_TARGETS.forEach((id, i) => {
       const sr = rectAt(`[data-w="sbk-${i}"]`, M[7] + 1.0);
-      const from = { x: sr.right - w.left, y: sr.top + sr.height / 2 - w.top };
+      // 手机竖屏：三块横排，光路从每块的底边中点出发自上而下；桌面和横屏：从右边出发
+      const down = narrowMQ.matches && matchMedia('(orientation: portrait)').matches;
+      const from = down ? { x: sr.left + sr.width / 2 - w.left, y: sr.bottom - w.top } : { x: sr.right - w.left, y: sr.top + sr.height / 2 - w.top };
       const to = center(`[data-w="b-${id}"]`, CUE.arrive(i));
       setArc([`arcb-${i}`, `arcw-${i}`, `arc-${i}`], from, to, 0.28);
     });
@@ -250,6 +252,12 @@ export function attach(root: HTMLElement): () => void {
     // 三层空间旋转之后比平面大：留出余量；手机上只用画面区域（文字在它上面），横向尽量铺满
     // 桌面上画面夹在左边的文字区（约 560px）和右边的幕进度点（约 100px）之间，不压到它们
     const ch = Number.parseFloat(getComputedStyle(root).getPropertyValue('--ch')) || 0;
+    // 手机开场幕：画面区的上沿让到“向上滑动”提示之下（上沿淡出）
+    const hint = root.querySelector<HTMLElement>('.s0 .scroll-hint');
+    root.style.setProperty(
+      '--pt0s',
+      narrow && hint ? `${Math.max(0, Math.round(hint.getBoundingClientRect().bottom + 10 - (world.getBoundingClientRect().top + ch)))}px` : '0px',
+    );
     const ws = narrow
       ? Math.min((r.width / 1000) * 1.04, (world.getBoundingClientRect().height - ch - 30) / 500)
       : Math.min((r.width - 660) / 880, r.height / 650, r.width / 1340);
