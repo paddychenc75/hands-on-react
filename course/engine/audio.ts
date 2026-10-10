@@ -352,6 +352,16 @@ export function scheduleScore(ctx: BaseAudioContext, o: Out, from: number, to: n
     tone(ctx, o, at(CUE.attach), 660, 'triangle', 0.003, 0.5, 0.2 * sfx, { rev: 0.6, del: 0.4, pan: 0.2 });
     tone(ctx, o, at(CUE.attach) + 0.01, 990, 'sine', 0.003, 0.35, 0.1 * sfx, { rev: 0.6 });
   }
+  // 后面三个钩子：同一个音色，音高依次上行；自定义 Hook 被复制到第二张卡片：一个更高更短的“叮”
+  CUE.hooks.forEach((t, j) => {
+    if (!inR(t)) return;
+    tone(ctx, o, at(t), [740, 831, 988][j], 'triangle', 0.003, 0.45, 0.3 * sfx, { rev: 0.6, del: 0.4, pan: 0.2 + j * 0.05 });
+    tone(ctx, o, at(t) + 0.01, [1109, 1245, 1480][j], 'sine', 0.003, 0.3, 0.09 * sfx, { rev: 0.6 });
+  });
+  if (inR(CUE.hookCopy)) {
+    tone(ctx, o, at(CUE.hookCopy), 1480, 'triangle', 0.003, 0.4, 0.28 * sfx, { rev: 0.6, del: 0.5, pan: -0.2 });
+    tone(ctx, o, at(CUE.hookCopy) + 0.01, 1976, 'sine', 0.003, 0.3, 0.09 * sfx, { rev: 0.6 });
+  }
   /* 第 6 幕：被打断的渲染丢弃（一个下滑音）；紧急更新插队（明亮的拨弦）；随后更急更亮的声部 */
   if (inR(CUE.urgent - 0.35)) tone(ctx, o, at(CUE.urgent - 0.35), 520, 'sawtooth', 0.01, 0.3, 0.07 * sfx, { rev: 0.3 }, 170);
   [0, 0.09, 0.18].forEach((dt, j) => {

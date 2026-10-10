@@ -215,7 +215,7 @@
   html.story-dyn .story.xf .world, html.story-dyn .story.xf .sc { opacity: 0; }
   /* 3D 层里的东西不接收触摸和点击（iOS 上 3D 变换的层命中测试和可见位置可能不一致，会把点击吃掉） */
   html.story-dyn .story .world, html.story-dyn .story .world * { pointer-events: none; }
-  html.story-dyn .story .sc-copy { position: fixed; z-index: 10; left: max(28px, 5vw); top: calc(var(--nav) + var(--V) / 2); transform: translateY(-50%); width: min(440px, 36vw); max-width: none; margin: 0; padding: 0; opacity: 0; pointer-events: none; visibility: hidden; align-content: center; }
+  html.story-dyn .story .sc-copy { position: fixed; z-index: 10; left: max(28px, 5vw); top: calc(var(--nav) + var(--V) / 2); transform: translateY(-50%); width: min(420px, 32vw); max-width: none; margin: 0; padding: 0; opacity: 0; pointer-events: none; visibility: hidden; align-content: center; }
   html.story-dyn .story .sc-copy::before { content: ""; position: absolute; inset: -40px -90px -40px -60px; z-index: -1; background: radial-gradient(closest-side, rgba(5, 11, 15, .82), rgba(5, 11, 15, .55) 62%, transparent); }
   html.story-dyn .story .sc.live .sc-copy, html.story-dyn .story:not(.ready) .s0 .sc-copy { visibility: visible; pointer-events: auto; }
   html.story-dyn .story .s0 .sc-copy { opacity: 1; }
@@ -277,7 +277,7 @@
 .story .hc-f code { font: 700 22px var(--f-mono); color: #e8f4f9; white-space: nowrap; }
 .story .hc-front { background: #2b1b13; border: 2px dashed var(--w-diff); box-shadow: 0 0 40px rgba(240, 170, 79, .3); }
 .story .hc-back { transform: rotateY(180deg); background: #0c2530; border: 2px solid var(--w-render); box-shadow: 0 0 44px rgba(92, 198, 228, .4); }
-.story .hkb { position: absolute; right: -18px; bottom: -30px; display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 99px; text-decoration: none; opacity: 0; white-space: nowrap; font: 700 16px var(--f-mono); color: var(--w-render); background: #10303a; border: 1.5px solid var(--w-render); box-shadow: 0 0 24px rgba(92, 198, 228, .5); }
+.story .hkb { position: static; display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 99px; text-decoration: none; opacity: 0; white-space: nowrap; font: 700 16px var(--f-mono); color: var(--w-render); background: #10303a; border: 1.5px solid var(--w-render); box-shadow: 0 0 24px rgba(92, 198, 228, .5); }
 .story .fly { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; }
 .story .fly.fa { width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--w-diff); box-shadow: 0 0 18px var(--w-diff), 0 0 44px rgba(240, 170, 79, .6); }
 .story .fly.fb { width: 32px; height: 32px; margin: -16px 0 0 -16px; border-radius: 50%; display: grid; place-items: center; font: 800 18px var(--f-mono); font-style: normal; color: #1b1204; background: var(--w-diff); box-shadow: 0 0 20px var(--w-diff), 0 0 50px rgba(240, 170, 79, .6); }
@@ -482,8 +482,8 @@
  * 幕进度指示合并进控制条上面那条分段进度（圆点列表在手机上不用）；触摸区域都 ≥ 44px。
  * ===================================================================== */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
-  html.story-dyn .story { --ph: calc(80px + var(--safe-b)); --ph-end: calc(60px + var(--safe-b)); --ch: 176px; --yw: 116px; }
-  @media (max-height: 700px) { html.story-dyn .story { --ch: 164px; } }
+  html.story-dyn .story { --ph: calc(80px + var(--safe-b)); --ph-end: calc(60px + var(--safe-b)); --ch: 184px; --yw: 116px; }
+  @media (max-height: 700px) { html.story-dyn .story { --ch: 172px; } }
   html.story-dyn .story .rail { display: none; }
   html.story-dyn .story .world { top: var(--nav); bottom: var(--ph); height: auto; }
   html.story-dyn .story .w3d { top: var(--ch); bottom: 0; left: 0; right: 0; inset: var(--ch) 0 0 0; }
@@ -496,7 +496,7 @@
   html.story-dyn .story .s7 .sc-copy { top: calc(var(--nav) + 8px); bottom: auto; }
   html.story-dyn .story .srvpanel { top: calc(var(--ch) + 8px); }
   html.story-dyn .story .s1 h2 { padding-left: 0; text-align: left; }
-  html.story-dyn .story .hc { top: calc(var(--ch) + (100% - var(--ch)) * .46); left: 52%; width: min(340px, 88vw); }
+  html.story-dyn .story .hc { top: calc(var(--ch) + (100% - var(--ch)) * .27); left: 50%; width: min(340px, 88vw); height: 88px; margin-top: -44px; }
   @media (max-width: 380px) { html.story-dyn .story { --yw: 108px; } html.story-dyn .story :is(.s1, .s2, .s3, .s4, .s5, .s6, .s7, .s8) h2 { font-size: 20px; } }
   html.story-dyn .story .legend { left: 12px; bottom: 6px; gap: 10px; font-size: 12px; flex-wrap: wrap; }
   /* 文字层：固定在画面上方 */
@@ -532,11 +532,14 @@
   html.story-dyn .story .snd-tip { left: auto; right: 12px; transform: none; bottom: calc(var(--ph) + 8px); animation: none; }
   /* 收束幕：控制条只留重播和声音，内容不再让位给进度条 */
   html.story-dyn .story.ended[data-active="9"] .player { transform: none; opacity: 1; background: rgba(6, 14, 19, .78); }
-  html.story-dyn .story.ended[data-active="9"] .player :is(.play, .prev, .next, .scrub, .skip) { display: none; }
+  html.story-dyn .story.ended[data-active="9"] .player :is(.play, .scrub, .skip) { visibility: hidden; pointer-events: none; }
   html.story-dyn .story .s9 .sc-copy { top: var(--nav); bottom: var(--ph); }
   html.story-dyn .story.ended .s9 .sc-copy { bottom: var(--ph-end); }
-  html.story-dyn .story[data-active="9"] .player .scrub { display: none; }
+  /* 进入收束幕时控制条的高度不变（否则它会“跳”一下，算作布局偏移）：分段进度只是看不见，整条条透明、不挡点击，只有按钮可点 */
+  html.story-dyn .story[data-active="9"] .player .scrub { visibility: hidden; pointer-events: none; }
   html.story-dyn .story[data-active="9"] { --ph: var(--ph-end); }
+  html.story-dyn .story[data-active="9"] .player { pointer-events: none; background: transparent; border-color: transparent; box-shadow: none; }
+  html.story-dyn .story[data-active="9"] .player :is(button, a) { pointer-events: auto; }
 }
 /* 手机横屏：左文右图，控制条是一行 */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: landscape) and (max-height: 540px) {
@@ -565,7 +568,49 @@
   html.story-dyn .story .s9 .sc-copy { display: flex; flex-direction: column; }
   html.story-dyn .story .s9 .fin { margin-block: auto; flex: none; }
 }
-/* 手机：三层空间里节点上的字渲染出来只有 4–5px，读不了，隐藏（图例、说明文字和提示条已经讲清楚了）；节点的形状、颜色和光继续表达 */
+/* 手机：相机取景放大以后，节点和卡片上的字渲染出来要 ≥ 11px，所以设计尺寸的字号放大（节点框 92×34 放得下 16px 的等宽字） */
 @media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
-  html.story-dyn .story .world :is(.nd > span, .gn > span, .card code, .cls, .plbl, .mt) { display: none; }
+  html.story-dyn .story .nd, html.story-dyn .story .gn { font-size: 19px; width: 118px; margin-left: -13px; }
+  /* 卡片上的“function X()”太长，手机上换成 <X />（组件的用法），字号放大 */
+  html.story-dyn .story .card code { font-size: 0; }
+  html.story-dyn .story .card code::after { content: attr(data-j); font-size: 15px; }
+  html.story-dyn .story .card .mt, html.story-dyn .story .card .hk { font-size: 13px; }
+  html.story-dyn .story .card .cls { font-size: 13px; }
+  html.story-dyn .story .plbl { font-size: 14px; }
+  html.story-dyn .story .nd .fl { font-size: 15px; }
+  /* 开场幕：三层空间缓慢地呼吸和转动（只动 transform） */
+  @keyframes st-breathe { from { transform: rotate(-3deg) scale(1); } to { transform: rotate(3deg) scale(1.06); } }
+  html.story-dyn .story[data-active="0"] .w3d { animation: st-breathe 9s ease-in-out infinite alternate; }
+}
+
+/* Hooks 一幕：卡片翻成 function 之后，几个钩子依次挂在下面一排；自定义 Hook 被复制到第二张卡片 */
+.story .hk-row { position: absolute; left: -12px; right: -12px; top: calc(100% + 18px); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.story .hk-row .hkb { font-size: 14px; padding: 5px 11px; }
+.story .hc2 { position: absolute; left: 11%; right: 11%; top: calc(100% + 86px); height: 84px; border-radius: 14px; display: grid; place-content: center; justify-items: center; gap: 6px; opacity: 0; background: #0c2530; border: 2px solid var(--w-render); box-shadow: 0 0 36px rgba(92, 198, 228, .32); }
+.story .hc2 small { color: var(--w-ink2); font-size: 12.5px; }
+.story .hc2 code { font: 700 18px var(--f-mono); color: #e8f4f9; white-space: nowrap; }
+.story .hc2 .hkc { position: absolute; right: -10px; bottom: -16px; font-size: 13px; padding: 3px 10px; }
+@media (max-width: 899px) {
+  html.story-dyn .story .hk-row { gap: 6px; left: -14px; right: -14px; }
+  html.story-dyn .story .hk-row .hkb { font-size: 12px; padding: 4px 7px; gap: 5px; }
+  html.story-dyn .story .hk-row .hkb svg { display: none; }
+  html.story-dyn .story .hc2 { top: calc(100% + 66px); height: 78px; left: 8%; right: 8%; }
+  html.story-dyn .story .hc2 code { font-size: 16px; }
+  html.story-dyn .story .hc2 small { font-size: 12px; }
+}
+/* 服务端一幕在手机上要同时看到服务器面板和三个目标节点，放不大，节点上的字读不了，干脆不显示（光路和面板在讲这件事） */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) {
+  html.story-dyn .story[data-active="7"] .world :is(.nd > span, .gn > span, .card code::after) { visibility: hidden; }
+}
+/* 非苹方字体（安卓、Linux、CI）说明会多折几行：标题最多 2 行、说明最多 4 行，文字区的高度就是确定的，不会顶进画面和图例 */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
+  html.story-dyn .story :is(.s1, .s2, .s3, .s4, .s5, .s6, .s7, .s8) h2 .mk-in { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  html.story-dyn .story :is(.s1, .s2, .s3, .s4, .s5, .s6, .s7, .s8) .desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+}
+/* 手机：画面区的下沿留出图例、提示条和“每一帧”节拍条的位置（不同幕占的高度不同），画面在这条线上淡出，不和它们叠在一起 */
+@media (prefers-reduced-motion: no-preference) and (max-width: 899px) and (orientation: portrait) {
+  html.story-dyn .story { --pb: 30px; }
+  html.story-dyn .story:is([data-active="2"], [data-active="3"], [data-active="8"]) { --pb: 80px; }
+  html.story-dyn .story:is([data-active="4"], [data-active="6"]) { --pb: 116px; }
+  html.story-dyn .story .w3d { -webkit-mask-image: linear-gradient(#000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); mask-image: linear-gradient(#000 calc(100% - var(--pb) - 22px), transparent calc(100% - var(--pb))); }
 }

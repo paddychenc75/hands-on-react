@@ -263,7 +263,7 @@ export default function HomePage() {
                 </i>
                 {NODES.map(n => (
                   <div key={n.id} className="card" data-w={'c-' + n.id} style={at(n.x - 56, n.y - 62, 112, 28)}>
-                    <code>function {n.label}()</code>
+                    <code data-j={`<${n.label} />`}>function {n.label}()</code>
                     <i className="cf" data-w={'cf-' + n.id} />
                     {n.memo ? (
                       <em className="mt" data-w={'mt-' + n.id}>
@@ -327,13 +327,31 @@ export default function HomePage() {
                 <code>function Counter()</code>
               </div>
             </div>
-            <u className="hkb" data-w="hkb">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-                <path d="M9 3v9a4 4 0 1 0 4 4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-                <circle cx="9" cy="3.5" r="1.8" fill="currentColor" />
-              </svg>
-              useState
-            </u>
+            <div className="hk-row">
+              <u className="hkb" data-w="hkb">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <path d="M9 3v9a4 4 0 1 0 4 4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  <circle cx="9" cy="3.5" r="1.8" fill="currentColor" />
+                </svg>
+                useState
+              </u>
+              <u className="hkb" data-w="hkb-1">
+                useEffect
+              </u>
+              <u className="hkb" data-w="hkb-2">
+                useRef
+              </u>
+              <u className="hkb" data-w="hkb-3">
+                useCounter
+              </u>
+            </div>
+            <div className="hc2" data-w="hc2">
+              <small>另一个组件：同一个 Hook，直接复用</small>
+              <code>function TodoList()</code>
+              <u className="hkb hkc" data-w="hkb-c">
+                useCounter
+              </u>
+            </div>
           </div>
           <i className="fly fa" data-w="fly-a-0" />
           <i className="fly fa" data-w="fly-a-1" />

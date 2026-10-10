@@ -34,17 +34,23 @@ const POSES_DESKTOP: Pose[] = [
   [56, -12, 200, 20, 0.94], // 8 编译器
   [64, -24, 0, -260, 0.34], // 9 收束
 ];
+/** 手机上相机要“取景”：每一幕只拍和本幕相关的那一块，放大后节点上的字才读得出来（不相关的节点在画外）。
+ *  平移写成 calc(var(--ws) * N px)：--ws 是舞台的缩放（story.ts 的 fitWorld 按画面区域算出），所以不管手机多宽，同一个设计坐标都取到同一块。
+ *  focus(cx, cy, s)：把数据平面上的点 (cx, cy)（1000×620 设计坐标）移到画面中心，放大 s 倍。 */
+const focus = (cx: number, cy: number, s: number, rx = 46, rz = -12): Pose => [rx, rz, -(cx - 500) * s, -(cy - 310) * s, s];
+const poseCssMobile = (p: Pose) =>
+  `rotateX(${p[0]}deg) rotateZ(${p[1]}deg) translate3d(calc(var(--ws) * ${p[2].toFixed(1)}px), calc(var(--ws) * ${p[3].toFixed(1)}px), 0px) scale(${p[4]})`;
 const POSES_MOBILE: Pose[] = [
-  [50, -26, 0, 20, 0.9],
-  [52, -20, 0, 10, 1.01],
-  [42, -14, 0, 0, 1.12],
-  [48, -10, 0, -10, 1.1],
-  [38, -8, 0, -20, 1.12],
-  [54, -16, 0, 20, 1.23],
-  [40, -10, 0, 0, 1.12],
-  [46, -20, 20, 10, 0.94],
-  [52, -14, 0, 10, 1.12],
-  [60, -24, 0, -250, 0.34],
+  focus(500, 270, 1.08, 26, -64), // 0 开场：整个三层空间，竖着占满下半屏
+  focus(540, 318, 0.95, 36), // 1 手动改 DOM：DOM 层的三块和那条漏掉的线
+  focus(670, 250, 1.85, 36), // 2 声明式：App、TodoList 和两个 Item，光从根往下
+  focus(740, 370, 2.0, 36), // 3 协调：TodoList 的子树，两处差别
+  focus(620, 235, 2.1, 36), // 4 Fiber：树里正在被切片的工作单元
+  focus(500, 310, 1.0, 40, -16), // 5 Hooks：画面在卡片上（HUD），三维层退到后面
+  focus(440, 280, 2.1, 36), // 6 并发：被打断的节点和插队的 Search
+  focus(540, 300, 1.15, 36), // 7 服务端：服务器面板到三个节点的光路
+  focus(730, 330, 2.1, 36), // 8 编译器：被扫描的卡片和被跳过的子树
+  [60, -24, 0, -250, 0.34], // 9 收束
 ];
 
 export function buildTracks(mobile = false): Tracks {
@@ -91,14 +97,25 @@ export function buildTracks(mobile = false): Tracks {
 
   /* ===== 相机 ===== */
   const poses = mobile ? POSES_MOBILE : POSES_DESKTOP;
-  k('cam', 0, { transform: poseCss([68, -40, poses[0][2] * 0.6, 60, poses[0][4] * 0.85]) }, EASE.inout);
+  const camCss = (p: Pose, i: number) => (mobile && i < 9 ? poseCssMobile(p) : poseCss(p));
+  k(
+    'cam',
+    0,
+    {
+      transform: mobile
+        ? camCss([poses[0][0] + 20, poses[0][1] - 20, poses[0][2], poses[0][3], poses[0][4] * 0.85], 0)
+        : poseCss([68, -40, poses[0][2] * 0.6, 60, poses[0][4] * 0.85]),
+    },
+    EASE.inout,
+  );
   poses.forEach((p, i) => {
-    const arrive = i === 0 ? 4.6 : M[i] + 0.9;
-    k('cam', arrive, { transform: poseCss(p) }, EASE.inout);
+    const arrive = i === 0 ? (mobile ? 2.4 : 4.6) : M[i] + 0.9;
+    k('cam', arrive, { transform: camCss(p, i) }, EASE.inout);
     // 到位后很慢地继续飘一点（镜头推拉），到下一幕之前再被下一个姿态接走
     const end = i === 9 ? TOTAL : M[i + 1] - 0.05;
-    const drift: Pose = [p[0] + 1.5, p[1] + 2, p[2] - 8, p[3] + 4, p[4] * 1.025];
-    k('cam', end, { transform: poseCss(drift) }, EASE.lin);
+    const drift: Pose =
+      mobile && i < 9 ? [p[0] + 1.5, p[1] + 2, p[2] - 8 * p[4], p[3] + 4 * p[4], p[4] * 1.02] : [p[0] + 1.5, p[1] + 2, p[2] - 8, p[3] + 4, p[4] * 1.025];
+    k('cam', end, { transform: camCss(drift, i) }, EASE.lin);
   });
 
   /* ===== 0 开场：三层空间由线条画出，原子图标化成树根 ===== */
@@ -362,7 +379,7 @@ export function buildTracks(mobile = false): Tracks {
   /* ===== 5 Hooks：镜头推近到一张卡片，class 翻成 function，钩子带着 useState 挂上去 ===== */
   k('hc', 0, { opacity: 0, transform: 'scale(.8)' }, EASE.out);
   k('hc', M[5] + 0.15, { opacity: 0, transform: 'scale(.8)' }, EASE.out);
-  k('hc', M[5] + 0.7, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
+  k('hc', M[5] + 0.5, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
   k('hc', M[6] - 0.5, { opacity: 1, transform: 'scale(1)' }, EASE.inout);
   k('hc', M[6] - 0.05, { opacity: 0, transform: 'scale(1.06)' });
   k('hc-in', 0, { transform: 'rotateY(0deg)' }, EASE.inout);
@@ -370,11 +387,22 @@ export function buildTracks(mobile = false): Tracks {
   k('hc-in', CUE.flip + 0.1, { transform: 'rotateY(-12deg)' }, EASE.out); // 翻之前的预备：轻微回缩
   k('hc-in', CUE.flip + 0.95, { transform: 'rotateY(-180deg)' }, EASE.back);
   k('hc-in', CUE.flip + 1.1, { transform: 'rotateY(-180deg)' });
-  k('hkb', 0, { opacity: 0, transform: 'translate(140px, -90px) rotate(28deg) scale(.5)' }, EASE.out);
-  k('hkb', CUE.attach - 0.55, { opacity: 0, transform: 'translate(140px, -90px) rotate(28deg) scale(.5)' }, EASE.out);
-  k('hkb', CUE.attach - 0.3, { opacity: 1, transform: 'translate(90px, -50px) rotate(14deg) scale(.8)' }, EASE.back);
-  k('hkb', CUE.attach, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1.1)' }, EASE.out);
-  k('hkb', CUE.attach + 0.22, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1)' });
+  const hookIn = (name: string, t: number, from = 'translate(140px, -90px) rotate(28deg) scale(.5)') => {
+    k(name, 0, { opacity: 0, transform: from }, EASE.out);
+    k(name, t - 0.55, { opacity: 0, transform: from }, EASE.out);
+    k(name, t - 0.3, { opacity: 1, transform: 'translate(70px, -40px) rotate(12deg) scale(.8)' }, EASE.back);
+    k(name, t, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1.1)' }, EASE.out);
+    k(name, t + 0.2, { opacity: 1, transform: 'translate(0px, 0px) rotate(0deg) scale(1)' });
+  };
+  hookIn('hkb', CUE.attach);
+  CUE.hooks.forEach((t, j) => hookIn('hkb-' + (j + 1), t, 'translate(80px, -70px) rotate(20deg) scale(.5)'));
+  // 第二张卡片：自定义 Hook 被复制过来（同一个钩子，第二次挂上）
+  k('hc2', 0, { opacity: 0, transform: 'translateY(14px) scale(.92)' }, EASE.out);
+  k('hc2', CUE.hookCopy - 0.45, { opacity: 0, transform: 'translateY(14px) scale(.92)' }, EASE.out);
+  k('hc2', CUE.hookCopy - 0.1, { opacity: 1, transform: 'translateY(0px) scale(1)' }, EASE.inout);
+  k('hc2', M[6] - 0.5, { opacity: 1, transform: 'translateY(0px) scale(1)' }, EASE.inout);
+  k('hc2', M[6] - 0.05, { opacity: 0, transform: 'translateY(0px) scale(1.04)' });
+  hookIn('hkb-c', CUE.hookCopy, 'translate(0px, -120px) rotate(0deg) scale(.7)');
   // 镜头推近：别的东西让一让
   k('cam', M[5] + 0.1, { opacity: 1 }, EASE.inout);
   k('cam', M[5] + 0.7, { opacity: 0.22 }, EASE.inout);

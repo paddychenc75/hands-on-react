@@ -1062,6 +1062,196 @@ for (const [w, h] of PHONES) {
   );
   await c.close();
 }
+/* 8b. 画面取景与版式：
+ *   手机：每一幕相机只取与本幕相关的那一块；关键元素的包围盒完全在画面区域里（360/390/412/430），节点上的字渲染出来 ≥ 11px；
+ *   文字区与画面中的节点、图例、节拍条、提示条、控制条互不相交——正常字距和加宽字距（模拟安卓/Linux 的非苹方字体，说明多折几行）下都成立；
+ *   桌面（1280/1440/1920）：文字区与画面中可见的节点留出间距，右侧幕进度点所在的竖条里没有画面里的字；
+ *   开场幕画面占满下半屏并在缓慢转动；Hooks 一幕的结论帧是“卡片 + 四个钩子 + 第二张卡片”。 */
+const KEYS = {
+  1: ['b-Header', 'b-Item1', 'b-Box2'],
+  2: ['n-App', 'n-TodoList', 'n-Item1', 'n-Item2'],
+  3: ['n-TodoList', 'n-Item2', 'n-Box2'],
+  4: ['n-App', 'n-TodoList'],
+  6: ['n-Search'],
+  7: ['srvp', 'n-Header', 'n-Item1', 'n-Item2'],
+  8: ['n-TodoList', 'n-Item1'],
+};
+const layoutProbe = i => {
+  const eff = e => {
+    let o = 1;
+    for (let x = e; x && x !== document.body; x = x.parentElement) o *= +getComputedStyle(x).opacity;
+    return o;
+  };
+  const box = e => {
+    const r = e.getBoundingClientRect();
+    return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+  };
+  const hit = (a, c, m = 0) => a.l < c.r + m && c.l < a.r + m && a.t < c.b + m && c.t < a.b + m;
+  const cp = document.querySelector(`[data-w="cp-${i}"]`);
+  let tb = null;
+  for (const e of cp.querySelectorAll('h1, h2, p, .eyebrow, .desc, .lead, a, button')) {
+    if (!e.checkVisibility({ checkVisibilityCSS: true }) || !e.textContent.trim()) continue;
+    const r = box(e);
+    if (r.r - r.l < 2) continue;
+    tb = tb ? { l: Math.min(tb.l, r.l), t: Math.min(tb.t, r.t), r: Math.max(tb.r, r.r), b: Math.max(tb.b, r.b) } : r;
+  }
+  const wide = innerWidth >= 900;
+  const nodes = [...document.querySelectorAll('.world .nd, .world .card, .world .gn')]
+    .filter(e => eff(e) > 0.35 && e.checkVisibility())
+    .map(e => ({ n: e.dataset.w || e.className, ...box(e) }))
+    .filter(r => r.r > 0 && r.l < innerWidth && r.b > 0 && r.t < innerHeight);
+  // 手机上画面区域在文字区之下：被画面区域裁掉的部分不算
+  if (!wide) {
+    const w3 = box(document.querySelector('.w3d'));
+    for (const n of nodes) {
+      n.t = Math.max(n.t, w3.t);
+      n.b = Math.min(n.b, w3.b);
+    }
+  }
+  const v = [];
+  if (i > 0 && i < 9) {
+    for (const n of nodes) {
+      if (tb && hit(tb, n, wide ? 12 : 0)) v.push('文字区×节点 ' + n.n);
+      if (wide && n.r > innerWidth - 110) v.push('节点压进进度点条 ' + n.n + ' ' + Math.round(n.r));
+    }
+    for (const s of ['.legend', '.frames', '.player']) {
+      const e = document.querySelector(s);
+      if (e && e.checkVisibility() && eff(e) > 0.05 && tb && hit(tb, box(e))) v.push('文字区×' + s);
+    }
+    for (const e of document.querySelectorAll('.cl')) if (eff(e) > 0.3 && tb && hit(tb, box(e))) v.push('文字区×提示条');
+  }
+  return { v, nodes: nodes.length };
+};
+for (const [w, h] of [
+  [360, 640],
+  [390, 844],
+  [412, 915],
+  [430, 932],
+]) {
+  for (const wideText of [false, true]) {
+    const c = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+    const p = await c.newPage();
+    p.on('pageerror', e => errs.push(e.message));
+    await p.addInitScript(() => {
+      window.__storyTest = true;
+      window.__storyNoAuto = true;
+    });
+    await p.goto(site);
+    await p.waitForSelector('.story.ready');
+    if (wideText) await p.addStyleTag({ content: '.story, .story * { letter-spacing: 0.06em !important; }' });
+    await p.waitForTimeout(400);
+    const bad = [];
+    const outside = [];
+    const small = [];
+    for (let i = 0; i < 10; i++) {
+      await atF(p, STOP[i]);
+      await p.waitForTimeout(320);
+      const r = await p.evaluate(layoutProbe, i);
+      if (r.v.length) bad.push(i + ':' + r.v.slice(0, 3).join(','));
+      if (!wideText && KEYS[i]) {
+        const o = await p.evaluate(
+          ([keys, i]) => {
+            const world = document.querySelector('.world').getBoundingClientRect();
+            const w3 = document.querySelector('.w3d').getBoundingClientRect();
+            const out = { out: [], fonts: [] };
+            for (const k of keys) {
+              const e = document.querySelector(`.world [data-w="${k}"]`);
+              if (!e) {
+                out.out.push(k + ' 不存在');
+                continue;
+              }
+              const r = e.getBoundingClientRect();
+              const bottom = k === 'srvp' ? world.bottom : w3.bottom;
+              const top = k === 'srvp' ? world.top : w3.top;
+              if (r.left < world.left - 1 || r.right > world.right + 1 || r.top < top - 1 || r.bottom > bottom + 1) out.out.push(k);
+            }
+            if (i !== 7)
+              for (const sp of document.querySelectorAll('.world .nd > span')) {
+                let o = 1;
+                for (let x = sp; x && x !== document.body; x = x.parentElement) o *= +getComputedStyle(x).opacity;
+                const r = sp.getBoundingClientRect();
+                if (
+                  o < 0.5 ||
+                  !sp.checkVisibility({ visibilityProperty: true }) ||
+                  r.right < 0 ||
+                  r.left > innerWidth ||
+                  r.top < w3.top ||
+                  r.bottom > w3.bottom
+                )
+                  continue;
+                out.fonts.push(Number.parseFloat(getComputedStyle(sp).fontSize) * (r.height / sp.offsetHeight));
+              }
+            return out;
+          },
+          [KEYS[i], i],
+        );
+        if (o.out.length) outside.push(i + ':' + o.out.join(','));
+        if (o.fonts.length && Math.min(...o.fonts) < 11) small.push(i + ':' + Math.min(...o.fonts).toFixed(1));
+      }
+    }
+    ok(
+      !bad.length,
+      `${w}×${h}${wideText ? '（字距加宽 0.06em，模拟非苹方字体）' : ''}：每幕文字区与画面节点、图例、节拍条、提示条、控制条互不相交`,
+      bad.join(' ; '),
+    );
+    if (!wideText) {
+      ok(!outside.length, `${w}×${h}：每幕标注的关键元素完全落在画面区域内`, outside.join(' ; '));
+      ok(!small.length, `${w}×${h}：节点上的字实际渲染 ≥ 11px`, small.join(' ; '));
+      // 开场：三层空间占满下半屏，并且在缓慢转动
+      await atF(p, STOP[0]);
+      await p.waitForTimeout(300);
+      const op = await p.evaluate(() => {
+        const w3 = document.querySelector('.w3d').getBoundingClientRect();
+        const pl = document.querySelector('.p4').getBoundingClientRect();
+        return {
+          cover: (Math.min(pl.bottom, w3.bottom) - Math.max(pl.top, w3.top)) / w3.height,
+          tf: getComputedStyle(document.querySelector('.w3d')).transform,
+        };
+      });
+      await p.waitForTimeout(1500);
+      const tf2 = await p.evaluate(() => getComputedStyle(document.querySelector('.w3d')).transform);
+      ok(op.cover > 0.5 && op.tf !== tf2, `${w}×${h}：开场的三层空间占下半屏画面区域的 ${(op.cover * 100) | 0}%，且在缓慢转动`, JSON.stringify([op, tf2]));
+      // Hooks：结论帧 = 卡片 + 四个钩子 + 第二张卡片，都完整在画面里
+      await atF(p, STOP[5]);
+      await p.waitForTimeout(320);
+      const hk = await p.evaluate(() => {
+        const world = document.querySelector('.world').getBoundingClientRect();
+        const leg = document.querySelector('.legend').getBoundingClientRect();
+        const names = ['hc', 'hkb', 'hkb-1', 'hkb-2', 'hkb-3', 'hc2', 'hkb-c'];
+        return names.map(n => {
+          const e = document.querySelector(`.world [data-w="${n}"]`);
+          const r = e.getBoundingClientRect();
+          return [n, +getComputedStyle(e).opacity, r.left >= world.left - 1 && r.right <= world.right + 1 && r.bottom <= leg.top + 4];
+        });
+      });
+      ok(
+        hk.every(x => x[1] > 0.99 && x[2]),
+        `${w}×${h}：Hooks 一幕的结论帧：卡片、useState、useEffect、useRef、自定义 Hook、第二张卡片和复制过去的钩子都完整可见，不压图例`,
+        JSON.stringify(hk),
+      );
+    }
+    await c.close();
+  }
+}
+for (const [w, h] of [
+  [1280, 800],
+  [1440, 900],
+  [1920, 1080],
+]) {
+  const p = await open({ w, h });
+  const bad = [];
+  let seen = 0;
+  for (let i = 0; i < 10; i++) {
+    await atF(p, STOP[i]);
+    await p.waitForTimeout(350);
+    const r = await p.evaluate(layoutProbe, i);
+    seen += r.nodes;
+    if (r.v.length) bad.push(i + ':' + r.v.slice(0, 3).join(','));
+  }
+  ok(!bad.length && seen > 50, `${w}×${h} 桌面：每幕文字区与画面节点留出间距，右侧幕进度点的竖条里没有画面里的字（共检查 ${seen} 个节点）`, bad.join(' ; '));
+  await p.ctx.close();
+}
+
 /* 9. 键盘：Tab 从头走，每个获得焦点的链接、按钮都看得见（不透明、在视口里） */
 {
   const p = await open({ seen: true });
@@ -1656,8 +1846,11 @@ if (process.env.HOME_SHOTS) {
     ['desktop', { w: 1440, h: 900 }],
     ['mobile', { w: 390, h: 844 }],
     ['mobile360', { w: 360, h: 640 }],
+    ['mobile412', { w: 412, h: 915 }],
+    ['mobile-wide390', { w: 390, h: 844, wide: true }],
   ]) {
     const p = await open(opts);
+    if (opts.wide) await p.addStyleTag({ content: '.story, .story * { letter-spacing: 0.06em !important; }' });
     for (const [i, f] of plan.entries()) {
       await atF(p, f);
       await p.waitForTimeout(600);

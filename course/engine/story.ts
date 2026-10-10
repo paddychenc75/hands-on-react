@@ -40,7 +40,7 @@ export const sceneOf = (f: number): number => {
   return i;
 };
 /** 每一幕的“结论帧”：这一幕的文字和画面都到位、下一幕的转场还没开始（秒）。收束幕是片尾 */
-export const STOP: number[] = MARKS.map((_m, i) => (i === MARKS.length - 1 ? TOTAL : MARKS[i + 1] - (i === 0 ? 1.0 : 0.85)));
+export const STOP: number[] = MARKS.map((_m, i) => (i === MARKS.length - 1 ? TOTAL : MARKS[i + 1] - (i === 0 ? 1.0 : i === 5 ? 0.55 : 0.85)));
 /** 每一幕的“起始帧”：从这里往下播就是这一幕的动画（文字已出现，上一幕的东西已退场） */
 export const START: number[] = MARKS.map((m, i) => (i === 0 ? 0 : m + 0.6));
 /** 影片时间 → 它属于哪一幕的“停靠区间”：结论帧之前的最后一幕（f 在第 k-1 幕结论帧之后、第 k 幕结论帧之前，就算第 k 幕） */
@@ -248,7 +248,11 @@ export function attach(root: HTMLElement): () => void {
     const r = (w3d || world).getBoundingClientRect();
     const narrow = narrowMQ.matches;
     // 三层空间旋转之后比平面大：留出余量；手机上只用画面区域（文字在它上面），横向尽量铺满
-    const ws = narrow ? Math.min((r.width / 1000) * 1.04, r.height / 500) : Math.min(r.width / 1340, r.height / 650);
+    // 桌面上画面夹在左边的文字区（约 560px）和右边的幕进度点（约 100px）之间，不压到它们
+    const ch = Number.parseFloat(getComputedStyle(root).getPropertyValue('--ch')) || 0;
+    const ws = narrow
+      ? Math.min((r.width / 1000) * 1.04, (world.getBoundingClientRect().height - ch - 30) / 500)
+      : Math.min((r.width - 660) / 880, r.height / 650, r.width / 1340);
     world.style.setProperty('--ws', ws.toFixed(4));
   };
 
@@ -434,7 +438,7 @@ export function attach(root: HTMLElement): () => void {
   function play(gesture = false) {
     if (!isDyn() || playing) return;
     cancelMotion();
-    if (curF >= TOTAL - 0.05) {
+    if (curF >= TOTAL - 0.05 || curF <= STOP[0] + 0.02) {
       setF(0);
       root.classList.remove('ended');
     }
@@ -943,7 +947,11 @@ export function attach(root: HTMLElement): () => void {
     const i = Number(location.hash.slice(-1));
     setF(i === 0 ? 0 : STOP[i]);
     rest();
-  } else setF(0);
+  } else {
+    // 马上要自动播放：从 0 开始（开场的线条一笔笔画出来）；不自动播放时停在开场的结论帧，别让人看一张空白的画面
+    const willAuto = isDyn() && !playedOnce && !location.hash && !document.hidden && !(window as unknown as { __storyNoAuto?: boolean }).__storyNoAuto;
+    setF(willAuto ? 0 : STOP[0]);
+  }
   // 测试钩子：只有测试页面设了 window.__storyTest 才会有。读音频状态、离线渲染整段配乐做检查
   if ((window as unknown as { __storyTest?: boolean }).__storyTest) {
     (window as unknown as { __storyHook?: unknown }).__storyHook = {

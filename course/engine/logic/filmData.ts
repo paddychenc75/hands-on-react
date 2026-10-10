@@ -110,8 +110,11 @@ export const CUE = {
   stallStart: M[4] + 1.0,
   smooth: M[4] + 4.0,
   /** 第 5 幕：卡片翻转、钩子挂上去 */
-  flip: M[5] + 1.0,
-  attach: M[5] + 2.35,
+  flip: M[5] + 0.65,
+  attach: M[5] + 1.3,
+  /** 第 5 幕：useEffect、useRef、自定义 Hook 依次挂上去（音高依次上行），然后自定义 Hook 被复制到第二张卡片 */
+  hooks: [M[5] + 1.6, M[5] + 1.9, M[5] + 2.2],
+  hookCopy: M[5] + 2.5,
   /** 第 6 幕：紧急更新插队；被打断的从头重来 */
   urgent: M[6] + 2.7,
   redo: M[6] + 4.5,
@@ -145,6 +148,8 @@ export function cueList(): CueRef[] {
   out.push(
     { name: 'flip', t: CUE.flip + 0.1, track: 'hc-in' },
     { name: 'attach', t: CUE.attach, track: 'hkb' },
+    ...CUE.hooks.map((t, j) => ({ name: 'hook-' + j, t, track: 'hkb-' + (j + 1) })),
+    { name: 'hook-copy', t: CUE.hookCopy, track: 'hkb-c' },
     { name: 'urgent', t: CUE.urgent, track: 'ur-Search' },
   );
   for (let i = 0; i < 3; i++) {
