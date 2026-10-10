@@ -15,7 +15,7 @@ const { ok, done } = checker();
 const SHOTS = path.join(ROOT, 'tests/screenshots');
 const ids = await lessonOrder();
 const TOKEN = 'ghp_ZZTESTMARKERTOKEN0123456789abcdef';
-const TOKEN_B = 'github_pat_ZZTESTMARKERTOKENB0123456789';
+const _TOKEN_B = 'github_pat_ZZTESTMARKERTOKENB0123456789';
 // 测试里把防抖、退避、心跳缩短；真实时长另有一组断言（见"真实时长"一节）。
 // SYNC_THROTTLE=4 node tests/e2e/sync.mjs 用 CDP 给每个页面降 CPU（模拟 GitHub 的 2 核 runner）；等待条件一律轮询到成立或超时（超时按降速倍数放大）
 const TUNE = { debounce: 250, maxWait: 500, pullAfter: 0, initialDelay: 100, backoff: 150, heartbeat: 500, periodic: 3000, leaseTtl: 3000 };
@@ -65,7 +65,7 @@ const doneIds = async p =>
     .sort();
 const cards = async p => (await prog(p)).__srs || {};
 const canon = v =>
-  JSON.stringify(v, (k, x) =>
+  JSON.stringify(v, (_k, x) =>
     x && typeof x === 'object' && !Array.isArray(x)
       ? Object.fromEntries(
           Object.keys(x)
@@ -95,7 +95,7 @@ async function enable(p, token = TOKEN) {
   await p.waitForSelector('.sync-result .sync-msg', { timeout: 20000 });
   return p.textContent('.sync-result .sync-msg');
 }
-const badgeState = p => p.getAttribute('.sync-badge', 'data-state').catch(() => null);
+const _badgeState = p => p.getAttribute('.sync-badge', 'data-state').catch(() => null);
 const foreground = async p => {
   await p.bringToFront();
   await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));

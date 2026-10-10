@@ -1169,7 +1169,7 @@ for (const [w, h] of [
       if (r.v.length) bad.push(i + ':' + r.v.slice(0, 3).join(','));
       if (!wideText && KEYS[i]) {
         const o = await p.evaluate(
-          ([keys, i]) => {
+          ([keys, _i]) => {
             const world = document.querySelector('.world').getBoundingClientRect();
             const w3 = document.querySelector('.w3d').getBoundingClientRect();
             const out = { out: [], fonts: [] };
@@ -1622,7 +1622,7 @@ for (const [w, h] of [
       await c.close();
     }
     {
-      const { c, pg } = await mk(paths['自动播放到结束后']);
+      const { c, pg } = await mk(paths.自动播放到结束后);
       const vis = await pg.evaluate(() => document.querySelector('.player .skip').checkVisibility({ checkVisibilityCSS: true }));
       ok(!vis, `${dn}：收束幕播完后，控制条里不再有“跳过”这个无用的按钮`);
       // 控制条里每个可见的按钮点一下都有效：重播、声音
