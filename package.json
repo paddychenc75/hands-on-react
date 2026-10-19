@@ -31,7 +31,7 @@
     "@biomejs/biome": "^2.5.15",
     "@hookform/resolvers": "5.9.1",
     "@rspress/core": "^2.0.23",
-    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-query": "5.104.3",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "esbuild": "0.28.2",
