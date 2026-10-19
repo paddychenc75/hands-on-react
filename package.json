@@ -44,7 +44,7 @@
     "react-runtime-19": "npm:react@19.3.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
-    "zod": "4.6.5",
+    "zod": "4.6.7",
     "zustand": "5.0.15"
   }
 }
